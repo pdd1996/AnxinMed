@@ -19,6 +19,10 @@ import type { AppEnv } from './types.js'
 import { ApiError } from './lib/http.js'
 import { resolveUser } from './middleware/resolveUser.js'
 import { healthHandler } from './routes/health.js'
+import { drugsRoute } from './routes/drugs.js'
+import { plansRoute } from './routes/plans.js'
+import { tasksRoute } from './routes/tasks.js'
+import { recordsRoute } from './routes/records.js'
 import { registerStubs } from './routes/_stubs.js'
 
 export const app = new Hono<AppEnv>()
@@ -40,7 +44,13 @@ app.get('/api/health', healthHandler)
 // 其余 /api/* 全部经 resolveUser 守卫（MVP 注入演示用户 p-001）
 app.use('/api/*', resolveUser)
 
-// T7–T9 路由骨架（501 占位；POST /api/records 挂真实 zValidator）
+// 真实业务路由（T7：药箱 / 计划 / 今日任务 / 服药记录）
+app.route('/api/drugs', drugsRoute)
+app.route('/api/plans', plansRoute)
+app.route('/api/tasks', tasksRoute)
+app.route('/api/records', recordsRoute)
+
+// 其余 M2/M3 路由骨架（501 占位）
 registerStubs(app)
 
 app.notFound((c) => c.json({ ok: false, code: ERR_CODES.NOT_FOUND, message: '路由不存在' }, 404))
