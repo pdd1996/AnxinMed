@@ -38,4 +38,12 @@ export default tseslint.config(
       'react-refresh/only-export-components': 'warn',
     },
   },
+  {
+    // shadcn/ui 组件（拷入仓库）会连同 variants 常量一起导出，react-refresh 的
+    // only-export-components 对其为误报；保持与上游一致，不为此改动组件源码。
+    files: ['packages/web/src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 )

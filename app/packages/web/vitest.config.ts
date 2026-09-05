@@ -1,10 +1,15 @@
 import { defineConfig } from 'vitest/config'
+import { fileURLToPath, URL } from 'node:url'
 
-// web 测试骨架（M1-T6）。当前无测试；
-// T8/T9 引入组件测试时把 environment 切为 'jsdom' 并加 @testing-library/react + jsdom 依赖。
+// web 测试（M1-T8 起）：jsdom 环境 + `@` 别名，支撑 @testing-library/react 组件/store 冒烟测试。
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   test: {
-    environment: 'node',
+    environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
   },
 })

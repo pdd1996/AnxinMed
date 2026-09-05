@@ -38,25 +38,28 @@ if (process.env.NODE_ENV === 'production') {
   app.use('/api/*', cors())
 }
 
-// 公开 infra 路由：健康检查在 resolveUser 之前，不依赖用户解析
-app.get('/api/health', healthHandler)
+// 单条链式表达式注册路由并导出 AppType（hc<AppType> 端到端类型推导，技术方案 §1）。
+// 顺序即语义：健康检查在 resolveUser 之前（公开），其余 /api/* 经守卫（MVP 注入演示用户 p-001）。
+// .get/.use/.route 运行时均返回同一 app 实例，故 export const app 与集成测试 app.request() 不受影响。
+const route = app
+  .get('/api/health', healthHandler)
+  .use('/api/*', resolveUser)
+  .route('/api/drugs', drugsRoute)
+  .route('/api/plans', plansRoute)
+  .route('/api/tasks', tasksRoute)
+  .route('/api/records', recordsRoute)
 
-// 其余 /api/* 全部经 resolveUser 守卫（MVP 注入演示用户 p-001）
-app.use('/api/*', resolveUser)
+/** RPC 类型出口：web 端 `import type { AppType } from '@anxin/api'` 获得端到端类型。 */
+export type AppType = typeof route
 
-// 真实业务路由（T7：药箱 / 计划 / 今日任务 / 服药记录）
-app.route('/api/drugs', drugsRoute)
-app.route('/api/plans', plansRoute)
-app.route('/api/tasks', tasksRoute)
-app.route('/api/records', recordsRoute)
-
-// 其余 M2/M3 路由骨架（501 占位）
+// 其余 M2/M3 路由骨架（501 占位，不进 AppType；web 本期不调用）。registerStubs 收基类 Hono<AppEnv>，故传 app。
 registerStubs(app)
 
-app.notFound((c) => c.json({ ok: false, code: ERR_CODES.NOT_FOUND, message: '路由不存在' }, 404))
+// notFound / onError 挂在 route（=== app 同一实例）上，令 route 作为值被使用（供 AppType 类型导出）。
+route.notFound((c) => c.json({ ok: false, code: ERR_CODES.NOT_FOUND, message: '路由不存在' }, 404))
 
 // 全局错误出口：统一 { ok:false, code, message }；日志不打用户数据（执行总纲 §0.5 / §3.2）
-app.onError((err, c) => {
+route.onError((err, c) => {
   if (err instanceof ApiError) {
     return c.json({ ok: false, code: err.code, message: err.message }, err.status)
   }

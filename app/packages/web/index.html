@@ -1,9 +1,17 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-scale="normal">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>安心用药</title>
+    <script>
+      // 首屏前应用已持久化的字号档，避免大字用户刷新时闪烁（zustand persist: anxin-font-scale）。
+      try {
+        var s = JSON.parse(localStorage.getItem('anxin-font-scale') || '{}')
+        var scale = (s && s.state && s.state.scale) || 'normal'
+        document.documentElement.setAttribute('data-scale', scale)
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -6,10 +6,10 @@ import type { AppEnv } from '../types.js'
 import { okJson } from '../lib/http.js'
 import * as tasksService from '../services/tasks.service.js'
 
+// 链式定义（供 AppType 类型累积；handler 体不变）。
 export const tasksRoute = new Hono<AppEnv>()
-
-tasksRoute.get('/today', async (c) => {
-  const date = c.req.query('date') || undefined
-  const result = await tasksService.getTodayTasks(c.get('user').id, date)
-  return okJson(c, result)
-})
+  .get('/today', async (c) => {
+    const date = c.req.query('date') || undefined
+    const result = await tasksService.getTodayTasks(c.get('user').id, date)
+    return okJson(c, result)
+  })

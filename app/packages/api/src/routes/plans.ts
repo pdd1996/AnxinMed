@@ -7,27 +7,24 @@ import type { AppEnv } from '../types.js'
 import { vJson, okJson, ApiError } from '../lib/http.js'
 import * as plansService from '../services/plans.service.js'
 
+// 链式定义（供 AppType 类型累积；handler 体不变）。
 export const plansRoute = new Hono<AppEnv>()
-
-plansRoute.get('/', async (c) => {
-  const drugId = c.req.query('drugId') || undefined
-  const items = await plansService.listPlans(c.get('user').id, drugId)
-  return okJson(c, { items })
-})
-
-plansRoute.post('/', vJson(PlanCreateSchema), async (c) => {
-  const plan = await plansService.createPlan(c.get('user').id, c.req.valid('json'))
-  return okJson(c, { plan }, 201)
-})
-
-plansRoute.patch('/:id', vJson(PlanPatchSchema), async (c) => {
-  const plan = await plansService.patchPlan(c.get('user').id, c.req.param('id'), c.req.valid('json'))
-  if (!plan) throw new ApiError(404, ERR_CODES.NOT_FOUND, '计划不存在')
-  return okJson(c, { plan })
-})
-
-plansRoute.delete('/:id', async (c) => {
-  const ok = await plansService.deletePlan(c.get('user').id, c.req.param('id'))
-  if (!ok) throw new ApiError(404, ERR_CODES.NOT_FOUND, '计划不存在')
-  return okJson(c, {})
-})
+  .get('/', async (c) => {
+    const drugId = c.req.query('drugId') || undefined
+    const items = await plansService.listPlans(c.get('user').id, drugId)
+    return okJson(c, { items })
+  })
+  .post('/', vJson(PlanCreateSchema), async (c) => {
+    const plan = await plansService.createPlan(c.get('user').id, c.req.valid('json'))
+    return okJson(c, { plan }, 201)
+  })
+  .patch('/:id', vJson(PlanPatchSchema), async (c) => {
+    const plan = await plansService.patchPlan(c.get('user').id, c.req.param('id'), c.req.valid('json'))
+    if (!plan) throw new ApiError(404, ERR_CODES.NOT_FOUND, '计划不存在')
+    return okJson(c, { plan })
+  })
+  .delete('/:id', async (c) => {
+    const ok = await plansService.deletePlan(c.get('user').id, c.req.param('id'))
+    if (!ok) throw new ApiError(404, ERR_CODES.NOT_FOUND, '计划不存在')
+    return okJson(c, {})
+  })

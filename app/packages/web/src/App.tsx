@@ -1,17 +1,25 @@
-import { APP_NAME } from '@anxin/shared'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { RouterProvider } from 'react-router'
+import { Toaster } from '@/components/ui/sonner'
+import { FontScaleSync } from '@/components/layout/FontScaleSync'
+import { router } from '@/router'
+
+// 服务端数据全走 TanStack Query（技术方案 §8）；UI 状态走 zustand（stores/）。
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false },
+  },
+})
 
 /**
- * M1-T2 脚手架占位页：验证 @anxin/shared 跨包导入 + Vite 对 shared 源码的转译。
- * M1-T8 起用 react-router + shadcn/ui + 老年向设计令牌重写为真实路由骨架。
+ * 应用外壳（M1-T8）：TanStack Query + 路由 + 字号档同步 + 全局错误 toast（sonner）。
  */
 export default function App() {
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem', lineHeight: 1.7 }}>
-      <h1>{APP_NAME}</h1>
-      <p>M1-T2 前端脚手架已就绪：Vite + React 19 + TypeScript。</p>
-      <p>
-        跨包导入验证：<code>@anxin/shared</code> → <code>APP_NAME = "{APP_NAME}"</code> ✅
-      </p>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <FontScaleSync />
+      <RouterProvider router={router} />
+      <Toaster position="top-center" richColors />
+    </QueryClientProvider>
   )
 }
