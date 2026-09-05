@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -11,13 +12,16 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@anxin/shared": "workspace:*",
     "drizzle-orm": "^0.44.2",
     "postgres": "^3.4.5",
     "dotenv": "^17.4.2"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "drizzle-kit": "^0.31.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
   }
 }

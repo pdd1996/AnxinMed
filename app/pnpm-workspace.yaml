@@ -1,0 +1,9 @@
+packages:
+  - 'packages/*'
+
+# pnpm 10+ 默认拦截依赖的构建脚本；esbuild（vite / tsx 的底层）需显式放行才能装好平台二进制。
+# 注意：pnpm 11 起该设置从 package.json 的 "pnpm" 字段迁到此处（pnpm-workspace.yaml）。
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true
