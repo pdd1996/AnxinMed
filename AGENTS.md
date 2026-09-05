@@ -12,9 +12,10 @@
 ```
 AnxinMed/
 ├── app/      # 正式工程（当前仅有 packages/api：三库 schema + 迁移 + seed；M1 起补 pnpm workspace / web / shared）
+├── data/     # 说明书数据整理区（crawled 草稿 + 总账 + 入库台账，git 版本化；人工核对后升 reviewed）
 ├── demo/     # 可运行的演示应用 —— 迁移参照物，只读，不再演进
 ├── docs/     # 真相源文档（PRD / ADR / 技术方案 / 任务书）
-└── tools/    # 辅助工具（drug-crawler，规划中）
+└── tools/    # 辅助工具（drug-crawler 说明书爬虫）
 ```
 
 ## 真相源与执行顺序
