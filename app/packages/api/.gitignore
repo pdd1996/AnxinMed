@@ -1,3 +1,5 @@
 node_modules/
 .env
-drizzle/meta/
+
+# drizzle/meta/ 必须入库：_journal.json + snapshot 是 drizzle-kit generate/migrate 的依据，
+# 缺失会导致全新克隆 / CI / docker 无法生成或应用迁移（M1-T3 修正原忽略）。
