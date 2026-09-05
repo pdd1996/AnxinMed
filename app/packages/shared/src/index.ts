@@ -1,11 +1,16 @@
 /**
  * @anxin/shared —— 前后端一份真相（执行总纲 §3.1）。
  *
- * 包边界：shared 不依赖任何其他包；api 与 web 都只依赖 shared。
- * M1-T2：建立骨架（占位导出，验证跨包链接与 Vite/tsx 对 shared 源码的转译）。
- * M1-T4：填入领域类型 / 枚举 / 常量 / zod schema / 纯函数
- *         （底本 demo/src/types.ts + demo/src/lib.ts，按总纲 §2.5 对齐目标枚举）。
+ * 包边界：shared 不依赖任何其他包；api 与 web 都只依赖 shared（web 不直接 import api 的代码）。
+ * 内容：领域枚举 / 元数据 / 纯函数 / DTO 与白名单 zod schema / 错误码。
+ * M1-T4 立契约；后续里程碑在此扩充，禁止把领域真相散落到 api/web。
  */
 
-/** 产品名。占位导出，用于 T2 验证 api/web 跨包导入链路；T4 起补充领域契约。 */
+/** 产品名。 */
 export const APP_NAME = '安心用药'
+
+export * from './enums.js'
+export * from './lib.js'
+export * from './errors.js'
+export * from './dto.js'
+export * from './whitelist.js'
