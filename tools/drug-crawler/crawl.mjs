@@ -26,7 +26,7 @@ const DELAY_MS = 1800
 
 const WALL_MARK = '请登录后继续访问'
 
-// ── 页面上下文中执行的提取函数（与 docs/data-curation 批次所用逻辑一致）──
+// ── 页面上下文中执行的提取函数（与 data/crawled 批次所用逻辑一致）──
 async function searchFn(keyword) {
   const r = await fetch('/pc/search?keyword=' + encodeURIComponent(keyword) + '&type=drug', { credentials: 'include' })
   const html = await r.text()

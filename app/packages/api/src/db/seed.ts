@@ -16,6 +16,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const mockDataPath = join(__dirname, '..', '..', '..', '..', '..', 'demo', 'server', 'mock-data.json')
 
 async function seed() {
+  console.log('⚠️  本脚本导入 demo/server/mock-data.json 演示基线（含虚构说明书内容），仅用于建库基线与演示。')
+  console.log('    需要纯净真实数据时：seed 后运行 pnpm run db:audit --purge-mock --confirm 清理演示行。\n')
   console.log('📖 读取 mock-data.json …')
   const raw = readFileSync(mockDataPath, 'utf8')
   const data = JSON.parse(raw)
