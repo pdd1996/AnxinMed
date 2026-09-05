@@ -19,7 +19,7 @@ import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date } from
 // drug_master · 药品身份库
 // ---------------------------------------------------------------------------
 export const drugMaster = pgTable('drug_master', {
-  id: text('id').primaryKey(),                        // 条目 ID，如 mock-hycosan-01
+  id: text('id').primaryKey(),                        // 条目 ID，如 drug-hycosan-01
 
   // ── 身份快照（NMPA 对齐）──
   genericName: text('generic_name').notNull(),           // 通用名
