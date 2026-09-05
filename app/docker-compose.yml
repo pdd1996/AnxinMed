@@ -1,0 +1,25 @@
+# 安心用药 · 数据库基础设施（方案 C：仅 DB 层，后续 scaffold 复用）
+# 使用：docker compose up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: anxin-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: anxin
+      POSTGRES_PASSWORD: anxin_dev_2026
+      POSTGRES_DB: anxin_medication
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anxin -d anxin_medication"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:

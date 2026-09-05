@@ -1,0 +1,23 @@
+{
+  "name": "@anxin/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.2",
+    "postgres": "^3.4.5",
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}
