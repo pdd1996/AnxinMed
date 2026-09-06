@@ -44,6 +44,10 @@ export type SourceType = z.infer<typeof SourceTypeSchema>
 export const RiskLevelSchema = z.enum(['L1', 'L2', 'L3', 'L4'])
 export type RiskLevel = z.infer<typeof RiskLevelSchema>
 
+// ── 层检测标签（M2 入口校验；经 /api/intake/detect 传输，PRD §7.2 / V2.1 贴标降级）──
+export const LayerLabelSchema = z.enum(['处方层', '医院标签层', '药盒原装层', '说明书层', '不支持'])
+export type LayerLabel = z.infer<typeof LayerLabelSchema>
+
 // ── 剂量单位（stock / dose 的 unit）──
 export const DOSE_UNITS = ['滴', '片', '粒', '支', '袋', '喷', '丸'] as const
 export type DoseUnit = (typeof DOSE_UNITS)[number]
