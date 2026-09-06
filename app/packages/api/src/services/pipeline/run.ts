@@ -32,6 +32,15 @@ import {
   toDraftConflicts,
 } from './buildDraft.js'
 import type { Degraded, DraftPayload, Entry, PipelineContext } from './types.js'
+import { Stopwatch } from '../../lib/timing.js'
+
+/** 打点助手（M3-T5）：timing 缺省时直接执行——既有调用方/测试无感，向后兼容。 */
+async function phase<T>(timing: Stopwatch | undefined, name: string, fn: () => Promise<T>): Promise<T> {
+  return timing ? timing.measureAsync(name, fn) : fn()
+}
+function phaseSync<T>(timing: Stopwatch | undefined, name: string, fn: () => T): T {
+  return timing ? timing.measureSync(name, fn) : fn()
+}
 
 /** detect 结果（信息性，不抛错）。type 别名（非 interface）以满足 okJson 的 Record<string, unknown> 约束。 */
 export type DetectResult = {
@@ -104,23 +113,23 @@ export async function runPrescription(
   image: ImageInput,
   clients: AiClients,
   ctx: PipelineContext,
+  timing?: Stopwatch,
 ): Promise<DraftPayload[]> {
   // ① 层检测（硬闸门）+ 入口校验（不符 → 409 / 不支持 → 422）
-  const layers = await clients.detectLayers(image)
+  const layers = await phase(timing, 'detect', () => clients.detectLayers(image))
   assertLayersForEntry('A', layers)
 
   // 身份线与医嘱线并行（架构图「身份线（并行）」）：层校验通过即发起 VLM 提取，不阻塞 OCR/解析。
   // 错误暂存到汇合处再分流（AIUnavailable → identity=null 降级；其它 → 冒泡）；
   // catch 已挂载，降级早退路径不会产生未处理拒绝。
-  const identityTask = clients
-    .extractIdentity(image)
+  const identityTask = phase(timing, 'identity', () => clients.extractIdentity(image))
     .then((identity) => ({ identity: identity as IdentityFields | null, error: null as unknown }))
     .catch((error: unknown) => ({ identity: null as IdentityFields | null, error }))
 
   // ② OCR（失败 → 降级：全 needsManual 草稿，不 503）
   let ocr: OcrResult
   try {
-    ocr = await clients.runOcr(image)
+    ocr = await phase(timing, 'ocr', () => clients.runOcr(image))
   } catch (err) {
     if (err instanceof AIUnavailableError) {
       return [degradedDraft('A', layers, ERR_CODES.OCR_FAILED, 'OCR 服务不可用，请核对处方原文手动补全，或改用手动建档')]
@@ -129,7 +138,7 @@ export async function runPrescription(
   }
 
   // ③ 裁剪（无 Rp 锚点 → null → 降级）
-  const crop = cropBody(ocr)
+  const crop = phaseSync(timing, 'crop', () => cropBody(ocr))
   if (!crop) {
     return [
       degradedDraft('A', layers, ERR_CODES.PARSE_FAILED, '未定位到处方正文锚点（Rp / 处方完毕），请核对原文手动补全'),
@@ -140,16 +149,16 @@ export async function runPrescription(
   // 但医嘱线任何一步失败都不炸整体 → 转降级草稿（错误细节不入 payload，L3 不打原文）
   let parse: ParseResult
   try {
-    parse = parseWhitelist(ocrToText(ocr))
+    parse = phaseSync(timing, 'parse', () => parseWhitelist(ocrToText(ocr)))
   } catch {
     return [
       degradedDraft('A', layers, ERR_CODES.PARSE_FAILED, '处方解析失败，请核对原文手动补全，或改用手动建档'),
     ]
   }
   // ⑥ 兜底 + 回链（仅当有缺项；只发 L0 正文）
-  const fb = await resolveFallback(parse, crop.bodyText, clients)
+  const fb = await phase(timing, 'fallback', () => resolveFallback(parse, crop.bodyText, clients))
   // ⑤ L2 脱敏（作用于回链合并后的最终白名单，合并值不逃逸 L2）
-  const scanned = sanitizeScan(fb.whitelist)
+  const scanned = phaseSync(timing, 'sanitize', () => sanitizeScan(fb.whitelist))
   const whitelist = scanned.value
   const sanitizeAudit = scanned.audit
 
@@ -177,7 +186,7 @@ export async function runPrescription(
   const healthSuggestions = buildHealthSuggestions(whitelist)
 
   // ⑦ 逐条目装配 N 份草稿
-  return items.map((item, idx) => {
+  const drafts = phaseSync(timing, 'build', () => items.map((item, idx) => {
     const effIdentity = buildItemIdentity(identity, item)
     const match = matchDrugMaster(effIdentity, ctx.candidates)
     const masterId = match.status === 'unique' && match.match ? match.match.id : null
@@ -211,19 +220,25 @@ export async function runPrescription(
       dosageRange,
       degraded: null,
     } satisfies DraftPayload
-  })
+  }))
+  return drafts
 }
 
 /** 入口B 仅身份线 → 1 份建档草稿（药盒层永不提取用法用量；医院标签层 → labelNotice）。 */
-export async function runDrug(image: ImageInput, clients: AiClients, ctx: PipelineContext): Promise<DraftPayload> {
-  const layers = await clients.detectLayers(image) // 硬闸门
+export async function runDrug(
+  image: ImageInput,
+  clients: AiClients,
+  ctx: PipelineContext,
+  timing?: Stopwatch,
+): Promise<DraftPayload> {
+  const layers = await phase(timing, 'detect', () => clients.detectLayers(image)) // 硬闸门
   assertLayersForEntry('B', layers)
   const labelNotice = layers.includes('医院标签层')
 
   let identity: IdentityFields | null = null
   let degraded: Degraded | null = null
   try {
-    identity = await clients.extractIdentity(image)
+    identity = await phase(timing, 'identity', () => clients.extractIdentity(image))
   } catch (err) {
     if (!(err instanceof AIUnavailableError)) throw err
     degraded = {
@@ -232,10 +247,12 @@ export async function runDrug(image: ImageInput, clients: AiClients, ctx: Pipeli
     }
   }
 
-  const match: MatchResult = identity ? matchDrugMaster(identity, ctx.candidates) : { status: 'no_match' }
-  const masterId = match.status === 'unique' && match.match ? match.match.id : null
-  const masterIds = [...new Set([...ctx.activeMasterIds, ...(masterId ? [masterId] : [])])]
-  const interactions = checkInteractions(masterIds, ctx.rules, ctx.drugNameById)
+  const { match, interactions } = phaseSync(timing, 'build', () => {
+    const m: MatchResult = identity ? matchDrugMaster(identity, ctx.candidates) : { status: 'no_match' }
+    const mid = m.status === 'unique' && m.match ? m.match.id : null
+    const mids = [...new Set([...ctx.activeMasterIds, ...(mid ? [mid] : [])])]
+    return { match: m, interactions: checkInteractions(mids, ctx.rules, ctx.drugNameById) }
+  })
   // 入口B 无用法用量 → 不做范围校验（专用文案；复用 checkDosageRange 的「说明书未收录」note 会误导）
   const dosageRange: DosageRangeResult = {
     status: 'none',

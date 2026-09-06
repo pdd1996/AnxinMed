@@ -21,6 +21,7 @@
     "db:seed-drafts": "tsx src/db/seed-drafts-demo.ts",
     "db:import-crawled": "tsx src/db/import-crawled.ts",
     "db:audit": "tsx src/db/data-audit.ts",
+    "perf:intake": "tsx src/scripts/perf-intake.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

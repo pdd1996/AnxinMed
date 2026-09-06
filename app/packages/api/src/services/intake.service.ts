@@ -9,6 +9,7 @@ import { isPlanActiveOn, todayStr, ERR_CODES } from '@anxin/shared'
 import { AIUnavailableError, type AiClients, type ImageInput } from '../lib/ai/types.js'
 import { ApiError } from '../lib/http.js'
 import { newId } from '../lib/util.js'
+import { Stopwatch, type TimingSummary } from '../lib/timing.js'
 import * as assetsRepo from '../repositories/assets.repo.js'
 import * as drugsRepo from '../repositories/drugs.repo.js'
 import * as plansRepo from '../repositories/plans.repo.js'
@@ -46,6 +47,15 @@ function rethrowMapped(err: unknown): never {
     throw new ApiError(503, ERR_CODES.AI_UNAVAILABLE, '识别服务暂不可用，请稍后重试，或改用「手动建档」录入')
   }
   throw err
+}
+
+/**
+ * 结构化打点日志（M3-T5 · spec §T5.1）：单行 JSON，含入口/草稿数/总墙钟/各阶段耗时。
+ * 不含用户数据/原文（执行总纲 §0.5）；测试环境静默（避免噪音），dev/prod 恒输出供 P50/P95 采样。
+ */
+function logIntakeTiming(entry: 'A' | 'B', summary: TimingSummary, drafts: number): void {
+  if (process.env.NODE_ENV === 'test') return
+  console.log(`[intake:timing] ${JSON.stringify({ entry, drafts, ...summary })}`)
 }
 
 /** 组管线上下文：drug_master 候选 / 规则 / 说明书切片 / 用户现有生效计划的 masterIds（相互作用生效集合基线）。 */
@@ -120,26 +130,40 @@ export async function detect(image: ImageInput, clients: AiClients, entry?: Entr
   }
 }
 
-/** POST /api/intake/prescription：入口A 全管线 → N 份草稿落库。 */
-export async function intakePrescription(userId: string, image: ImageInput, clients: AiClients): Promise<IntakeResult> {
-  const ctx = await gatherContext(userId)
+/** POST /api/intake/prescription：入口A 全管线 → N 份草稿落库。timing 可注入（测量工具），缺省自建并落结构化日志。 */
+export async function intakePrescription(
+  userId: string,
+  image: ImageInput,
+  clients: AiClients,
+  timing: Stopwatch = new Stopwatch(),
+): Promise<IntakeResult> {
+  const ctx = await timing.measureAsync('gatherContext', () => gatherContext(userId))
   let payloads: DraftPayload[]
   try {
-    payloads = await runPrescription(image, clients, ctx)
+    payloads = await runPrescription(image, clients, ctx, timing)
   } catch (err) {
     rethrowMapped(err)
   }
-  return persistDrafts(userId, payloads)
+  const result = await timing.measureAsync('persist', () => persistDrafts(userId, payloads))
+  logIntakeTiming('A', timing.summarize(), result.drafts.length)
+  return result
 }
 
-/** POST /api/intake/drug：入口B 仅身份线 → 1 份建档草稿落库。 */
-export async function intakeDrug(userId: string, image: ImageInput, clients: AiClients): Promise<IntakeResult> {
-  const ctx = await gatherContext(userId)
+/** POST /api/intake/drug：入口B 仅身份线 → 1 份建档草稿落库。timing 可注入（测量工具），缺省自建并落结构化日志。 */
+export async function intakeDrug(
+  userId: string,
+  image: ImageInput,
+  clients: AiClients,
+  timing: Stopwatch = new Stopwatch(),
+): Promise<IntakeResult> {
+  const ctx = await timing.measureAsync('gatherContext', () => gatherContext(userId))
   let payload: DraftPayload
   try {
-    payload = await runDrug(image, clients, ctx)
+    payload = await runDrug(image, clients, ctx, timing)
   } catch (err) {
     rethrowMapped(err)
   }
-  return persistDrafts(userId, [payload])
+  const result = await timing.measureAsync('persist', () => persistDrafts(userId, [payload]))
+  logIntakeTiming('B', timing.summarize(), result.drafts.length)
+  return result
 }
