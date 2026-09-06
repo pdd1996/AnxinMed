@@ -48,6 +48,35 @@ export interface IdentityFields {
 export type FallbackFields = Record<string, string>
 
 /**
+ * 咨询回答原始分区（Baichuan 输出，经 ConsultRawSectionsSchema safeParse）。
+ * 全字段可选：模型可能缺项，normalizeSections 内走 stripDosageAdvice + 兜底文案。
+ */
+export interface ConsultRawSections {
+  summary?: string
+  keyPoints?: string[]
+  risks?: string[]
+  nextAction?: string
+  warning?: string
+}
+
+/** 咨询 prompt 入参（services/consult/prompt.ts 组装；只含白名单文本，不含图像/PII）。 */
+export interface ConsultPromptPayload {
+  question: string
+  /** 药品身份快照（genericName/brandName/specification/form）+ manual 档标记。 */
+  drug: {
+    genericName: string
+    brandName: string | null
+    specification: string | null
+    form: string | null
+    isManual: boolean
+  }
+  /** 本次取用的说明书段落（label + version + text）。 */
+  section: { label: string; version: string | null; text: string }
+  /** 相互作用上下文渲染后的文本（已含「未覆盖 ≠ 无风险」提示）。 */
+  interactionsText: string
+}
+
+/**
  * 统一 AI 客户端接口。管线只依赖此接口，不直接 import 具体实现。
  * 每个方法失败时抛 AIUnavailableError（或经 zod safeParse 失败抛明确错误），由编排层转降级。
  */
@@ -60,4 +89,14 @@ export interface AiClients {
   runOcr(image: ImageInput): Promise<OcrResult>
   /** 兜底解析：仅当正则解析有缺项时触发；入参只含白名单文本。 */
   fallbackParse(bodyText: string, missingFields: string[]): Promise<FallbackFields>
+  /**
+   * 咨询回答（M3-T1）：本地说明书 + 相互作用上下文 → 结构化回答。
+   * 输出必过 ConsultRawSectionsSchema safeParse；非法抛 AIUnavailableError。
+   */
+  consultAnswer(payload: ConsultPromptPayload): Promise<ConsultRawSections>
+  /**
+   * 医疗搜索兜底（M3-T1 · PRD §7.5，默认关）：仅当 ENABLE_MEDICAL_SEARCH=true 且本地未命中时触发。
+   * 未实现时抛 AIUnavailableError（上层转 no-source 降级）。
+   */
+  medicalSearch?(question: string, drugName: string): Promise<ConsultRawSections>
 }

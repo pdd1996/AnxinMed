@@ -247,3 +247,69 @@ export const drafts = pgTable('drafts', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+// ===========================================================================
+// 咨询与风险留痕（M3-T1 · PRD §7.5）——AI 咨询服务的两张只写表
+// 医生端洞察（M3-T3）消费本组表出「风险事件流」「咨询历史摘要」，故 T1 就落表结构。
+// 不变式：
+//   1) question / detail 落库前经 sanitizeScan / redactForLog（L3 出口约束），永不带原文 PII；
+//   2) 一次咨询 = 一行 consult_logs；若被守门拦截（L4/L3/manual-gate），额外一行 risk_events；
+//   3) L1/L2 正常回答不进 risk_events（不算风险事件）；只 L3/L4 与 manual-gate 触发。
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// consult_logs · 咨询历史留痕（每次 POST /api/consult 一行）
+// 用途：医生端「咨询历史摘要」读库（M3-T3）+ 用户端「最近咨询」自查
+// ---------------------------------------------------------------------------
+export const consultLogs = pgTable('consult_logs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),                     // → users.id（应用层过滤）
+  question: text('question').notNull(),                  // 用户提问，落库前过 scrubWithPatterns（L3 出口）
+  drugIds: jsonb('drug_ids'),                            // string[]：咨询涉及的 drugs.id（用户域）；空数组表示无药上下文
+  riskLevel: varchar('risk_level', { enum: ['L1', 'L2', 'L3', 'L4'] }).notNull(),
+  /**
+   * 咨询结果状态（守门与生成路径的联合出口）：
+   *   answered       L1 正常回答（LLM 或降级规则拼装）
+   *   limited        L2 剂量过滤后回答（stripDosageAdvice 触发）
+   *   refused        L3 拒答（停药/换药/剂量调整）
+   *   emergency      L4 紧急信号（引导急救）
+   *   manual-gate    manual 档药品拒绝进入个体化解释（接口层拒绝）
+   *   no-source      本地说明书库未命中（且医疗搜索默认关）
+   *   ai-unavailable Baichuan 不可用 → 502/降级
+   */
+  status: varchar('status', {
+    enum: ['answered', 'limited', 'refused', 'emergency', 'manual-gate', 'no-source', 'ai-unavailable'],
+  }).notNull(),
+  /** 被拦截的档位（answered/limited 为 null）；供医生端「咨询被拦截 N 次」快速过滤。 */
+  blockedAt: varchar('blocked_at', { enum: ['L4', 'L3', 'manual-gate'] }),
+  notice: text('notice'),                                // L2 过滤提示 / no-source 兜底提示 / l0Notice（manual 档）
+  citations: jsonb('citations'),                         // Citation[]：{ drugName, source, version } 三件套（PRD §7.5）
+  sectionsSnapshot: jsonb('sections_snapshot'),          // 结构化回答快照（summary/keyPoints/risks/nextAction/warning），供 M3-T3 摘要引用
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// ---------------------------------------------------------------------------
+// risk_events · 风险事件流（L4/L3/manual-gate 触发；一次拦截 = 一行）
+// 用途：医生端「风险事件流」（M3-T3）按 level/type 聚合，L4 红/L3 橙
+// ---------------------------------------------------------------------------
+export const riskEvents = pgTable('risk_events', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),                     // → users.id
+  /** 事件级别：L4 紧急 / L3 拒答 / manual-gate（药品未经 OCR 确认，拒绝个体化解释） */
+  level: varchar('level', { enum: ['L4', 'L3', 'manual-gate'] }).notNull(),
+  /** 事件类型（细分口径，供医生端聚合）：
+   *   emergency        L4 命中紧急关键词
+   *   refused          L3 命中停/换药/剂量调整
+   *   manual-blocked   manual 档药品被接口层拒绝
+   */
+  type: varchar('type', { enum: ['emergency', 'refused', 'manual-blocked'] }).notNull(),
+  drugId: text('drug_id'),                               // → drugs.id（触发拦截的咨询对象，可空）
+  consultLogId: text('consult_log_id'),                  // → consult_logs.id（同次咨询）
+  detail: jsonb('detail'),                               // { matchedKeyword?, questionRedacted } 命中关键词 + 脱敏后问题片段（L3 出口）
+  occurredAt: timestamp('occurred_at').defaultNow().notNull(),  // 事件发生时间（前端按此排序）
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})

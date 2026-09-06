@@ -12,7 +12,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { LayerLabel } from '@anxin/shared'
-import { AIUnavailableError, type AiClients, type FallbackFields, type IdentityFields, type ImageInput, type OcrResult } from './types.js'
+import {
+  AIUnavailableError,
+  type AiClients,
+  type ConsultPromptPayload,
+  type ConsultRawSections,
+  type FallbackFields,
+  type IdentityFields,
+  type ImageInput,
+  type OcrResult,
+} from './types.js'
 import { currentScenario } from './scenario.js'
 
 /** 单个场景的录制包（模型 I/O 冻结件）。 */
@@ -24,6 +33,10 @@ export interface FixturePack {
   extractIdentity: IdentityFields | null
   runOcr: OcrResult | null
   fallbackParse: FallbackFields | null
+  /** M3-T1 咨询回答录制（可选：M2 fixture 包无此字段，走咨询路径明确抛错，不静默通过）。 */
+  consultAnswer?: ConsultRawSections | null
+  /** M3-T1 医疗搜索兜底录制（可选）。 */
+  medicalSearch?: ConsultRawSections | null
 }
 
 /** app/e2e/fixtures（从本文件 app/packages/api/src/lib/ai/ 上溯 5 级到 app/）。 */
@@ -49,10 +62,21 @@ export interface AiCallCounts {
   runOcr: number
   extractIdentity: number
   fallbackParse: number
+  consultAnswer: number
+  medicalSearch: number
 }
 const callLog = new Map<string, AiCallCounts>()
 export function aiCallLog(scenario: string): AiCallCounts {
-  return callLog.get(scenario) ?? { detectLayers: 0, runOcr: 0, extractIdentity: 0, fallbackParse: 0 }
+  return (
+    callLog.get(scenario) ?? {
+      detectLayers: 0,
+      runOcr: 0,
+      extractIdentity: 0,
+      fallbackParse: 0,
+      consultAnswer: 0,
+      medicalSearch: 0,
+    }
+  )
 }
 function bump(scenario: string, method: keyof AiCallCounts) {
   const cur = aiCallLog(scenario)
@@ -84,5 +108,20 @@ export class FixtureAiClients implements AiClients {
     const s = currentScenario()
     bump(s, 'fallbackParse')
     return loadPack(s).fallbackParse ?? {}
+  }
+  async consultAnswer(_payload: ConsultPromptPayload): Promise<ConsultRawSections> {
+    const s = currentScenario()
+    bump(s, 'consultAnswer')
+    const raw = loadPack(s).consultAnswer
+    // M2 fixture 包无此字段 → 明确抛错（不静默通过）；M3 咨询 E2E 录制时补上即可回放。
+    if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无咨询回答录制`)
+    return raw
+  }
+  async medicalSearch(_question: string, _drugName: string): Promise<ConsultRawSections> {
+    const s = currentScenario()
+    bump(s, 'medicalSearch')
+    const raw = loadPack(s).medicalSearch
+    if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无医疗搜索录制`)
+    return raw
   }
 }

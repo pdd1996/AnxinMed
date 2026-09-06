@@ -92,3 +92,18 @@ export const ProfilePatchSchema = z.object({
   deletes: z.array(z.string().min(1)).optional(),
 })
 export type ProfilePatch = z.infer<typeof ProfilePatchSchema>
+
+// ── AI 咨询（M3-T1 · PRD §7.5）──
+
+/**
+ * POST /api/consult：围绕已确认药品提问。
+ *
+ * drugIds 允许为空数组：L4 紧急信号（胸痛/急救词）与 L3 拒答（停药/换药/剂量）
+ * 可在无药上下文时触发（用户可能直接打「我胸痛」）；L1/L2/manual-gate/no-source
+ * 路径要求至少一个已确认药品（service 层校验）。
+ */
+export const ConsultRequestSchema = z.object({
+  question: z.string().trim().min(1, '请输入咨询问题').max(2000),
+  drugIds: z.array(z.string().min(1)).default([]),
+})
+export type ConsultRequest = z.infer<typeof ConsultRequestSchema>

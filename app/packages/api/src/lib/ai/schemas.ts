@@ -32,3 +32,16 @@ export const OcrResultSchema = z.object({
 
 /** 兜底解析：字段键 → 值（后续须过回链校验才可用）。 */
 export const FallbackParseSchema = z.record(z.string())
+
+/**
+ * 咨询回答（M3-T1）：LLM 输出的结构化分区。
+ * 全部字段可选（模型可能缺项），normalizeSections 内走 stripDosageAdvice + 兜底文案。
+ * ⚠️ 模型输出必过本 schema safeParse（执行总纲 §3.2.3）；非法输出抛 AIUnavailableError，不猜。
+ */
+export const ConsultRawSectionsSchema = z.object({
+  summary: z.string().optional(),
+  keyPoints: z.array(z.string()).optional(),
+  risks: z.array(z.string()).optional(),
+  nextAction: z.string().optional(),
+  warning: z.string().optional(),
+})

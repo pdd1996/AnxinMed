@@ -10,6 +10,7 @@ import {
   PlanSourceSchema,
   PlanStatusSchema,
   RecordStatusSchema,
+  RiskLevelSchema,
   SourceTypeSchema,
   TagKindSchema,
 } from './enums.js'
@@ -108,3 +109,63 @@ export const SourceDTO = z.object({
   sanitizeAudit: z.record(z.number()).nullish(),
 })
 export type SourceDTOType = z.infer<typeof SourceDTO>
+
+// ── AI 咨询响应（M3-T1 · PRD §7.5）──
+
+/**
+ * 咨询结果状态（守门与生成路径的联合出口，与 consult_logs.status 枚举一致）：
+ *   answered        L1 正常回答
+ *   limited         L2 剂量过滤后回答
+ *   refused         L3 拒答（停药/换药/剂量调整）
+ *   emergency       L4 紧急信号（引导急救）
+ *   manual-gate     manual 档药品拒绝个体化解释（仅可 L0 资料查询）
+ *   no-source       本地说明书库未命中（且医疗搜索默认关）
+ *   ai-unavailable  Baichuan 不可用 → 降级
+ */
+export const ConsultStatusSchema = z.enum([
+  'answered',
+  'limited',
+  'refused',
+  'emergency',
+  'manual-gate',
+  'no-source',
+  'ai-unavailable',
+])
+export type ConsultStatus = z.infer<typeof ConsultStatusSchema>
+
+/** 结构化回答分区（前端分段展示，避免一大块文字）。 */
+export const ConsultSectionsSchema = z.object({
+  summary: z.string(),
+  keyPoints: z.array(z.string()),
+  risks: z.array(z.string()),
+  nextAction: z.string(),
+  warning: z.string(),
+})
+export type ConsultSections = z.infer<typeof ConsultSectionsSchema>
+
+/** 引用三件套（PRD §7.5）：药名 + 来源 + 版本（本地说明书库或网络检索兜底）。 */
+export const CitationSchema = z.object({
+  drugName: z.string(),
+  source: z.string(),
+  version: z.string(),
+  /** 兜底网络检索时为 true；前端渲染「未经本库核实」徐章。 */
+  unverified: z.boolean().optional(),
+})
+export type Citation = z.infer<typeof CitationSchema>
+
+/**
+ * POST /api/consult 响应体。
+ * - `answer` 为 `sections.summary` 的别名（方便前端直接取一句话）；
+ * - `blocked=true` 时 `sections` 仅包含守门固定文案（不是 LLM 生成），前端可隐藏「下一步」以外的建议内容。
+ */
+export const ConsultResponseSchema = z.object({
+  riskLevel: RiskLevelSchema,
+  status: ConsultStatusSchema,
+  answer: z.string(),
+  sections: ConsultSectionsSchema.nullish(),
+  citations: z.array(CitationSchema).default([]),
+  notice: z.string().nullish(),
+  l0Notice: z.string().nullish(),
+  blocked: z.boolean().default(false),
+})
+export type ConsultResponse = z.infer<typeof ConsultResponseSchema>

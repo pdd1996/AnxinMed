@@ -1,10 +1,15 @@
 /**
- * Baichuan-M3-Plus 客户端（M2-T1）：仅用于「兜底解析」（正则解析有缺项时触发；咨询在 M3 强化）。
+ * Baichuan-M3-Plus 客户端（M2-T1 兜底解析 + M3-T1 咨询回答/医疗搜索）。
  * 发给模型的内容只含 L0 裁剪后的白名单文本（不含图像/PII 之外内容），由请求体组装单测保证。
  */
-import { AIUnavailableError, type FallbackFields } from './types.js'
+import {
+  AIUnavailableError,
+  type ConsultPromptPayload,
+  type ConsultRawSections,
+  type FallbackFields,
+} from './types.js'
 import { callJson, extractChatContent, parseModelJson, type ChatResponse } from './http.js'
-import { FallbackParseSchema } from './schemas.js'
+import { ConsultRawSectionsSchema, FallbackParseSchema } from './schemas.js'
 
 /** 兜底解析请求体（纯函数，可测）。只含白名单文本 + 缺项字段名，不含图像。 */
 export function buildFallbackParseRequest(bodyText: string, missingFields: string[]) {
@@ -38,6 +43,122 @@ export async function fallbackParse(bodyText: string, missingFields: string[]): 
   const parsed = FallbackParseSchema.safeParse(raw)
   if (!parsed.success) {
     throw new AIUnavailableError('baichuan', `兜底解析输出不符合约定：${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
+// ---------------------------------------------------------------------------
+// M3-T1：咨询回答（本地说明书 + 相互作用上下文 → 结构化回答）
+// ---------------------------------------------------------------------------
+
+/**
+ * 咨询回答请求体组装（纯函数，可测）：只含白名单文本（药品身份快照 + 说明书段落 + 相互作用渲染文本 + 用户问题）。
+ * 与 demo/server/index.js:1019-1050 等价，拆出为独立函数便于单测与 E2E fixture 回放。
+ */
+export function buildConsultRequest(payload: ConsultPromptPayload) {
+  const { question, drug, section, interactionsText } = payload
+  const content = `你是"安心用药"药品资料解释助手，基于已确认药品的本地说明书库回答问题。
+
+硬性规则：
+1. 只输出严格 JSON，禁止 Markdown、禁止 **粗体**、禁止 ^[1]^ 这类引用编号。
+2. 总字数控制在 150-250 个汉字。
+3. 不得给出具体剂量、频次、疗程数字，不得说"一日X片/每次X mg"。
+4. 不得诊断、开处方、建议停换药；不预测个体疗效（"对你效果如何"不回答）。
+5. 解释药理作用时使用通俗语言，说明"是什么、为什么这样用"。
+6. 只基于下方提供的说明书段落与相互作用资料回答，资料未覆盖的内容明确说明，不要编造。
+7. 不要结尾追问。
+
+JSON 格式：
+{"summary":"一句话直接回答","keyPoints":["最多3条"],"risks":["最多3条"],"nextAction":"下一步建议","warning":"不要自行调整处方的提示"}
+
+已确认药品：${drug.genericName}${drug.brandName ? `（${drug.brandName}）` : ''}；规格：${drug.specification || '未标注'}；剂型：${drug.form || '未标注'}。
+${drug.isManual ? '注意：该药品为用户手动建档（未经 OCR 确认），回答仅做一般性资料解释（L0），不得结合个体情况展开。' : ''}
+本次取用的说明书段落（${section.label}，版本 ${section.version || '未标注'}）：
+${section.text}
+
+${interactionsText}
+
+用户问题：${question}`
+
+  return {
+    model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
+    temperature: 0.1,
+    messages: [{ role: 'user' as const, content }],
+  }
+}
+
+/** 咨询回答：本地说明书 + 相互作用上下文 → 结构化分区。输出过 ConsultRawSectionsSchema safeParse。 */
+export async function consultAnswer(payload: ConsultPromptPayload): Promise<ConsultRawSections> {
+  const baseUrl = process.env.BAICHUAN_BASE_URL
+  const key = process.env.BAICHUAN_API_KEY
+  if (!baseUrl || !key) {
+    throw new AIUnavailableError('baichuan', '缺少 BAICHUAN_BASE_URL / BAICHUAN_API_KEY 配置')
+  }
+  const res = await callJson<ChatResponse>(
+    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildConsultRequest(payload)),
+    },
+    { client: 'baichuan' },
+  )
+  const raw = parseModelJson(extractChatContent(res, 'baichuan'), 'baichuan')
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('baichuan', `咨询回答输出不符合约定：${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
+/**
+ * 医疗搜索兜底请求体（纯函数，可测）：PRD §7.5，本地未命中且 ENABLE_MEDICAL_SEARCH=true 才触发。
+ * 明确标注"基于网络检索，未经本库核实"，且只做一般性资料解释。
+ */
+export function buildMedicalSearchRequest(question: string, drugName: string) {
+  const content = `你是"安心用药"医疗资料检索助手。本地说明书库未收录「${drugName}」，请基于网络检索结果回答用户问题。
+
+硬性规则：
+1. 只输出严格 JSON（格式同下），禁止 Markdown。
+2. 总字数 150-250 汉字。
+3. 不得给出具体剂量/频次/疗程数字。
+4. 不得诊断、开处方、建议停换药；不预测个体疗效。
+5. 明确标注"基于网络检索，未经本库核实"；只做一般性资料解释，不结合个体情况。
+6. 检索不到的内容明确说明"未检索到可靠资料"，不编造。
+
+JSON 格式：
+{"summary":"一句话直接回答","keyPoints":["最多3条"],"risks":["最多3条"],"nextAction":"下一步建议","warning":"不要自行调整处方的提示"}
+
+用户问题：${question}
+药品名：${drugName}`
+
+  return {
+    model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
+    temperature: 0.1,
+    messages: [{ role: 'user' as const, content }],
+  }
+}
+
+/** 医疗搜索兜底：未配置 BAICHUAN_API_KEY 或未实现时抛 AIUnavailableError，上层转 no-source 降级。 */
+export async function medicalSearch(question: string, drugName: string): Promise<ConsultRawSections> {
+  const baseUrl = process.env.BAICHUAN_BASE_URL
+  const key = process.env.BAICHUAN_API_KEY
+  if (!baseUrl || !key) {
+    throw new AIUnavailableError('baichuan', '医疗搜索兜底不可用：缺少 BAICHUAN_BASE_URL / BAICHUAN_API_KEY 配置')
+  }
+  const res = await callJson<ChatResponse>(
+    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildMedicalSearchRequest(question, drugName)),
+    },
+    { client: 'baichuan' },
+  )
+  const raw = parseModelJson(extractChatContent(res, 'baichuan'), 'baichuan')
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('baichuan', `医疗搜索输出不符合约定：${parsed.error.message}`)
   }
   return parsed.data
 }

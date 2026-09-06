@@ -1,17 +1,23 @@
 /**
- * 管线测试用的 AiClients mock 工厂（M2-T6）—— 非 .test.ts，不被 vitest 收集。
+ * 管线测试用的 AiClients mock 工厂（M2-T6 + M3-T1 咨询）—— 非 .test.ts，不被 vitest 收集。
  *
  * 提供：mkOcr（把多行文本渲染成字符级 OCR 结果，复用 sanitize-crop.test.ts 的布局约定）、
  * mockClients（按 overrides 造 AiClients，支持错误注入 + 调用计数，验证降级与「OCR 未调用」）。
+ *
+ * M3-T1 扩展：consultAnswer / medicalSearch 默认抛 AIUnavailableError（明确失败，不静默通过）；
+ * M2 管线测试不走咨询路径，故默认报错不影响现有测试；M3 咨询测试需显式 override。
  */
 import type { LayerLabel } from '@anxin/shared'
-import type {
-  AiClients,
-  FallbackFields,
-  IdentityFields,
-  ImageInput,
-  OcrChar,
-  OcrResult,
+import {
+  AIUnavailableError,
+  type AiClients,
+  type ConsultPromptPayload,
+  type ConsultRawSections,
+  type FallbackFields,
+  type IdentityFields,
+  type ImageInput,
+  type OcrChar,
+  type OcrResult,
 } from '../../lib/ai/types.js'
 
 /** 把多行文本渲染成字符级 OCR 结果：每行 y=行号×30，字符宽 16 高 20，行内 x 递增。 */
@@ -38,10 +44,19 @@ export interface AiCalls {
   runOcr: number
   extractIdentity: number
   fallbackParse: number
+  consultAnswer: number
+  medicalSearch: number
 }
 
 export function newCalls(): AiCalls {
-  return { detectLayers: 0, runOcr: 0, extractIdentity: 0, fallbackParse: 0 }
+  return {
+    detectLayers: 0,
+    runOcr: 0,
+    extractIdentity: 0,
+    fallbackParse: 0,
+    consultAnswer: 0,
+    medicalSearch: 0,
+  }
 }
 
 export interface MockOverrides {
@@ -49,10 +64,16 @@ export interface MockOverrides {
   ocr?: OcrResult
   identity?: IdentityFields
   fallback?: FallbackFields
+  /** M3-T1：咨询回答 override（未提供时默认抛 AIUnavailableError）。 */
+  consult?: ConsultRawSections
+  /** M3-T1：医疗搜索兜底 override。 */
+  medical?: ConsultRawSections
   detectLayersError?: Error
   runOcrError?: Error
   extractIdentityError?: Error
   fallbackError?: Error
+  consultAnswerError?: Error
+  medicalSearchError?: Error
   calls?: AiCalls
 }
 
@@ -79,6 +100,19 @@ export function mockClients(o: MockOverrides = {}): AiClients {
       calls.fallbackParse++
       if (o.fallbackError) throw o.fallbackError
       return o.fallback ?? {}
+    },
+    async consultAnswer(_payload: ConsultPromptPayload) {
+      calls.consultAnswer++
+      if (o.consultAnswerError) throw o.consultAnswerError
+      // 默认抛 AIUnavailableError：M2 管线测试不走咨询路径，如意外走到则明确失败（不静默通过）
+      if (!o.consult) throw new AIUnavailableError('baichuan', 'mock 未提供 consultAnswer override')
+      return o.consult
+    },
+    async medicalSearch(_question: string, _drugName: string) {
+      calls.medicalSearch++
+      if (o.medicalSearchError) throw o.medicalSearchError
+      if (!o.medical) throw new AIUnavailableError('baichuan', 'mock 未提供 medicalSearch override')
+      return o.medical
     },
   }
 }

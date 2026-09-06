@@ -1,10 +1,10 @@
 /**
- * 资产域数据访问（M2-T5）——drug_master / package_inserts / interaction_rules。
+ * 资产域数据访问（M2-T5 + M3-T1）——drug_master / package_inserts / interaction_rules。
  *
  * 资产域是 Mock 三库（write-once，与用户域分离，无 userId）；规则引擎（services/rules）为纯函数，
  * 由此仓储取数后经 plans.service 编排传入。字段裁剪到匹配/校验所需，避免把整库拖进内存。
  */
-import { eq, inArray } from 'drizzle-orm'
+import { eq, ilike, inArray } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { drugMaster, packageInserts, interactionRules } from '../db/schema.js'
 
@@ -83,4 +83,26 @@ export async function findDrugMasterNames(ids: string[]): Promise<Record<string,
     .from(drugMaster)
     .where(inArray(drugMaster.id, unique))
   return Object.fromEntries(rows.map((r) => [r.id, r.genericName]))
+}
+
+/**
+ * 按通用名模糊匹配说明书候选（M3-T1 · manual 档兜底路径）。
+ *
+ * 用途：手动建档药品（drugMasterId=null）仅可做 L0 资料查询，需按药名兜底命中说明书。
+ * SQL 层用 ilike 做子串初筛（MVP 精选库规模小，命中候选通常 ≤5 条）；
+ * 精筛（归一化双向子串 nameMatches）由 service 层完成，避免 repo 层依赖 service 纯函数。
+ *
+ * @param genericName 用户药箱的 genericName（drugs.genericName）
+ * @returns 候选说明书行（可能为空；service 层用 nameMatches 精筛取第一条）
+ */
+export async function listPackageInsertsByGenericNameLike(
+  genericName: string,
+): Promise<PackageInsertRow[]> {
+  const name = String(genericName ?? '').trim()
+  if (!name) return []
+  return db
+    .select()
+    .from(packageInserts)
+    .where(ilike(packageInserts.genericName, `%${name}%`))
+    .limit(5)
 }

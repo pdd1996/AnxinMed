@@ -91,6 +91,13 @@ function fakeClients(o: FakeOptions): AiClients {
     async fallbackParse() {
       return o.fallback ?? {}
     },
+    // M3-T1 扩展：seed 脚本不走咨询路径，默认抛错（明确失败，不静默通过）
+    async consultAnswer() {
+      throw new AIUnavailableError('baichuan', '演示 seed 不走咨询路径')
+    },
+    async medicalSearch() {
+      throw new AIUnavailableError('baichuan', '演示 seed 不走医疗搜索路径')
+    },
   }
 }
 
