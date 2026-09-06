@@ -3,7 +3,7 @@
  * 表上无 (user_id, field_key) 唯一约束，故 upsert 在应用层 select-then-write（MVP 单用户并发可忽略）。
  */
 import { and, eq } from 'drizzle-orm'
-import { db } from '../db/client.js'
+import { db, type Executor } from '../db/client.js'
 import { healthProfiles } from '../db/schema.js'
 
 export type HealthRow = typeof healthProfiles.$inferSelect
@@ -22,8 +22,8 @@ export function listByUser(userId: string) {
     .orderBy(healthProfiles.createdAt)
 }
 
-export async function findByField(userId: string, fieldKey: string): Promise<HealthRow | undefined> {
-  const rows = await db
+export async function findByField(userId: string, fieldKey: string, exec: Executor = db): Promise<HealthRow | undefined> {
+  const rows = await exec
     .select()
     .from(healthProfiles)
     .where(and(eq(healthProfiles.userId, userId), eq(healthProfiles.fieldKey, fieldKey)))
@@ -31,8 +31,8 @@ export async function findByField(userId: string, fieldKey: string): Promise<Hea
   return rows[0]
 }
 
-export async function insertHealth(row: HealthInsert): Promise<HealthRow> {
-  const inserted = await db.insert(healthProfiles).values(row).returning()
+export async function insertHealth(row: HealthInsert, exec: Executor = db): Promise<HealthRow> {
+  const inserted = await exec.insert(healthProfiles).values(row).returning()
   return inserted[0]
 }
 
@@ -40,8 +40,9 @@ export async function updateHealth(
   userId: string,
   fieldKey: string,
   patch: { value?: string | null; sourceMeta?: HealthSourceMeta | null },
+  exec: Executor = db,
 ): Promise<HealthRow | undefined> {
-  const rows = await db
+  const rows = await exec
     .update(healthProfiles)
     .set({ ...patch, updatedAt: new Date() })
     .where(and(eq(healthProfiles.userId, userId), eq(healthProfiles.fieldKey, fieldKey)))

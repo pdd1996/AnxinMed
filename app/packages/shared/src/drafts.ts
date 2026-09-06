@@ -1,12 +1,12 @@
 /**
  * 录入草稿契约（M2-T6）—— 前后端一份真相。
  *
- * 覆盖：草稿枚举 / intake 请求体 / 计划草稿 / 冲突清单 / 健康建议。
+ * 覆盖：草稿枚举 / intake 请求体 / 计划草稿 / 冲突清单 / 健康建议 / confirm·reject 请求体。
  * `DraftPayload`（drafts.payload jsonb 的完整形态）是 api 侧 TS 接口（services/pipeline/types.ts），
  * 组合此处的子 schema + api 内部类型；GET /api/drafts/:id 的响应类型经 hc<AppType> 端到端推导给 web。
- * confirm/reject 请求体（DraftConfirmSchema/DraftRejectSchema）在 T6b 追加。
  */
 import { z } from 'zod'
+import { ConfirmStatusSchema, CycleTypeSchema } from './enums.js'
 import { DoseSchema, PlanTagsSchema } from './dto.js'
 
 // ── 草稿枚举 ──
@@ -92,3 +92,55 @@ export const HealthSuggestionSchema = z.object({
   source: z.string(),
 })
 export type HealthSuggestion = z.infer<typeof HealthSuggestionSchema>
+
+// ── 草稿确认 / 拒绝（确认页是唯一闸门；PRD §7.2.5）──
+// 客户端提交「已核对/已修正的最终决策」；追溯上下文（来源类型/白名单快照/裁剪引用/脱敏审计/确认留痕）
+// 由服务端从已存 drafts.payload 取，客户端无法伪造。医嘱字段如有修正，tags 标 'user'（§7.2.4）。
+
+/** 确认后的药品档案（用户核对/从冲突清单选候选/手填后的最终身份）。 */
+export const DraftConfirmDrugSchema = z.object({
+  genericName: z.string().min(1),
+  brandName: z.string().nullish(),
+  specification: z.string().nullish(),
+  form: z.string().nullish(),
+  manufacturer: z.string().nullish(),
+  /** 选中候选的 drug_master.id（唯一匹配/用户从冲突清单选定）；手动建档为 null。 */
+  drugMasterId: z.string().nullish(),
+  confirmStatus: ConfirmStatusSchema,
+  stock: DoseSchema.nullish(),
+  openedAt: z.string().nullish(),
+  expiry: z.string().nullish(),
+})
+export type DraftConfirmDrug = z.infer<typeof DraftConfirmDrugSchema>
+
+/** 确认后的计划（疗程三选一已在确认页落定，cycleType 不含 'pending'）；入口B 建档通常为 null。 */
+export const DraftConfirmPlanSchema = z.object({
+  dose: DoseSchema,
+  frequency: z.number().int().positive(),
+  times: z.array(z.string()).min(1),
+  route: z.string().nullish(),
+  meal: z.string().nullish(),
+  cycleType: CycleTypeSchema,
+  startDate: z.string().min(1),
+  endDate: z.string().nullish(),
+  /** 四类标注：用户修正的医嘱字段标 'user'；缺省则沿用草稿 planDraft.tags。 */
+  tags: PlanTagsSchema.nullish(),
+})
+export type DraftConfirmPlan = z.infer<typeof DraftConfirmPlanSchema>
+
+/** POST /api/drafts/:id/confirm：单事务原子写 drugs+plans+sources+health_profiles+drafts.status。 */
+export const DraftConfirmSchema = z.object({
+  drug: DraftConfirmDrugSchema,
+  plan: DraftConfirmPlanSchema.nullish(),
+  /** 健康信息勾选项（只写勾选的；PRD §7.1.2 入口二）。 */
+  health: z.array(z.object({ fieldKey: z.string().min(1), value: z.string().min(1) })).nullish(),
+  /** 确认方式（留痕）；缺省则服务端按 confirmStatus 推导。 */
+  method: z.string().nullish(),
+})
+export type DraftConfirm = z.infer<typeof DraftConfirmSchema>
+
+/** POST /api/drafts/:id/reject：信息不符 → status=rejected 留痕。 */
+export const DraftRejectSchema = z.object({
+  reason: z.string().nullish(),
+})
+export type DraftReject = z.infer<typeof DraftRejectSchema>

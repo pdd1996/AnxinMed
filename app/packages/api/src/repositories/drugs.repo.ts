@@ -2,7 +2,7 @@
  * drugs 药箱数据访问（Drizzle builder，全部 userId 过滤 —— 多用户边界，任务书 T7）。
  */
 import { and, desc, eq } from 'drizzle-orm'
-import { db } from '../db/client.js'
+import { db, type Executor } from '../db/client.js'
 import { drugs } from '../db/schema.js'
 
 export type DrugRow = typeof drugs.$inferSelect
@@ -17,8 +17,8 @@ export async function findDrug(userId: string, id: string): Promise<DrugRow | un
   return rows[0]
 }
 
-export async function insertDrug(row: DrugInsert): Promise<DrugRow> {
-  const inserted = await db.insert(drugs).values(row).returning()
+export async function insertDrug(row: DrugInsert, exec: Executor = db): Promise<DrugRow> {
+  const inserted = await exec.insert(drugs).values(row).returning()
   return inserted[0]
 }
 

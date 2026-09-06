@@ -3,7 +3,7 @@
  * 今日生效判定用 shared 的 isPlanActiveOn（在 tasks.service 内过滤），repo 只负责取数。
  */
 import { and, desc, eq } from 'drizzle-orm'
-import { db } from '../db/client.js'
+import { db, type Executor } from '../db/client.js'
 import { plans } from '../db/schema.js'
 
 export type PlanRow = typeof plans.$inferSelect
@@ -19,8 +19,8 @@ export async function findPlan(userId: string, id: string): Promise<PlanRow | un
   return rows[0]
 }
 
-export async function insertPlan(row: PlanInsert): Promise<PlanRow> {
-  const inserted = await db.insert(plans).values(row).returning()
+export async function insertPlan(row: PlanInsert, exec: Executor = db): Promise<PlanRow> {
+  const inserted = await exec.insert(plans).values(row).returning()
   return inserted[0]
 }
 
