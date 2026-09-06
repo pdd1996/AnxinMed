@@ -1,9 +1,9 @@
 {
-  "_readme": "安心用药 golden case 样张真相源（M2-T9/T10 共用，git 管理）。本文件是【唯一真相】：make-fixtures.py 据 lines/redact 渲染 PNG 样张；zero-leak.test.ts 据同一份 lines 生成 mock OCR 驱动真管线。二者永不漂移。",
+  "_readme": "安心用药 golden case 样张真相源（M2-T9/T10 共用，git 管理）。本文件是【唯一真相】：make-fixtures.py 据 lines/redact 渲染 PNG 样张；zero-leak.test.ts 与 e2e/scripts/make-fixtures.ts 据同一份 lines 生成 mock OCR / fixture 回放包，驱动真管线。二者永不漂移。",
   "_piiNotice": "以下姓名/电话/病历号/地址/医师均为【合成假数据】（张三、13800001234 为公认测试号段），仅用于验证脱敏零泄漏，绝非真实用户信息，可安全入库。",
-  "_lineLayout": "lines 为处方笺全文逐行（前记身份信息 + Rp 正文 + 后记签名）。redact 列出该场景需【涂黑遮挡】的行号（0 基）——涂黑后 OCR 读不到，故 mock OCR 输入 = lines 去掉 redact 行；PNG 上对应行画黑框。",
+  "_lineLayout": "lines 为处方笺/药盒全文逐行。redact 列出需【涂黑遮挡】的行号（0 基）——涂黑后 OCR 读不到，故 mock OCR 输入 = lines 去掉 redact 行；PNG 上对应行画黑框。entry=A 拍处方笺 / B 拍药品。identity 缺省沿用 drug.identity。",
   "drug": {
-    "_note": "drug_master 候选 + VLM 身份。DM 规格用半角冒号、identity 规格用全角冒号，验证 matchDrugMaster 归一化后唯一匹配（对齐 intake-api.test.ts）。",
+    "_note": "drug_master 候选 + 缺省 VLM 身份。DM 规格用半角冒号、identity 规格用全角冒号，验证 matchDrugMaster 归一化后唯一匹配（对齐 intake-api.test.ts）。E2E 测试库据此 seed drug_master。",
     "drugMaster": {
       "id": "dm-t9-hycosan",
       "genericName": "玻璃酸钠滴眼液",
@@ -29,8 +29,9 @@
   },
   "scenarios": {
     "rx-normal": {
-      "_note": "合成处方笺 golden case：前记含姓名/电话/病历号/地址（L0 裁剪丢弃）；诊断内嵌复诊电话（L1 捕获进 diagnosis → L2 脱敏为 [已脱敏]）。全字段解析完整 → 不触发兜底。用来验 DB 落库（drafts.payload + confirm 四表）与日志两类产物零泄漏。",
+      "_note": "合成处方笺 golden case：前记含姓名/电话/病历号/地址（L0 裁掉）+ 诊断内嵌复诊电话（L2 脱敏）。全字段完整 → 唯一匹配 + 不触发兜底。E2E：草稿字段全对 → 确认 → 药箱+计划生效。",
       "image": "rx-normal.png",
+      "entry": "A",
       "layers": ["处方层"],
       "lines": [
         "萧山区第二人民医院（演示合成处方笺）",
@@ -51,8 +52,9 @@
       "redact": []
     },
     "rx-redacted": {
-      "_note": "涂黑遮挡变体：日期行 + 用法行被涂黑（OCR 读不到）→ needsManual 含 date/usage → 触发 Baichuan 兜底。用来验【第三方请求体】零泄漏：发给兜底模型的正文只有 L0 裁剪后的 Rp 正文（前记 PII 已裁掉），兜底返回幻觉值被回链拦截，绝不预填。前记 PII 仍在（证明降级路径同样不泄漏）。",
+      "_note": "涂黑遮挡变体：日期行 + 用法行涂黑 → needsManual(date/usage) → 触发 Baichuan 兜底；兜底幻觉值被回链拦截，人工补字段恒空（绝不预填）。",
       "image": "rx-redacted.png",
+      "entry": "A",
       "layers": ["处方层"],
       "lines": [
         "萧山区第二人民医院（演示合成处方笺）",
@@ -72,9 +74,65 @@
       ],
       "redact": [6, 11],
       "fallback": {
-        "_note": "兜底模型返回的幻觉值：正文（裁剪后仅药品行）逐字不可寻 → verifyBacklink 拦截，usage/date 仍走人工补。",
+        "_note": "兜底模型返回的幻觉值：裁剪正文（仅药品行）逐字不可寻 → verifyBacklink 拦截。",
         "items[0].usage": "每次2滴 每日5次"
       }
+    },
+    "rx-spec-conflict": {
+      "_note": "规格冲突：处方/身份提取 0.2%（10mL:20mg） vs 库条目 0.1%（10mL:10mg）→ conflict + 冲突清单，系统不选边（drugMasterId=null）。复用同一 master 行：rx-normal 提取 0.1% 仍唯一匹配，互不干扰。",
+      "image": "rx-spec-conflict.png",
+      "entry": "A",
+      "layers": ["处方层"],
+      "identity": {
+        "genericName": "玻璃酸钠滴眼液",
+        "brandName": "海露",
+        "specification": "0.2%（10mL：20mg）",
+        "form": "滴眼液",
+        "manufacturer": "EUSAN GmbH",
+        "otcFlag": true
+      },
+      "lines": [
+        "萧山区第二人民医院（演示合成处方笺）",
+        "处方号：RX20260904003",
+        "病历号：MZ20260001",
+        "姓名：张三",
+        "联系电话：13800001234",
+        "住址：广东省深圳市南山区科技路1号",
+        "日期：2026-09-04",
+        "科室：眼科",
+        "临床诊断：干眼综合征",
+        "Rp",
+        "玻璃酸钠滴眼液 0.2%（10mL：20mg） ×1支",
+        "用法：滴眼 每次1滴 每日4次 共7天",
+        "处方完毕",
+        "医师：李四"
+      ],
+      "redact": []
+    },
+    "drug-box-labeled": {
+      "_note": "入口B 药盒（含医院贴标）：layers 含医院标签层 → labelNotice；结构上无任何用法用量草稿（planDraft 恒 null），标签用法不自动抄录。lines 仅作药盒正面视觉渲染（入口B 不跑 OCR）。",
+      "image": "drug-box-labeled.png",
+      "entry": "B",
+      "layers": ["医院标签层", "药盒原装层"],
+      "lines": [
+        "玻璃酸钠滴眼液 0.1%（10mL:10mg）",
+        "海露 HYCOSAN 滴眼液",
+        "EUSAN GmbH",
+        "【医院贴标】滴眼 每次1滴 每日4次（标签用法不自动抄录）"
+      ],
+      "redact": []
+    },
+    "unsupported-loose-pills": {
+      "_note": "散装药片（无包装无说明书）→ detectLayers=['不支持'] → 422 UNSUPPORTED_OBJECT + 安全提示；OCR 绝不被调用（fixture 客户端记录调用日志供断言）。lines 仅作视觉渲染。",
+      "image": "unsupported-loose-pills.png",
+      "entry": "B",
+      "layers": ["不支持"],
+      "lines": [
+        "（散装药片，无包装无说明书）",
+        "白色圆形片剂 ×若干",
+        "无药名 / 无规格 / 无用法标识"
+      ],
+      "redact": []
     }
   }
 }

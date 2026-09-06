@@ -35,10 +35,14 @@ pnpm dev
 
 ```bash
 pnpm test            # shared 纯函数 + api 集成(独立测试库 anxin_medication_test) + web 冒烟
-pnpm -r typecheck    # 三包类型检查
+pnpm test:e2e        # M2-T10 golden case E2E（Playwright + fixture 回放，无 key 可跑；独立端口 8797/5174）
+pnpm test:e2e:live   # 有 key 环境跑真实管线（发布前手动，非回归）
+pnpm -r typecheck    # 四包类型检查（shared/api/web/e2e）
 pnpm lint            # ESLint（MVP 阶段部分规则为 warn）
 pnpm -r build        # web: vite build；api: esbuild bundle → dist
 ```
+
+> E2E 详见 [e2e/README.md](e2e/README.md)：fixture 回放机制、场景清单、录制/重录与断言四层。
 
 ## 目录结构
 
@@ -48,6 +52,8 @@ app/
 │   ├── shared/   # 领域契约：zod schema / 枚举 / 元数据 / 纯函数（前后端一份真相）
 │   ├── api/      # Hono API：routes(薄) → services(业务) → repositories(Drizzle)；db/(schema/迁移/seed)
 │   └── web/      # React SPA：router / routes / stores(zustand) / components(shadcn+domain) / api(hc 客户端)
+├── e2e/               # M2-T10 Playwright golden case E2E（fixture 回放 + 独立测试库）
+├── fixtures/          # golden case 样张真相源（golden-cases.json + PNG + 渲染器，T9/T10 共用）
 ├── docker-compose.yml   # 生产形态：api(多阶段镜像) + db
 ├── Dockerfile           # api+web 多阶段构建（deps → build → runtime slim）
 └── .env / packages/api/.env   # 本地 secrets，不提交（仅 .env.example 入库）

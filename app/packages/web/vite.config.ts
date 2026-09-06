@@ -16,7 +16,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        // 默认代理到 8787；E2E 用独立端口（API_PROXY_TARGET）避免与本地 dev 服务抢端口。
+        target: process.env.API_PROXY_TARGET ?? 'http://localhost:8787',
         changeOrigin: true,
       },
     },

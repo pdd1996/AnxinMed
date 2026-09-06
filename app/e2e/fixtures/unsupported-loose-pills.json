@@ -1,0 +1,11 @@
+{
+  "scenario": "unsupported-loose-pills",
+  "entry": "B",
+  "source": "synthetic",
+  "detectLayers": [
+    "不支持"
+  ],
+  "extractIdentity": null,
+  "runOcr": null,
+  "fallbackParse": null
+}

@@ -17,6 +17,8 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { ERR_CODES } from '@anxin/shared'
 import type { AppEnv } from './types.js'
 import { ApiError } from './lib/http.js'
+import { withScenario } from './lib/ai/scenario.js'
+import { aiCallLog } from './lib/ai/fixtures.js'
 import { resolveUser } from './middleware/resolveUser.js'
 import { healthHandler } from './routes/health.js'
 import { drugsRoute } from './routes/drugs.js'
@@ -39,6 +41,13 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   // dev：web(5173) 经 vite 代理 /api→8787；放开 CORS 便于直连调试。
   app.use('/api/*', cors())
+}
+
+// E2E（M2-T10）：fixtures 模式把请求级 x-test-scenario 头放进 AsyncLocalStorage，供 FixtureAiClients 按请求回放；
+// 并暴露 fixture 客户端调用计数（「OCR 未调用」等结构断言）。仅 AI_MODE=fixtures 注册，生产/单测不存在。
+if (process.env.AI_MODE === 'fixtures') {
+  app.use('/api/*', (c, next) => withScenario(c.req.header('x-test-scenario') ?? '', next))
+  app.get('/api/_e2e/ai-calls', (c) => c.json({ ok: true, calls: aiCallLog(c.req.query('scenario') ?? '') }))
 }
 
 // 单条链式表达式注册路由并导出 AppType（hc<AppType> 端到端类型推导，技术方案 §1）。

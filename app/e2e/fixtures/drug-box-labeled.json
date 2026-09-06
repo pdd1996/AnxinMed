@@ -1,0 +1,19 @@
+{
+  "scenario": "drug-box-labeled",
+  "entry": "B",
+  "source": "synthetic",
+  "detectLayers": [
+    "医院标签层",
+    "药盒原装层"
+  ],
+  "extractIdentity": {
+    "genericName": "玻璃酸钠滴眼液",
+    "brandName": "海露",
+    "specification": "0.1%（10mL：10mg）",
+    "form": "滴眼液",
+    "manufacturer": "EUSAN GmbH",
+    "otcFlag": true
+  },
+  "runOcr": null,
+  "fallbackParse": null
+}
