@@ -53,6 +53,16 @@ export async function fetchProfile() {
   return unwrap(res)
 }
 
+// ── 服药记录查询（M3-T6 · PRD §7.4 按日周月查询与导出）──
+
+/** GET /api/records?from&to：按日期范围查记录（含药名 + 状态聚合，供列表与前端 CSV 导出）。 */
+export async function fetchRecords(from: string, to: string) {
+  const res = await client.api.records.$get({ query: { from, to } })
+  return unwrap(res)
+}
+export type RecordsResponseDto = Omit<Awaited<ReturnType<typeof fetchRecords>>, 'ok'>
+export type RecordItemDto = RecordsResponseDto['items'][number]
+
 // ── 录入草稿（M2-T7 确认页）──
 
 /** 草稿详情：payload 为 api 侧 DraftPayload，经 hc<AppType> 端到端推导（web 不复制类型，执行总纲 §3.1）。 */

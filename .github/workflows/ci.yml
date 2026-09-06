@@ -1,0 +1,104 @@
+name: CI
+
+# 技术方案 §9 / 任务书 M3-T6：push/PR 触发 lint + typecheck + 迁移到测试库 + 全部测试；
+# golden case E2E 单独 job（fixture 回放路径，AI key 不进 CI）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 测试库 anxin_medication_test 由测试基建（api vitest globalSetup / e2e globalSetup）从 DATABASE_URL
+# 派生自建 + 迁移 + seed；postgres 超级用户具 CREATEDB，故 CI 无需手动 migrate/seed 步骤。
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anxin_medication
+
+jobs:
+  quality:
+    name: lint + typecheck + test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: anxin_medication
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck (shared/api/web/e2e)
+        run: pnpm -r typecheck
+      # api 集成测试 globalSetup 自动建测试库 → 迁移(纯 SQL) → seed users（等价"迁移到测试库"）
+      - name: Test (shared + api 集成 + web)
+        run: pnpm test
+
+  e2e:
+    name: golden case E2E (fixtures)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: anxin_medication
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm --filter @anxin/e2e exec playwright install --with-deps chromium
+      # AI_MODE=fixtures（playwright.config 注入）：FixtureAiClients 回放录制包，无需 QWEN/BAICHUAN/OCR key
+      - name: Golden case E2E
+        run: pnpm test:e2e
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: app/e2e/test-results
+          retention-days: 7
+          if-no-files-found: ignore

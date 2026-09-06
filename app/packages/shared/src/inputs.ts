@@ -73,6 +73,19 @@ export const RecordCreateSchema = z.object({
 })
 export type RecordCreate = z.infer<typeof RecordCreateSchema>
 
+/**
+ * GET /api/records?from&to：按日期范围查询服药记录（M3-T6 · PRD §7.4 沿用 V1 §7.5「按日周月查询与导出」）。
+ * from/to 为 ISO date（YYYY-MM-DD）；日/周/月的具体区间由前端换算后传入。from 不得晚于 to。
+ */
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+export const RecordsQuerySchema = z
+  .object({
+    from: z.string().regex(ISO_DATE_PATTERN, 'from 需为 YYYY-MM-DD'),
+    to: z.string().regex(ISO_DATE_PATTERN, 'to 需为 YYYY-MM-DD'),
+  })
+  .refine((v) => v.from <= v.to, { message: 'from 不能晚于 to', path: ['from'] })
+export type RecordsQuery = z.infer<typeof RecordsQuerySchema>
+
 // ── 健康信息（我的页手动填写；字段级来源标「用户自述」，PRD §7.1.2）──
 
 /** 健康信息字段选项（对齐 demo Profile 的 HEALTH_FIELDS；fieldKey 直接用中文标签）。 */

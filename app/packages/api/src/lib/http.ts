@@ -49,3 +49,14 @@ export function vJson<S extends ZodSchema>(schema: S) {
     }
   })
 }
+
+/** query 参数校验（GET，如 /api/records?from&to）：失败 → { ok:false, code:VALIDATION, message } 400。 */
+export function vQuery<S extends ZodSchema>(schema: S) {
+  return zValidator('query', schema, (result, c) => {
+    if (!result.success) {
+      const first = result.error.issues[0]
+      const message = first ? `${first.path.join('.') || '(query)'}: ${first.message}` : '查询参数校验失败'
+      return errJson(c, ERR_CODES.VALIDATION, message, 400)
+    }
+  })
+}

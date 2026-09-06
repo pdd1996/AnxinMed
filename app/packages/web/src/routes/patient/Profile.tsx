@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { AlertTriangle, ChevronRight, Plus, Settings, Trash2, UserRound } from 'lucide-react'
+import { AlertTriangle, ChevronRight, ClipboardList, Plus, Settings, Trash2, UserRound } from 'lucide-react'
 import { client, fetchProfile, unwrap } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -112,6 +112,19 @@ export default function Profile() {
               产品不做诊断：「诊断」字段语义永远为「用户报告的诊断」，AI 将其视为用户提供的、未经医学验证的信息。
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <Button asChild variant="ghost" className="min-h-14 w-full justify-between rounded-none px-4">
+            <Link to="/records">
+              <span className="flex items-center gap-2 text-base font-semibold">
+                <ClipboardList className="size-5" aria-hidden /> 服药记录（查询与导出）
+              </span>
+              <ChevronRight className="size-5" aria-hidden />
+            </Link>
+          </Button>
         </CardContent>
       </Card>
 
