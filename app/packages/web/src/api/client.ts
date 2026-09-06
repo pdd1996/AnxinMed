@@ -38,3 +38,16 @@ export async function fetchTodayTasks() {
   const res = await client.api.tasks.today.$get()
   return unwrap(res)
 }
+
+/** 计划列表（药箱页用）。 */
+export async function fetchPlans() {
+  const res = await client.api.plans.$get()
+  const data = await unwrap(res)
+  return data.items
+}
+
+/** 健康信息（我的页用）。 */
+export async function fetchProfile() {
+  const res = await client.api.profile.$get()
+  return unwrap(res)
+}

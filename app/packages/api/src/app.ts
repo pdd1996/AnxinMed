@@ -23,6 +23,7 @@ import { drugsRoute } from './routes/drugs.js'
 import { plansRoute } from './routes/plans.js'
 import { tasksRoute } from './routes/tasks.js'
 import { recordsRoute } from './routes/records.js'
+import { profilesRoute } from './routes/profiles.js'
 import { registerStubs } from './routes/_stubs.js'
 
 export const app = new Hono<AppEnv>()
@@ -48,6 +49,7 @@ const route = app
   .route('/api/plans', plansRoute)
   .route('/api/tasks', tasksRoute)
   .route('/api/records', recordsRoute)
+  .route('/api/profile', profilesRoute)
 
 /** RPC 类型出口：web 端 `import type { AppType } from '@anxin/api'` 获得端到端类型。 */
 export type AppType = typeof route

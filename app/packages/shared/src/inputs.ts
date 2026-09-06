@@ -72,3 +72,23 @@ export const RecordCreateSchema = z.object({
   status: RecordStatusSchema,
 })
 export type RecordCreate = z.infer<typeof RecordCreateSchema>
+
+// ── 健康信息（我的页手动填写；字段级来源标「用户自述」，PRD §7.1.2）──
+
+/** 健康信息字段选项（对齐 demo Profile 的 HEALTH_FIELDS；fieldKey 直接用中文标签）。 */
+export const HEALTH_FIELDS = ['性别', '年龄', '出生年月', '过敏史', '特殊状态', '紧急联系人', '诊断'] as const
+export type HealthField = (typeof HEALTH_FIELDS)[number]
+
+/** PATCH /api/profile 的单条 upsert（按 fieldKey）。 */
+export const HealthEntryUpsertSchema = z.object({
+  fieldKey: z.string().min(1),
+  value: z.string().min(1),
+})
+export type HealthEntryUpsert = z.infer<typeof HealthEntryUpsertSchema>
+
+/** PATCH /api/profile：health_profiles 按字段 upsert / 删除。 */
+export const ProfilePatchSchema = z.object({
+  upserts: z.array(HealthEntryUpsertSchema).optional(),
+  deletes: z.array(z.string().min(1)).optional(),
+})
+export type ProfilePatch = z.infer<typeof ProfilePatchSchema>

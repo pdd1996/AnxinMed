@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router'
 import { Toaster } from '@/components/ui/sonner'
 import { FontScaleSync } from '@/components/layout/FontScaleSync'
+import { OnboardingGate } from '@/components/OnboardingGate'
 import { router } from '@/router'
 
 // 服务端数据全走 TanStack Query（技术方案 §8）；UI 状态走 zustand（stores/）。
@@ -18,7 +19,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <FontScaleSync />
-      <RouterProvider router={router} />
+      <OnboardingGate>
+        <RouterProvider router={router} />
+      </OnboardingGate>
       <Toaster position="top-center" richColors />
     </QueryClientProvider>
   )

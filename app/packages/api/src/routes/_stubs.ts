@@ -18,10 +18,8 @@ export function registerStubs(app: Hono<AppEnv>): void {
   app.post('/api/drafts/:id/confirm', stub)
   app.post('/api/drafts/:id/reject', stub)
 
-  // AI 咨询（M3）/ 医生端洞察（M3）/ 健康信息（T9）
+  // AI 咨询（M3）/ 医生端洞察（M3）。健康信息 /api/profile 已在 T9 换真实路由（profiles.ts）。
   app.post('/api/consult', stub)
   app.get('/api/insight/patients', stub)
   app.post('/api/insight/summary', stub)
-  app.get('/api/profile', stub)
-  app.patch('/api/profile', stub)
 }
