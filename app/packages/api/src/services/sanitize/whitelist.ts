@@ -147,21 +147,6 @@ export function parseWhitelist(text: string): ParseResult {
     }
   }
 
-  // needsManual：解析不全的字段一律标记，绝不预填猜测
-  const needsManual: string[] = []
-  if (!hospital) needsManual.push('hospital')
-  if (!prescriptionNo) needsManual.push('prescriptionNo')
-  if (!date) needsManual.push('date')
-  if (!department) needsManual.push('department')
-  if (!diagnosis) needsManual.push('diagnosis')
-  if (items.length === 0) needsManual.push('items')
-  items.forEach((it, i) => {
-    if (!it.drugName) needsManual.push(`items[${i}].drugName`)
-    if (!it.specification) needsManual.push(`items[${i}].specification`)
-    if (!it.quantity) needsManual.push(`items[${i}].quantity`)
-    if (!it.usage) needsManual.push(`items[${i}].usage`)
-  })
-
   const candidate = { hospital, prescriptionNo, date, department, diagnosis, items }
   // 结构性封顶自证：输出必须过闭合 schema safeParse（越界字段会被拒 → 抛错暴露，绝不静默）
   const parsed = PrescriptionWhitelist.safeParse(candidate)
@@ -169,5 +154,27 @@ export function parseWhitelist(text: string): ParseResult {
     throw new Error(`白名单解析输出越界（不应发生，闭合 schema 拒绝）：${parsed.error.message}`)
   }
 
+  const needsManual = computeNeedsManual(parsed.data)
   return { whitelist: parsed.data, needsManual, complete: needsManual.length === 0 }
+}
+
+/**
+ * 由白名单计算缺项清单（needsManual）：任何为空的字段/条目子字段都需人工补，绝不预填猜测。
+ * parseWhitelist 与 T3 兜底合并后复用同一真相，避免两处漂移。
+ */
+export function computeNeedsManual(w: PrescriptionWhitelistType): string[] {
+  const needs: string[] = []
+  if (!w.hospital) needs.push('hospital')
+  if (!w.prescriptionNo) needs.push('prescriptionNo')
+  if (!w.date) needs.push('date')
+  if (!w.department) needs.push('department')
+  if (!w.diagnosis) needs.push('diagnosis')
+  if (w.items.length === 0) needs.push('items')
+  w.items.forEach((it, i) => {
+    if (!it.drugName) needs.push(`items[${i}].drugName`)
+    if (!it.specification) needs.push(`items[${i}].specification`)
+    if (!it.quantity) needs.push(`items[${i}].quantity`)
+    if (!it.usage) needs.push(`items[${i}].usage`)
+  })
+  return needs
 }
