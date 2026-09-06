@@ -135,3 +135,19 @@
   min-height: var(--touch);
   min-width: var(--touch);
 }
+
+/* 录入页「上传中」扫描线动画（M2-T8）：纯装饰，处理中状态另有阶段文案承担语义。 */
+@keyframes scanline-sweep {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
+  }
+}
+.scanline {
+  animation: scanline-sweep 2.4s ease-in-out infinite;
+}
