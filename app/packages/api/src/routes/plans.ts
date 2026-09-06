@@ -15,8 +15,9 @@ export const plansRoute = new Hono<AppEnv>()
     return okJson(c, { items })
   })
   .post('/', vJson(PlanCreateSchema), async (c) => {
-    const plan = await plansService.createPlan(c.get('user').id, c.req.valid('json'))
-    return okJson(c, { plan }, 201)
+    // 手动建计划也跑相互作用 + 范围校验（M2-T5），结果随响应返回供前端展示（只标注不阻止）
+    const result = await plansService.createPlan(c.get('user').id, c.req.valid('json'))
+    return okJson(c, result, 201)
   })
   .patch('/:id', vJson(PlanPatchSchema), async (c) => {
     const plan = await plansService.patchPlan(c.get('user').id, c.req.param('id'), c.req.valid('json'))

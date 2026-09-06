@@ -44,6 +44,12 @@ export type SourceType = z.infer<typeof SourceTypeSchema>
 export const RiskLevelSchema = z.enum(['L1', 'L2', 'L3', 'L4'])
 export type RiskLevel = z.infer<typeof RiskLevelSchema>
 
+// ── 相互作用分级（interaction_rules.level；PRD §7.8.1，四级，禁忌最高）──
+export const InteractionLevelSchema = z.enum(['禁忌', '慎用', '需监测', '注意'])
+export type InteractionLevel = z.infer<typeof InteractionLevelSchema>
+/** 分级排序权重：禁忌 > 慎用 > 需监测 > 注意（数值越大越严重），供规则引擎排序与前端分级色。 */
+export const INTERACTION_LEVEL_ORDER: Record<InteractionLevel, number> = { 禁忌: 4, 慎用: 3, 需监测: 2, 注意: 1 }
+
 // ── 层检测标签（M2 入口校验；经 /api/intake/detect 传输，PRD §7.2 / V2.1 贴标降级）──
 export const LayerLabelSchema = z.enum(['处方层', '医院标签层', '药盒原装层', '说明书层', '不支持'])
 export type LayerLabel = z.infer<typeof LayerLabelSchema>
