@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { speak } from '@/lib/speech'
 import type { PlanGroup, TaskStatus } from '@/lib/tasks'
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -41,15 +42,6 @@ export function ReminderModal({
 }) {
   const nextPending = group.slots.find((s) => s.status === 'pending')
   const speakText = `服药提醒，${group.drugName}，每次${group.dose.value}${group.dose.unit}，每日${group.frequency}次`
-
-  function speak() {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(speakText)
-    u.lang = 'zh-CN'
-    u.rate = 0.92
-    window.speechSynthesis.speak(u)
-  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -96,7 +88,7 @@ export function ReminderModal({
             确认已服{nextPending ? `（${nextPending.time}）` : ''}
           </Button>
           <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" className="min-h-11" onClick={speak}>
+            <Button variant="outline" className="min-h-11" onClick={() => speak(speakText)}>
               <Volume2 className="size-4" aria-hidden />
               播报
             </Button>

@@ -8,6 +8,7 @@ import { CONFIRM_STATUS_META } from '@anxin/shared'
 import { DrugSelector } from '@/components/domain/consult/DrugSelector'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
+import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationButton'
 
 /**
  * 咨询页（M3-T2 · PRD §7.5 / spec §T2）——围绕已确认药品提问。
@@ -19,7 +20,8 @@ import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
  * - 快捷问题 + 提问输入框 + 发送按钮
  * - 边界说明侧栏（"我能帮你" / "我不会做"）
  *
- * ⚠️ 语音输入/播报是 M3-T4 的事，本任务不做（spec §T4）；
+ * M3-T4：提问框接入按键式语音输入（VoiceDictationButton），回答卡接入中文播报（SpeakButton，见 AnswerCard/EmergencyCard）；
+ *    语音仅为快捷入口，手动输入/发送按钮等价保留；不支持环境自动降级（spec §T4.3）。
  *    消息历史用 useState 本地管理（咨询是会话式，不需要持久化到 DB——consult_logs 已由后端落库）。
  */
 
@@ -198,6 +200,14 @@ export default function Consult() {
               disabled={!effectiveDrugId || consultMutation.isPending}
               rows={2}
               className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            {/* M3-T4：语音提问（转写确认后追加到输入框）；贴近卡片底部，浮层向上展开。 */}
+            <VoiceDictationButton
+              label="语音输入问题"
+              continuous
+              panelSide="top"
+              disabled={!effectiveDrugId || consultMutation.isPending}
+              onCommit={(text) => setQuestion((prev) => (prev.trim() ? `${prev.trimEnd()}${text}` : text))}
             />
             <Button
               type="button"

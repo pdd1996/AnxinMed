@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationButton'
 import { HEALTH_FIELDS } from '@anxin/shared'
 
 /**
@@ -83,12 +84,19 @@ export default function Profile() {
                   <option key={f}>{f}</option>
                 ))}
               </select>
-              <Input
-                className="flex-1"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                placeholder="填写内容"
-              />
+              <div className="flex flex-1 items-center gap-2">
+                <Input
+                  className="flex-1"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="填写内容"
+                />
+                {/* M3-T4：语音填写健康信息值（转写确认后写入，与手动输入同一 setter）。 */}
+                <VoiceDictationButton
+                  label="语音填写健康信息"
+                  onCommit={(text) => setValue(text)}
+                />
+              </div>
               <Button
                 className="min-h-11"
                 disabled={!value.trim()}

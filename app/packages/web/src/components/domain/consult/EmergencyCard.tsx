@@ -2,6 +2,7 @@ import { OctagonXIcon, PhoneIcon, MapPinIcon } from 'lucide-react'
 import type { ConsultSections } from '@anxin/shared'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { SpeakButton } from '@/components/domain/voice/SpeakButton'
 
 /**
  * L4 急救引导卡（M3-T2 · PRD §7.5.1）——守门命中紧急信号（胸痛/呼吸困难/意识异常等）时置顶渲染。
@@ -14,6 +15,13 @@ import { Card, CardContent } from '@/components/ui/card'
  * ⚠️ 本卡渲染时 `blocked=true`，前端应隐藏常规回答区（sections/nextAction 已含在本卡内）。
  */
 export function EmergencyCard({ sections }: { sections: ConsultSections }) {
+  // 急救指引播报文本（spec §T4.2）：结论→风险→下一步→提醒，去尾句号避免叠字。
+  const speakText = [sections.summary, ...sections.risks, sections.nextAction, sections.warning]
+    .filter(Boolean)
+    .map((s) => s.replace(/[。.]+$/, '').trim())
+    .filter(Boolean)
+    .join('。')
+
   return (
     <Card className="border-risk-l4/50 bg-risk-l4/5 shadow-lg">
       <CardContent className="space-y-4 p-5">
@@ -23,6 +31,7 @@ export function EmergencyCard({ sections }: { sections: ConsultSections }) {
             <h2 className="text-lg font-bold text-risk-l4">紧急风险提示</h2>
             <p className="text-sm font-medium text-foreground">{sections.summary}</p>
           </div>
+          <SpeakButton text={speakText} label="播报急救指引" className="shrink-0" />
         </div>
 
         {sections.risks.length > 0 && (

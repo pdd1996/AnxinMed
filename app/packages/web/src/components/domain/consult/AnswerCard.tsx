@@ -2,6 +2,7 @@ import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
 import type { ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { RiskBadge } from '@/components/domain/RiskBadge'
 import { Card, CardContent } from '@/components/ui/card'
+import { SpeakButton } from '@/components/domain/voice/SpeakButton'
 import { CitationsList } from './CitationsList'
 import type { Citation } from '@anxin/shared'
 
@@ -39,6 +40,29 @@ export interface AnswerCardProps {
   blocked?: boolean
 }
 
+/**
+ * 组装中文播报文本（spec §T4.2）：结构化 sections 按「结论→需要知道→注意风险→下一步→提醒」顺序朗读，
+ * 否则用一句话 answer；末尾附 notice（如 L2 过滤提示）。去除尾部句号避免叠字。
+ */
+function buildSpeakText(sections: ConsultSections | null, answer: string, notice?: string | null): string {
+  const parts: string[] = []
+  if (sections) {
+    parts.push(sections.summary)
+    if (sections.keyPoints.length > 0) parts.push(`需要知道，${sections.keyPoints.join('；')}`)
+    if (sections.risks.length > 0) parts.push(`注意风险，${sections.risks.join('；')}`)
+    parts.push(`下一步，${sections.nextAction}`)
+    if (sections.warning) parts.push(sections.warning)
+  } else if (answer) {
+    parts.push(answer)
+  }
+  if (notice) parts.push(notice)
+  return parts
+    .filter(Boolean)
+    .map((s) => s.replace(/[。.]+$/, '').trim())
+    .filter(Boolean)
+    .join('。')
+}
+
 export function AnswerCard({
   riskLevel,
   status,
@@ -54,7 +78,7 @@ export function AnswerCard({
   return (
     <Card className={blocked ? 'border-risk-l3/30' : undefined}>
       <CardContent className="space-y-3 p-4">
-        {/* 顶部：RiskBadge + status 徽章 */}
+        {/* 顶部：RiskBadge + status 徽章 + 播报（M3-T4 §T4.2） */}
         <div className="flex flex-wrap items-center gap-2">
           <RiskBadge level={riskLevel} showHint />
           <span
@@ -62,6 +86,7 @@ export function AnswerCard({
           >
             {statusMeta.label}
           </span>
+          <SpeakButton text={buildSpeakText(sections, answer, notice)} className="ml-auto" />
         </div>
 
         {/* 中部：sections 结构化（如有）；否则仅 answer 一句话 */}

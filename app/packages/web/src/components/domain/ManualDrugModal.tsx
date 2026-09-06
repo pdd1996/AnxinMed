@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationButton'
 import { DOSE_UNITS } from '@anxin/shared'
 
 export interface ManualDrugForm {
@@ -49,12 +50,20 @@ export function ManualDrugModal({
         <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="md-name">药名</Label>
-            <Input
-              id="md-name"
-              value={form.genericName}
-              onChange={(e) => setForm({ ...form, genericName: e.target.value })}
-              placeholder="如：玻璃酸钠滴眼液"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="md-name"
+                className="flex-1"
+                value={form.genericName}
+                onChange={(e) => setForm({ ...form, genericName: e.target.value })}
+                placeholder="如：玻璃酸钠滴眼液"
+              />
+              {/* M3-T4：药名为手动建档的主要自由文本字段，提供语音快捷入口（手动输入仍保留）。 */}
+              <VoiceDictationButton
+                label="语音输入药名"
+                onCommit={(text) => setForm((prev) => ({ ...prev, genericName: text }))}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
