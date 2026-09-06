@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
+import { toast } from 'sonner'
 import { AlertTriangle, Box as BoxIcon, FileText, Hand, Pause, Pencil, Pill, Play, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
 import { client, fetchDrugs, fetchPlans, unwrap } from '@/api/client'
 import { ManualDrugModal, type ManualDrugForm } from '@/components/domain/ManualDrugModal'
@@ -32,6 +33,7 @@ function openedOverdue(drug: DrugItem): boolean {
  */
 export default function Box() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showManual, setShowManual] = useState(false)
   const [planTarget, setPlanTarget] = useState<{ drug: DrugItem; plan?: PlanItem } | null>(null)
 
@@ -39,6 +41,28 @@ export default function Box() {
   const plansQuery = useQuery({ queryKey: ['plans'], queryFn: fetchPlans })
   const drugs = drugsQuery.data ?? []
   const plans = plansQuery.data ?? []
+
+  /**
+   * 确认页（M2-T7）跳转过来的一次性意图：
+   *   ?manual=1        → 信息不符后手动建档（PRD §7.2.6）
+   *   ?plan=<drugId>   → 入口B 药盒建档不产生计划，直接打开该药的计划弹窗（两步式录入）
+   * 处理完立即清参数（replace），防刷新/回退重复弹窗；找不到药品则可见报错，不静默吞。
+   */
+  useEffect(() => {
+    const manual = searchParams.get('manual')
+    const planDrugId = searchParams.get('plan')
+    if (!manual && !planDrugId) return
+    if (drugsQuery.isLoading) return // 等药箱数据到位再开（plan 需要 drug 对象）
+    const drugList = drugsQuery.data ?? []
+    const planList = plansQuery.data ?? []
+    if (manual) setShowManual(true)
+    if (planDrugId) {
+      const drug = drugList.find((d) => d.id === planDrugId)
+      if (drug) setPlanTarget({ drug, plan: planList.find((p) => p.drugId === drug.id) })
+      else toast.error('未找到要建计划的药品，请刷新后重试')
+    }
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams, drugsQuery.data, drugsQuery.isLoading, plansQuery.data])
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['drugs'] })
