@@ -127,3 +127,20 @@ export async function intakeDrug(image: string) {
   const res = await client.api.intake.drug.$post({ json: { image } })
   return settle(res)
 }
+
+// ── AI 咨询（M3-T2）──
+
+/**
+ * POST /api/consult：围绕已确认药品提问。
+ * 响应经 hc<AppType> 端到端推导（shared ConsultResponseSchema + 后端 consultLogId）。
+ * 守门与降级全部在后端 services/consult.service.ts 编排；本层不做业务判断。
+ * L4/L3/manual-gate/no-source/ai-unavailable 均返回 200（守门正常路径，非错误），
+ * 故用 unwrap（toast 仅在真错误时触发）；前端按 riskLevel/status/blocked 渲染各分支。
+ */
+export async function postConsult(question: string, drugIds: string[]) {
+  const res = await client.api.consult.$post({ json: { question, drugIds } })
+  return unwrap(res)
+}
+
+/** 咨询响应 DTO（去掉 ok 字段；hc<AppType> 推导，web 不复制类型）。 */
+export type ConsultResponseDto = Omit<Awaited<ReturnType<typeof postConsult>>, 'ok'>
