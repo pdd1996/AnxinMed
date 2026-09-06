@@ -1,7 +1,24 @@
-# 安心用药 · 数据库基础设施（方案 C：仅 DB 层，后续 scaffold 复用）
-# 使用：docker compose up -d
+# 安心用药 · 生产形态：api（多阶段镜像，托管 web/dist + /api，8787）+ db
+# 本地开发仅起 db：docker compose up -d db
+# 端到端/生产：docker compose up -d --build；随后在宿主机跑迁移与 seed（见 README「生产部署」）
 
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anxin-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+    environment:
+      NODE_ENV: production
+      # 指向 compose 内的 db 服务；生产（ECS）以环境变量/secret 覆盖，勿把真实密码提交进 git
+      DATABASE_URL: postgres://anxin:anxin_dev_2026@db:5432/anxin_medication
+
   db:
     image: postgres:16-alpine
     container_name: anxin-db

@@ -1,0 +1,19 @@
+# 依赖与构建产物（镜像内重建，不进上下文）
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+
+# 版本控制 / IDE / 验证截图
+.git
+.qoder
+
+# secrets：绝不进镜像（真实 key 只放宿主机 .env）
+.env
+**/.env
+
+# 非构建所需
+data
+demo
+docs
+tools

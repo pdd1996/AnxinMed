@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --external:postgres --external:drizzle-orm --external:hono --external:@hono/node-server --external:@hono/zod-validator --external:dotenv --external:zod",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -25,15 +26,16 @@
     "@anxin/shared": "workspace:*",
     "@hono/node-server": "^1.13.0",
     "@hono/zod-validator": "^0.4.1",
-    "hono": "^4.6.0",
-    "drizzle-orm": "^0.44.2",
-    "postgres": "^3.4.5",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.44.2",
+    "hono": "^4.6.0",
+    "postgres": "^3.4.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "drizzle-kit": "^0.31.1",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0"
