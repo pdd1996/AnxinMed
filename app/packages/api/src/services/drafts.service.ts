@@ -6,7 +6,7 @@
  * 追溯上下文（来源类型 / 白名单快照 / 裁剪引用 / 脱敏审计）从已存 drafts.payload 取，
  * 客户端只提交「已核对的最终决策」，无法伪造追溯数据。
  */
-import { ERR_CODES, type ConfirmStatus, type DraftConfirm, type DraftReject } from '@anxin/shared'
+import { ERR_CODES, type ConfirmStatus, type DraftConfirm, type DraftReject, type PlanTags } from '@anxin/shared'
 import { db } from '../db/client.js'
 import { ApiError } from '../lib/http.js'
 import { newId } from '../lib/util.js'
@@ -16,7 +16,10 @@ import * as drugsRepo from '../repositories/drugs.repo.js'
 import * as plansRepo from '../repositories/plans.repo.js'
 import * as profilesRepo from '../repositories/profiles.repo.js'
 import type { DraftRow } from '../repositories/drafts.repo.js'
+import type { HealthSourceMeta } from '../repositories/profiles.repo.js'
 import type { DraftPayload } from './pipeline/index.js'
+import { runRuleChecks } from './plans.service.js'
+import type { DosageRangeResult, InteractionResult } from './rules/index.js'
 
 /** 确认方式留痕（缺省按 confirmStatus 推导；对齐 demo confirmMethod 文案）。 */
 const CONFIRM_METHOD: Record<ConfirmStatus, string> = {
@@ -31,6 +34,9 @@ export type ConfirmDraftResult = {
   planId: string | null
   sourceId: string
   status: 'confirmed'
+  /** 对**最终确认值**重跑的规则检查（只标注不阻止；无计划为 null）。M2 收尾清单：检查接入建计划与确认两条路径。 */
+  interactions: InteractionResult | null
+  dosageRange: DosageRangeResult | null
 }
 export type RejectDraftResult = { id: string; status: 'rejected' }
 
@@ -89,6 +95,19 @@ export async function confirmDraft(userId: string, id: string, input: DraftConfi
   const draft = await loadPendingDraft(userId, id)
   const payload = draft.payload as DraftPayload
 
+  // 健康勾选对账：只接受草稿建议清单内的字段（防伪造 prescription_confirmed 溯源，PRD §7.1.2）；
+  // 不在清单内的字段属于「我的-健康信息」手动填写范畴（self_reported），失败必须可见，不静默丢弃。
+  const suggested = payload.healthSuggestions ?? []
+  for (const h of input.health ?? []) {
+    if (!suggested.some((s) => s.field === h.fieldKey)) {
+      throw new ApiError(
+        400,
+        ERR_CODES.VALIDATION,
+        `健康信息字段「${h.fieldKey}」不在本草稿的建议清单内，请到「我的 · 健康信息」手动填写`,
+      )
+    }
+  }
+
   const now = new Date()
   const nowIso = now.toISOString()
   const sourceId = newId('src')
@@ -96,6 +115,14 @@ export async function confirmDraft(userId: string, id: string, input: DraftConfi
   const planId = input.plan ? newId('plan') : null
   const method = input.method ?? CONFIRM_METHOD[input.drug.confirmStatus]
   const isPrescription = payload.type === 'prescription'
+  // 入口B（药盒）草稿如带计划：管线结构上不产出用法用量，该计划必为用户手填 →
+  // 医嘱字段强制标 user，防「transcribed（抄录）」语义出现在药盒来源计划上（V2.1 红线口径）。
+  // 处方草稿的 tags 信任确认页（用户逐项核对后的标注，唯一闸门语义）。
+  const planTags: PlanTags | null = input.plan
+    ? isPrescription
+      ? input.plan.tags ?? payload.planDraft?.tags ?? null
+      : { ...(input.plan.tags ?? {}), dose: 'user', frequency: 'user', duration: 'user' }
+    : null
 
   await db.transaction(async (tx) => {
     // ① sources：三层追溯锚点 + 确认留痕（追溯上下文全部从 payload 取，客户端无法伪造）
@@ -150,15 +177,19 @@ export async function confirmDraft(userId: string, id: string, input: DraftConfi
           status: 'active',
           source: isPrescription ? 'prescription' : 'manual',
           sourceId,
-          itemId: null,
-          tags: input.plan.tags ?? payload.planDraft?.tags ?? null,
+          itemId: id, // 反查来源内条目（PRD §7.3.1）：N 拆 N 模式下草稿即条目单元
+          tags: planTags,
         },
         tx,
       )
     }
-    // ④ health_profiles：勾选项 upsert（字段级来源标 prescription_confirmed）
+    // ④ health_profiles：勾选项 upsert（与建议值一致 → prescription_confirmed；用户改过值 → self_reported，溯源诚实）
     for (const h of input.health ?? []) {
-      const sourceMeta = { source: 'prescription_confirmed' as const, confirmedAt: nowIso }
+      const suggestion = suggested.find((s) => s.field === h.fieldKey)
+      const sourceMeta: HealthSourceMeta = {
+        source: suggestion && suggestion.value === h.value ? 'prescription_confirmed' : 'self_reported',
+        confirmedAt: nowIso,
+      }
       const existing = await profilesRepo.findByField(userId, h.fieldKey, tx)
       if (existing) {
         await profilesRepo.updateHealth(userId, h.fieldKey, { value: h.value, sourceMeta }, tx)
@@ -171,7 +202,23 @@ export async function confirmDraft(userId: string, id: string, input: DraftConfi
     if (!updated) throw new ApiError(409, ERR_CODES.CONFLICT, '草稿状态已变更，请刷新后重试')
   })
 
-  return { drugId, planId, sourceId, status: 'confirmed' }
+  // 确认路径的规则检查：对**用户最终确认值**重跑（草稿生成时算的是旧值，修正后必须重检），
+  // 只标注不阻止，随响应返回供前端提示（对齐 demo confirmDraft 的相互作用 toast）。
+  const checks = input.plan
+    ? await runRuleChecks(userId, input.drug.drugMasterId ?? null, {
+        dose: input.plan.dose,
+        frequency: input.plan.frequency,
+      })
+    : null
+
+  return {
+    drugId,
+    planId,
+    sourceId,
+    status: 'confirmed',
+    interactions: checks?.interactions ?? null,
+    dosageRange: checks?.dosageRange ?? null,
+  }
 }
 
 /** POST /api/drafts/:id/reject —— status=rejected 留痕（rejectReason/rejectedAt 并入 payload）。 */

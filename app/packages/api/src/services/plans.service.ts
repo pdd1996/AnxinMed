@@ -18,7 +18,6 @@ import * as drugsRepo from '../repositories/drugs.repo.js'
 import * as recordsRepo from '../repositories/records.repo.js'
 import * as assetsRepo from '../repositories/assets.repo.js'
 import type { PlanRow } from '../repositories/plans.repo.js'
-import type { DrugRow } from '../repositories/drugs.repo.js'
 import {
   checkDosageRange,
   checkInteractions,
@@ -75,12 +74,13 @@ export type CreatePlanResult = {
 }
 
 /**
- * 建计划时的规则检查（PRD §7.8.2 时机二 / §8.3）：相互作用对「生效计划集合 + 即将新建的药」，
+ * 建计划/确认时的规则检查（PRD §7.8.2 时机二 / §8.3）：相互作用对「生效计划集合 + 即将新建的药」，
  * 范围校验对新计划的药。只标注不阻止；资产库缺数据时引擎自然返回空/none（不报错、不阻断建计划）。
+ * 两条接入路径共用：手动建计划（createPlan）与草稿确认（drafts.service.confirmDraft 对最终值重跑）。
  */
-async function runRuleChecks(
+export async function runRuleChecks(
   userId: string,
-  newDrug: DrugRow,
+  newDrugMasterId: string | null,
   planDraft: { dose: Stock; frequency: number },
 ): Promise<{ interactions: InteractionResult; dosageRange: DosageRangeResult }> {
   const today = todayStr()
@@ -90,7 +90,7 @@ async function runRuleChecks(
   const activeMasterIds = drugRows
     .filter((d) => d.drugMasterId && planRows.some((p) => p.drugId === d.id && isPlanActiveOn(p, today)))
     .map((d) => d.drugMasterId as string)
-  const masterIds = [...new Set([...activeMasterIds, ...(newDrug.drugMasterId ? [newDrug.drugMasterId] : [])])]
+  const masterIds = [...new Set([...activeMasterIds, ...(newDrugMasterId ? [newDrugMasterId] : [])])]
 
   const ruleRows = await assetsRepo.listInteractionRules()
   const rules: InteractionRuleInput[] = ruleRows.map((r) => ({
@@ -103,8 +103,8 @@ async function runRuleChecks(
   const names = await assetsRepo.findDrugMasterNames(masterIds)
   const interactions = checkInteractions(masterIds, rules, names)
 
-  const insertRow = newDrug.drugMasterId
-    ? await assetsRepo.findPackageInsertByDrugMasterId(newDrug.drugMasterId)
+  const insertRow = newDrugMasterId
+    ? await assetsRepo.findPackageInsertByDrugMasterId(newDrugMasterId)
     : undefined
   const insertSlice: PackageInsertDosage | null = insertRow
     ? {
@@ -148,7 +148,7 @@ export async function createPlan(userId: string, input: PlanCreate): Promise<Cre
   }
 
   // 规则检查（相互作用 + 范围校验）：只标注不阻止，随响应返回（PRD §7.8.2 / §8.3）
-  const { interactions, dosageRange } = await runRuleChecks(userId, drug, {
+  const { interactions, dosageRange } = await runRuleChecks(userId, drug.drugMasterId ?? null, {
     dose: input.dose,
     frequency: input.frequency,
   })

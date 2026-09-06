@@ -26,18 +26,20 @@ function hasDrugPackage(layers: LayerLabel[]): boolean {
  */
 export function layerSuggestion(entry: Entry, layers: LayerLabel[]): string | null {
   if (has(layers, '不支持')) return null
+  // 检测到其它层（如说明书层）时先说清楚检测到了什么，避免「未检测到」与实际矛盾
+  const detected = layers.length > 0 ? `检测到${layers.join('、')}。` : ''
   if (entry === 'A') {
     if (!has(layers, '处方层')) {
       if (hasDrugPackage(layers)) {
         return `检测到${layers.join('、')}，未检测到处方层。你选择的是「拍处方笺」，是否切换到「拍药品」入口？`
       }
-      return '未在图片中检测到处方内容。你选择的是「拍处方笺」，请确认拍摄的是平铺完整、覆盖 Rp 至处方完毕的处方笺。'
+      return `${detected}未在图片中检测到处方内容。你选择的是「拍处方笺」，请确认拍摄的是平铺完整、覆盖 Rp 至处方完毕的处方笺。`
     }
     return null
   }
   if (!hasDrugPackage(layers)) {
     if (has(layers, '处方层')) return '检测到处方层。你选择的是「拍药品」，是否切换到「拍处方笺」入口？'
-    return '未检测到可识别的药品包装或医院标签，请补拍正面清晰的药盒。'
+    return `${detected}未检测到可识别的药品包装或医院标签，请补拍正面清晰的药盒。`
   }
   return null
 }

@@ -98,7 +98,7 @@ describe('管线 run.ts · 入口A 成功路径', () => {
     expect(d.needsManual).toEqual([]) // 全字段解析完整
   })
 
-  it('一张处方笺含 2 个条目 → 拆 2 份草稿（PRD §7.2.1），各自匹配到不同库条目', async () => {
+  it('一张处方笺含 2 个条目 → 拆 2 份草稿（PRD §7.2.1），各自匹配到不同库条目；整图身份不串味', async () => {
     const rx2 = [
       ...HEADER,
       'Rp',
@@ -114,6 +114,12 @@ describe('管线 run.ts · 入口A 成功路径', () => {
     expect(drafts[0].drugDraft.drugMasterId).toBe('dm-hycosan')
     expect(drafts[1].drugDraft.drugMasterId).toBe('dm-levo')
     expect(drafts[1].planDraft?.frequency).toBe(3)
+    // 串味防护：整图 VLM 身份是海露的，条目2（左氧氟沙星）绝不继承其商品名/厂家
+    expect(drafts[0].identity?.brandName).toBe('海露')
+    expect(drafts[1].identity?.brandName).toBeUndefined()
+    expect(drafts[1].identity?.manufacturer).toBeUndefined()
+    expect(drafts[1].drugDraft.brandName).toBeNull() // 库候选 LEVO.brandName=null，非「海露」
+    expect(drafts[1].identity?.form).toBe('滴眼液') // 从条目药名推剂型，非继承
   })
 
   it('低置信字符进入原文对照清单（确认页标红下划线）', async () => {
@@ -198,6 +204,19 @@ describe('管线 run.ts · 三条降级路径（产出 needsManual 草稿，不�
     expect(d.fallbackStatus).toBe('unavailable')
     expect(d.needsManual).toContain('usage')
   })
+
+  it('处方日期被涂黑（顶层缺项）→ needsManual 含 date，startDate 兜底今天且标 default（不静默）', async () => {
+    const rxNoDate = HEADER.filter((l) => !l.startsWith('日期'))
+    const clients = mockClients({
+      layers: ['处方层'],
+      ocr: mkOcr([...rxNoDate, 'Rp', '玻璃酸钠滴眼液 0.1%（10mL：10mg） ×1支', '用法：滴眼 每次1滴 每日4次 共7天', '处方完毕']),
+      identity: IDENTITY,
+    })
+    const [d] = await runPrescription(IMG, clients, ctx())
+    expect(d.needsManual).toContain('date') // 顶层缺项对确认页可见
+    expect(d.whitelist?.date).toBe('')
+    expect(d.planDraft?.tags.startDate).toBe('default') // 兜底值明确标「默认」，非「抄录」
+  })
 })
 
 describe('管线 run.ts · 入口B（药盒，永不抄录用法用量）', () => {
@@ -244,6 +263,15 @@ describe('管线 run.ts · 入口校验分支（409 / 422 / 503）', () => {
     expect(err.code).toBe('LAYER_MISMATCH')
     expect(err.details).toMatchObject({ detected: ['药盒原装层'] })
     expect(String(err.details?.suggestion)).toContain('切换到「拍药品」')
+  })
+
+  it('入口B 但检测到处方层 → 409 LAYER_MISMATCH（反方向同样不静默改道）', async () => {
+    const clients = mockClients({ layers: ['处方层'], identity: IDENTITY })
+    const err = await runDrug(IMG, clients, ctx()).catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err.status).toBe(409)
+    expect(err.code).toBe('LAYER_MISMATCH')
+    expect(String(err.details?.suggestion)).toContain('切换到「拍处方笺」')
   })
 
   it('散装药片（不支持）→ 422 UNSUPPORTED_OBJECT，且 OCR 未被调用（入口A/B 一致）', async () => {

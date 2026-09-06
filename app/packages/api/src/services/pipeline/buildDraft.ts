@@ -20,13 +20,17 @@ import {
 import type { IdentityFields, OcrChar } from '../../lib/ai/types.js'
 import type { Box } from '../sanitize/crop.js'
 import { parseSig } from '../sanitize/whitelist.js'
+import { nameMatches } from '../identity/normalize.js'
 import type { DrugMasterCandidate, MatchResult } from '../identity/match.js'
 import type { DrugDraft, LowConfidenceChar } from './types.js'
 
-/** 从药名推剂型（照搬 demo formFromName）：仅用于身份线缺剂型时的归一提示，不猜药名。 */
+/**
+ * 从药名推剂型（参照 demo formFromName，修正其 replace 缺陷）：仅用于身份线缺剂型时的归一提示，不猜药名。
+ * demo 原式 m[1].replace('滴眼','滴眼液') 在匹配到「滴眼液」时会产出「滴眼液液」，改为仅对裸「滴眼」归一。
+ */
 export function formFromName(name: string): string {
   const m = String(name || '').match(/(滴眼液|滴眼|注射液|口服液|喷雾剂|软膏|乳膏|滴丸|颗粒|胶囊|栓|贴)/)
-  if (m) return m[1].replace('滴眼', '滴眼液')
+  if (m) return m[1] === '滴眼' ? '滴眼液' : m[1]
   if (/片$/.test(name || '')) return '片剂'
   return ''
 }
@@ -68,16 +72,22 @@ export function buildPlanDraft(usageText: string, baseDate: string): PlanDraft {
   }
 }
 
-/** 条目 + 整图身份 → 该条目的有效身份（多条目时以 OCR 条目名/规格为准，VLM 身份作补充）。 */
+/**
+ * 条目 + 整图身份 → 该条目的有效身份。
+ * 多条目处方「串味」防护：整图 VLM 身份通常只对应其中一个药，故商品名/规格/剂型/厂家/OTC/批准文号
+ * 仅当 identity.genericName 与本条目药名可匹配（nameMatches 归一化双向子串）时才继承；
+ * 否则只用条目自身的 OCR 名/规格 + 从药名推剂型（不猜）。
+ */
 export function buildItemIdentity(identity: IdentityFields | null, item: PrescriptionItem): IdentityFields {
+  const same = Boolean(identity?.genericName && nameMatches(identity.genericName, item.drugName))
   return {
     genericName: item.drugName || identity?.genericName || '',
-    brandName: identity?.brandName,
-    specification: item.specification || identity?.specification || undefined,
-    form: identity?.form || formFromName(item.drugName) || undefined,
-    manufacturer: identity?.manufacturer,
-    otcFlag: identity?.otcFlag,
-    approvalNumber: identity?.approvalNumber,
+    brandName: same ? identity?.brandName : undefined,
+    specification: item.specification || (same ? identity?.specification : undefined) || undefined,
+    form: (same ? identity?.form : undefined) || formFromName(item.drugName) || undefined,
+    manufacturer: same ? identity?.manufacturer : undefined,
+    otcFlag: same ? identity?.otcFlag : undefined,
+    approvalNumber: same ? identity?.approvalNumber : undefined,
   }
 }
 

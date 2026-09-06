@@ -18,10 +18,10 @@ import {
   type ImageInput,
   type OcrResult,
 } from '../../lib/ai/types.js'
-import { cropBody, ocrToText, parseWhitelist, sanitizeScan } from '../sanitize/index.js'
+import { cropBody, ocrToText, parseWhitelist, sanitizeScan, type ParseResult } from '../sanitize/index.js'
 import { resolveFallback } from '../backlink/index.js'
 import { matchDrugMaster, type MatchResult } from '../identity/index.js'
-import { checkDosageRange, checkInteractions } from '../rules/index.js'
+import { checkDosageRange, checkInteractions, type DosageRangeResult } from '../rules/index.js'
 import { assertLayersForEntry, layerSuggestion } from './layers.js'
 import {
   buildDrugDraft,
@@ -47,10 +47,16 @@ function defaultConfirmStatus(match: MatchResult | null, hasPlan: boolean): Conf
   return hasPlan ? 'transcribed' : 'ocr_matched'
 }
 
-/** 某条目相关的人工补字段（从白名单 needsManual 里取 items[idx].* 子路径 → 字段名）。 */
+/**
+ * 某条目草稿的人工补清单：items[idx].* 子路径 → 字段名，再并入顶层缺项（hospital/date/…）。
+ * 顶层缺项必须可见：如处方日期被涂黑 → needsManual 含 'date'，确认页提示 startDate 是系统默认值需核对
+ *（否则「缺项被静默兜底」违反 rx-redacted golden case 口径）。
+ */
 function itemNeedsManual(allNeeds: string[], idx: number): string[] {
   const prefix = `items[${idx}].`
-  return allNeeds.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length))
+  const itemNeeds = allNeeds.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length))
+  const topNeeds = allNeeds.filter((p) => p === 'items' || !p.startsWith('items['))
+  return [...itemNeeds, ...topNeeds]
 }
 
 /** 降级草稿（OCR/裁剪/条目缺失等单步失败）：全 needsManual，绝不预填猜测。 */
@@ -103,6 +109,14 @@ export async function runPrescription(
   const layers = await clients.detectLayers(image)
   assertLayersForEntry('A', layers)
 
+  // 身份线与医嘱线并行（架构图「身份线（并行）」）：层校验通过即发起 VLM 提取，不阻塞 OCR/解析。
+  // 错误暂存到汇合处再分流（AIUnavailable → identity=null 降级；其它 → 冒泡）；
+  // catch 已挂载，降级早退路径不会产生未处理拒绝。
+  const identityTask = clients
+    .extractIdentity(image)
+    .then((identity) => ({ identity: identity as IdentityFields | null, error: null as unknown }))
+    .catch((error: unknown) => ({ identity: null as IdentityFields | null, error }))
+
   // ② OCR（失败 → 降级：全 needsManual 草稿，不 503）
   let ocr: OcrResult
   try {
@@ -122,8 +136,16 @@ export async function runPrescription(
     ]
   }
 
-  // ④ 白名单解析（全文扫描头部；条目仅在正文区）
-  const parse = parseWhitelist(ocrToText(ocr))
+  // ④ 白名单解析（全文扫描头部；条目仅在正文区）——理论上闭合 schema 拒绝才抛（不应发生），
+  // 但医嘱线任何一步失败都不炸整体 → 转降级草稿（错误细节不入 payload，L3 不打原文）
+  let parse: ParseResult
+  try {
+    parse = parseWhitelist(ocrToText(ocr))
+  } catch {
+    return [
+      degradedDraft('A', layers, ERR_CODES.PARSE_FAILED, '处方解析失败，请核对原文手动补全，或改用手动建档'),
+    ]
+  }
   // ⑥ 兜底 + 回链（仅当有缺项；只发 L0 正文）
   const fb = await resolveFallback(parse, crop.bodyText, clients)
   // ⑤ L2 脱敏（作用于回链合并后的最终白名单，合并值不逃逸 L2）
@@ -131,14 +153,10 @@ export async function runPrescription(
   const whitelist = scanned.value
   const sanitizeAudit = scanned.audit
 
-  // 身份线（VLM 提取；失败 → identity=null，逐项按 no_match 降级，不炸）
-  let identity: IdentityFields | null = null
-  try {
-    identity = await clients.extractIdentity(image)
-  } catch (err) {
-    if (!(err instanceof AIUnavailableError)) throw err
-    identity = null
-  }
+  // 身份线汇合（并行任务）：VLM 失败 → identity=null，逐项按 no_match 降级，不炸
+  const identityOutcome = await identityTask
+  if (identityOutcome.error && !(identityOutcome.error instanceof AIUnavailableError)) throw identityOutcome.error
+  const identity = identityOutcome.identity
 
   const items = whitelist.items
   if (items.length === 0) {
@@ -218,8 +236,12 @@ export async function runDrug(image: ImageInput, clients: AiClients, ctx: Pipeli
   const masterId = match.status === 'unique' && match.match ? match.match.id : null
   const masterIds = [...new Set([...ctx.activeMasterIds, ...(masterId ? [masterId] : [])])]
   const interactions = checkInteractions(masterIds, ctx.rules, ctx.drugNameById)
-  // 入口B 无用法用量 → 无范围校验对象（none）
-  const dosageRange = checkDosageRange({ dose: null, frequency: null }, null)
+  // 入口B 无用法用量 → 不做范围校验（专用文案；复用 checkDosageRange 的「说明书未收录」note 会误导）
+  const dosageRange: DosageRangeResult = {
+    status: 'none',
+    issues: [],
+    note: '药盒建档无医嘱用法用量，不做范围校验；手动创建计划时将按说明书校验',
+  }
 
   return {
     entry: 'B',

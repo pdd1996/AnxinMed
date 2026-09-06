@@ -12,7 +12,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 import { app } from '../app.js'
 import { db } from '../db/client.js'
-import { drugMaster, drafts, drugs, plans, sources, healthProfiles } from '../db/schema.js'
+import { drugMaster, packageInserts, drafts, drugs, plans, sources, healthProfiles } from '../db/schema.js'
+import * as draftsRepo from '../repositories/drafts.repo.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function req(method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> {
@@ -27,6 +28,7 @@ async function req(method: string, path: string, body?: unknown): Promise<{ stat
 const USER = 'p-001'
 const OTHER = 'p-002'
 const DM_HYCOSAN = 'dm-t6b-hycosan'
+const PI_HYCOSAN = 'pi-t6b-hycosan'
 
 const rxPayload = {
   entry: 'A',
@@ -93,11 +95,21 @@ beforeAll(async () => {
   await cleanUser()
   await db.delete(drafts).where(eq(drafts.userId, OTHER))
   await db.insert(drugMaster).values({ id: DM_HYCOSAN, genericName: '玻璃酸钠滴眼液', specification: '0.1%（10mL:10mg）', form: '滴眼液' })
+  // 说明书 fixture：上限 10 次/日 → 确认路径重跑范围校验的锚点（频次 4 → pass；99 → exceed）
+  await db.insert(packageInserts).values({
+    id: PI_HYCOSAN,
+    drugId: DM_HYCOSAN,
+    genericName: '玻璃酸钠滴眼液',
+    dosage: { adult: { dosePerUse: { value: 1, unit: '滴' }, maxFrequencyPerDay: { value: 10, unit: '次', note: '超出需眼科医生指导' } } },
+    source: '海露说明书',
+    version: 'v1',
+  })
 })
 
 afterAll(async () => {
   await cleanUser()
   await db.delete(drafts).where(eq(drafts.userId, OTHER))
+  await db.delete(packageInserts).where(eq(packageInserts.id, PI_HYCOSAN))
   await db.delete(drugMaster).where(eq(drugMaster.id, DM_HYCOSAN))
 })
 
@@ -120,6 +132,7 @@ describe('POST /api/drafts/:id/confirm · 单事务原子写四表', () => {
     const planRows = await db.select().from(plans).where(eq(plans.id, planId))
     expect(planRows[0]).toMatchObject({ drugId, frequency: 4, status: 'active', source: 'prescription', sourceId, startDate: '2026-09-02' })
     expect((planRows[0].tags as any).dose).toBe('user') // 用户修正的用量标 user
+    expect(planRows[0].itemId).toBe(id) // 反查来源内条目（PRD §7.3.1）：草稿即条目单元
 
     const srcRows = await db.select().from(sources).where(eq(sources.id, sourceId))
     expect(srcRows[0].type).toBe('prescription')
@@ -135,6 +148,10 @@ describe('POST /api/drafts/:id/confirm · 单事务原子写四表', () => {
 
     const dRows = await db.select().from(drafts).where(eq(drafts.id, id))
     expect(dRows[0].status).toBe('confirmed')
+
+    // 确认路径对**最终值**重跑规则检查（M2 收尾清单：接入建计划与确认两条路径）：4 次/日 ≤ 10 → pass
+    expect(res.body.dosageRange.status).toBe('pass')
+    expect(res.body.interactions).toMatchObject({ hits: [], coverageNote: null })
   })
 
   it('入口B（建档，无计划）→ 只写 drugs+sources（type=drug_box），无 plans 行', async () => {
@@ -219,5 +236,72 @@ describe('草稿确认的守卫分支', () => {
     const res = await req('POST', `/api/drafts/${id}/confirm`, { drug: { confirmStatus: 'manual' } })
     expect(res.status).toBe(400)
     expect(res.body.code).toBe('VALIDATION')
+  })
+})
+
+describe('确认路径的规则检查与溯源守卫（review 修复）', () => {
+  it('最终确认值超标（99 次/日 > 说明书上限 10）→ 仍 200 落库，dosageRange=exceed 只标注不阻止', async () => {
+    const id = 'draft-t6b-exceed'
+    await seedDraft(id, 'prescription', rxPayload)
+    const res = await req('POST', `/api/drafts/${id}/confirm`, {
+      drug: { genericName: '玻璃酸钠滴眼液', drugMasterId: DM_HYCOSAN, confirmStatus: 'transcribed' },
+      plan: { dose: { value: 1, unit: '滴' }, frequency: 99, times: ['08:00'], cycleType: 'open', startDate: '2026-09-02' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.dosageRange.status).toBe('exceed')
+    expect(res.body.dosageRange.issues[0]).toMatchObject({ field: 'frequency', planValue: '99 次/日', insertMax: '10 次/日' })
+    const planRows = await db.select().from(plans).where(eq(plans.id, res.body.planId))
+    expect(planRows).toHaveLength(1) // 超标不阻止创建（PRD §8.3）
+  })
+
+  it('health 字段不在草稿建议清单内 → 400（防伪造 prescription_confirmed 溯源），draft 仍 pending', async () => {
+    const id = 'draft-t6b-health-forge'
+    await seedDraft(id, 'prescription', rxPayload)
+    const res = await req('POST', `/api/drafts/${id}/confirm`, {
+      drug: { genericName: '玻璃酸钠滴眼液', confirmStatus: 'transcribed' },
+      health: [{ fieldKey: '过敏史', value: '无' }], // 建议清单只有「诊断」
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('VALIDATION')
+    expect(res.body.message).toContain('建议清单')
+    const rows = await db.select().from(drafts).where(eq(drafts.id, id))
+    expect(rows[0].status).toBe('pending') // 校验在事务前，无任何写入
+  })
+
+  it('health 勾选值被用户改过 → 来源标 self_reported（非 prescription_confirmed，溯源诚实）', async () => {
+    const id = 'draft-t6b-health-edited'
+    await seedDraft(id, 'prescription', rxPayload)
+    const res = await req('POST', `/api/drafts/${id}/confirm`, {
+      drug: { genericName: '玻璃酸钠滴眼液', confirmStatus: 'transcribed' },
+      health: [{ fieldKey: '诊断', value: '干眼症（用户修正）' }], // ≠ 建议值「干眼综合征」
+    })
+    expect(res.status).toBe(200)
+    const hRows = await db.select().from(healthProfiles).where(and(eq(healthProfiles.userId, USER), eq(healthProfiles.fieldKey, '诊断')))
+    expect(hRows[0].value).toBe('干眼症（用户修正）')
+    expect((hRows[0].sourceMeta as any).source).toBe('self_reported')
+  })
+
+  it('入口B 草稿带计划（必为用户手填）→ 医嘱字段强制标 user，客户端传 transcribed 无效；source=manual', async () => {
+    const id = 'draft-t6b-b-with-plan'
+    await seedDraft(id, 'drug', drugPayload)
+    const res = await req('POST', `/api/drafts/${id}/confirm`, {
+      drug: { genericName: '玻璃酸钠滴眼液', drugMasterId: DM_HYCOSAN, confirmStatus: 'ocr_matched' },
+      plan: { dose: { value: 1, unit: '滴' }, frequency: 2, times: ['08:00', '20:00'], cycleType: 'open', startDate: '2026-09-02', tags: { dose: 'transcribed', frequency: 'transcribed' } },
+    })
+    expect(res.status).toBe(200)
+    const planRows = await db.select().from(plans).where(eq(plans.id, res.body.planId))
+    expect(planRows[0].source).toBe('manual')
+    expect((planRows[0].tags as any).dose).toBe('user') // 药盒来源计划上绝不允许「抄录」语义
+    expect((planRows[0].tags as any).frequency).toBe('user')
+    expect((planRows[0].tags as any).duration).toBe('user')
+  })
+
+  it('resolveDraft 竞态守卫：仅 pending 可落定，二次落定返回 undefined（事务内据此 409 回滚）', async () => {
+    const id = 'draft-t6b-race'
+    await seedDraft(id, 'drug', drugPayload)
+    const first = await draftsRepo.resolveDraft(USER, id, 'confirmed')
+    expect(first?.status).toBe('confirmed')
+    const second = await draftsRepo.resolveDraft(USER, id, 'rejected')
+    expect(second).toBeUndefined() // WHERE status='pending' 未命中 → 不覆盖已落定状态
   })
 })
