@@ -18,6 +18,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-users": "tsx src/db/seed-users.ts",
     "db:seed-demo": "tsx src/db/seed-demo.ts",
+    "db:seed-drafts": "tsx src/db/seed-drafts-demo.ts",
     "db:import-crawled": "tsx src/db/import-crawled.ts",
     "db:audit": "tsx src/db/data-audit.ts",
     "db:studio": "drizzle-kit studio"
