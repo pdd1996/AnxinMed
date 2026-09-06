@@ -7,9 +7,15 @@ import { zValidator } from '@hono/zod-validator'
 import type { ZodSchema } from 'zod'
 import { ERR_CODES } from '@anxin/shared'
 
-/** 领域错误：携带 HTTP 状态 + 错误码；app.onError 统一转 { ok:false, code, message }（不静默吞错）。 */
+/** 领域错误：携带 HTTP 状态 + 错误码 +（可选）结构化明细；app.onError 统一转 { ok:false, code, message, ...details }（不静默吞错）。 */
 export class ApiError extends Error {
-  constructor(public status: ContentfulStatusCode, public code: string, message: string) {
+  constructor(
+    public status: ContentfulStatusCode,
+    public code: string,
+    message: string,
+    /** 附加明细（如 LAYER_MISMATCH 的 { detected, suggestion }）；展开进错误响应体，向后兼容。 */
+    public details?: Record<string, unknown>,
+  ) {
     super(message)
     this.name = 'ApiError'
   }

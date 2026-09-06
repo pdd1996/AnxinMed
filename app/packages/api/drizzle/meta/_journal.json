@@ -15,6 +15,13 @@
       "when": 1788598324414,
       "tag": "0001_workable_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788676546606,
+      "tag": "0002_happy_madripoor",
+      "breakpoints": true
     }
   ]
 }

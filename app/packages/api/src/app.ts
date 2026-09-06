@@ -24,6 +24,8 @@ import { plansRoute } from './routes/plans.js'
 import { tasksRoute } from './routes/tasks.js'
 import { recordsRoute } from './routes/records.js'
 import { profilesRoute } from './routes/profiles.js'
+import { intakeRoute } from './routes/intake.js'
+import { draftsRoute } from './routes/drafts.js'
 import { registerStubs } from './routes/_stubs.js'
 
 export const app = new Hono<AppEnv>()
@@ -50,6 +52,8 @@ const route = app
   .route('/api/tasks', tasksRoute)
   .route('/api/records', recordsRoute)
   .route('/api/profile', profilesRoute)
+  .route('/api/intake', intakeRoute)
+  .route('/api/drafts', draftsRoute)
 
 /** RPC 类型出口：web 端 `import type { AppType } from '@anxin/api'` 获得端到端类型。 */
 export type AppType = typeof route
@@ -63,7 +67,7 @@ route.notFound((c) => c.json({ ok: false, code: ERR_CODES.NOT_FOUND, message: '�
 // 全局错误出口：统一 { ok:false, code, message }；日志不打用户数据（执行总纲 §0.5 / §3.2）
 route.onError((err, c) => {
   if (err instanceof ApiError) {
-    return c.json({ ok: false, code: err.code, message: err.message }, err.status)
+    return c.json({ ok: false, code: err.code, message: err.message, ...(err.details ?? {}) }, err.status)
   }
   if (err instanceof HTTPException) {
     return c.json({ ok: false, code: ERR_CODES.VALIDATION, message: err.message }, err.status as ContentfulStatusCode)

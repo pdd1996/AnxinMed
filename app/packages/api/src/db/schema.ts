@@ -1,5 +1,5 @@
 /**
- * 安心用药 · 数据库 Schema（9 张表 = 资产域三库 + 用户域六表）
+ * 安心用药 · 数据库 Schema（10 张表 = 资产域三库 + 用户域七表）
  *
  * PRD V2 §12.3/§13 · 技术方案 §4 · 执行总纲 §3.2。
  *
@@ -10,6 +10,7 @@
  *
  * 用户域（全部带 userId，多用户边界从第一天贯通）：
  *   users / drugs（药箱）/ plans（计划）/ records（记录）/ sources（来源）/ health_profiles（健康信息）
+ *   drafts（录入草稿，M2-T6）—— 拍照录入管线产物，确认页唯一闸门前的暂存区
  *
  * 核心不变式：药品主数据库 ≠ 用户药箱；医嘱只抄录不生成；条目禁止模型生成。
  */
@@ -223,6 +224,25 @@ export const healthProfiles = pgTable('health_profiles', {
   fieldKey: text('field_key').notNull(),                 // 字段键（gender/birthMonth/allergy/…）
   value: text('value'),                                  // 字段值
   sourceMeta: jsonb('source_meta'),                      // { source: 'self_reported'|'prescription_confirmed', confirmedAt? }
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// ---------------------------------------------------------------------------
+// drafts · 录入草稿（M2-T6）—— 拍照录入管线（①–⑦）产物，确认页（唯一闸门）前的暂存区
+// 不变式：payload 内一切医嘱/身份字段均来自「抄录 + 回链校验 + 脱敏」或 needsManual 空缺，
+//         绝不含模型猜测预填；原文（OCR/前记身份）只在管线内存流转，落库仅存脱敏白名单 + 裁剪几何。
+// 一张处方笺含 N 个条目 → 拆 N 份草稿（PRD §7.2.1），各自独立确认。
+// ---------------------------------------------------------------------------
+export const drafts = pgTable('drafts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),                     // → users.id（应用层过滤）
+  type: varchar('type', { enum: ['prescription', 'drug'] }).notNull(),       // 入口A 处方笺 / 入口B 药品
+  status: varchar('status', { enum: ['pending', 'confirmed', 'rejected'] })
+    .notNull()
+    .default('pending'),                                 // 待确认 / 已确认 / 已拒绝
+  payload: jsonb('payload').notNull(),                   // DraftPayload（档案/计划草稿+四类标注+冲突清单+健康建议+人工补清单+裁剪图引用）
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
