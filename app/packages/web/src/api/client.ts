@@ -1,6 +1,7 @@
 import { hc } from 'hono/client'
 import { toast } from 'sonner'
 import type { AppType } from '@anxin/api'
+import type { DraftConfirm } from '@anxin/shared'
 
 /**
  * hc<AppType> 端到端类型客户端（技术方案 §1）。
@@ -49,5 +50,32 @@ export async function fetchPlans() {
 /** 健康信息（我的页用）。 */
 export async function fetchProfile() {
   const res = await client.api.profile.$get()
+  return unwrap(res)
+}
+
+// ── 录入草稿（M2-T7 确认页）──
+
+/** 草稿详情：payload 为 api 侧 DraftPayload，经 hc<AppType> 端到端推导（web 不复制类型，执行总纲 §3.1）。 */
+export async function fetchDraft(id: string) {
+  const res = await client.api.drafts[':id'].$get({ param: { id } })
+  const data = await unwrap(res)
+  return data.draft
+}
+
+export type DraftDto = Awaited<ReturnType<typeof fetchDraft>>
+export type DraftPayloadDto = DraftDto['payload']
+
+/**
+ * 草稿确认（录入主线唯一闸门）：服务端单事务原子写 sources+drugs+plans+health_profiles+drafts.status。
+ * 响应含对**用户最终确认值**重跑的规则检查（interactions/dosageRange），只标注不阻止，前端负责展示。
+ */
+export async function confirmDraft(id: string, body: DraftConfirm) {
+  const res = await client.api.drafts[':id'].confirm.$post({ param: { id }, json: body })
+  return unwrap(res)
+}
+
+/** 草稿拒绝（「信息不符」）：status=rejected 留痕。 */
+export async function rejectDraft(id: string, reason?: string) {
+  const res = await client.api.drafts[':id'].reject.$post({ param: { id }, json: { reason: reason ?? null } })
   return unwrap(res)
 }
