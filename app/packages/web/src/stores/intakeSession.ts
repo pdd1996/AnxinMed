@@ -18,6 +18,12 @@ interface IntakeSessionState {
   setSession: (draftIds: string[], imageDataUrl: string) => void
   /** 清理：传 draftIds 只清这几份；不传清空整个会话。 */
   clear: (draftIds?: string[]) => void
+  /**
+   * 层检测纠偏的跨入口交接（M2-T8）：在 /intake/rx 检测到「实为药盒」时，把原图交给 /intake/drug
+   * 直接重跑，用户不必重新选文件。同样只在内存，切换完成或放弃即清。
+   */
+  pendingImage: { dataUrl: string; fromEntry: 'A' | 'B'; note: string } | null
+  setPendingImage: (pending: { dataUrl: string; fromEntry: 'A' | 'B'; note: string } | null) => void
 }
 
 export const useIntakeSession = create<IntakeSessionState>()((set) => ({
@@ -37,6 +43,8 @@ export const useIntakeSession = create<IntakeSessionState>()((set) => ({
       for (const id of draftIds) delete next[id]
       return { imageByDraftId: next }
     }),
+  pendingImage: null,
+  setPendingImage: (pending) => set({ pendingImage: pending }),
 }))
 
 /** 非响应式读取（测试与提交后清理用）：组件内请用 useIntakeSession 选择器。 */

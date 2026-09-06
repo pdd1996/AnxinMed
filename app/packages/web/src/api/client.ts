@@ -79,3 +79,51 @@ export async function rejectDraft(id: string, reason?: string) {
   const res = await client.api.drafts[':id'].reject.$post({ param: { id }, json: { reason: reason ?? null } })
   return unwrap(res)
 }
+
+// ── 录入管线（M2-T8）──
+
+/**
+ * 不 toast 的拆包（录入页要自己渲染失败分支，toast 会重复且丢结构化信息）。
+ * 失败时保留 status/code/details（409 的 detected/suggestion 等），禁止静默吞错：调用方必须把失败可见化。
+ */
+export type Settled<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number; code: string; message: string; details: Record<string, unknown> }
+
+export async function settle<T extends { ok: boolean }>(res: {
+  ok: boolean
+  status: number
+  json(): Promise<T>
+}): Promise<Settled<Omit<T, 'ok'>>> {
+  const body = await res.json()
+  if (res.ok && body.ok) {
+    const { ok: _ok, ...data } = body
+    return { ok: true, data: data as Omit<T, 'ok'> }
+  }
+  const err = body as unknown as Record<string, unknown>
+  return {
+    ok: false,
+    status: res.status,
+    code: typeof err.code === 'string' ? err.code : 'UNKNOWN',
+    message: typeof err.message === 'string' ? err.message : '请求失败，请稍后重试',
+    details: err,
+  }
+}
+
+/** POST /api/intake/detect：仅层检测（入口校验，信息性不抛 409/422）。 */
+export async function detectImage(image: string, entry?: 'A' | 'B') {
+  const res = await client.api.intake.detect.$post({ json: entry ? { image, entry } : { image } })
+  return settle(res)
+}
+
+/** POST /api/intake/prescription：入口A 全管线 → N 份草稿。 */
+export async function intakePrescription(image: string) {
+  const res = await client.api.intake.prescription.$post({ json: { image } })
+  return settle(res)
+}
+
+/** POST /api/intake/drug：入口B 仅身份线 → 1 份建档草稿。 */
+export async function intakeDrug(image: string) {
+  const res = await client.api.intake.drug.$post({ json: { image } })
+  return settle(res)
+}
