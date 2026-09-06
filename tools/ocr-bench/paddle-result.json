@@ -1,0 +1,35 @@
+{
+  "engine": "PaddleOCR 自托管 (PP-OCRv4, CPU)",
+  "init_seconds": 10.07,
+  "inference_seconds": 68.86,
+  "inference_warm_seconds": 68.83,
+  "lines_detected": 13,
+  "medical_order_char_accuracy": 1.0,
+  "medical_order_exact_lines": "4/4",
+  "all_char_accuracy": 0.9722,
+  "all_exact_lines": "11/12",
+  "char_level_confidence_available": true,
+  "confidence_sample": [
+    0.9949,
+    0.9979,
+    0.9708,
+    0.9999,
+    1.0
+  ],
+  "coordinates_available": true,
+  "ocr_texts": [
+    "示例市第二医院 处方笺",
+    "处方编号：20260906-001 费别：自费",
+    "姓名：张某某性别：男 年龄：68岁",
+    "临床诊断：高血压2型糖尿病",
+    "日期：2026年09月06日",
+    "Rp",
+    "1. 苯磺酸氨氯地平片 5mg×14片",
+    "用法：每次1片每日1次 口服",
+    "2. 盐酸二甲双胍片 0.5g×30片",
+    "用法：每次1片每日2次 口服",
+    "医师：李某某",
+    "药师：王某某",
+    "处方完毕"
+  ]
+}
