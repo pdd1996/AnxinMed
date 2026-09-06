@@ -169,3 +169,82 @@ export const ConsultResponseSchema = z.object({
   blocked: z.boolean().default(false),
 })
 export type ConsultResponse = z.infer<typeof ConsultResponseSchema>
+
+// ── 医生端洞察响应（M3-T3 · PRD §7.7）──
+
+/** 患者列表项（GET /api/insight/patients）。 */
+export const InsightPatientSchema = z.object({
+  id: z.string(),
+  name: z.string().nullish(),
+  age: z.number().nullish(),
+  gender: z.string().nullish(),
+  conditions: z.array(z.string()).default([]),
+  drugCount: z.number().default(0),
+  enrolledAt: z.string(),
+  lastActiveAt: z.string().nullish(),
+})
+export type InsightPatient = z.infer<typeof InsightPatientSchema>
+
+/** 5 个只读工具的聚合输出（POST /api/insight/summary 响应中的 tools 字段）。 */
+export const InsightToolsSchema = z.object({
+  adherence: z.object({
+    rate: z.number(),
+    taken: z.number(),
+    skipped: z.number(),
+    total: z.number(),
+    consecutiveSkip: z.number(),
+    skipDetails: z.array(z.object({ date: z.string(), drugId: z.string() })),
+    dateRange: z.number(),
+  }),
+  medicationList: z.array(
+    z.object({
+      id: z.string(),
+      genericName: z.string(),
+      brandName: z.string().nullish(),
+      specification: z.string().nullish(),
+      form: z.string().nullish(),
+      stock: z.object({ value: z.number(), unit: z.string() }).nullish(),
+      expiry: z.string().nullish(),
+    }),
+  ),
+  interactions: z.object({
+    hasInteraction: z.boolean(),
+    items: z.array(z.object({ level: z.string(), note: z.string(), drugs: z.array(z.string()) })),
+  }),
+  expiry: z.object({
+    expiring: z.array(z.unknown()),
+    expired: z.array(z.unknown()),
+    lowStock: z.array(z.unknown()),
+  }),
+  riskEvents: z.object({
+    events: z.array(z.object({ date: z.string(), level: z.string(), type: z.string(), detail: z.string() })),
+    consultCount: z.number(),
+    lastQuestion: z.string(),
+    blockedCount: z.number(),
+    hasL4: z.boolean(),
+    hasL3: z.boolean(),
+  }),
+})
+export type InsightTools = z.infer<typeof InsightToolsSchema>
+
+/**
+ * POST /api/insight/summary 响应体。
+ * - `sections` 为 guardSummary 二次守门后的结构化摘要（L4/L3/L2/L1）；
+ * - `snapshot.mode` 区分 LLM 生成 / 离线降级 / 错误降级；
+ * - `tools` 为 5 个只读工具的聚合输出（前端展示“工具输出”区域）。
+ */
+export const InsightSummaryResponseSchema = z.object({
+  patient: InsightPatientSchema,
+  riskLevel: RiskLevelSchema,
+  sections: ConsultSectionsSchema,
+  tools: InsightToolsSchema,
+  snapshot: z.object({
+    generatedAt: z.string(),
+    dateRange: z.string(),
+    toolChain: z.array(z.string()),
+    mode: z.enum(['llm', 'offline-fallback', 'error-fallback']),
+  }),
+  citations: z.array(z.string()).default([]),
+  notice: z.string().nullish(),
+})
+export type InsightSummaryResponse = z.infer<typeof InsightSummaryResponseSchema>

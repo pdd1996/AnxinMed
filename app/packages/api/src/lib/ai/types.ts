@@ -77,6 +77,43 @@ export interface ConsultPromptPayload {
 }
 
 /**
+ * 医生端摘要 prompt 入参（M3-T3 · services/insight/run.ts 组装）。
+ * 只含 5 个只读工具的聚合输出 + 患者基本信息（name/age/gender/conditions），不含 PII 原文。
+ */
+export interface InsightPromptPayload {
+  patient: {
+    name: string
+    age: number | null
+    gender: string | null
+    conditions: string[]
+  }
+  dateRange: string
+  tools: {
+    adherence: {
+      rate: number
+      taken: number
+      total: number
+      consecutiveSkip: number
+      skipDetails: string[]
+    }
+    medicationCount: number
+    medicationNames: string[]
+    interactions: string[]
+    expiry: {
+      expiringCount: number
+      expiredCount: number
+      lowStockCount: number
+    }
+    riskEvents: {
+      hasL4: boolean
+      hasL3: boolean
+      blockedCount: number
+      lastQuestion: string
+    }
+  }
+}
+
+/**
  * 统一 AI 客户端接口。管线只依赖此接口，不直接 import 具体实现。
  * 每个方法失败时抛 AIUnavailableError（或经 zod safeParse 失败抛明确错误），由编排层转降级。
  */
@@ -99,4 +136,9 @@ export interface AiClients {
    * 未实现时抛 AIUnavailableError（上层转 no-source 降级）。
    */
   medicalSearch?(question: string, drugName: string): Promise<ConsultRawSections>
+  /**
+   * 医生端摘要（M3-T3 · PRD §7.7）：5 个只读工具输出 + 患者信息 → 结构化摘要。
+   * 输出 schema 与咨询相同（ConsultRawSectionsSchema）；非法抛 AIUnavailableError。
+   */
+  insightSummary(payload: InsightPromptPayload): Promise<ConsultRawSections>
 }

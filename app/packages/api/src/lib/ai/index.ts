@@ -15,10 +15,16 @@ export function createAiClients(): AiClients {
     fallbackParse: baichuan.fallbackParse,
     consultAnswer: baichuan.consultAnswer,
     medicalSearch: baichuan.medicalSearch,
+    insightSummary: baichuan.insightSummary,
   }
 }
 
 export * from './types.js'
 export { buildDetectLayersRequest, buildExtractIdentityRequest } from './qwen.js'
 export { buildOcrRequest } from './ocr.js'
-export { buildFallbackParseRequest, buildConsultRequest, buildMedicalSearchRequest } from './baichuan.js'
+export {
+  buildFallbackParseRequest,
+  buildConsultRequest,
+  buildMedicalSearchRequest,
+  buildInsightRequest,
+} from './baichuan.js'

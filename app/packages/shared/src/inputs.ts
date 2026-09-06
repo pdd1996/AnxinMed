@@ -107,3 +107,11 @@ export const ConsultRequestSchema = z.object({
   drugIds: z.array(z.string().min(1)).default([]),
 })
 export type ConsultRequest = z.infer<typeof ConsultRequestSchema>
+
+// ── 医生端洞察（M3-T3 · PRD §7.7）──
+
+/** POST /api/insight/summary：选定患者 → 组装 5 类数据 → Baichuan 生成摘要。 */
+export const InsightSummaryRequestSchema = z.object({
+  patientId: z.string().trim().min(1, '请提供 patientId'),
+})
+export type InsightSummaryRequest = z.infer<typeof InsightSummaryRequestSchema>

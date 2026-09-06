@@ -7,6 +7,7 @@ import {
   type ConsultPromptPayload,
   type ConsultRawSections,
   type FallbackFields,
+  type InsightPromptPayload,
 } from './types.js'
 import { callJson, extractChatContent, parseModelJson, type ChatResponse } from './http.js'
 import { ConsultRawSectionsSchema, FallbackParseSchema } from './schemas.js'
@@ -159,6 +160,77 @@ export async function medicalSearch(question: string, drugName: string): Promise
   const parsed = ConsultRawSectionsSchema.safeParse(raw)
   if (!parsed.success) {
     throw new AIUnavailableError('baichuan', `医疗搜索输出不符合约定：${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
+// ---------------------------------------------------------------------------
+// M3-T3：医生端摘要（5 个只读工具输出 + 患者信息 → 结构化摘要）
+// ---------------------------------------------------------------------------
+
+/**
+ * 医生端摘要请求体组装（纯函数，可测）：照搬 demo/server/index.js:1355-1378 的实测 prompt。
+ * 只含 5 个只读工具的聚合输出 + 患者基本信息，不含 PII 原文。
+ */
+export function buildInsightRequest(payload: InsightPromptPayload) {
+  const { patient, dateRange, tools } = payload
+  const { adherence, medicationCount, medicationNames, interactions, expiry, riskEvents } = tools
+
+  const interactionsText = interactions.length > 0 ? interactions.join('；') : '未见明确相互作用'
+  const skipDetailsText = adherence.consecutiveSkip > 0 ? `，漏服明细 ${adherence.skipDetails.join('、')}` : ''
+
+  const content = `你是"安心用药"演示版的患者洞察助手，为医生生成诊前用药摘要。只基于以下工具输出的事实生成摘要，不要编造数据。
+
+硬性规则：
+1. 只输出严格 JSON，禁止 Markdown、禁止 **粗体**、禁止引用编号。
+2. 总字数控制在 150-250 个汉字。
+3. 不得给出具体剂量、频次、疗程数字，不得说"一日X片/每次X mg"。
+4. 不得诊断、开处方、建议停换药或调整剂量。
+5. 摘要面向医生，用于诊前快速了解患者用药情况，不是用药建议。
+6. 不要结尾追问。
+
+JSON 格式：
+{"summary":"一句话概括患者近期用药情况","keyPoints":["最多3条关键发现"],"risks":["最多3条风险提示"],"nextAction":"下一步建议（指向诊间确认或联系医生）","warning":"提醒医生本摘要仅供参考"}
+
+患者：${patient.name}${patient.age ? `，${patient.age}岁` : ''}${patient.gender ? `，${patient.gender}` : ''}${patient.conditions.length > 0 ? `，慢病：${patient.conditions.join('、')}` : ''}。
+数据区间：${dateRange}（近 30 天）。
+
+工具输出（均为只读计算结果）：
+- 依从性：执行率 ${adherence.rate}%（已服 ${adherence.taken}/${adherence.total}），连续漏服 ${adherence.consecutiveSkip} 次${skipDetailsText}
+- 用药清单（${medicationCount} 种）：${medicationNames.join('、')}
+- 相互作用：${interactionsText}
+- 临期库存：临期 ${expiry.expiringCount} 种、过期 ${expiry.expiredCount} 种、低库存 ${expiry.lowStockCount} 种
+- 风险事件：L4 紧急 ${riskEvents.hasL4 ? '有' : '无'}、L3 拒答 ${riskEvents.hasL3 ? '有' : '无'}；咨询被拦截 ${riskEvents.blockedCount} 次；最近咨询："${riskEvents.lastQuestion}"
+
+请基于以上事实生成诊前摘要。`
+
+  return {
+    model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
+    temperature: 0.1,
+    messages: [{ role: 'user' as const, content }],
+  }
+}
+
+/** 医生端摘要：5 个只读工具输出 + 患者信息 → 结构化摘要。输出过 ConsultRawSectionsSchema safeParse。 */
+export async function insightSummary(payload: InsightPromptPayload): Promise<ConsultRawSections> {
+  const baseUrl = process.env.BAICHUAN_BASE_URL
+  const key = process.env.BAICHUAN_API_KEY
+  if (!baseUrl || !key) {
+    throw new AIUnavailableError('baichuan', '缺少 BAICHUAN_BASE_URL / BAICHUAN_API_KEY 配置')
+  }
+  const res = await callJson<ChatResponse>(
+    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildInsightRequest(payload)),
+    },
+    { client: 'baichuan' },
+  )
+  const raw = parseModelJson(extractChatContent(res, 'baichuan'), 'baichuan')
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('baichuan', `医生端摘要输出不符合约定：${parsed.error.message}`)
   }
   return parsed.data
 }

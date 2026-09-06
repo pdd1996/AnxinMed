@@ -16,6 +16,7 @@ import {
   type FallbackFields,
   type IdentityFields,
   type ImageInput,
+  type InsightPromptPayload,
   type OcrChar,
   type OcrResult,
 } from '../../lib/ai/types.js'
@@ -46,6 +47,7 @@ export interface AiCalls {
   fallbackParse: number
   consultAnswer: number
   medicalSearch: number
+  insightSummary: number
 }
 
 export function newCalls(): AiCalls {
@@ -56,6 +58,7 @@ export function newCalls(): AiCalls {
     fallbackParse: 0,
     consultAnswer: 0,
     medicalSearch: 0,
+    insightSummary: 0,
   }
 }
 
@@ -68,12 +71,15 @@ export interface MockOverrides {
   consult?: ConsultRawSections
   /** M3-T1：医疗搜索兜底 override。 */
   medical?: ConsultRawSections
+  /** M3-T3：医生端摘要 override。 */
+  insight?: ConsultRawSections
   detectLayersError?: Error
   runOcrError?: Error
   extractIdentityError?: Error
   fallbackError?: Error
   consultAnswerError?: Error
   medicalSearchError?: Error
+  insightSummaryError?: Error
   calls?: AiCalls
 }
 
@@ -113,6 +119,13 @@ export function mockClients(o: MockOverrides = {}): AiClients {
       if (o.medicalSearchError) throw o.medicalSearchError
       if (!o.medical) throw new AIUnavailableError('baichuan', 'mock 未提供 medicalSearch override')
       return o.medical
+    },
+    async insightSummary(_payload: InsightPromptPayload) {
+      calls.insightSummary++
+      if (o.insightSummaryError) throw o.insightSummaryError
+      // 默认抛 AIUnavailableError：M2/M3-T1 测试不走摘要路径，如意外走到则明确失败（不静默通过）
+      if (!o.insight) throw new AIUnavailableError('baichuan', 'mock 未提供 insightSummary override')
+      return o.insight
     },
   }
 }

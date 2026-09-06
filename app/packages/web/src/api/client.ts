@@ -144,3 +144,23 @@ export async function postConsult(question: string, drugIds: string[]) {
 
 /** 咨询响应 DTO（去掉 ok 字段；hc<AppType> 推导，web 不复制类型）。 */
 export type ConsultResponseDto = Omit<Awaited<ReturnType<typeof postConsult>>, 'ok'>
+
+// ── 医生端洞察（M3-T3）──
+
+/** GET /api/insight/patients：患者列表 + 概要。 */
+export async function fetchInsightPatients() {
+  const res = await client.api.insight.patients.$get()
+  const data = await unwrap(res)
+  return data.items
+}
+
+/** POST /api/insight/summary：选定患者 → 组装 5 类数据 → Baichuan 生成摘要。 */
+export async function generateInsightSummary(patientId: string) {
+  const res = await client.api.insight.summary.$post({ json: { patientId } })
+  return unwrap(res)
+}
+
+/** 患者列表项 DTO（hc<AppType> 推导）。 */
+export type InsightPatientDto = Awaited<ReturnType<typeof fetchInsightPatients>>[number]
+/** 摘要响应 DTO（去掉 ok 字段）。 */
+export type InsightSummaryDto = Omit<Awaited<ReturnType<typeof generateInsightSummary>>, 'ok'>
