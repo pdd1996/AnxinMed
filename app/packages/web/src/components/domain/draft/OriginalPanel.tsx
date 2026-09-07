@@ -1,13 +1,6 @@
-import { useState } from 'react'
-import { AlertTriangle, Check, FileText, ImageOff, Lock, ZoomIn, ZoomOut } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { AlertTriangle, Check, FileText, ImageOff, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DraftPayload } from '@/lib/draft'
-
-type CropBox = NonNullable<DraftPayload['cropBox']>
-type LowChar = NonNullable<DraftPayload['lowConfidenceChars']>[number]
-
-const ZOOMS = [1, 1.5, 2]
 
 /** 人工补清单 → 中文标签 + 该行原文（缺失时明确说「原文缺失」，绝不编造）。 */
 const NEED_META: Record<string, { label: string; original: (p: DraftPayload) => string }> = {
@@ -23,80 +16,12 @@ const NEED_META: Record<string, { label: string; original: (p: DraftPayload) => 
 }
 
 /**
- * 裁剪图视图：按 payload.cropBox 几何做**纯 CSS 裁剪**（服务端不存图片字节，只存框），
- * 低置信字符按同一坐标系叠加红框下划线；放大用 transform，图片与标注同步缩放。
- */
-function CropView({ url, box, chars }: { url: string; box: CropBox; chars: LowChar[] }) {
-  const [zoomIdx, setZoomIdx] = useState(0)
-  const zoom = ZOOMS[zoomIdx]
-  const cropChars = chars.filter((c) => c.box.x >= box.x && c.box.y >= box.y)
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
-          正文裁剪区（前记患者信息 / 后记签名已整块丢弃）· 红框为低置信字符
-        </span>
-        <span className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="缩小原文图"
-            disabled={zoomIdx === 0}
-            onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
-          >
-            <ZoomOut className="size-4" aria-hidden />
-          </Button>
-          <span className="w-10 text-center text-xs font-semibold">{zoom}×</span>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="放大原文图"
-            disabled={zoomIdx === ZOOMS.length - 1}
-            onClick={() => setZoomIdx((i) => Math.min(ZOOMS.length - 1, i + 1))}
-          >
-            <ZoomIn className="size-4" aria-hidden />
-          </Button>
-        </span>
-      </div>
-      <div className="max-h-[26rem] overflow-auto rounded-lg border bg-muted/40 p-2">
-        <div style={{ width: box.w * zoom, height: box.h * zoom }}>
-          <div
-            className="relative"
-            style={{ width: box.w, height: box.h, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-          >
-            <img
-              src={url}
-              alt="处方正文裁剪图"
-              className="absolute left-0 top-0 max-w-none"
-              style={{
-                width: box.w,
-                height: box.h,
-                objectFit: 'none',
-                objectPosition: `${-box.x}px ${-box.y}px`,
-              }}
-            />
-            {cropChars.map((c, i) => (
-              <span
-                key={`${c.text}-${i}`}
-                title={`识别置信度 ${(c.confidence * 100).toFixed(0)}%，请重点核对`}
-                className="absolute rounded-[2px] border-b-2 border-risk-l4 bg-risk-l4/15"
-                style={{ left: c.box.x - box.x, top: c.box.y - box.y, width: c.box.w, height: c.box.h }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * 原文对照面板（PRD §10.2 第 1 条 / §7.2.5）：原文截图 ↔ 结构化字段并排，低置信字符标红，
- * 附脱敏四层执行状态与层检测结果。取不到会话内原图（刷新/直接打开链接）→ 降级为文字原文对照，明确告知。
+ * 原文对照面板（PRD §10.2 第 1 条 / §7.2.5）：原文整图 ↔ 结构化字段并排（qwen3.5-ocr 行级契约，
+ * 无字符级置信度与裁剪几何，不再做 CSS 裁剪/红框叠加），附脱敏四层执行状态与层检测结果。
+ * 取不到会话内原图（刷新/直接打开链接）→ 降级为文字原文对照，明确告知。
  */
 export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; imageUrl?: string }) {
   const w = payload.whitelist ?? null
-  const chars = payload.lowConfidenceChars ?? []
   const audit = payload.sanitizeAudit ?? {}
   const auditHits = Object.entries(audit).filter(([, n]) => n > 0)
   const needs = payload.needsManual ?? []
@@ -113,11 +38,7 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
         </CardHeader>
         <CardContent className="space-y-4">
           {imageUrl ? (
-            payload.cropBox && payload.cropBox.w > 0 ? (
-              <CropView url={imageUrl} box={payload.cropBox} chars={chars} />
-            ) : (
-              <img src={imageUrl} alt="识别原图" className="max-h-[26rem] w-full rounded-lg border object-contain" />
-            )
+            <img src={imageUrl} alt="识别原图" className="max-h-[26rem] w-full rounded-lg border object-contain" />
           ) : (
             <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
               <ImageOff className="mt-0.5 size-5 shrink-0" aria-hidden />
@@ -178,25 +99,6 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
             </dl>
           )}
 
-          {chars.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                {`低置信字符 ${chars.length} 个（最低 ${(Math.min(...chars.map((c) => c.confidence)) * 100).toFixed(0)}%）· 请重点核对`}
-              </p>
-              <p className="flex flex-wrap gap-2 text-sm">
-                {chars.map((c, i) => (
-                  <span
-                    key={`${c.text}-${i}`}
-                    title={`置信度 ${(c.confidence * 100).toFixed(0)}%`}
-                    className="rounded border-b-2 border-risk-l4 bg-risk-l4/10 px-1.5 py-0.5 font-semibold text-risk-l4 underline decoration-risk-l4"
-                  >
-                    {c.text}
-                  </span>
-                ))}
-              </p>
-            </div>
-          )}
-
           {needs.length > 0 && (
             <div className="space-y-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3">
               <p className="flex items-center gap-2 text-sm font-bold text-risk-l3">
@@ -233,7 +135,7 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
           <ul className="space-y-1.5 text-sm">
             <li className="flex items-start gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>L0 版面裁剪 —— 前记（患者信息）/ 后记（签名）整块丢弃，只留正文{payload.cropBox ? '（裁剪框已存档）' : ''}</span>
+              <span>L0 版面裁剪 —— 前记（患者信息）/ 后记（签名）整块丢弃，只留正文行</span>
             </li>
             <li className="flex items-start gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
@@ -267,7 +169,7 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
             <p className="text-xs text-muted-foreground">兜底解析服务本次不可用：缺项保留人工补（不影响已抄录字段）。</p>
           )}
           <p className="text-xs text-muted-foreground">
-            原图仅在本次会话的浏览器内存中显示，不上传保存；服务端只保留裁剪几何与脱敏后的白名单字段。
+            原图仅在本次会话的浏览器内存中显示，不上传保存；服务端只保留脱敏后的白名单字段。
           </p>
         </CardContent>
       </Card>

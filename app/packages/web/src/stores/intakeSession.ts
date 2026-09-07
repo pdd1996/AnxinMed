@@ -3,8 +3,8 @@ import { create } from 'zustand'
 /**
  * 录入会话 store（M2-T7）—— 上传原图 dataURL 的**内存**暂存，供确认页做「原文截图 ↔ 结构化字段」对照。
  *
- * 为什么只在内存：服务端不存图片字节（payload.bodyImageRef 恒 null，只存 cropBox 几何 + 低置信字符坐标，
- * 见 api services/pipeline/types.ts「M2 仅存引用/几何，不存字节」）；而处方笺原图含前记身份信息，
+ * 为什么只在内存：服务端不存图片字节（payload.bodyImageRef 恒 null，qwen3.5-ocr 行级契约下只保留
+ * 脱敏后的行文本与白名单字段，见 api services/pipeline/types.ts「M2 仅存引用，不存字节」）；而处方笺原图含前记身份信息，
  * 脱敏红线要求即用即弃 —— 故本 store **绝不接 persist 中间件**，也不写 localStorage/sessionStorage，
  * 刷新即失（确认页取不到图时降级为文字原文对照，见 OriginalPanel）。
  *

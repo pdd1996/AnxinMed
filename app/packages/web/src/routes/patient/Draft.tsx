@@ -30,7 +30,7 @@ import { CONFIRM_STATUS_META } from '@anxin/shared'
 /**
  * 草稿确认页（M2-T7 · PRD §7.2.5 / §10.2）—— 录入主线的**唯一闸门**。
  *
- * 左列原文对照（会话内原图按 cropBox 裁剪 + 低置信字符标红；取不到图则文字对照降级），
+ * 左列原文对照（会话内原图整图展示 + 文字原文对照；取不到图则纯文字降级），
  * 右列结构化字段逐项核对（身份 / 医嘱 / 时间点 / 健康建议 / 规则检查 / 使用人）。
  * 确认走 POST /api/drafts/:id/confirm（服务端单事务原子写四表 + 确认留痕，并对最终确认值重跑规则检查）；
  * 「信息不符」走 POST /api/drafts/:id/reject 后回重拍或手动建档（PRD §7.2.6）。
@@ -248,7 +248,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           </div>
           <p className="flex items-start gap-2 text-xs text-muted-foreground">
             <ListChecks className="mt-0.5 size-4 shrink-0" aria-hidden />
-            确认即留痕：药品 ID、确认时间、确认方式、识别图片引用（裁剪几何）与关键字段快照写入来源记录；
+            确认即留痕：药品 ID、确认时间、确认方式与关键字段快照写入来源记录；
             医嘱字段若被你修正，标注会从「抄录」降为「自填」。
           </p>
         </CardContent>

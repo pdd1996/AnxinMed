@@ -249,23 +249,24 @@ describe('唯一闸门：逐项核对 + 使用人 + 提交后跳转', () => {
 })
 
 describe('原文对照与入口B', () => {
-  it('会话内有原图 → 按 cropBox 几何裁剪渲染 + 低置信字符红框叠加', async () => {
+  it('会话内有原图 → 整图 object-contain 渲染；裁剪视图与低置信红框已随行级契约退役', async () => {
     const url = 'data:image/png;base64,AAAA'
     useIntakeSession.getState().setSession(['draft-1'], url)
     renderDraft(rxUniquePayload)
-    const img = (await screen.findByAltText('处方正文裁剪图')) as HTMLImageElement
+    const img = (await screen.findByAltText('识别原图')) as HTMLImageElement
     expect(img.getAttribute('src')).toBe(url)
-    expect(img.style.width).toBe('900px') // cropBox.w
-    expect(img.style.height).toBe('260px') // cropBox.h
-    expect(screen.getAllByTitle(/识别置信度/)).toHaveLength(2) // 低置信字符标红
-    expect(screen.getByText(/低置信字符 2 个/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: '放大原文图' })).toBeTruthy()
+    expect(img.className).toContain('object-contain') // 整图完整可见，无几何裁剪
+    // 裁剪错位图与假红框不得再出现（qwen3.5-ocr 只输出行级纯文本）
+    expect(screen.queryByAltText('处方正文裁剪图')).toBeNull()
+    expect(screen.queryByText(/低置信字符/)).toBeNull()
+    expect(screen.queryByTitle(/识别置信度/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '放大原文图' })).toBeNull()
   })
 
   it('会话内无原图（刷新/直接打开链接）→ 明确降级为文字原文对照，不静默', async () => {
     renderDraft(rxUniquePayload)
     expect(await screen.findByText(/本次会话已无原图/)).toBeTruthy()
-    expect(screen.queryByAltText('处方正文裁剪图')).toBeNull()
+    expect(screen.queryByAltText('识别原图')).toBeNull()
     expect(screen.getByText('滴眼 每次1滴 每日4次 共7天')).toBeTruthy() // 用法原文行仍在
   })
 
