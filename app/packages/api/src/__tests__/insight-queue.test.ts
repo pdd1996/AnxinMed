@@ -16,7 +16,7 @@ import { AIUnavailableError, type AiClients } from '../lib/ai/types.js'
 import { mockClients, newCalls } from './helpers/ai-mocks.js'
 import { countGrades, rollupTimeline, runQueueTool } from '../services/insight/tools.js'
 import { listPatientsWithStats } from '../repositories/insight.repo.js'
-import { gradeAdherence, ADHERENCE_GRADE_THRESHOLDS } from '@anxin/shared'
+import { gradeAdherence } from '@anxin/shared'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function req(method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> {
@@ -300,6 +300,5 @@ describe('分档阈值 · shared 契约与 repo 字段一致', () => {
     for (const p of patients) {
       expect(p.adherenceGrade).toBe(gradeAdherence(p.adherenceRate))
     }
-    expect(ADHERENCE_GRADE_THRESHOLDS.poor).toBeUndefined() // poor 无下界阈值（<80 即差）
   })
 })

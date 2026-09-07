@@ -4,17 +4,29 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
+  CircleDashed,
   Info,
   LoaderCircle,
+  MinusCircle,
   PackageCheck,
   ShieldCheck,
+  Sparkles,
   Stethoscope,
+  TriangleAlert,
 } from 'lucide-react'
-import { fetchInsightPatients, generateInsightSummary, type InsightSummaryDto } from '@/api/client'
+import {
+  fetchInsightQueue,
+  generateInsightSummary,
+  generateQueueSummary,
+  type InsightQueueDto,
+  type InsightSummaryDto,
+  type QueueSummaryDto,
+} from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { RiskBadge } from '@/components/domain/RiskBadge'
-import type { RiskEventType } from '@anxin/shared'
+import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventType } from '@anxin/shared'
 
 /** 临期/低库存药品项（shared dto 里为 z.unknown()，本处窄化为具体形态）。 */
 interface ExpiryItem {
@@ -32,25 +44,42 @@ const EVENT_TYPE_LABEL: Record<RiskEventType, string> = {
 }
 
 /**
- * 医生端洞察页（M3-T3 · PRD §7.7 / spec §T3）——迁移 demo/doctor.tsx。
+ * 分档 → 视觉语义（色 token 同 RiskBadge 体系）：
+ * 优 = L1 绿 / 中 = L2 蓝 / 差 = L3 橙 / 未分档 = 中性 muted。
+ */
+const GRADE_META: Record<AdherenceGrade | 'ungraded', { chip: string; bar: string; icon: typeof CircleCheck }> = {
+  good: { chip: 'border-risk-l1/35 bg-risk-l1/15 text-risk-l1', bar: 'bg-risk-l1', icon: CircleCheck },
+  fair: { chip: 'border-risk-l2/35 bg-risk-l2/15 text-risk-l2', bar: 'bg-risk-l2', icon: MinusCircle },
+  poor: { chip: 'border-risk-l3/35 bg-risk-l3/15 text-risk-l3', bar: 'bg-risk-l3', icon: TriangleAlert },
+  ungraded: { chip: 'border-border bg-muted text-muted-foreground', bar: 'bg-muted-foreground/40', icon: CircleDashed },
+}
+
+/**
+ * 医生端洞察页（M3-T3 + T7 · PRD §7.7 / spec §T3+§T7）——迁移 demo/doctor.tsx。
  *
- * 三屏结构：
- *   1. 患者列表（PatientListView）：卡片网格，点击生成摘要；
- *   2. 加载中骨架（PatientSummarySkeleton）；
- *   3. 摘要视图（PatientSummaryView）：依从性 + 用药清单 + 相互作用 + 临期库存 + 风险事件 + Agent 摘要 + 数据快照。
+ * 两级结构（T7：队列视图为落地页，患者下钻为显式动作）：
+ *   1. 队列视图（QueueView）：分档统计卡 + 依从性分布直方图 + 队列表格（点击下钻）+
+ *      风险事件时间线 + 队列摘要（百川末端叙述，0 次 LLM 的数据直查）；
+ *   2. 患者摘要流（下钻后）：加载骨架 → 摘要视图（依从性 + 用药清单 + 相互作用 + 临期库存 +
+ *      风险事件 + Agent 摘要 + 数据快照）。
  *
  * ⚠️ 独立分支（/doctor/*），无底部导航（DoctorLayout 已处理）；
- *    数据源从 demo 的 mock JSON 改读 PostgreSQL（spec §T3）。
+ *    数据源全部读 PostgreSQL（GET /api/insight/queue 为 0 次 LLM 直查库）。
  */
-
 export default function Insight() {
-  const patientsQuery = useQuery({ queryKey: ['insight', 'patients'], queryFn: fetchInsightPatients })
+  const queueQuery = useQuery({ queryKey: ['insight', 'queue'], queryFn: fetchInsightQueue })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [summary, setSummary] = useState<InsightSummaryDto | null>(null)
+  const [queueSummary, setQueueSummary] = useState<QueueSummaryDto | null>(null)
 
   const summaryMutation = useMutation({
     mutationFn: (patientId: string) => generateInsightSummary(patientId),
     onSuccess: (data) => setSummary(data),
+  })
+
+  const queueSummaryMutation = useMutation({
+    mutationFn: generateQueueSummary,
+    onSuccess: (data) => setQueueSummary(data),
   })
 
   const handlePick = (patientId: string) => {
@@ -64,41 +93,50 @@ export default function Insight() {
     setSummary(null)
   }
 
-  // 摘要视图
+  // 患者摘要视图（下钻后）
   if (selectedId && summary) {
     return <PatientSummaryView summary={summary} onBack={handleBack} />
   }
 
   // 加载中骨架
   if (selectedId && summaryMutation.isPending) {
-    const patient = patientsQuery.data?.find((p) => p.id === selectedId)
+    const patient = queueQuery.data?.patients.find((p) => p.id === selectedId)
     return <PatientSummarySkeleton patientName={patient?.name ?? '患者'} onBack={handleBack} />
   }
 
-  // 患者列表
+  // 队列视图（落地页）
   return (
-    <PatientListView
-      patients={patientsQuery.data ?? []}
-      loading={patientsQuery.isLoading}
-      error={patientsQuery.error ? '患者列表加载失败，请确认后端服务已启动' : ''}
+    <QueueView
+      queue={queueQuery.data ?? null}
+      loading={queueQuery.isLoading}
+      error={queueQuery.error ? '队列数据加载失败，请确认后端服务已启动' : ''}
+      summary={queueSummary}
+      summaryPending={queueSummaryMutation.isPending}
+      onGenerateSummary={() => queueSummaryMutation.mutate()}
       onPick={handlePick}
     />
   )
 }
 
 // ---------------------------------------------------------------------------
-// 患者列表
+// 队列视图（T7：分档统计卡 + 图表 + 患者下钻）
 // ---------------------------------------------------------------------------
 
-function PatientListView({
-  patients,
+function QueueView({
+  queue,
   loading,
   error,
+  summary,
+  summaryPending,
+  onGenerateSummary,
   onPick,
 }: {
-  patients: Awaited<ReturnType<typeof fetchInsightPatients>>
+  queue: InsightQueueDto | null
   loading: boolean
   error: string
+  summary: QueueSummaryDto | null
+  summaryPending: boolean
+  onGenerateSummary: () => void
   onPick: (id: string) => void
 }) {
   return (
@@ -106,10 +144,10 @@ function PatientListView({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-medium text-muted-foreground">医生端 · 演示</p>
-          <h1 className="text-xl font-bold">患者洞察</h1>
+          <h1 className="text-xl font-bold">患者队列</h1>
         </div>
         <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold">
-          {patients.length} 名患者
+          {queue ? `${queue.total} 名患者` : '—'}
         </span>
       </div>
 
@@ -117,73 +155,288 @@ function PatientListView({
         <CardContent className="flex items-start gap-2 p-3 text-sm">
           <Info className="mt-0.5 size-4 shrink-0 text-risk-l2" aria-hidden />
           <p className="text-muted-foreground">
-            选择患者生成诊前摘要。Agent 调用依从性、相互作用、临期库存、风险事件等只读工具，再由 LLM
-            组装摘要并过安全守门。本页仅供演示，不用于真实诊疗。
+            队列数据由语义化只读工具直查数据库（0 次大模型调用），分档口径为确定性阈值（优 ≥95% / 中 80–94% / 差 &lt;80%）。
+            点击患者行生成诊前摘要；摘要由 Agent 调用只读工具并过安全守门生成。本页仅供演示，不用于真实诊疗。
           </p>
         </CardContent>
       </Card>
 
       {loading && (
         <p className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-          <LoaderCircle className="size-6 animate-spin" aria-hidden /> 正在加载患者列表…
+          <LoaderCircle className="size-6 animate-spin" aria-hidden /> 正在加载队列数据…
         </p>
       )}
 
-      {error && (
+      {error && !loading && (
         <p className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
           <AlertTriangle className="size-6 text-risk-l3" aria-hidden />
           {error}
         </p>
       )}
 
-      {!loading && !error && patients.length === 0 && (
-        <p className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-          <Stethoscope className="size-6" aria-hidden />
-          暂无患者数据
-        </p>
+      {!loading && !error && queue && (
+        <>
+          {/* 分档统计卡 */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(['good', 'fair', 'poor', 'ungraded'] as const).map((g) => {
+              const meta = GRADE_META[g]
+              const Icon = meta.icon
+              const count = queue.grades[g]
+              const label = g === 'ungraded' ? '未分档' : ADHERENCE_GRADE_LABEL[g]
+              return (
+                <Card key={g}>
+                  <CardContent className="flex items-center gap-3 p-3">
+                    <Icon className={`size-5 shrink-0 ${g === 'good' ? 'text-risk-l1' : g === 'fair' ? 'text-risk-l2' : g === 'poor' ? 'text-risk-l3' : 'text-muted-foreground'}`} aria-hidden />
+                    <div>
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="text-lg font-bold leading-tight">{count}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* 依从性分布直方图（固定模板 · spec §T7.5） */}
+          <AdherenceHistogram queue={queue} />
+
+          {/* 队列表格（患者下钻为显式动作） */}
+          <SectionHeading eyebrow="图表 · 队列表格" title="按患者下钻" />
+          <CohortTable queue={queue} onPick={onPick} />
+
+          {/* 风险事件时间线（固定模板） */}
+          <SectionHeading eyebrow="图表 · 事件时间线" title="近 30 天风险事件（L4/L3/manual-gate）" />
+          <RiskTimeline queue={queue} />
+
+          {/* 队列摘要 */}
+          <SectionHeading eyebrow="Agent 摘要" title="队列摘要" />
+          <QueueSummaryPanel
+            summary={summary}
+            pending={summaryPending}
+            onGenerate={onGenerateSummary}
+            dateRange={queue.dateRange}
+          />
+        </>
       )}
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {patients.map((p) => (
-          <Card
-            key={p.id}
-            className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/30"
-            onClick={() => onPick(p.id)}
-          >
-            <CardContent className="space-y-3 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary">
-                  {(p.name ?? '患')[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-bold">{p.name ?? '未命名'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.age ? `${p.age} 岁 · ` : ''}
-                    {p.gender ?? '未知'}
-                  </p>
-                </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {p.conditions.map((c) => (
-                  <span key={c} className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs">
-                    {c}
-                  </span>
-                ))}
-                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                  {p.drugCount} 种药
-                </span>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                最近活跃 {p.lastActiveAt ?? '无记录'}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
     </div>
+  )
+}
+
+/** 依从性分布直方图（CSS 条形；数据 = GET /api/insight/queue 的 grades）。 */
+function AdherenceHistogram({ queue }: { queue: InsightQueueDto }) {
+  const rows = (['good', 'fair', 'poor', 'ungraded'] as const).map((g) => ({
+    g,
+    label: g === 'ungraded' ? '未分档' : ADHERENCE_GRADE_LABEL[g],
+    count: queue.grades[g],
+    pct: queue.total > 0 ? Math.round((queue.grades[g] / queue.total) * 100) : 0,
+  }))
+  return (
+    <Card>
+      <CardContent className="space-y-2.5 p-4">
+        <p className="text-sm font-semibold">依从性分布（近 {queue.dateRange} 天执行率）</p>
+        {rows.map((r) => (
+          <div key={r.g} className="flex items-center gap-2 text-xs">
+            <span className="w-12 shrink-0 text-muted-foreground">{r.label}</span>
+            <div className="h-4 flex-1 overflow-hidden rounded bg-muted">
+              <div
+                className={`h-full ${GRADE_META[r.g].bar}`}
+                style={{ width: `${Math.max(r.pct, r.count > 0 ? 4 : 0)}%` }}
+              />
+            </div>
+            <span className="w-14 shrink-0 text-right font-medium">
+              {r.count} 人（{r.pct}%）
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 队列表格（点击行 → 患者摘要下钻）。 */
+function CohortTable({ queue, onPick }: { queue: InsightQueueDto; onPick: (id: string) => void }) {
+  return (
+    <Card>
+      <CardContent className="p-2">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-muted-foreground">
+              <th className="px-2 py-2 font-medium">患者</th>
+              <th className="px-2 py-2 font-medium">诊断</th>
+              <th className="px-2 py-2 text-center font-medium">在服</th>
+              <th className="px-2 py-2 text-center font-medium">执行率（30 天）</th>
+              <th className="px-2 py-2 font-medium">最近活跃</th>
+              <th className="w-8 px-2 py-2" aria-hidden />
+            </tr>
+          </thead>
+          <tbody>
+            {queue.patients.map((p) => {
+              const grade = p.adherenceGrade ?? 'ungraded'
+              const meta = GRADE_META[grade]
+              return (
+                <tr
+                  key={p.id}
+                  className="cursor-pointer border-t border-border transition-colors hover:bg-muted/40"
+                  onClick={() => onPick(p.id)}
+                >
+                  <td className="px-2 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                        {(p.name ?? '患')[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{p.name ?? '未命名'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.age ? `${p.age} 岁 · ` : ''}
+                          {p.gender ?? '未知'}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-2 py-2.5 text-xs text-muted-foreground">
+                    {p.conditions.length > 0 ? p.conditions.join('、') : '—'}
+                  </td>
+                  <td className="px-2 py-2.5 text-center text-xs">{p.drugCount} 种</td>
+                  <td className="px-2 py-2.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className="text-xs font-semibold">{p.adherenceRate != null ? `${p.adherenceRate}%` : '—'}</span>
+                      <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${meta.chip}`}>
+                        {grade === 'ungraded' ? '未分档' : ADHERENCE_GRADE_LABEL[grade]}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-2 py-2.5 text-xs text-muted-foreground">{p.lastActiveAt ?? '无记录'}</td>
+                  <td className="px-2 py-2.5">
+                    <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 风险事件时间线（按日期倒序；空态给安心文案）。 */
+function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
+  const timeline = [...queue.riskTimeline].reverse() // 最新在前
+  if (timeline.length === 0) {
+    return (
+      <Card className="border-risk-l1/30 bg-risk-l1/5">
+        <CardContent className="flex items-center gap-2 p-3 text-sm">
+          <ShieldCheck className="size-4 shrink-0 text-risk-l1" aria-hidden />
+          <p className="text-muted-foreground">近 30 天全体患者无风险拦截事件（L4/L3/manual-gate）。</p>
+        </CardContent>
+      </Card>
+    )
+  }
+  return (
+    <Card>
+      <CardContent className="space-y-2 p-3">
+        {timeline.map((t) => (
+          <div key={`${t.date}-${t.level}`} className="flex items-center gap-2 text-sm">
+            <RiskBadge level={t.level} showHint={false} className="shrink-0" />
+            <span className="text-xs text-muted-foreground">{t.date}</span>
+            <span className="text-xs">
+              {t.count} 起{t.level === 'L4' ? '（需优先跟进）' : ''}
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 队列摘要面板（百川末端叙述 + guardSummary；无 key / 失败自动规则降级，notice 可见）。 */
+function QueueSummaryPanel({
+  summary,
+  pending,
+  onGenerate,
+  dateRange,
+}: {
+  summary: QueueSummaryDto | null
+  pending: boolean
+  onGenerate: () => void
+  dateRange: number
+}) {
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        {!summary && !pending && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-muted-foreground">
+              基于近 {dateRange} 天分档统计与风险事件，生成队列叙述摘要（数字全部来自工具计算结果）。
+            </p>
+            <Button size="sm" onClick={onGenerate} className="min-h-9">
+              <Sparkles className="size-4" aria-hidden />
+              生成队列摘要
+            </Button>
+          </div>
+        )}
+
+        {pending && (
+          <p className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+            <LoaderCircle className="size-5 animate-spin" aria-hidden />
+            Agent 正在调用只读工具并组装队列摘要…
+          </p>
+        )}
+
+        {summary && (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold">
+                {summary.snapshot.mode === 'llm' ? 'LLM 生成' : '规则降级'}
+              </span>
+              <Button variant="outline" size="sm" onClick={onGenerate} className="min-h-8">
+                重新生成
+              </Button>
+            </div>
+            {summary.notice && (
+              <p className="flex items-start gap-1.5 rounded-md border border-risk-l3/30 bg-risk-l3/5 p-2 text-xs text-muted-foreground">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-risk-l3" aria-hidden />
+                {summary.notice}
+              </p>
+            )}
+            <p className="text-sm font-semibold">{summary.sections.summary}</p>
+            {summary.sections.keyPoints.length > 0 && (
+              <ul className="space-y-1 pl-1 text-sm">
+                {summary.sections.keyPoints.map((k) => (
+                  <li key={k} className="flex items-start gap-2">
+                    <span className="mt-1.5 size-1 shrink-0 rounded-full bg-muted-foreground" aria-hidden />
+                    <span>{k}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {summary.sections.risks.length > 0 && (
+              <ul className="space-y-1 pl-1 text-sm">
+                {summary.sections.risks.map((r) => (
+                  <li key={r} className="flex items-start gap-2 text-risk-l3">
+                    <span className="mt-1.5 size-1 shrink-0 rounded-full bg-risk-l3" aria-hidden />
+                    <span>{r}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="flex items-start gap-1.5 rounded-md border border-border bg-muted/30 p-2 text-sm">
+              <span className="font-medium">下一步：</span>
+              {summary.sections.nextAction}
+            </p>
+            <div className="space-y-0.5 text-xs text-muted-foreground">
+              <p>生成时间：{summary.snapshot.generatedAt}</p>
+              <p>工具链：{summary.snapshot.toolChain.join(' → ')}</p>
+              <p>来源：{summary.citations.join('；')}</p>
+            </div>
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              {summary.sections.warning}
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -196,7 +449,7 @@ function PatientSummarySkeleton({ patientName, onBack }: { patientName: string; 
     <div className="space-y-4">
       <Button variant="outline" size="sm" onClick={onBack} className="min-h-9">
         <ChevronLeft className="size-4" aria-hidden />
-        返回患者列表
+        返回队列视图
       </Button>
       <p className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
         <LoaderCircle className="size-6 animate-spin" aria-hidden />
@@ -208,7 +461,7 @@ function PatientSummarySkeleton({ patientName, onBack }: { patientName: string; 
 }
 
 // ---------------------------------------------------------------------------
-// 摘要视图
+// 摘要视图（患者下钻后；M3-T3 原三屏结构的第三屏）
 // ---------------------------------------------------------------------------
 
 function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; onBack: () => void }) {
@@ -219,7 +472,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
     <div className="space-y-4">
       <Button variant="outline" size="sm" onClick={onBack} className="min-h-9">
         <ChevronLeft className="size-4" aria-hidden />
-        返回患者列表
+        返回队列视图
       </Button>
 
       {/* 患者头部 */}
@@ -256,7 +509,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
         <CardContent className="space-y-3 p-4">
           <div className="h-2 overflow-hidden rounded-full bg-muted">
             <div
-              className={`h-full transition-all ${adherence.rate >= 60 ? 'bg-risk-l1' : 'bg-risk-l3'}`}
+              className={`h-full transition-all ${GRADE_META[adherence.rate >= 95 ? 'good' : adherence.rate >= 80 ? 'fair' : 'poor'].bar}`}
               style={{ width: `${adherence.rate}%` }}
             />
           </div>

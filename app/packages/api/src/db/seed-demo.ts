@@ -15,7 +15,7 @@
 import 'dotenv/config'
 import { inArray, like } from 'drizzle-orm'
 import { db as devDb, client } from './client.js'
-import { users, drugs, plans, records, healthProfiles, drugMaster } from './schema.js'
+import { users, drugs, plans, records, healthProfiles, drugMaster, consultLogs, riskEvents } from './schema.js'
 import { addDaysStr, todayStr } from '@anxin/shared'
 
 /**
@@ -228,9 +228,10 @@ export async function seedDemoData(db: typeof devDb = devDb): Promise<void> {
     },
   ])
 
-  // 最近 7 天 records（rate/tailSkip；今天保持 pending 以便「注册即见今日任务」）
+  // 最近 30 天 records（rate/tailSkip；今天保持 pending 以便「注册即见今日任务」）。
+  // T7：由 7 天拉长到 30 天——医生端队列分档按近 30 天执行率计算，窗口内需有完整数据。
   const recRows: typeof records.$inferInsert[] = []
-  for (let offset = 6; offset >= 0; offset--) {
+  for (let offset = 29; offset >= 0; offset--) {
     const date = addDaysStr(today, -offset)
     for (const preset of PRESETS) {
       if (offset < preset.tailSkip) continue // 最近 tailSkip 天不记录 → pending
@@ -261,9 +262,11 @@ export async function seedDemoData(db: typeof devDb = devDb): Promise<void> {
     })
   }
 
+  await seedQueueDemoPatients(db, today, now)
+
   console.log(
-    `✅ demo 数据：4 药 + 4 计划 + ${recRows.length} 条 records + ${HEALTH.length} 条健康信息（p-001）` +
-      `｜drugMasterId 解析：amlo=${amloMaster ?? 'null'} atorva=${atorvaMaster ?? 'null'} metf=${metfMaster ?? 'null'} glip=${glipMaster ?? 'null'}` +
+    `✅ demo 数据：p-001 4 药 + 4 计划 + ${recRows.length} 条 records + ${HEALTH.length} 条健康信息` +
+      ` + 队列演示患者 7 人（优/中/差/未分档）｜drugMasterId 解析：amlo=${amloMaster ?? 'null'} atorva=${atorvaMaster ?? 'null'} metf=${metfMaster ?? 'null'} glip=${glipMaster ?? 'null'}` +
       '｜预期命中 ir-001(氨氯地平+阿托伐他汀) 与 ir-002(二甲双胍+格列吡嗪)',
   )
 }
@@ -280,4 +283,198 @@ if (process.argv[1]?.replace(/\\/g, '/').endsWith('db/seed-demo.ts')) {
       await client.end().catch(() => {})
       process.exit(1)
     })
+}
+
+// ---------------------------------------------------------------------------
+// T7：队列演示患者（p-101..p-107，≥8 人含 p-001，分档各异 + 漏服模式差异 + 演示风险事件）
+// 分档口径 = shared gradeAdherence：优 ≥95 / 中 80–94 / 差 <80；无打卡 = 未分档。
+// ---------------------------------------------------------------------------
+
+/** 队列演示患者配置（taken/total 决定档位；consecutiveSkipTail = 末尾连续漏服天数）。 */
+interface QueuePatientSpec {
+  id: string
+  name: string
+  age: string
+  gender: string
+  condition: string
+  drugName: string
+  /** 近 30 天记录数（每日 1 次；null = 无打卡 → 未分档）。 */
+  total: number | null
+  taken: number
+  consecutiveSkipTail: number
+}
+
+const QUEUE_PATIENTS: QueuePatientSpec[] = [
+  { id: 'p-101', name: '李某某', age: '72', gender: '女', condition: '高血压', drugName: '苯磺酸氨氯地平片', total: 20, taken: 20, consecutiveSkipTail: 0 },
+  { id: 'p-102', name: '王某某', age: '65', gender: '男', condition: '2型糖尿病', drugName: '盐酸二甲双胍片', total: 30, taken: 29, consecutiveSkipTail: 0 },
+  { id: 'p-103', name: '赵某某', age: '70', gender: '男', condition: '高血压、高脂血症', drugName: '阿托伐他汀钙片', total: 30, taken: 26, consecutiveSkipTail: 1 },
+  { id: 'p-104', name: '钱某某', age: '58', gender: '女', condition: '2型糖尿病', drugName: '格列吡嗪片', total: 30, taken: 25, consecutiveSkipTail: 2 },
+  { id: 'p-105', name: '孙某某', age: '76', gender: '男', condition: '高血压、冠心病', drugName: '苯磺酸氨氯地平片', total: 30, taken: 18, consecutiveSkipTail: 3 },
+  { id: 'p-106', name: '周某某', age: '81', gender: '女', condition: '高血压、2型糖尿病', drugName: '盐酸二甲双胍片', total: 30, taken: 13, consecutiveSkipTail: 12 },
+  { id: 'p-107', name: '吴某某', age: '69', gender: '男', condition: '高脂血症', drugName: '阿托伐他汀钙片', total: null, taken: 0, consecutiveSkipTail: 0 },
+]
+
+/** 队列演示患者 seed（幂等：先清 p-101..p-107 旧数据；p-001 不动）。 */
+async function seedQueueDemoPatients(db: typeof devDb, today: string, now: Date): Promise<void> {
+  const ids = QUEUE_PATIENTS.map((p) => p.id)
+  await db.delete(riskEvents).where(inArray(riskEvents.userId, ids))
+  await db.delete(consultLogs).where(inArray(consultLogs.userId, ids))
+  await db.delete(records).where(inArray(records.userId, ids))
+  await db.delete(plans).where(inArray(plans.userId, ids))
+  await db.delete(drugs).where(inArray(drugs.userId, ids))
+  await db.delete(healthProfiles).where(inArray(healthProfiles.userId, ids))
+
+  await db
+    .insert(users)
+    .values(QUEUE_PATIENTS.map((p) => ({ id: p.id, name: p.name, email: null, phone: null })))
+    .onConflictDoUpdate({
+      target: users.id,
+      set: { updatedAt: now },
+    })
+
+  for (const spec of QUEUE_PATIENTS) {
+    // 健康信息
+    await db.insert(healthProfiles).values([
+      { id: `demo-health-${spec.id}-0`, userId: spec.id, fieldKey: '性别', value: spec.gender },
+      { id: `demo-health-${spec.id}-1`, userId: spec.id, fieldKey: '年龄', value: spec.age },
+      { id: `demo-health-${spec.id}-2`, userId: spec.id, fieldKey: '诊断', value: spec.condition },
+    ])
+
+    // 1 药 1 计划（手动档，不挂 drugMasterId——队列演示不需要说明书命中）
+    await db.insert(drugs).values({
+      id: `demo-drug-${spec.id}`,
+      userId: spec.id,
+      genericName: spec.drugName,
+      brandName: '（演示）',
+      specification: '5mg',
+      form: '片剂',
+      manufacturer: '演示药厂',
+      drugMasterId: null,
+      confirmStatus: 'manual',
+      stock: { value: 20, unit: '片' },
+      expiry: addDaysStr(today, 180),
+      confirmedAt: now,
+    })
+    await db.insert(plans).values({
+      id: `demo-plan-${spec.id}`,
+      userId: spec.id,
+      drugId: `demo-drug-${spec.id}`,
+      dose: { value: 1, unit: '片' },
+      frequency: 1,
+      times: ['08:00'],
+      route: '口服',
+      meal: '饭后',
+      cycleType: 'open',
+      startDate: addDaysStr(today, -30),
+      endDate: null,
+      status: 'active',
+      source: 'manual',
+      tags: { dose: 'user', frequency: 'user', times: 'assist', startDate: 'default' },
+    })
+
+    // 近 30 天 records：前 taken 条打卡，末尾 consecutiveSkipTail 天连续漏服（漏服时段模式差异）
+    if (spec.total != null) {
+      const rows: (typeof records.$inferInsert)[] = []
+      for (let offset = spec.total - 1; offset >= 0; offset--) {
+        const date = addDaysStr(today, -offset)
+        const index = spec.total - 1 - offset // 0..total-1（按日期正序）
+        const isTail = offset < spec.consecutiveSkipTail
+        const status = isTail || index >= spec.taken ? 'skipped' : 'taken'
+        rows.push({
+          id: `demo-rec-${spec.id}-${date}`,
+          userId: spec.id,
+          planId: `demo-plan-${spec.id}`,
+          scheduledDate: date,
+          scheduledTime: '08:00',
+          status,
+          actedAt: now,
+        })
+      }
+      await db.insert(records).values(rows)
+    }
+  }
+
+  // 演示咨询留痕 + 风险事件（供队列时间线/患者摘要的风险事件流展示；问题文本已脱敏口径）
+  await db.insert(consultLogs).values([
+    {
+      id: 'demo-clog-p105-l4',
+      userId: 'p-105',
+      question: '我胸痛得厉害还喘不上气',
+      drugIds: [],
+      riskLevel: 'L4',
+      status: 'emergency',
+      blockedAt: 'L4',
+      notice: '检测到紧急风险信号，已引导立即就医。',
+      citations: [],
+      sectionsSnapshot: null,
+    },
+    {
+      id: 'demo-clog-p105-l3',
+      userId: 'p-105',
+      question: '血压正常了，我想把氨氯地平停掉',
+      drugIds: ['demo-drug-p-105'],
+      riskLevel: 'L3',
+      status: 'refused',
+      blockedAt: 'L3',
+      notice: '涉及停药调整，请咨询医生。',
+      citations: [],
+      sectionsSnapshot: null,
+    },
+    {
+      id: 'demo-clog-p103-gate',
+      userId: 'p-103',
+      question: '这个药一次吃多少',
+      drugIds: ['demo-drug-p-103'],
+      riskLevel: 'L1',
+      status: 'manual-gate',
+      blockedAt: 'manual-gate',
+      notice: '药品未经 OCR 确认，个体化解释暂不可用。',
+      citations: [],
+      sectionsSnapshot: null,
+    },
+    {
+      id: 'demo-clog-p101-ok',
+      userId: 'p-101',
+      question: '氨氯地平是治什么的',
+      drugIds: ['demo-drug-p-101'],
+      riskLevel: 'L1',
+      status: 'answered',
+      blockedAt: null,
+      notice: null,
+      citations: [],
+      sectionsSnapshot: null,
+    },
+  ])
+  await db.insert(riskEvents).values([
+    {
+      id: 'demo-revt-p105-l4',
+      userId: 'p-105',
+      level: 'L4',
+      type: 'emergency',
+      drugId: null,
+      consultLogId: 'demo-clog-p105-l4',
+      detail: { matchedKeyword: '胸痛', questionRedacted: '我胸痛得厉害还喘不上气' },
+      occurredAt: now,
+    },
+    {
+      id: 'demo-revt-p105-l3',
+      userId: 'p-105',
+      level: 'L3',
+      type: 'refused',
+      drugId: 'demo-drug-p-105',
+      consultLogId: 'demo-clog-p105-l3',
+      detail: { matchedKeyword: '停药', questionRedacted: '血压正常了，我想把氨氯地平停掉' },
+      occurredAt: now,
+    },
+    {
+      id: 'demo-revt-p103-gate',
+      userId: 'p-103',
+      level: 'manual-gate',
+      type: 'manual-blocked',
+      drugId: 'demo-drug-p-103',
+      consultLogId: 'demo-clog-p103-gate',
+      detail: { matchedKeyword: null, questionRedacted: '这个药一次吃多少' },
+      occurredAt: now,
+    },
+  ])
 }

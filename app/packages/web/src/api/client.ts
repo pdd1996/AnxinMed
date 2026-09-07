@@ -170,7 +170,25 @@ export async function generateInsightSummary(patientId: string) {
   return unwrap(res)
 }
 
+// ── 医生端队列（T7 · ADR #17 语义化只读工具）──
+
+/** GET /api/insight/queue：队列视图数据（分档统计 + 患者表 + 事件时间线，0 次 LLM）。 */
+export async function fetchInsightQueue() {
+  const res = await client.api.insight.queue.$get()
+  return unwrap(res)
+}
+
+/** POST /api/insight/queue-summary：队列摘要（百川末端叙述 + guardSummary + 规则降级）。 */
+export async function generateQueueSummary() {
+  const res = await client.api.insight['queue-summary'].$post({ json: {} })
+  return unwrap(res)
+}
+
 /** 患者列表项 DTO（hc<AppType> 推导）。 */
 export type InsightPatientDto = Awaited<ReturnType<typeof fetchInsightPatients>>[number]
 /** 摘要响应 DTO（去掉 ok 字段）。 */
 export type InsightSummaryDto = Omit<Awaited<ReturnType<typeof generateInsightSummary>>, 'ok'>
+/** 队列视图数据 DTO。 */
+export type InsightQueueDto = Awaited<ReturnType<typeof fetchInsightQueue>>
+/** 队列摘要 DTO。 */
+export type QueueSummaryDto = Omit<Awaited<ReturnType<typeof generateQueueSummary>>, 'ok'>
