@@ -86,6 +86,8 @@ export interface InsightPromptPayload {
     conditions: string[]
   }
   dateRange: string
+  /** 医生追问（T7 ask 长尾路径）：非空时 prompt 聚焦回答该问题，仍只基于工具输出事实。 */
+  question?: string
   tools: {
     adherence: {
       rate: number
@@ -102,13 +104,14 @@ export interface InsightPromptPayload {
       expiredCount: number
       lowStockCount: number
     }
-    riskEvents: {
-      hasL4: boolean
-      hasL3: boolean
-      blockedCount: number
-      lastQuestion: string
-    }
+  riskEvents: {
+    hasL4: boolean
+    hasL3: boolean
+    blockedCount: number
+    lastQuestion: string
   }
+}
+
 }
 
 /**
@@ -123,6 +126,8 @@ export interface QueuePromptPayload {
   /** 执行率差的患者名单（封顶 10，供诊前点名随访；来自 listPatientsWithStats，演示数据已脱敏）。 */
   poorPatientNames: string[]
   riskEvents: { total: number; hasL4: boolean; hasL3: boolean }
+  /** 医生追问（T7 ask 长尾路径）：非空时 prompt 聚焦回答该问题，仍只基于统计事实。 */
+  question?: string
 }
 
 /**

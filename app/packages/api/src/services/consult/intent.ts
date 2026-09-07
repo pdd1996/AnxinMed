@@ -28,8 +28,10 @@ export type QueryIntent = 'medication-list' | 'adherence' | 'expiry-stock' | 'in
  * - 裁剪 storage 条目的单字「存」——「库存」是 expiry-stock 查询词，单字会误杀；
  * - 保留「相互作用」（说明书标准术语）——「这个药一起吃有什么相互作用」类说明书问题
  *   宁可漏判（走现有管线，行为不变）也不误路由到模板。
+ *
+ * 导出：医生端 ask 意图路由（insight/askIntent.ts）复用同一份仲裁表（宁漏勿误单一真相）。
  */
-const EXPLAIN_INTENT_PATTERN =
+export const EXPLAIN_INTENT_PATTERN =
   /药理|机制|原理|机理|起效|怎么作用|为什么有效|不良|副作用|反应|不适|禁忌|不能|过敏|成分|辅料|含有|含什么|注意|事项|小心|保存|储存|存放|相互作用|怎么吃|怎么用|用法|用量|吃几|用几|频次/
 
 /**

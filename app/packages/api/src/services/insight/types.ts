@@ -83,6 +83,8 @@ export interface InsightRunInput {
   patient: PatientListItem
   tools: InsightTools
   dateRange: string
+  /** 医生追问（T7 ask 长尾路径）：非空时 LLM 聚焦回答该问题，仍只基于工具输出事实。 */
+  question?: string
   /** AI 客户端注入接缝（M2-T1）；测试注入 mock，生产为 baichuan。 */
   ai: AiClients
 }

@@ -70,6 +70,7 @@ export async function runInsightSummary(input: InsightRunInput): Promise<Insight
           lastQuestion: tools.riskEvents.lastQuestion,
         },
       },
+      question: input.question,
     })
 
     // ── 2. guardSummary 二次守门（L4/L3/L2/L1）──

@@ -314,3 +314,28 @@ export const riskEvents = pgTable('risk_events', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// insight_ask_logs · 医生端问答留痕（T7 · ADR #17 保留项：漏判留痕作为工具集扩充依据）
+// 用途：POST /api/insight/ask 每问一行；intent 为空 = 正则漏判（长尾）——漏判率高时优先
+//       扩语义工具，绝不放开 SQL（ADR #17 禁 text-to-SQL）
+// ---------------------------------------------------------------------------
+export const insightAskLogs = pgTable('insight_ask_logs', {
+  id: text('id').primaryKey(),
+  /** 患者维度提问时的患者 id（→ users.id）；null = 队列维度提问 */
+  patientId: text('patient_id'),
+  /** 医生提问，落库前过 scrubWithPatterns（L3 出口约束，同 consult_logs 纪律） */
+  question: text('question').notNull(),
+  /** 回答路径：data = 固定问法命中意图，直查库（0 次 LLM）；llm = 长尾叙述（百川 + 守门） */
+  mode: varchar('mode', { enum: ['data', 'llm'] }).notNull(),
+  /** 命中的意图（队列工具名或患者查询意图）；null = 漏判（扩工具的依据） */
+  intent: text('intent'),
+  /** 实际执行的工具名（adherence_distribution / patient_cohort / …；data 路径必填） */
+  toolUsed: text('tool_used'),
+  /** 结构化回答快照（summary/keyPoints/risks/nextAction/warning） */
+  answerSnapshot: jsonb('answer_snapshot'),
+  citations: jsonb('citations'),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})

@@ -194,7 +194,8 @@ JSON 格式：
 {"summary":"一句话概括患者近期用药情况","keyPoints":["最多3条关键发现"],"risks":["最多3条风险提示"],"nextAction":"下一步建议（指向诊间确认或联系医生）","warning":"提醒医生本摘要仅供参考"}
 
 患者：${patient.name}${patient.age ? `，${patient.age}岁` : ''}${patient.gender ? `，${patient.gender}` : ''}${patient.conditions.length > 0 ? `，慢病：${patient.conditions.join('、')}` : ''}。
-数据区间：${dateRange}（近 30 天）。
+数据区间：${dateRange}（近 30 天）。${payload.question ? `
+医生追问：${payload.question}（请聚焦回答该问题，仍只基于以下事实）` : ''}
 
 工具输出（均为只读计算结果）：
 - 依从性：执行率 ${adherence.rate}%（已服 ${adherence.taken}/${adherence.total}），连续漏服 ${adherence.consecutiveSkip} 次${skipDetailsText}
@@ -265,7 +266,8 @@ JSON 格式：
 
 数据区间：${payload.dateRange}（近 30 天），共 ${payload.total} 名患者。
 分档统计（工具计算结果）：执行率优 ${grades.good} 人、中 ${grades.fair} 人、差 ${grades.poor} 人${poorText}、无记录未分档 ${grades.ungraded} 人。
-风险事件：${riskText}。
+风险事件：${riskText}。${payload.question ? `
+医生追问：${payload.question}（请聚焦回答该问题，仍只基于以上事实；答不了就明确说查不了，能查的是分档统计、差档名单与风险事件）` : ''}
 
 请基于以上事实生成队列摘要。`
 

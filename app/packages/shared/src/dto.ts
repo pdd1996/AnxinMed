@@ -292,3 +292,31 @@ export const InsightQueueResponseSchema = z.object({
   ),
 })
 export type InsightQueueResponse = z.infer<typeof InsightQueueResponseSchema>
+
+/**
+ * POST /api/insight/ask 请求体（T7 医生端问答）。
+ * - `patientId` 为空 = 队列维度问法；非空 = 患者维度问法；
+ * - 问题为原文，api 层落库与送 LLM 前统一过 PII 脱敏（L3 出口约束）。
+ */
+export const InsightAskRequestSchema = z.object({
+  question: z.string().min(1).max(200),
+  patientId: z.string().min(1).nullish(),
+})
+export type InsightAskRequest = z.infer<typeof InsightAskRequestSchema>
+
+/**
+ * POST /api/insight/ask 响应体。
+ * - `mode='data'`：固定问法命中意图，只读工具直查库（0 次 LLM），`toolUsed` 必非空；
+ * - `mode='llm'`：长尾问法，百川基于工具统计末端叙述，过 guardSummary 二次守门；
+ * - `suggestions` 为固定问法示例（前端快捷 chip + 「能查的是这些」引导）。
+ */
+export const InsightAskResponseSchema = z.object({
+  mode: z.enum(['data', 'llm']),
+  riskLevel: RiskLevelSchema,
+  sections: ConsultSectionsSchema,
+  toolUsed: z.string().nullish(),
+  citations: z.array(z.string()).default([]),
+  notice: z.string().nullish(),
+  suggestions: z.array(z.string()).default([]),
+})
+export type InsightAskResponse = z.infer<typeof InsightAskResponseSchema>

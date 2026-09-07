@@ -16,7 +16,7 @@
  */
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
-import { drugs, healthProfiles, plans, records, riskEvents, users } from '../db/schema.js'
+import { drugs, healthProfiles, insightAskLogs, plans, records, riskEvents, users } from '../db/schema.js'
 import { todayStr, addDaysStr, gradeAdherence } from '@anxin/shared'
 
 // ---------------------------------------------------------------------------
@@ -288,4 +288,19 @@ export async function listRiskEventsWindow(days = 30): Promise<RiskEventWindowRo
     .from(riskEvents)
     .where(gte(riskEvents.occurredAt, since))
   return rows.map((r) => ({ date: r.occurredAt.toISOString().slice(0, 10), level: r.level }))
+}
+
+// ---------------------------------------------------------------------------
+// 7. T7 问答留痕（ADR #17 保留项：漏判留痕 = 扩工具依据，绝不放开 SQL）
+// ---------------------------------------------------------------------------
+
+/** 患者存在性检查（ask 患者维度问法的 404 前置；轻量单行查询）。 */
+export async function findPatient(id: string) {
+  const [row] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, id)).limit(1)
+  return row ?? null
+}
+
+/** 医生问答留痕（每问一行；question 为脱敏后文本——L3 出口约束）。 */
+export async function insertAskLog(row: typeof insightAskLogs.$inferInsert): Promise<void> {
+  await db.insert(insightAskLogs).values(row)
 }
