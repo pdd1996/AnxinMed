@@ -11,15 +11,25 @@
  * LLM 不可用 → 离线降级（runInsightSummaryOffline），返回 200 + notice 说明。
  */
 import { Hono } from 'hono'
-import { InsightAskRequestSchema, InsightSummaryRequestSchema } from '@anxin/shared'
+import {
+  InsightAdherenceSeriesQuerySchema,
+  InsightAskRequestSchema,
+  InsightSummaryRequestSchema,
+} from '@anxin/shared'
 import type { AppEnv } from '../types.js'
-import { vJson, okJson } from '../lib/http.js'
+import { vJson, vQuery, okJson } from '../lib/http.js'
 import * as insightService from '../services/insight.service.js'
 
 export const insightRoute = new Hono<AppEnv>()
   .get('/patients', async (c) => {
     const items = await insightService.listPatients()
     return okJson(c, { items })
+  })
+  // 患者下钻打卡时序（T7 图表卡片 · 0 次 LLM 直查库；口径与队列视图同源）
+  .get('/patients/:id/adherence-series', vQuery(InsightAdherenceSeriesQuerySchema), async (c) => {
+    const { days } = c.req.valid('query')
+    const result = await insightService.getPatientAdherenceSeries(c.req.param('id'), days)
+    return okJson(c, result)
   })
   .get('/queue', async (c) => {
     const result = await insightService.getQueue()

@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@antv/g2": "^5.4.8",
     "@anxin/shared": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.102.8",

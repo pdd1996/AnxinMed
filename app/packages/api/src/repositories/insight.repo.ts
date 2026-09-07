@@ -17,7 +17,7 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { drugs, healthProfiles, insightAskLogs, plans, records, riskEvents, users } from '../db/schema.js'
-import { todayStr, addDaysStr, gradeAdherence } from '@anxin/shared'
+import { todayStr, addDaysStr, gradeAdherence, isPlanActiveOn } from '@anxin/shared'
 
 // ---------------------------------------------------------------------------
 // 1. 患者列表（users + health_profiles + 生效计划数 + 最近活跃 + T7 依从性分档）
@@ -192,6 +192,105 @@ export async function getAdherenceStats(userId: string, days = 30): Promise<Adhe
     .map((r) => ({ date: r.scheduledDate, drugId: r.planId })) // planId 作为 drugId 的近似（MVP 简化）
 
   return { rate, taken, skipped, total, consecutiveSkip, skipDetails, dateRange: days }
+}
+
+// ---------------------------------------------------------------------------
+// 2.5 按日打卡序列 + 按药品聚合（T7 患者下钻图表 · 0 次 LLM 直查库）
+// ---------------------------------------------------------------------------
+
+export interface AdherenceSeriesDay {
+  date: string
+  taken: number
+  skipped: number
+  later: number
+  /** 当日应服次数 = 生效计划（shared isPlanActiveOn）× 计划 times 点位数。 */
+  expected: number
+}
+
+export interface AdherenceSeriesDrugRow {
+  genericName: string
+  brandName: string | null
+  taken: number
+  skipped: number
+  later: number
+}
+
+export interface AdherenceSeriesResult {
+  startDate: string
+  endDate: string
+  series: AdherenceSeriesDay[]
+  byDrug: AdherenceSeriesDrugRow[]
+}
+
+/**
+ * 近 N 天按日打卡序列 + 按药品聚合（患者下钻图表数据，窗口内无打卡日补零）。
+ * - 常数 3 次查询（窗口天数无关）；分档/口径不在 SQL 判定，rate 由 getAdherenceStats 统一给出；
+ * - expected 用 shared isPlanActiveOn 单一真相（与任务生成 tasks.service 同口径）；
+ *   注意：重复计划/重复时间点会如实计入应服（数据本身的问题，聚合层不做去重裁决）；
+ * - byDrug 按「通用名+商品名」聚合——同一药品的多条药箱档案合并为一行（医生视角的「药」），
+ *   不按 drugs.id 分组（重复录入会画出同名柱）。
+ */
+export async function getAdherenceSeries(userId: string, days = 30): Promise<AdherenceSeriesResult> {
+  const end = todayStr()
+  const start = addDaysStr(end, -days + 1)
+
+  const dayList: string[] = []
+  for (let i = 0; i < days; i++) dayList.push(addDaysStr(start, i))
+
+  const [statusRows, drugRows, planRows] = await Promise.all([
+    db
+      .select({
+        scheduledDate: records.scheduledDate,
+        status: records.status,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(records)
+      .where(and(eq(records.userId, userId), gte(records.scheduledDate, start)))
+      .groupBy(records.scheduledDate, records.status),
+    db
+      .select({
+        genericName: drugs.genericName,
+        brandName: drugs.brandName,
+        taken: sql<number>`count(*) filter (where ${records.status} = 'taken')::int`,
+        skipped: sql<number>`count(*) filter (where ${records.status} = 'skipped')::int`,
+        later: sql<number>`count(*) filter (where ${records.status} = 'later')::int`,
+      })
+      .from(records)
+      .innerJoin(plans, eq(records.planId, plans.id))
+      .innerJoin(drugs, eq(plans.drugId, drugs.id))
+      .where(and(eq(records.userId, userId), gte(records.scheduledDate, start)))
+      .groupBy(drugs.genericName, drugs.brandName),
+    db.select().from(plans).where(eq(plans.userId, userId)),
+  ])
+
+  const byDate = new Map<string, { taken: number; skipped: number; later: number }>()
+  for (const r of statusRows) {
+    const cur = byDate.get(r.scheduledDate) ?? { taken: 0, skipped: 0, later: 0 }
+    cur[r.status] = (cur[r.status] ?? 0) + r.cnt
+    byDate.set(r.scheduledDate, cur)
+  }
+
+  const planSlots = planRows.map((p) => ({
+    status: p.status,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    slots: Array.isArray(p.times) ? (p.times as unknown[]).length : 0,
+  }))
+
+  const series: AdherenceSeriesDay[] = dayList.map((date) => {
+    const c = byDate.get(date)
+    const expected = planSlots.reduce(
+      (n, p) => n + (isPlanActiveOn(p, date) ? p.slots : 0),
+      0,
+    )
+    return { date, taken: c?.taken ?? 0, skipped: c?.skipped ?? 0, later: c?.later ?? 0, expected }
+  })
+
+  const byDrug = drugRows
+    .map((d) => ({ ...d }))
+    .sort((a, b) => b.taken + b.skipped + b.later - (a.taken + a.skipped + a.later))
+
+  return { startDate: start, endDate: end, series, byDrug }
 }
 
 // ---------------------------------------------------------------------------

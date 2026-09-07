@@ -206,3 +206,18 @@ export type InsightQueueDto = Awaited<ReturnType<typeof fetchInsightQueue>>
 export type QueueSummaryDto = Omit<Awaited<ReturnType<typeof generateQueueSummary>>, 'ok'>
 /** 问答响应 DTO。 */
 export type InsightAskDto = Omit<Awaited<ReturnType<typeof askInsight>>, 'ok'>
+
+/**
+ * GET /api/insight/patients/:id/adherence-series：患者下钻打卡时序（T7 图表卡片 · 0 次 LLM）。
+ * 按日序列（taken/skipped/later/expected）+ 按药品聚合 + 窗口合计；口径与队列视图同源。
+ */
+export async function fetchPatientAdherenceSeries(patientId: string, days: number) {
+  const res = await client.api.insight.patients[':id']['adherence-series'].$get({
+    param: { id: patientId },
+    query: { days: String(days) },
+  })
+  return unwrap(res)
+}
+
+/** 患者打卡时序 DTO（hc<AppType> 推导）。 */
+export type InsightAdherenceSeriesDto = Awaited<ReturnType<typeof fetchPatientAdherenceSeries>>

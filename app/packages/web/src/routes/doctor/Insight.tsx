@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { RiskBadge } from '@/components/domain/RiskBadge'
+import { PatientAdherenceCharts } from '@/components/domain/insight/PatientAdherenceCharts'
 import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventType } from '@anxin/shared'
 
 /** 临期/低库存药品项（shared dto 里为 z.unknown()，本处窄化为具体形态）。 */
@@ -704,6 +705,10 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
           )}
         </CardContent>
       </Card>
+
+      {/* 打卡时序图表（T7 · G2 5.x 前端渲染，数据 0 次 LLM 直查库） */}
+      <SectionHeading eyebrow="工具输出" title="打卡时序图表" />
+      <PatientAdherenceCharts patientId={patient.id} />
 
       {/* 用药清单与相互作用 */}
       <SectionHeading eyebrow="工具输出" title="用药清单与相互作用" />

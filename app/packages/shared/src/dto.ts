@@ -320,3 +320,52 @@ export const InsightAskResponseSchema = z.object({
   suggestions: z.array(z.string()).default([]),
 })
 export type InsightAskResponse = z.infer<typeof InsightAskResponseSchema>
+
+/**
+ * GET /api/insight/patients/:id/adherence-series?days=N 查询参数（T7 患者下钻图表）。
+ * days 为统计窗口天数（1–90，缺省 30）；query 层是字符串，z.coerce 收敛为整数。
+ */
+export const InsightAdherenceSeriesQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(30),
+})
+export type InsightAdherenceSeriesQuery = z.infer<typeof InsightAdherenceSeriesQuerySchema>
+
+/**
+ * GET /api/insight/patients/:id/adherence-series 响应体（T7 患者下钻图表 · 0 次 LLM 直查库）。
+ * - `series` 按日打卡序列：taken/skipped/later 来自 records 按日×状态聚合（窗口内无打卡日补零）；
+ *   `expected` = 当日应服次数（生效计划 shared isPlanActiveOn × 计划 times 点位数，当前 active 状态）；
+ * - `byDrug` 按「通用名+商品名」聚合（records JOIN plans JOIN drugs；同一药品多条药箱档案合并为一行，
+ *   按打卡总量降序），供水平条形图；
+ * - `adherence` 窗口合计（口径同 getAdherenceStats：rate = taken / total，total 含全部状态）。
+ */
+export const InsightAdherenceSeriesResponseSchema = z.object({
+  patientId: z.string(),
+  days: z.number().int(),
+  startDate: z.string(),
+  endDate: z.string(),
+  series: z.array(
+    z.object({
+      date: z.string(),
+      taken: z.number(),
+      skipped: z.number(),
+      later: z.number(),
+      expected: z.number(),
+    }),
+  ),
+  byDrug: z.array(
+    z.object({
+      genericName: z.string(),
+      brandName: z.string().nullish(),
+      taken: z.number(),
+      skipped: z.number(),
+      later: z.number(),
+    }),
+  ),
+  adherence: z.object({
+    rate: z.number(),
+    taken: z.number(),
+    skipped: z.number(),
+    total: z.number(),
+  }),
+})
+export type InsightAdherenceSeriesResponse = z.infer<typeof InsightAdherenceSeriesResponseSchema>

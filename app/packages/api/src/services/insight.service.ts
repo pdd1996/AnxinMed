@@ -37,7 +37,7 @@ import { scrubWithPatterns, PII_ASSERT_PATTERNS } from './sanitize/scan.js'
 import { newId } from '../lib/util.js'
 import type { QueuePromptPayload } from '../lib/ai/types.js'
 import type { InsightTools, InteractionsSummary, RiskEventsSummary } from './insight/types.js'
-import type { ConsultSections, InsightAskResponse, RiskLevel } from '@anxin/shared'
+import type { ConsultSections, InsightAdherenceSeriesResponse, InsightAskResponse, RiskLevel } from '@anxin/shared'
 import { ApiError } from '../lib/http.js'
 import { ERR_CODES } from '@anxin/shared'
 
@@ -196,6 +196,39 @@ async function resolveActiveMasterIds(userId: string): Promise<string[]> {
   return drugRows
     .filter((d) => d.drugMasterId && planRows.some((p) => p.drugId === d.id && isPlanActiveOn(p, today)))
     .map((d) => d.drugMasterId as string)
+}
+
+/**
+ * 患者下钻打卡时序（T7 图表卡片 · 0 次 LLM 直查库）。
+ * 按日序列（taken/skipped/later/expected）+ 按药品聚合 + 窗口合计；口径与队列视图同源
+ * （getAdherenceStats / shared isPlanActiveOn），供前端 G2 模板按结果契约渲染。
+ */
+export async function getPatientAdherenceSeries(
+  patientId: string,
+  days = 30,
+): Promise<InsightAdherenceSeriesResponse> {
+  const patient = await insightRepo.findPatient(patientId)
+  if (!patient) {
+    throw new ApiError(404, ERR_CODES.NOT_FOUND, '未找到该患者，请确认 patientId')
+  }
+  const [seriesData, stats] = await Promise.all([
+    insightRepo.getAdherenceSeries(patientId, days),
+    insightRepo.getAdherenceStats(patientId, days),
+  ])
+  return {
+    patientId,
+    days,
+    startDate: seriesData.startDate,
+    endDate: seriesData.endDate,
+    series: seriesData.series,
+    byDrug: seriesData.byDrug,
+    adherence: {
+      rate: stats.rate,
+      taken: stats.taken,
+      skipped: stats.skipped,
+      total: stats.total,
+    },
+  }
 }
 
 /** 队列/患者数据路径 citation（与 insight 摘要 run 的字符串口径一致；consult 的 Citation 三件套不进医生端 ask）。 */
