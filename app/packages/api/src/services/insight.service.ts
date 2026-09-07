@@ -14,7 +14,7 @@
  * - 不做守门判断（走 services/insight/guards.ts 纯函数）；
  * - AI 客户端经 lib/ai/registry.ts 注入接缝取得（测试可 setAiClients(mock)）。
  */
-import { isPlanActiveOn, todayStr, addDaysStr, type InsightSummaryResponse } from '@anxin/shared'
+import { isPlanActiveOn, todayStr, addDaysStr, type InsightQueueResponse, type InsightSummaryResponse } from '@anxin/shared'
 import * as assetsRepo from '../repositories/assets.repo.js'
 import * as consultRepo from '../repositories/consult.repo.js'
 import * as drugsRepo from '../repositories/drugs.repo.js'
@@ -23,6 +23,9 @@ import * as plansRepo from '../repositories/plans.repo.js'
 import { getAiClients } from '../lib/ai/registry.js'
 import { checkInteractions, type InteractionRuleInput } from './rules/index.js'
 import { runInsightSummary, runInsightSummaryOffline, toRiskEventItem, toLastQuestion } from './insight/index.js'
+import { countGrades, rollupTimeline } from './insight/tools.js'
+import { runQueueSummary, runQueueSummaryOffline } from './insight/queue.js'
+import type { QueuePromptPayload } from '../lib/ai/types.js'
 import type { InsightTools, InteractionsSummary, RiskEventsSummary } from './insight/types.js'
 import { ApiError } from '../lib/http.js'
 import { ERR_CODES } from '@anxin/shared'
@@ -30,6 +33,22 @@ import { ERR_CODES } from '@anxin/shared'
 /** 患者列表（GET /api/insight/patients）。 */
 export async function listPatients() {
   return insightRepo.listPatientsWithStats()
+}
+
+/** 队列视图数据（GET /api/insight/queue · T7）：分档统计 + 患者表 + 事件时间线，0 次 LLM 直查库。 */
+export async function getQueue(): Promise<InsightQueueResponse> {
+  const days = 30
+  const patients = await insightRepo.listPatientsWithStats(days)
+  const rows = await insightRepo.listRiskEventsWindow(days)
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dateRange: days,
+    total: patients.length,
+    grades: countGrades(patients),
+    patients,
+    riskTimeline: rollupTimeline(rows),
+  }
 }
 
 /** 生效计划集合的相互作用摘要（复用 M2-T5 checkInteractions）。 */
@@ -116,4 +135,39 @@ export async function generateSummary(patientId: string): Promise<InsightSummary
 
   const ai = getAiClients()
   return runInsightSummary({ patient, tools, dateRange, ai })
+}
+
+/**
+ * 生成队列摘要（POST /api/insight/queue-summary · T7.6）。
+ * 数字全部来自工具计算结果（listPatientsWithStats / listRiskEventsWindow），
+ * 百川仅在链路末端做叙述，过 guardSummary 二次守门；无 key / LLM 失败走规则降级。
+ */
+export async function generateQueueSummary() {
+  const days = 30
+  const patients = await insightRepo.listPatientsWithStats(days)
+  const windowRows = await insightRepo.listRiskEventsWindow(days)
+
+  const grades = countGrades(patients)
+  const riskEvents = {
+    total: windowRows.length,
+    hasL4: windowRows.some((r) => r.level === 'L4'),
+    hasL3: windowRows.some((r) => r.level === 'L3'),
+  }
+  // 字段最小化（ADR #17 第 5 条）：统计 + 差档名单（封顶 10，演示数据已脱敏），不带全量身份信息
+  const payload: QueuePromptPayload = {
+    dateRange: `${addDaysStr(todayStr(), -days + 1)} ~ ${todayStr()}`,
+    total: patients.length,
+    grades,
+    poorPatientNames: patients
+      .filter((p) => p.adherenceGrade === 'poor')
+      .map((p) => p.name ?? '未命名')
+      .slice(0, 10),
+    riskEvents,
+  }
+
+  if (!process.env.BAICHUAN_API_KEY) {
+    return runQueueSummaryOffline({ payload, grades, riskEvents })
+  }
+  const ai = getAiClients()
+  return runQueueSummary({ payload, grades, riskEvents, ai })
 }

@@ -18,6 +18,7 @@ import {
   type ImageInput,
   type InsightPromptPayload,
   type OcrResult,
+  type QueuePromptPayload,
 } from '../../lib/ai/types.js'
 
 /** 行级 OCR 结果：直接传行数组（无置信度/坐标，诚实契约）。 */
@@ -38,6 +39,7 @@ export interface AiCalls {
   consultAnswer: number
   medicalSearch: number
   insightSummary: number
+  queueSummary: number
 }
 
 export function newCalls(): AiCalls {
@@ -49,6 +51,7 @@ export function newCalls(): AiCalls {
     consultAnswer: 0,
     medicalSearch: 0,
     insightSummary: 0,
+    queueSummary: 0,
   }
 }
 
@@ -63,6 +66,8 @@ export interface MockOverrides {
   medical?: ConsultRawSections
   /** M3-T3：医生端摘要 override。 */
   insight?: ConsultRawSections
+  /** T7：队列摘要 override。 */
+  queue?: ConsultRawSections
   detectLayersError?: Error
   runOcrError?: Error
   extractIdentityError?: Error
@@ -70,6 +75,7 @@ export interface MockOverrides {
   consultAnswerError?: Error
   medicalSearchError?: Error
   insightSummaryError?: Error
+  queueSummaryError?: Error
   calls?: AiCalls
 }
 
@@ -116,6 +122,13 @@ export function mockClients(o: MockOverrides = {}): AiClients {
       // 默认抛 AIUnavailableError：M2/M3-T1 测试不走摘要路径，如意外走到则明确失败（不静默通过）
       if (!o.insight) throw new AIUnavailableError('baichuan', 'mock 未提供 insightSummary override')
       return o.insight
+    },
+    async queueSummary(_payload: QueuePromptPayload) {
+      calls.queueSummary++
+      if (o.queueSummaryError) throw o.queueSummaryError
+      // 默认抛 AIUnavailableError：不走队列摘要路径的测试如意外走到则明确失败（不静默通过）
+      if (!o.queue) throw new AIUnavailableError('baichuan', 'mock 未提供 queueSummary override')
+      return o.queue
     },
   }
 }

@@ -22,6 +22,7 @@ import {
   type ImageInput,
   type InsightPromptPayload,
   type OcrResult,
+  type QueuePromptPayload,
 } from './types.js'
 import { currentScenario } from './scenario.js'
 
@@ -40,6 +41,8 @@ export interface FixturePack {
   medicalSearch?: ConsultRawSections | null
   /** M3-T3 医生端摘要录制（可选）。 */
   insightSummary?: ConsultRawSections | null
+  /** T7 队列摘要录制（可选）。 */
+  queueSummary?: ConsultRawSections | null
 }
 
 /** app/e2e/fixtures（从本文件 app/packages/api/src/lib/ai/ 上溯 5 级到 app/）。 */
@@ -68,6 +71,7 @@ export interface AiCallCounts {
   consultAnswer: number
   medicalSearch: number
   insightSummary: number
+  queueSummary: number
 }
 const callLog = new Map<string, AiCallCounts>()
 export function aiCallLog(scenario: string): AiCallCounts {
@@ -80,6 +84,7 @@ export function aiCallLog(scenario: string): AiCallCounts {
       consultAnswer: 0,
       medicalSearch: 0,
       insightSummary: 0,
+      queueSummary: 0,
     }
   )
 }
@@ -135,6 +140,14 @@ export class FixtureAiClients implements AiClients {
     const raw = loadPack(s).insightSummary
     // M2/M3-T1 fixture 包无此字段 → 明确抛错（不静默通过）；M3-T3 摘要 E2E 录制时补上即可回放。
     if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无医生端摘要录制`)
+    return raw
+  }
+  async queueSummary(_payload: QueuePromptPayload): Promise<ConsultRawSections> {
+    const s = currentScenario()
+    bump(s, 'queueSummary')
+    const raw = loadPack(s).queueSummary
+    // 无录制的场景包 → 明确抛错（编排层转 error-fallback，不静默通过）；T7 队列 E2E 录制时补上即可回放。
+    if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无队列摘要录制`)
     return raw
   }
 }

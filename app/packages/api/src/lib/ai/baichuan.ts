@@ -8,6 +8,7 @@ import {
   type ConsultRawSections,
   type FallbackFields,
   type InsightPromptPayload,
+  type QueuePromptPayload,
 } from './types.js'
 import { callJson, extractChatContent, parseModelJson, type ChatResponse } from './http.js'
 import { ConsultRawSectionsSchema, FallbackParseSchema } from './schemas.js'
@@ -231,6 +232,70 @@ export async function insightSummary(payload: InsightPromptPayload): Promise<Con
   const parsed = ConsultRawSectionsSchema.safeParse(raw)
   if (!parsed.success) {
     throw new AIUnavailableError('baichuan', `医生端摘要输出不符合约定：${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
+// ---------------------------------------------------------------------------
+// T7：队列摘要（分档统计 + 差档名单 + 事件计数 → 结构化叙述）
+// ---------------------------------------------------------------------------
+
+/** 队列摘要请求体组装（纯函数，可测）。字段最小化（ADR #17 第 5 条）：只含统计 + 差档名单 + 事件计数。 */
+export function buildQueueSummaryRequest(payload: QueuePromptPayload) {
+  const { grades, poorPatientNames, riskEvents } = payload
+  const poorText =
+    poorPatientNames.length > 0 ? `（${poorPatientNames.slice(0, 10).join('、')}）` : ''
+  const riskText =
+    `风险事件 ${riskEvents.total} 条` +
+    (riskEvents.hasL4 ? '，含 L4 紧急信号' : '') +
+    (riskEvents.hasL3 ? '，含 L3 拒答拦截' : '')
+
+  const content = `你是"安心用药"演示版的医生端队列洞察助手，为医生生成患者队列的用药管理摘要。只基于以下统计事实生成摘要，不要编造数据。
+
+硬性规则：
+1. 只输出严格 JSON，禁止 Markdown、禁止 **粗体**、禁止引用编号。
+2. 总字数控制在 150-250 个汉字。
+3. 不得给出具体剂量、频次、疗程数字，不得说"一日X片/每次X mg"。
+4. 不得诊断、开处方、建议停换药或调整剂量。
+5. 摘要面向医生，用于快速了解队列依从性与风险分布，不是用药建议。
+6. 不要结尾追问。
+
+JSON 格式：
+{"summary":"一句话概括队列依从性分布","keyPoints":["最多3条关键发现"],"risks":["最多3条风险提示"],"nextAction":"下一步建议（指向优先随访对象或诊间确认）","warning":"提醒医生本摘要仅供参考"}
+
+数据区间：${payload.dateRange}（近 30 天），共 ${payload.total} 名患者。
+分档统计（工具计算结果）：执行率优 ${grades.good} 人、中 ${grades.fair} 人、差 ${grades.poor} 人${poorText}、无记录未分档 ${grades.ungraded} 人。
+风险事件：${riskText}。
+
+请基于以上事实生成队列摘要。`
+
+  return {
+    model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
+    temperature: 0.1,
+    messages: [{ role: 'user' as const, content }],
+  }
+}
+
+/** 队列摘要：分档统计 → 结构化叙述。输出过 ConsultRawSectionsSchema safeParse。 */
+export async function queueSummary(payload: QueuePromptPayload): Promise<ConsultRawSections> {
+  const baseUrl = process.env.BAICHUAN_BASE_URL
+  const key = process.env.BAICHUAN_API_KEY
+  if (!baseUrl || !key) {
+    throw new AIUnavailableError('baichuan', '缺少 BAICHUAN_BASE_URL / BAICHUAN_API_KEY 配置')
+  }
+  const res = await callJson<ChatResponse>(
+    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildQueueSummaryRequest(payload)),
+    },
+    { client: 'baichuan' },
+  )
+  const raw = parseModelJson(extractChatContent(res, 'baichuan'), 'baichuan')
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('baichuan', `队列摘要输出不符合约定：${parsed.error.message}`)
   }
   return parsed.data
 }

@@ -16,6 +16,7 @@ export function createAiClients(): AiClients {
     consultAnswer: baichuan.consultAnswer,
     medicalSearch: baichuan.medicalSearch,
     insightSummary: baichuan.insightSummary,
+    queueSummary: baichuan.queueSummary,
   }
 }
 
@@ -27,4 +28,5 @@ export {
   buildConsultRequest,
   buildMedicalSearchRequest,
   buildInsightRequest,
+  buildQueueSummaryRequest,
 } from './baichuan.js'

@@ -112,6 +112,20 @@ export interface InsightPromptPayload {
 }
 
 /**
+ * 队列摘要 prompt 入参（T7 · services/insight/queue.ts 组装）。
+ * 字段最小化（ADR #17 第 5 条）：只发分档统计 + 差档名单（脱敏演示名，封顶）+ 事件计数，
+ * 不带全量患者身份信息——队列场景泄露面大于单患者。
+ */
+export interface QueuePromptPayload {
+  dateRange: string
+  total: number
+  grades: { good: number; fair: number; poor: number; ungraded: number }
+  /** 执行率差的患者名单（封顶 10，供诊前点名随访；来自 listPatientsWithStats，演示数据已脱敏）。 */
+  poorPatientNames: string[]
+  riskEvents: { total: number; hasL4: boolean; hasL3: boolean }
+}
+
+/**
  * 统一 AI 客户端接口。管线只依赖此接口，不直接 import 具体实现。
  * 每个方法失败时抛 AIUnavailableError（或经 zod safeParse 失败抛明确错误），由编排层转降级。
  */
@@ -139,4 +153,10 @@ export interface AiClients {
    * 输出 schema 与咨询相同（ConsultRawSectionsSchema）；非法抛 AIUnavailableError。
    */
   insightSummary(payload: InsightPromptPayload): Promise<ConsultRawSections>
+  /**
+   * 队列摘要（T7 · ADR #17 第 3 条）：分档统计 + 差档名单 + 事件计数 → 结构化叙述。
+   * 数字全部来自工具计算结果，LLM 只做末端叙述；非法抛 AIUnavailableError。
+   * 可选方法：FixtureAiClients / mock 未配置时由编排层转 error-fallback（不静默）。
+   */
+  queueSummary?(payload: QueuePromptPayload): Promise<ConsultRawSections>
 }
