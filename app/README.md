@@ -87,8 +87,8 @@ curl localhost:8787/api/health        # 期望 200 {"ok":true,...}
 | `QWEN_MODEL` | | `qwen3-vl-plus` | Qwen 模型名 |
 | `BAICHUAN_API_KEY` / `BAICHUAN_BASE_URL` | 咨询/兜底/摘要 | — | Baichuan-M3-Plus：医嘱兜底解析 + 咨询回答 + 医生端摘要；缺失 → 离线兜底（咨询 200 降级、摘要规则拼装） |
 | `BAICHUAN_MODEL` | | `baichuan-m3-plus` | Baichuan 模型名 |
-| `OCR_BASE_URL` | 医嘱线 OCR | — | PaddleOCR 自托管服务地址（`POST /ocr`）；缺失 → OCR `AIUnavailableError`（录入转 `OCR_FAILED` 降级草稿） |
-| `OCR_PROVIDER` / `OCR_API_KEY` | | — | 备选云端 OCR 占位（ADR#13 定案为 PaddleOCR 自托管，未启用） |
+| `OCR_BASE_URL` | 医嘱线 OCR | — | qwen3.5-ocr 云端 OpenAI 兼容端点（`POST {OCR_BASE_URL}/chat/completions`，ADR #16 取代 #13）；缺失 → OCR `AIUnavailableError`（录入转 `OCR_FAILED` 降级草稿） |
+| `OCR_API_KEY` / `OCR_MODEL` | | `qwen3.5-ocr` | qwen3.5-ocr 密钥 / 模型名；60s 超时 + 重试退避 500ms（ADR #16） |
 | `ENABLE_MEDICAL_SEARCH` | | `false` | 医疗搜索兜底默认关（PRD §7.5：仅本地未命中才开，且标注「未经本库核实」） |
 | `AI_MODE` | | — | `fixtures`：E2E 回放 `FixtureAiClients`（无 key 可跑）；其余：真实客户端 |
 | `API_PROXY_TARGET` | | `http://localhost:8787` | web(vite) `/api` 代理目标（E2E 用独立端口 8797） |

@@ -6,7 +6,7 @@
  * 编排/降级/回链/脱敏/事务/API 全走真代码。CI 独立 job 跑 `pnpm test:e2e`（无 key 可复现）。
  *
  * 模式：默认 fixtures（回放）；`pnpm test:e2e:live`（E2E_AI_MODE=live）起真实 AI 客户端，
- *       需 QWEN/BAICHUAN/OCR key 与自托管 OCR，仅发布前/验收手动跑，非回归手段。
+ *       需 QWEN/BAICHUAN/OCR key 与 qwen3.5-ocr 云端 OpenAI 兼容端点（ADR #16），仅发布前/验收手动跑，非回归手段。
  */
 import { defineConfig, devices } from '@playwright/test'
 import { TEST_URL } from './lib/test-db.js'

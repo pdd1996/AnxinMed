@@ -1,7 +1,7 @@
 # app/fixtures · golden case 样张资产（M2-T9 / T10 共用，git 管理）
 
 > 本目录是录入主线 golden case 的**测试资产真相源**。CI 与日常回归只消费文本真相（`golden-cases.json`），
-> 不读像素；PNG 供 T10 `test:e2e:live` 真实 OCR 与人工 oracle 审核。
+> 不读像素；PNG 供 T10 `test:e2e:live` 真实 OCR（qwen3.5-ocr 云端转录，ADR #16）与人工 oracle 审核。
 
 ## 唯一真相源
 

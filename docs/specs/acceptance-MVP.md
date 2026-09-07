@@ -19,7 +19,7 @@
 | 6 | 手动建档标注"未经 OCR 确认"，AI 个性化咨询不可用 | `ManualDrugModal.tsx`（confirmStatus=manual 固定）；`consult-api.test.ts` › `manual 档门禁 → manual-gate + l0Notice`；`Consult.test.tsx` › `选中 manual 档药 → 提示未经 OCR 确认` | ✅ |
 | 7 | 散装药片图片得到明确"不支持"提示 | E2E `unsupported-loose-pills：明确「不支持」提示 + OCR 未被调用`；`intake-api.test.ts` › `不支持对象（散装药片）→ 422 UNSUPPORTED_OBJECT + 安全提示` | ✅ |
 | 8 | 处方患者信息与账号资料不一致时出现"给谁用的药"提示 | `Draft.test.tsx` › `唯一闸门：逐项核对 + 使用人 + 提交后跳转`；`components/domain/draft/HealthCard.tsx`（WhoCard 使用人确认，恒定提示） | ✅ |
-| 9 | golden case 已实测（海露 0.1% 首单：多规拦截 / 医嘱对照 / 三源规格一致） | 数据 provenance：`data/crawled/drug-hycosan-01.json`（说明书草稿）+ `data/crawled-总账.md`（核验总账）；OCR 实测 `tools/ocr-bench/paddle-result.json`（医嘱行字符准确率 1.0） | ✅ |
+| 9 | golden case 已实测（海露 0.1% 首单：多规拦截 / 医嘱对照 / 三源规格一致） | 数据 provenance：`data/crawled/drug-hycosan-01.json`（说明书草稿）+ `data/crawled-总账.md`（核验总账）；OCR 实测 `tools/ocr-bench/paddle-result.json`（医嘱行字符准确率 1.0；注：OCR 选型已由 ADR #16（qwen3.5-ocr）取代，该数据为 PaddleOCR 时期实测存档） | ✅ |
 
 ## §16.2 提醒功能
 
@@ -62,7 +62,7 @@
 
 ## 待复测 / 保留项（诚实标注，未打勾即未达标）
 
-- ⏳ **真实医嘱线 P95 ≤ 15s**：需 live 模型（生产 Linux+oneDNN OCR）复测；本机 OCR ~69s 系 Windows PIR/oneDNN 环境 bug（ADR#13 保留项，`docs/09` §T5.1）。打点与采样工具已就位。
+- ⏳ **真实医嘱线 P95 ≤ 15s**：需 live 模型（生产 Linux+oneDNN OCR）复测；本机 OCR ~69s 系 Windows PIR/oneDNN 环境 bug（ADR#13 保留项，`docs/09` §T5.1）。打点与采样工具已就位。（注 2026-09-07：OCR 已由 ADR #16 切换 qwen3.5-ocr 云端转录，live 复测对象改为云端转录延迟；PaddleOCR 口径为历史存档）
 - ⏳ **生产 docker 端到端**：`docker compose up --build` 需本机/云 Docker 执行（`m1-done` tag 同此暂缓，`app/README.md` 已注明本地 `NODE_ENV=production node dist` 验证 serving）。
 - ⏳ **CI 全绿**：`.github/workflows/ci.yml` 已就位，需推送 GitHub 后由 Actions 实跑确认（本地已等价验证 lint/typecheck/test/build 全绿 + E2E fixtures 可跑）。
 

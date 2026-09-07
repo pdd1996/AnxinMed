@@ -47,7 +47,7 @@
 | 后端 | Hono + @hono/node-server（端口 8787）；routes → services → repositories 三层；`hc<AppType>` 端到端类型推断 |
 | 校验 | zod（schema 定义在 shared 包，前后端一份真相） |
 | 数据 | PostgreSQL 16 + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git，12 张表） |
-| AI | Qwen3-VL / PaddleOCR 自托管 / Baichuan；统一 AiClients 注入接缝；E2E 用 fixtures 回放 |
+| AI | Qwen3-VL / qwen3.5-ocr 云端（医嘱线行级转录，ADR #16）/ Baichuan；统一 AiClients 注入接缝；E2E 用 fixtures 回放 |
 | 测试 | Vitest（单测 + `app.request()` 集成，独立测试库）+ Playwright（5 条 golden case E2E） |
 | 仓库 | pnpm 11 workspace（Node >= 20，ESM） |
 | 部署 | docker-compose：api 多阶段镜像托管 web dist + `/api`；postgres:16-alpine |
@@ -83,8 +83,8 @@ pnpm dev        # api :8787 + web :5173
 | `DATABASE_URL` | **是** | PostgreSQL 连接串。角色需 CREATEDB 权限（测试库 `anxin_medication_test` 由此 URL 派生自建） |
 | `QWEN_API_KEY` / `QWEN_BASE_URL` | 否 | Qwen3-VL：处方层检测 / 身份线提取 |
 | `BAICHUAN_API_KEY` / `BAICHUAN_BASE_URL` | 否 | Baichuan：医嘱兜底解析 / 咨询 / 医生端摘要 |
-| `OCR_BASE_URL` | 否 | 自托管 PaddleOCR 服务地址（医嘱线） |
-| `OCR_PROVIDER` / `OCR_API_KEY` | 否 | OCR 提供方配置 |
+| `OCR_BASE_URL` | 否 | qwen3.5-ocr 云端 OpenAI 兼容端点（医嘱线行级转录，ADR #16） |
+| `OCR_API_KEY` / `OCR_MODEL` | 否 | OCR 密钥 / 模型名（默认 `qwen3.5-ocr`） |
 | `QWEN_MODEL` / `BAICHUAN_MODEL` | 否 | 模型名覆盖 |
 | `ENABLE_MEDICAL_SEARCH` | 否 | 医疗搜索开关，默认 `false`（PRD §7.5：仅本地说明书未命中才兜底，且标注未经本库核实） |
 | `PORT` | 否 | API 端口，默认 8787 |

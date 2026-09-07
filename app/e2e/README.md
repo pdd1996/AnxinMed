@@ -9,7 +9,7 @@
 # 无 key 环境（CI / 日常回归）：fixture 回放，五个 golden case 全绿
 pnpm test:e2e
 
-# 有 key 环境（发布前/验收手动跑，非回归手段）：真实管线 + 自托管 OCR
+# 有 key 环境（发布前/验收手动跑，非回归手段）：真实管线 + qwen3.5-ocr
 pnpm test:e2e:live
 ```
 
@@ -41,8 +41,8 @@ pnpm --filter @anxin/e2e make-fixtures
 #   录制 = 对每个场景跑一遍真实管线，把模型逐步原始响应写回 e2e/fixtures/<scenario>.json
 ```
 
-合成包 `source:"synthetic"`：golden case 的处方文本/涂黑/冲突/标签/散装形态即 oracle，mock OCR 坐标按与
-单测一致的布局约定渲染。审核通过的包进 git，CI 与日常回归永远回放这批文件。
+合成包 `source:"synthetic"`：golden case 的处方文本/涂黑/冲突/标签/散装形态即 oracle，mock OCR 为行级文本转录
+（qwen3.5-ocr 契约，无字符级坐标/置信度）。审核通过的包进 git，CI 与日常回归永远回放这批文件。
 
 ## 断言四层
 
