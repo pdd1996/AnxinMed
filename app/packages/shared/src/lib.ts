@@ -5,6 +5,7 @@
  * 日期约定：入参/出参为 ISO 日期字符串 "YYYY-MM-DD"；时间点为 "HH:MM"。
  * 注：addDaysStr/todayStr 按本地时区取日历日（与 demo 一致，dev/CI 均为 UTC+ 或 UTC，行为正确）。
  */
+import type { AdherenceGrade } from './enums.js'
 
 /** 今天（本地时区）→ "YYYY-MM-DD" */
 export function todayStr(): string {
@@ -48,4 +49,29 @@ export function isPlanActiveOn(
   date: string,
 ): boolean {
   return plan.status === 'active' && plan.startDate <= date && (!plan.endDate || plan.endDate >= date)
+}
+
+// ---------------------------------------------------------------------------
+// 依从性分档（T7 · ADR #17 第 3 条：分档口径确定性、可审计、可复现）
+// ---------------------------------------------------------------------------
+
+/** 分档阈值（执行率百分比，与 api insight.repo 近 30 天 `count(*) filter` 口径同源）。 */
+export const ADHERENCE_GRADE_THRESHOLDS = { good: 95, fair: 80 } as const
+
+/**
+ * 执行率 → 依从性分档（纯函数）：优 ≥95 / 中 80–94 / 差 <80。
+ * rate 缺失（近 N 天无打卡记录）返回 null——调用方落「未分档」，绝不臆测为差。
+ */
+export function gradeAdherence(rate: number | null | undefined): AdherenceGrade | null {
+  if (typeof rate !== 'number' || !Number.isFinite(rate)) return null
+  if (rate >= ADHERENCE_GRADE_THRESHOLDS.good) return 'good'
+  if (rate >= ADHERENCE_GRADE_THRESHOLDS.fair) return 'fair'
+  return 'poor'
+}
+
+/** 分档 → 医生可读标签（api 数据模板与 web 队列视图共用，展示口径一份真相）。 */
+export const ADHERENCE_GRADE_LABEL: Record<AdherenceGrade, string> = {
+  good: '优',
+  fair: '中',
+  poor: '差',
 }

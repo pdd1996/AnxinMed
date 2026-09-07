@@ -5,6 +5,7 @@
  */
 import { z } from 'zod'
 import {
+  AdherenceGradeSchema,
   ConfirmStatusSchema,
   CycleTypeSchema,
   PlanSourceSchema,
@@ -189,6 +190,9 @@ export const InsightPatientSchema = z.object({
   drugCount: z.number().default(0),
   enrolledAt: z.string(),
   lastActiveAt: z.string().nullish(),
+  // T7 队列分档（近 30 天执行率；无打卡记录时两者皆 null = 未分档）
+  adherenceRate: z.number().nullish(),
+  adherenceGrade: AdherenceGradeSchema.nullish(),
 })
 export type InsightPatient = z.infer<typeof InsightPatientSchema>
 
@@ -262,3 +266,29 @@ export const InsightSummaryResponseSchema = z.object({
   notice: z.string().nullish(),
 })
 export type InsightSummaryResponse = z.infer<typeof InsightSummaryResponseSchema>
+
+/**
+ * GET /api/insight/queue 响应体（T7 队列视图：分档统计卡 + 图表 + 患者表，0 次 LLM 直查库）。
+ * - `grades` 为分档计数（口径 = lib.ts gradeAdherence 阈值；ungraded = 近 N 天无打卡记录）；
+ * - `riskTimeline` 为全体患者 risk_events 按日期×级别聚合（事件时间线图表的数据契约）。
+ */
+export const InsightQueueResponseSchema = z.object({
+  generatedAt: z.string(),
+  dateRange: z.number(),
+  total: z.number(),
+  grades: z.object({
+    good: z.number(),
+    fair: z.number(),
+    poor: z.number(),
+    ungraded: z.number(),
+  }),
+  patients: z.array(InsightPatientSchema),
+  riskTimeline: z.array(
+    z.object({
+      date: z.string(),
+      level: RiskEventLevelSchema,
+      count: z.number(),
+    }),
+  ),
+})
+export type InsightQueueResponse = z.infer<typeof InsightQueueResponseSchema>

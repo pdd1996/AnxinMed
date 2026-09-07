@@ -54,6 +54,11 @@ export type RiskEventLevel = z.infer<typeof RiskEventLevelSchema>
 export const RiskEventTypeSchema = z.enum(['emergency', 'refused', 'manual-blocked'])
 export type RiskEventType = z.infer<typeof RiskEventTypeSchema>
 
+// ── 依从性分档（医生端队列 · ADR #17 第 3 条：分档口径确定性，LLM 不做分类器）──
+//    阈值与判定函数见 lib.ts gradeAdherence（前后端一份真相）。
+export const AdherenceGradeSchema = z.enum(['good', 'fair', 'poor'])
+export type AdherenceGrade = z.infer<typeof AdherenceGradeSchema>
+
 // ── 相互作用分级（interaction_rules.level；PRD §7.8.1，四级，禁忌最高）──
 export const InteractionLevelSchema = z.enum(['禁忌', '慎用', '需监测', '注意'])
 export type InteractionLevel = z.infer<typeof InteractionLevelSchema>

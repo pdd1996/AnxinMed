@@ -10,6 +10,9 @@ import {
   estimateStockDays,
   suggestTimes,
   isPlanActiveOn,
+  gradeAdherence,
+  ADHERENCE_GRADE_THRESHOLDS,
+  ADHERENCE_GRADE_LABEL,
 } from './lib.js'
 
 describe('todayStr', () => {
@@ -104,5 +107,30 @@ describe('isPlanActiveOn', () => {
   })
   it('开放式（endDate 为 null）长期生效', () => {
     expect(isPlanActiveOn({ status: 'active', startDate: '2026-09-01', endDate: null }, '2027-01-01')).toBe(true)
+  })
+})
+
+describe('gradeAdherence（T7 · ADR #17 分档阈值边界）', () => {
+  it('边界值：优 ≥95 / 中 80–94 / 差 <80', () => {
+    expect(gradeAdherence(95)).toBe('good')
+    expect(gradeAdherence(100)).toBe('good')
+    expect(gradeAdherence(94)).toBe('fair')
+    expect(gradeAdherence(80)).toBe('fair')
+    expect(gradeAdherence(79)).toBe('poor')
+    expect(gradeAdherence(0)).toBe('poor')
+  })
+  it('缺失/非法执行率返回 null（未分档，绝不臆测为差）', () => {
+    expect(gradeAdherence(null)).toBeNull()
+    expect(gradeAdherence(undefined)).toBeNull()
+    expect(gradeAdherence(Number.NaN)).toBeNull()
+  })
+  it('阈值常量与判定函数一致（防止两处漂移）', () => {
+    expect(ADHERENCE_GRADE_THRESHOLDS.good).toBe(95)
+    expect(ADHERENCE_GRADE_THRESHOLDS.fair).toBe(80)
+  })
+  it('分档标签为医生可读中文（前后端同源）', () => {
+    expect(ADHERENCE_GRADE_LABEL.good).toBe('优')
+    expect(ADHERENCE_GRADE_LABEL.fair).toBe('中')
+    expect(ADHERENCE_GRADE_LABEL.poor).toBe('差')
   })
 })
