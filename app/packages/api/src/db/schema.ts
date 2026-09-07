@@ -205,7 +205,7 @@ export const sources = pgTable('sources', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),                     // → users.id
   type: varchar('type', { enum: ['prescription', 'drug_box', 'manual'] }).notNull(),  // 来源类型
-  bodyImageRef: text('body_image_ref'),                  // 正文裁剪图存储引用（脱敏 L0）
+  bodyImageRef: text('body_image_ref'),                  // 预留列，qwen3.5-ocr 行级契约下恒 null（ADR #16，原图不落盘）
   whitelistFields: jsonb('whitelist_fields'),            // L1 白名单字段快照
   prescriptionNo: text('prescription_no'),               // 处方号
   confirmTrace: jsonb('confirm_trace'),                  // { confirmedAt, method, keyFieldsSnapshot }（确认留痕）

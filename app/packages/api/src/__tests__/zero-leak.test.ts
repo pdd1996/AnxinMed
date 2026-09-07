@@ -92,10 +92,10 @@ interface Captured {
   url: string
   body: string
 }
-/** 安装 fetch mock：按 URL 路由 canned 响应（ocr/qwen 层检测/qwen 身份/baichuan 兜底），并记录全部请求体。 */
+/** 安装 fetch mock：按 URL 路由 canned 响应（ocr=chat 多行转录/qwen 层检测/qwen 身份/baichuan 兜底），并记录全部请求体。 */
 function installFetchMock(sc: Scenario): Captured[] {
   const captured: Captured[] = []
-  const ocrChars = mkOcr(ocrLines(sc)).chars
+  const ocrContent = mkOcr(ocrLines(sc)).lines.join('\n')
   const fb = fallbackOf(sc)
   vi.stubGlobal(
     'fetch',
@@ -103,7 +103,7 @@ function installFetchMock(sc: Scenario): Captured[] {
       const u = String(url)
       const body = typeof init?.body === 'string' ? init.body : ''
       captured.push({ url: u, body })
-      if (u.includes('ocr.test')) return mkRes({ chars: ocrChars })
+      if (u.includes('ocr.test')) return mkRes({ choices: [{ message: { content: ocrContent } }] })
       if (u.includes('bc.test')) return chatRes(fb)
       if (u.includes('qwen.test')) {
         const parsed = JSON.parse(body || '{}')
@@ -177,13 +177,14 @@ afterEach(() => {
   setAiClients(createAiClients()) // 还原注入接缝，避免泄漏到其它用例
 })
 
-/** 让真实 AI 客户端走 fetch mock：设置假 env（key 不入库、不真调）。 */
+/** 让真实 AI 客户端走 fetch mock：设置假 env（key 不入库、不真调）。OCR 为 qwen3.5-ocr chat 端点，需 key。 */
 function useRealClientsWithFetchMock() {
   process.env.QWEN_BASE_URL = 'http://qwen.test'
   process.env.QWEN_API_KEY = 'qk'
   process.env.BAICHUAN_BASE_URL = 'http://bc.test'
   process.env.BAICHUAN_API_KEY = 'bk'
   process.env.OCR_BASE_URL = 'http://ocr.test'
+  process.env.OCR_API_KEY = 'ok'
   setAiClients(createAiClients())
 }
 

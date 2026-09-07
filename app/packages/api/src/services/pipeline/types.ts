@@ -16,7 +16,6 @@ import type {
   ErrCode,
 } from '@anxin/shared'
 import type { IdentityFields } from '../../lib/ai/types.js'
-import type { Box } from '../sanitize/crop.js'
 import type { DrugMasterCandidate, MatchResult } from '../identity/match.js'
 import type { InteractionResult, InteractionRuleInput } from '../rules/interactions.js'
 import type { DosageRangeResult, PackageInsertDosage } from '../rules/dosage.js'
@@ -56,13 +55,6 @@ export interface Degraded {
   message: string
 }
 
-/** 低置信字符（裁剪正文内、去身份；确认页原文对照标红下划线）。 */
-export interface LowConfidenceChar {
-  text: string
-  confidence: number
-  box: Box
-}
-
 /**
  * 草稿载荷（drafts.payload）—— 确认页唯一闸门前的全部结构化产物。
  * 不变式：一切医嘱/身份字段来自「抄录 + 回链 + 脱敏」或 needsManual 空缺，绝无模型猜测预填；
@@ -82,9 +74,6 @@ export interface DraftPayload {
   needsManual: string[]
   /** L2 脱敏审计（类型 → 次数，不含原文）。 */
   sanitizeAudit?: Record<string, number>
-  /** L0 裁剪框几何（存档图仅存此框；前端按此叠加裁剪）。 */
-  cropBox?: Box | null
-  lowConfidenceChars?: LowConfidenceChar[]
   fallbackStatus?: 'not_needed' | 'success' | 'unavailable'
   backlinkIntercepted?: number
   /** 裁剪图存储引用（M2 仅存引用/几何，不存字节）。 */

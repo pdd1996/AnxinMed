@@ -19,15 +19,12 @@ export const IdentityExtractSchema = z.object({
   approvalNumber: z.string().optional(),
 })
 
-/** OCR 字符级结果（硬要求：字符级置信度 + 坐标）。 */
+/**
+ * OCR 行级转录结果（ADR 新条目取代 #13：qwen3.5-ocr，无字符级置信度/坐标）。
+ * lines 非空且每行非空——空转录 safeParse 失败 → AIUnavailableError('ocr') → 上层降级，不猜。
+ */
 export const OcrResultSchema = z.object({
-  chars: z.array(
-    z.object({
-      text: z.string(),
-      confidence: z.number(),
-      box: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }),
-    }),
-  ),
+  lines: z.array(z.string().min(1)).min(1),
 })
 
 /** 兜底解析：字段键 → 值（后续须过回链校验才可用）。 */

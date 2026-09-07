@@ -122,13 +122,6 @@ describe('管线 run.ts · 入口A 成功路径', () => {
     expect(drafts[1].identity?.form).toBe('滴眼液') // 从条目药名推剂型，非继承
   })
 
-  it('低置信字符进入原文对照清单（确认页标红下划线）', async () => {
-    const clients = mockClients({ layers: ['处方层'], ocr: mkOcr(RX, 0.5), identity: IDENTITY })
-    const [d] = await runPrescription(IMG, clients, ctx())
-    expect((d.lowConfidenceChars ?? []).length).toBeGreaterThan(0)
-    expect(d.cropBox).toBeTruthy()
-  })
-
   it('L2 脱敏在管线内生效：诊断值内嵌手机号被 [已脱敏] + 审计计数，原文不落 payload', async () => {
     const rxDiagPhone = [
       ...HEADER.slice(0, 3),

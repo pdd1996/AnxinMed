@@ -23,14 +23,12 @@ export interface ImageInput {
   mime: string
 }
 
-/** OCR 字符级结果（PRD 硬要求：字符级置信度 + 坐标）。box 为左上角 + 宽高。 */
-export interface OcrChar {
-  text: string
-  confidence: number
-  box: { x: number; y: number; w: number; h: number }
-}
+/**
+ * OCR 行级结果（ADR 新条目取代 #13：qwen3.5-ocr 行级转录，无字符级置信度/坐标）。
+ * 诚实降级：不合成假坐标/假置信度，裁剪按行索引（sanitize/crop.ts）。
+ */
 export interface OcrResult {
-  chars: OcrChar[]
+  lines: string[]
 }
 
 /** 身份线 VLM 提取字段（药盒层永不含用法用量——结构上无此字段）。 */
@@ -122,7 +120,7 @@ export interface AiClients {
   detectLayers(image: ImageInput): Promise<LayerLabel[]>
   /** 身份线：VLM 提取身份字段。 */
   extractIdentity(image: ImageInput): Promise<IdentityFields>
-  /** 医嘱线 OCR：字符级置信度 + 坐标。 */
+  /** 医嘱线 OCR：行级转录（qwen3.5-ocr，无字符级置信度/坐标）。 */
   runOcr(image: ImageInput): Promise<OcrResult>
   /** 兜底解析：仅当正则解析有缺项时触发；入参只含白名单文本。 */
   fallbackParse(bodyText: string, missingFields: string[]): Promise<FallbackFields>

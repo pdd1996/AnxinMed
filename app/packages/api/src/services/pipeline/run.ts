@@ -7,7 +7,7 @@
  *   入口B 拍药品：  ①detectLayers(硬闸门) → assertLayersForEntry → 身份线 → ⑦buildDraft（1 份建档，无用法用量）
  *
  * 降级：单步失败转 needsManual / degraded 标记，不炸整体（除 ①detectLayers —— 入口硬闸门，
- * AIUnavailable 冒泡由 intake.service 映射 503）。OCR 原文只在内存流转（L3），落库仅脱敏白名单 + 裁剪几何。
+ * AIUnavailable 冒泡由 intake.service 映射 503）。OCR 原文只在内存流转（L3），落库仅脱敏白名单。
  * run.ts 不碰 DB：drug_master 候选 / 规则 / 说明书 / 生效集合均由 PipelineContext 注入。
  */
 import { ERR_CODES, todayStr, type ConfirmStatus, type ErrCode, type LayerLabel } from '@anxin/shared'
@@ -28,7 +28,6 @@ import {
   buildHealthSuggestions,
   buildItemIdentity,
   buildPlanDraft,
-  pickLowConfidenceChars,
   toDraftConflicts,
 } from './buildDraft.js'
 import type { Degraded, DraftPayload, Entry, PipelineContext } from './types.js'
@@ -173,8 +172,6 @@ export async function runPrescription(
       degradedDraft('A', layers, ERR_CODES.PARSE_FAILED, '未从处方正文提取到药品条目，请核对原文手动补全', {
         whitelist,
         sanitizeAudit,
-        cropBox: crop.box,
-        lowConfidenceChars: pickLowConfidenceChars(crop.chars),
         fallbackStatus: fb.fallbackStatus,
         backlinkIntercepted: fb.backlinkIntercepted,
         prescriptionNo: whitelist.prescriptionNo || null,
@@ -182,7 +179,6 @@ export async function runPrescription(
     ]
   }
 
-  const lowConfidenceChars = pickLowConfidenceChars(crop.chars)
   const healthSuggestions = buildHealthSuggestions(whitelist)
 
   // ⑦ 逐条目装配 N 份草稿
@@ -203,8 +199,6 @@ export async function runPrescription(
       whitelist,
       needsManual: itemNeedsManual(fb.needsManual, idx),
       sanitizeAudit,
-      cropBox: crop.box,
-      lowConfidenceChars,
       fallbackStatus: fb.fallbackStatus,
       backlinkIntercepted: fb.backlinkIntercepted,
       bodyImageRef: null,

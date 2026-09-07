@@ -4,7 +4,7 @@
  */
 import { type LayerLabel } from '@anxin/shared'
 import { AIUnavailableError, type IdentityFields, type ImageInput } from './types.js'
-import { callJson, extractChatContent, parseModelJson, type ChatResponse } from './http.js'
+import { callJson, dataUrl, extractChatContent, parseModelJson, type ChatResponse } from './http.js'
 import { IdentityExtractSchema, LayersOutputSchema } from './schemas.js'
 
 const DETECT_PROMPT =
@@ -17,11 +17,7 @@ const IDENTITY_PROMPT =
   '"manufacturer"?:string,"otcFlag"?:boolean,"approvalNumber"?:string}。' +
   '禁止输出任何用法用量/剂量/频次字段。不要输出其它内容。'
 
-function dataUrl(image: ImageInput): string {
-  return `data:${image.mime};base64,${image.base64}`
-}
-
-/** 层检测请求体（纯函数，可测）。 */
+/** 层检测请求体（纯函数，可测）。dataURL 由 http.ts 统一导出（与 ocr 共用）。 */
 export function buildDetectLayersRequest(image: ImageInput) {
   return {
     model: process.env.QWEN_MODEL ?? 'qwen3-vl-plus',

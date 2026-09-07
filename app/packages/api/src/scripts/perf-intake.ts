@@ -2,8 +2,8 @@
  * M3-T5 性能测量工具（spec §T5.1）——「上传→草稿」P50/P95 采样。
  *
  * 以**瞬时 mock 模型**跑真实 intake 编排 N 次，测 gatherContext(DB 读) + 管线编排 + persist(DB 写)
- * 的**非模型开销** P50/P95。模型延迟（OCR/VLM/LLM，主导项）无法在本机无 live 服务时实测，
- * 见 docs/09 报告：OCR 引 tools/ocr-bench 实测（Windows CPU 69s，PIR/oneDNN bug）+ ADR#13 生产预期（Linux 1–3s）。
+ * 的**非模型开销** P50/P95。模型延迟（OCR/VLM/LLM，主导项）无法在本机无 live 服务时实测
+ * （OCR 已切 qwen3.5-ocr 云端端点，见 lib/ai/ocr.ts；Paddle 时代的 ocr-bench 实测已随 ADR#13 一并退役）。
  *
  * 自清理：只删除本次运行创建的草稿，不触碰其它数据。运行：cd app/packages/api && npm run perf:intake
  * 可调：PERF_N（次数，默认 30）、PERF_USER（默认 p-001，dev 库已 seed 的演示用户）。
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
     console.log(`[perf]   ${name.padEnd(14)} P50=${String(v.p50).padStart(6)}  P95=${String(v.p95).padStart(6)}`)
   }
   console.log(`\n[perf] 说明：以上为「非模型开销」（DB 读/编排/DB 写）。真实 P95 = 本开销 + 模型延迟（主导，需 live 服务实测）。`)
-  console.log(`[perf] 单次 P95 参考：total P95=${agg.total.p95}ms；模型侧 OCR 见 ocr-bench（Win CPU ~69s / Linux 预期 1–3s）。`)
+  console.log(`[perf] 单次 P95 参考：total P95=${agg.total.p95}ms；模型侧 OCR 为 qwen3.5-ocr 云端调用（含 60s 超时与重试退避）。`)
 
   // 自清理：删除本次创建的草稿
   if (createdDraftIds.length > 0) {

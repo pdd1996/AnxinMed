@@ -30,7 +30,6 @@ import {
   type FallbackFields,
   type IdentityFields,
   type ImageInput,
-  type OcrChar,
   type OcrResult,
 } from '../lib/ai/types.js'
 import { intakeDrug, intakePrescription } from '../services/intake.service.js'
@@ -48,19 +47,9 @@ const HOSPITAL = '萧山区第二人民医院（演示合成处方笺）'
 const FORM_RE =
   /滴眼液|滴眼|注射液|注射用|口服液|口服|片|胶囊|颗粒|丸|栓|膏|贴|喷|吸入|混悬|散|糖浆|合剂|滴丸|缓释|分散/
 
-/** 把多行文本渲染成字符级 OCR 结果（布局约定同 __tests__/helpers/ai-mocks.ts：行高 30、字符宽 16 高 20）。 */
-function mkOcr(lines: string[], confidence = 0.99, weakLines: number[] = []): OcrResult {
-  const chars: OcrChar[] = []
-  lines.forEach((line, li) => {
-    const y = li * 30
-    const conf = weakLines.includes(li) ? 0.82 : confidence
-    let x = 10
-    for (const ch of line) {
-      chars.push({ text: ch, confidence: conf, box: { x, y, w: 16, h: 20 } })
-      x += 16
-    }
-  })
-  return { chars }
+/** 行级 OCR 结果（qwen3.5-ocr 契约：lines 纯文本，无置信度/坐标）。 */
+function mkOcr(lines: string[]): OcrResult {
+  return { lines }
 }
 
 interface FakeOptions {
@@ -70,8 +59,6 @@ interface FakeOptions {
   fallback?: FallbackFields
   /** OCR 不可用（降级场景）。 */
   ocrDown?: boolean
-  /** 低置信度（确认页标红下划线）。 */
-  confidence?: number
 }
 
 /** 伪造 AiClients：只冻结模型 I/O，其余（脱敏/回链/匹配/规则）全走真代码。 */
@@ -82,7 +69,7 @@ function fakeClients(o: FakeOptions): AiClients {
     },
     async runOcr() {
       if (o.ocrDown) throw new AIUnavailableError('ocr', '演示：OCR 服务不可用')
-      return o.ocr ?? { chars: [] }
+      return o.ocr ?? { lines: [] }
     },
     async extractIdentity() {
       if (!o.identity) throw new AIUnavailableError('qwen', '演示：VLM 未提供身份')
@@ -266,11 +253,11 @@ export async function seedDemoDrafts(): Promise<void> {
 
   const created: { scene: string; ids: string[] }[] = []
 
-  // ① rx-normal：唯一匹配 + 全字段抄录（用法行故意给低置信度 → 确认页标红下划线）
+  // ① rx-normal：唯一匹配 + 全字段抄录
   const normal = await intakePrescription(
     USER,
     IMG,
-    fakeClients({ layers: ['处方层'], ocr: mkOcr(rxLines({ no: 'DEMO-RX-001', name, spec }), 0.99, [7]), identity }),
+    fakeClients({ layers: ['处方层'], ocr: mkOcr(rxLines({ no: 'DEMO-RX-001', name, spec })), identity }),
   )
   created.push({ scene: 'rx-normal 唯一匹配·全字段抄录', ids: normal.draftIds })
 
@@ -322,7 +309,7 @@ export async function seedDemoDrafts(): Promise<void> {
     IMG,
     fakeClients({
       layers: ['处方层'],
-      ocr: mkOcr(rxLines({ no: 'DEMO-RX-006', name, spec, sig: '滴眼 每次1滴 每日12次 共5天' }), 0.99, [7]),
+      ocr: mkOcr(rxLines({ no: 'DEMO-RX-006', name, spec, sig: '滴眼 每次1滴 每日12次 共5天' })),
       identity,
     }),
   )
@@ -334,7 +321,7 @@ export async function seedDemoDrafts(): Promise<void> {
   for (const c of created) {
     for (const id of c.ids) console.log(`   ${c.scene}\n      ${WEB_BASE}/${id}`)
   }
-  console.log('\n提示：原图不入库（服务端只存裁剪几何），确认页会显示「本次会话已无原图」的文字对照降级；')
+  console.log('\n提示：原图不入库（服务端不存图片字节），确认页会显示「本次会话已无原图」的文字对照降级；')
   console.log('      要看图对照，请走录入页上传（T8）—— 那条路径把原图放进内存会话 store。')
 }
 

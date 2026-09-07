@@ -17,12 +17,11 @@ import {
   type PrescriptionItem,
   type PrescriptionWhitelistType,
 } from '@anxin/shared'
-import type { IdentityFields, OcrChar } from '../../lib/ai/types.js'
-import type { Box } from '../sanitize/crop.js'
+import type { IdentityFields } from '../../lib/ai/types.js'
 import { parseSig } from '../sanitize/whitelist.js'
 import { nameMatches } from '../identity/normalize.js'
 import type { DrugMasterCandidate, MatchResult } from '../identity/match.js'
-import type { DrugDraft, LowConfidenceChar } from './types.js'
+import type { DrugDraft } from './types.js'
 
 /**
  * 从药名推剂型（参照 demo formFromName，修正其 replace 缺陷）：仅用于身份线缺剂型时的归一提示，不猜药名。
@@ -151,11 +150,4 @@ export function toDraftConflicts(match: MatchResult | null): DraftConflict[] {
 export function buildHealthSuggestions(w: PrescriptionWhitelistType | null): HealthSuggestion[] {
   if (!w?.diagnosis) return []
   return [{ field: '诊断', value: w.diagnosis, source: '处方笺抄录' }]
-}
-
-/** 裁剪正文内的低置信字符（去身份；确认页原文对照标红下划线）。 */
-export function pickLowConfidenceChars(chars: OcrChar[], threshold = 0.9): LowConfidenceChar[] {
-  return (chars ?? [])
-    .filter((c) => c.confidence < threshold)
-    .map((c) => ({ text: c.text, confidence: c.confidence, box: c.box as Box }))
 }
