@@ -137,7 +137,7 @@ export interface ConsultRunInput {
   ai: AiClients
 }
 
-/** runConsult 输出（路由层落库 + 返回给前端）。 */
+/** runConsult / runDataQuery 输出（路由层落库 + 返回给前端）。 */
 export interface ConsultRunResult {
   riskLevel: RiskLevel
   status:
@@ -148,6 +148,7 @@ export interface ConsultRunResult {
     | 'manual-gate'
     | 'no-source'
     | 'ai-unavailable'
+    | 'data-answered'
   answer: string
   sections: NormalizedSections | null
   citations: Citation[]
@@ -158,4 +159,9 @@ export interface ConsultRunResult {
   matchedKeyword: string | null
   /** 触发拦截的药品 id（供 risk_events.drugId 留痕）。 */
   triggerDrugId: string | null
+  /**
+   * 数据查询路径（status='data-answered'）使用的只读工具名（= QueryIntent 值，如
+   * 'medication-list'）；其余回答路径缺省。可选——run.ts 现有返回路径不含此字段亦合法。
+   */
+  toolUsed?: string | null
 }

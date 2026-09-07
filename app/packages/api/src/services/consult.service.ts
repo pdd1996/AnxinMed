@@ -6,7 +6,8 @@
  *   2. 组装 activeMasterIds（生效计划集合，复用 plans.service 逻辑）；
  *   3. 组装 interactionRules + drugNameById（复用 assets.repo + M2-T5 checkInteractions）；
  *   4. 用户提问过 scrubWithPatterns（L3 出口脱敏）；
- *   5. 调 services/consult/run.ts 的 runConsult 编排；
+ *   5. 前置分流：守门优先（L4/L3）→ 意图路由（数据查询走 dataquery.runDataQuery 只读工具，
+ *      0 次 LLM 调用）→ 未命中/开关关则调 services/consult/run.ts 的 runConsult 说明书管线；
  *   6. 落库：insertConsultLog + insertRiskEvent（如触发 L4/L3/manual-gate）；
  *   7. 返回 ConsultResponse（shared 契约）。
  *
@@ -24,13 +25,24 @@ import { getAiClients } from '../lib/ai/registry.js'
 import { PII_ASSERT_PATTERNS, scrubWithPatterns } from './sanitize/scan.js'
 import { nameMatches } from './identity/normalize.js'
 import { runConsult } from './consult/run.js'
-import type { ConsultDrug, InsertSlice } from './consult/types.js'
+import { runDataQuery } from './consult/dataquery.js'
+import { classifyConsultIntent } from './consult/intent.js'
+import { detectEmergency, detectProhibited } from './consult/guards.js'
+import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
 import { newId } from '../lib/util.js'
 
 /** env 开关：本地未命中该药品时才兜底开 Baichuan 医疗搜索（默认 false，PRD §7.5）。 */
 function isMedicalSearchEnabled(): boolean {
   return String(process.env.ENABLE_MEDICAL_SEARCH ?? '').toLowerCase() === 'true'
+}
+
+/**
+ * env 开关：意图路由灰度（默认开；仅显式 ENABLE_INTENT_ROUTE=false 才关）。
+ * 关闭即回到旧行为（所有问题走 run.ts 说明书管线）——一行判断即整体回滚。
+ */
+function isIntentRouteEnabled(): boolean {
+  return String(process.env.ENABLE_INTENT_ROUTE ?? '').toLowerCase() !== 'false'
 }
 
 /** package_inserts 行 → InsertSlice（裁剪到按键取数所需列）。 */
@@ -96,7 +108,11 @@ async function resolveActiveMasterIds(userId: string): Promise<string[]> {
     .map((d) => d.drugMasterId as string)
 }
 
-/** risk_events.level 映射（consult status → 事件级别）。 */
+/**
+ * risk_events.level 映射（consult status → 事件级别）。
+ * 仅 L4/L3/manual-gate 是风险事件；'data-answered'（及 answered/limited/no-source 等）走
+ * default 分支返回 null → 不进 risk_events（数据查询是 L1 事实读取，非风险）。
+ */
 function toRiskEventLevel(status: string): 'L4' | 'L3' | 'manual-gate' | null {
   if (status === 'emergency') return 'L4'
   if (status === 'refused') return 'L3'
@@ -153,16 +169,38 @@ export async function consult(
   // 4. AI 客户端（M2-T1 注入接缝；生产为 baichuan，测试可 setAiClients(mock)）
   const ai = getAiClients()
 
-  // 5. 调编排层（守门 + 生成 + 归一化 + citations）
-  const result = await runConsult({
-    question: questionRedacted,
-    drugs,
-    activeMasterIds,
-    interactionRules,
-    drugNameById,
-    enableMedicalSearch: isMedicalSearchEnabled(),
-    ai,
-  })
+  // 5. 编排分流：守门优先 → 意图路由 → 说明书管线（run.ts）
+  //
+  // ⚠️ 守门顺序纪律：L4 emergency → L3 refused → 意图路由 → 说明书管线。
+  //    混合句「我胸痛，还有多少药」必须走 L4，绝不被数据查询意图截胡；命中守门信号时
+  //    **不做**意图判定，直接走原 runConsult —— 其内部 guardConsult 会再次判 emergency/refused，
+  //    结果一致，且 risk_events 留痕逻辑保持单点（不在本层重复触发）。
+  // ⚠️ 语义边界：manual-gate 只限「个体化解释」（LLM 生成路径）；数据查询是 L0 以下的事实读取
+  //    （读本库 drugs/plans/records），不受 manual-gate 限制，故意图路由先于 manual-gate 判定。
+  let result: ConsultRunResult | null = null
+
+  // 5a/5b. 开关开 + 守门未命中 + 命中 QueryIntent → runDataQuery 只读工具（0 次 LLM 调用）。
+  //        复用上面已取好的 activeMasterIds/interactionRules/drugNameById（请求内数据共享，不重复查库）。
+  //        入参一律用脱敏后的 questionRedacted（L3 出口约束，绝不带原文 PII）。
+  if (isIntentRouteEnabled() && !detectEmergency(questionRedacted) && !detectProhibited(questionRedacted)) {
+    const intent = classifyConsultIntent(questionRedacted)
+    if (intent) {
+      result = await runDataQuery({ userId, intent, activeMasterIds, interactionRules, drugNameById })
+    }
+  }
+
+  // 未命中意图 / 开关关 / 守门命中：原样走 run.ts 说明书管线（守门 + 生成 + 归一化 + citations）
+  if (!result) {
+    result = await runConsult({
+      question: questionRedacted,
+      drugs,
+      activeMasterIds,
+      interactionRules,
+      drugNameById,
+      enableMedicalSearch: isMedicalSearchEnabled(),
+      ai,
+    })
+  }
 
   // 6. 落库：consult_logs（一次咨询一行）
   const consultLogId = newId('clog')
@@ -208,6 +246,7 @@ export async function consult(
     notice: result.notice,
     l0Notice: result.l0Notice,
     blocked: result.blocked,
+    toolUsed: result.toolUsed ?? null,
     consultLogId,
   }
 }

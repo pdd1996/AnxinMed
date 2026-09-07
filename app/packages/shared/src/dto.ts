@@ -121,6 +121,7 @@ export type SourceDTOType = z.infer<typeof SourceDTO>
  *   manual-gate     manual 档药品拒绝个体化解释（仅可 L0 资料查询）
  *   no-source       本地说明书库未命中（且医疗搜索默认关）
  *   ai-unavailable  Baichuan 不可用 → 降级
+ *   data-answered   患者数据查询，L1，未调 LLM（意图路由命中只读工具直查库）
  */
 export const ConsultStatusSchema = z.enum([
   'answered',
@@ -130,6 +131,7 @@ export const ConsultStatusSchema = z.enum([
   'manual-gate',
   'no-source',
   'ai-unavailable',
+  'data-answered',
 ])
 export type ConsultStatus = z.infer<typeof ConsultStatusSchema>
 
@@ -156,7 +158,9 @@ export type Citation = z.infer<typeof CitationSchema>
 /**
  * POST /api/consult 响应体。
  * - `answer` 为 `sections.summary` 的别名（方便前端直接取一句话）；
- * - `blocked=true` 时 `sections` 仅包含守门固定文案（不是 LLM 生成），前端可隐藏「下一步」以外的建议内容。
+ * - `blocked=true` 时 `sections` 仅包含守门固定文案（不是 LLM 生成），前端可隐藏「下一步」以外的建议内容；
+ * - `toolUsed` 本次回答使用的工具（status='data-answered' 时为只读查询工具名，如
+ *   'medication-list'；其余回答路径缺省），供前端徽章与审计区分「模板查库」与「LLM 生成」。
  */
 export const ConsultResponseSchema = z.object({
   riskLevel: RiskLevelSchema,
@@ -167,6 +171,7 @@ export const ConsultResponseSchema = z.object({
   notice: z.string().nullish(),
   l0Notice: z.string().nullish(),
   blocked: z.boolean().default(false),
+  toolUsed: z.string().nullish(),
 })
 export type ConsultResponse = z.infer<typeof ConsultResponseSchema>
 

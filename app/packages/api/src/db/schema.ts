@@ -276,9 +276,10 @@ export const consultLogs = pgTable('consult_logs', {
    *   manual-gate    manual 档药品拒绝进入个体化解释（接口层拒绝）
    *   no-source      本地说明书库未命中（且医疗搜索默认关）
    *   ai-unavailable Baichuan 不可用 → 502/降级
+   *   data-answered  患者数据查询，L1，未调 LLM（意图路由命中只读工具直查库）
    */
   status: varchar('status', {
-    enum: ['answered', 'limited', 'refused', 'emergency', 'manual-gate', 'no-source', 'ai-unavailable'],
+    enum: ['answered', 'limited', 'refused', 'emergency', 'manual-gate', 'no-source', 'ai-unavailable', 'data-answered'],
   }).notNull(),
   /** 被拦截的档位（answered/limited 为 null）；供医生端「咨询被拦截 N 次」快速过滤。 */
   blockedAt: varchar('blocked_at', { enum: ['L4', 'L3', 'manual-gate'] }),

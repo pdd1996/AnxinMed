@@ -31,3 +31,17 @@ export function webSearchCitation(drugName: string, retrievedAt: Date = new Date
     unverified: true,
   }
 }
+
+/**
+ * 患者数据查询引用（意图路由 data-answered 路径 · 计划 T3）。
+ * source 说明数据来自本人建档三表（drugs/plans/records）；version 用查询时刻 ISO 时间戳
+ * （与 webSearchCitation 时间戳风格同构）；unverified=false——本库事实而非网络检索。
+ */
+export function dbCitation(queriedAt: Date = new Date()): Citation {
+  return {
+    drugName: '我的用药数据',
+    source: '本地数据库（drugs/plans/records，仅本人可见）',
+    version: queriedAt.toISOString(),
+    unverified: false,
+  }
+}
