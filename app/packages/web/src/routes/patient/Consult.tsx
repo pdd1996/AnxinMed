@@ -23,6 +23,11 @@ import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationBu
  * M3-T4：提问框接入按键式语音输入（VoiceDictationButton），回答卡接入中文播报（SpeakButton，见 AnswerCard/EmergencyCard）；
  *    语音仅为快捷入口，手动输入/发送按钮等价保留；不支持环境自动降级（spec §T4.3）。
  *    消息历史用 useState 本地管理（咨询是会话式，不需要持久化到 DB——consult_logs 已由后端落库）。
+ *
+ * 意图路由 T5：咨询不再强制选药——不选药可直接问药箱数据类问题（清单/依从性/效期库存/联用冲突，
+ *    后端意图路由直查库返回 status='data-answered'，0 LLM）；选药后仍可问说明书问题。
+ *    快捷问题相应分两组：数据查询类始终可点，说明书类保持需选药（未选药时点了也只会得到
+ *    no-source 兜底，disable 是更清晰的适老化引导，见交付报告取舍说明）。
  */
 
 /** 会话消息（一问一答；user 消息含 question，assistant 消息含完整响应）。 */
@@ -33,12 +38,25 @@ interface ChatMessage {
   response?: ConsultResponseDto
 }
 
-/** 快捷问题（照搬 demo/src/pages/Consult.tsx:5-10）。 */
+/** 快捷问题 · 说明书类（照搬 demo/src/pages/Consult.tsx:5-10；需选中药品后可点）。 */
 const QUICK_QUESTIONS = [
   '这个药通常用于什么？',
   '常见不良反应有哪些？',
   '这个药是怎么作用的？（药理机制）',
   '这个药应该怎么保存？',
+]
+
+/**
+ * 快捷问题 · 药箱数据查询类（意图路由 T5；无需选药，始终可点）。
+ * ⚠️ 文案与后端 intent.ts 的 INTENT_ROUTES 正则逐条对过（实测命中），且不得含解释词
+ *    （副作用/禁忌/怎么吃等会被 EXPLAIN_INTENT_PATTERN 仲裁回说明书管线）；
+ *    改文案必须同步核对后端正则，否则按钮点了会答非所问。
+ */
+const DATA_QUICK_QUESTIONS = [
+  '我现在有多少药物？', // → medication-list
+  '我的依从性怎么样？', // → adherence
+  '有什么药快过期或快用完了？', // → expiry-stock
+  '我的药一起吃有冲突吗？', // → interaction-check
 ]
 
 let msgSeq = 0
@@ -87,7 +105,9 @@ export default function Consult() {
             <div className="flex-1">
               <h1 className="text-base font-bold">安心 AI 药师助手</h1>
               <p className="text-xs text-muted-foreground">
-                {selectedDrug ? `正在咨询：${selectedDrug.genericName}` : '请先选择已确认的药品'}
+                {selectedDrug
+                  ? `正在咨询：${selectedDrug.genericName}`
+                  : '可直接查询药箱数据；选择药品后可咨询说明书'}
               </p>
             </div>
           </div>
@@ -99,7 +119,7 @@ export default function Consult() {
             </p>
           ) : drugs.length === 0 ? (
             <p className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-              药箱为空。请先通过拍照录入或手动建档添加药品，再来咨询。
+              药箱为空。仍可点击下方数据查询快捷问题；如需咨询说明书，请先通过拍照录入或手动建档添加药品。
             </p>
           ) : (
             <DrugSelector drugs={drugs} selectedId={effectiveDrugId} onSelect={setSelectedDrugId} />
@@ -120,7 +140,7 @@ export default function Consult() {
           <div className="space-y-4">
             {messages.length === 0 && (
               <p className="rounded-md border border-border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
-                选择药品后，输入问题或点击快捷问题开始咨询。
+                输入问题或点击快捷问题开始咨询：不选药可查药箱数据（如「我现在有多少药物？」），选药后可问说明书问题。
               </p>
             )}
 
@@ -152,6 +172,7 @@ export default function Consult() {
                         notice={msg.response.notice}
                         l0Notice={msg.response.l0Notice}
                         blocked={msg.response.blocked}
+                        toolUsed={msg.response.toolUsed}
                       />
                     ) : null}
                   </div>
@@ -168,21 +189,38 @@ export default function Consult() {
             )}
           </div>
 
-          {/* 快捷问题 */}
-          <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-            {QUICK_QUESTIONS.map((q) => (
-              <Button
-                key={q}
-                type="button"
-                variant="outline"
-                size="sm"
-                className="min-h-9 text-xs"
-                onClick={() => handleAsk(q)}
-                disabled={consultMutation.isPending || !effectiveDrugId}
-              >
-                {q}
-              </Button>
-            ))}
+          {/* 快捷问题（两组：数据查询类始终可点；说明书类需选药） */}
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="flex flex-wrap gap-2">
+              {DATA_QUICK_QUESTIONS.map((q) => (
+                <Button
+                  key={q}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-9 border-primary/30 text-xs text-primary"
+                  onClick={() => handleAsk(q)}
+                  disabled={consultMutation.isPending}
+                >
+                  {q}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_QUESTIONS.map((q) => (
+                <Button
+                  key={q}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-9 text-xs"
+                  onClick={() => handleAsk(q)}
+                  disabled={consultMutation.isPending || !effectiveDrugId}
+                >
+                  {q}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* 提问输入框 */}
@@ -196,8 +234,12 @@ export default function Consult() {
                   handleAsk()
                 }
               }}
-              placeholder={effectiveDrugId ? '输入关于已确认药品的问题…' : '请先选择药品'}
-              disabled={!effectiveDrugId || consultMutation.isPending}
+              placeholder={
+                effectiveDrugId
+                  ? '输入关于已确认药品的问题…'
+                  : '可问药箱数据类问题（如：我现在有多少药物）；选药后可问说明书问题'
+              }
+              disabled={consultMutation.isPending}
               rows={2}
               className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
@@ -206,7 +248,7 @@ export default function Consult() {
               label="语音输入问题"
               continuous
               panelSide="top"
-              disabled={!effectiveDrugId || consultMutation.isPending}
+              disabled={consultMutation.isPending}
               onCommit={(text) => setQuestion((prev) => (prev.trim() ? `${prev.trimEnd()}${text}` : text))}
             />
             <Button
@@ -214,7 +256,7 @@ export default function Consult() {
               size="icon"
               className="size-11 shrink-0"
               onClick={() => handleAsk()}
-              disabled={!effectiveDrugId || consultMutation.isPending || !question.trim()}
+              disabled={consultMutation.isPending || !question.trim()}
               aria-label="发送"
             >
               {consultMutation.isPending ? (
@@ -243,6 +285,7 @@ export default function Consult() {
               <li>· 解释说明书字段与药理机制</li>
               <li>· 说明常见注意事项</li>
               <li>· 提示生效计划中的相互作用</li>
+              <li>· 查询你的药箱数据（清单 / 依从性 / 效期库存 / 联用冲突）</li>
             </ul>
           </CardContent>
         </Card>
