@@ -16,14 +16,17 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import {
+  askInsight,
   fetchInsightQueue,
   generateInsightSummary,
   generateQueueSummary,
+  type InsightAskDto,
   type InsightQueueDto,
   type InsightSummaryDto,
   type QueueSummaryDto,
 } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { RiskBadge } from '@/components/domain/RiskBadge'
 import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventType } from '@anxin/shared'
@@ -216,6 +219,10 @@ function QueueView({
             onGenerate={onGenerateSummary}
             dateRange={queue.dateRange}
           />
+
+          {/* 医生问答（T7）：队列维度 */}
+          <SectionHeading eyebrow="Agent 问答" title="向队列提问" />
+          <AskPanel patientId={null} />
         </>
       )}
     </div>
@@ -344,6 +351,160 @@ function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
             </span>
           </div>
         ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 医生问答（T7 · 两级意图路由：固定问法 0 次 LLM 直查库，长尾百川叙述）
+// ---------------------------------------------------------------------------
+
+/** 快捷问法（与 api askIntent.ts ASK_SUGGESTIONS 同源口径；首问前展示，响应后以服务端为准）。 */
+const ASK_CHIPS: Record<'queue' | 'patient', string[]> = {
+  queue: ['依从性分布怎么样？', '执行率差的患者有哪些？', '最近的风险事件汇总'],
+  patient: ['他最近依从性怎么样？', '药箱里还有什么药？', '有哪些药快过期了？'],
+}
+
+/** toolUsed → 医生可读标签（api 注册表/意图名同源）。 */
+const TOOL_USED_LABEL: Record<string, string> = {
+  adherence_distribution: '依从性分布',
+  patient_cohort: '分档患者队列',
+  risk_event_rollup: '风险事件聚合',
+  'medication-list': '药箱清单',
+  adherence: '依从性统计',
+  'expiry-stock': '效期库存',
+  'interaction-check': '相互作用检查',
+}
+
+/** 单轮问答记录。 */
+interface AskExchange {
+  question: string
+  answer: InsightAskDto | null
+  error?: string
+}
+
+/** 追问面板（队列视图 patientId=null / 患者摘要视图传患者 id，两处复用）。 */
+function AskPanel({ patientId }: { patientId: string | null }) {
+  const scope = patientId ? 'patient' : 'queue'
+  const [input, setInput] = useState('')
+  const [exchanges, setExchanges] = useState<AskExchange[]>([])
+  const [pending, setPending] = useState(false)
+
+  const send = async (question: string) => {
+    const q = question.trim()
+    if (!q || pending) return
+    setInput('')
+    setPending(true)
+    try {
+      const answer = await askInsight(q, patientId)
+      setExchanges((prev) => [...prev, { question: q, answer }])
+    } catch {
+      setExchanges((prev) => [...prev, { question: q, answer: null, error: '问答服务暂时不可用，请稍后重试' }])
+    } finally {
+      setPending(false)
+    }
+  }
+
+  const chips = exchanges.at(-1)?.answer?.suggestions?.length
+    ? exchanges.at(-1)!.answer!.suggestions
+    : ASK_CHIPS[scope]
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4" data-testid="ask-panel">
+        {exchanges.length === 0 && !pending && (
+          <p className="text-sm text-muted-foreground">
+            直接提问即可查询队列/患者数据：固定问法由只读工具直查数据库（0 次大模型调用），其他问法由 Agent
+            基于统计事实作答。查不了的会明确告知能查什么，绝不编造数字。
+          </p>
+        )}
+
+        {/* 问答线程 */}
+        {exchanges.map((ex, i) => (
+          <div key={i} className="space-y-1.5" data-testid={i === exchanges.length - 1 ? 'ask-exchange' : undefined}>
+            <p className="text-sm font-medium">{ex.question}</p>
+            {ex.answer && (
+              <div
+                className="rounded-md border border-border bg-muted/30 p-2.5 text-sm"
+                data-testid={i === exchanges.length - 1 ? 'ask-answer' : undefined}
+              >
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                  {ex.answer.mode === 'data' ? (
+                    <>
+                      <span className="rounded-full border border-risk-l1/35 bg-risk-l1/15 px-2 py-0.5 text-[10px] font-semibold text-risk-l1">
+                        数据查询
+                      </span>
+                      <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        来源：{TOOL_USED_LABEL[ex.answer.toolUsed ?? ''] ?? ex.answer.toolUsed}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                      LLM 生成 · 数字来自工具统计
+                    </span>
+                  )}
+                </div>
+                <p className="font-semibold">{ex.answer.sections.summary}</p>
+                {ex.answer.sections.keyPoints.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 pl-1 text-xs text-muted-foreground">
+                    {ex.answer.sections.keyPoints.map((k) => (
+                      <li key={k}>{k}</li>
+                    ))}
+                  </ul>
+                )}
+                {ex.answer.sections.risks.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 pl-1 text-xs text-risk-l3">
+                    {ex.answer.sections.risks.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">{ex.answer.sections.nextAction}</p>
+              </div>
+            )}
+            {ex.error && <p className="text-xs text-risk-l3">{ex.error}</p>}
+          </div>
+        ))}
+
+        {pending && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="ask-pending">
+            <LoaderCircle className="size-4 animate-spin" aria-hidden />
+            Agent 正在调用只读工具…
+          </p>
+        )}
+
+        {/* 快捷问法 chips */}
+        <div className="flex flex-wrap gap-1.5">
+          {chips.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => send(c)}
+              disabled={pending}
+              className="rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        {/* 输入行 */}
+        <div className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void send(input)
+            }}
+            placeholder={patientId ? '向 Agent 追问该患者的数据…' : '向 Agent 提问队列数据…'}
+            className="min-h-9 flex-1"
+            data-testid="ask-input"
+          />
+          <Button size="sm" onClick={() => void send(input)} disabled={pending || !input.trim()} className="min-h-9" data-testid="ask-send">
+            发送
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
@@ -742,6 +903,10 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
           </div>
         </CardContent>
       </Card>
+
+      {/* 医生问答（T7）：患者维度追问 */}
+      <SectionHeading eyebrow="Agent 问答" title="向 Agent 追问该患者" />
+      <AskPanel patientId={patient.id} />
     </div>
   )
 }

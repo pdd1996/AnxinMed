@@ -184,6 +184,18 @@ export async function generateQueueSummary() {
   return unwrap(res)
 }
 
+/**
+ * POST /api/insight/ask：医生问答（T7）。
+ * 固定问法命中意图 → 后端只读工具直查库（0 次 LLM，mode='data' + toolUsed）；
+ * 长尾 → 百川基于工具统计叙述（mode='llm'）。patientId 为空 = 队列维度。
+ */
+export async function askInsight(question: string, patientId?: string | null) {
+  const res = await client.api.insight.ask.$post({
+    json: { question, patientId: patientId ?? undefined },
+  })
+  return unwrap(res)
+}
+
 /** 患者列表项 DTO（hc<AppType> 推导）。 */
 export type InsightPatientDto = Awaited<ReturnType<typeof fetchInsightPatients>>[number]
 /** 摘要响应 DTO（去掉 ok 字段）。 */
@@ -192,3 +204,5 @@ export type InsightSummaryDto = Omit<Awaited<ReturnType<typeof generateInsightSu
 export type InsightQueueDto = Awaited<ReturnType<typeof fetchInsightQueue>>
 /** 队列摘要 DTO。 */
 export type QueueSummaryDto = Omit<Awaited<ReturnType<typeof generateQueueSummary>>, 'ok'>
+/** 问答响应 DTO。 */
+export type InsightAskDto = Omit<Awaited<ReturnType<typeof askInsight>>, 'ok'>
