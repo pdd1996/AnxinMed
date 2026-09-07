@@ -4,6 +4,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "baseUrl": ".",
+    // 禁用隐式 @types 扫描：用户主目录 node_modules/@types 有损坏残留目录（空 markdown-it），
+    // 会沿祖先链被 tsc 误当作隐式类型库（TS2688）；与 api 包显式 types 同款处理。
+    // vite/client 已由 src/vite-env.d.ts 显式 reference，其余类型全走模块导入解析。
+    "types": [],
     "paths": {
       "@/*": ["./src/*"]
     }
