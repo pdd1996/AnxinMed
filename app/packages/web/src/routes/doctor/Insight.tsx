@@ -14,7 +14,7 @@ import { fetchInsightPatients, generateInsightSummary, type InsightSummaryDto } 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { RiskBadge } from '@/components/domain/RiskBadge'
-import type { RiskLevel } from '@anxin/shared'
+import type { RiskEventType } from '@anxin/shared'
 
 /** 临期/低库存药品项（shared dto 里为 z.unknown()，本处窄化为具体形态）。 */
 interface ExpiryItem {
@@ -22,6 +22,13 @@ interface ExpiryItem {
   genericName: string
   expiry: string | null
   days?: number
+}
+
+/** 事件类型 → 医生可读标签（api/db/schema.ts risk_events.type 注释同源）。 */
+const EVENT_TYPE_LABEL: Record<RiskEventType, string> = {
+  emergency: '紧急信号',
+  refused: '拒答（停/换药/剂量）',
+  'manual-blocked': '拦截个体化解释',
 }
 
 /**
@@ -367,9 +374,9 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
           <CardContent className="space-y-2 p-3">
             {tools.riskEvents.events.map((e, idx) => (
               <div key={idx} className="flex items-start gap-2 text-sm">
-                <RiskBadge level={e.level as RiskLevel} showHint={false} className="shrink-0" />
+                <RiskBadge level={e.level} showHint={false} className="shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <strong className="text-xs">{e.type}</strong>
+                  <strong className="text-xs">{EVENT_TYPE_LABEL[e.type]}</strong>
                   <p className="text-xs text-muted-foreground">
                     {e.date} · {e.detail}
                   </p>
@@ -382,7 +389,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
         <Card className="border-risk-l1/30 bg-risk-l1/5">
           <CardContent className="flex items-center gap-2 p-3 text-sm">
             <ShieldCheck className="size-4 text-risk-l1" aria-hidden />
-            <p className="text-muted-foreground">近 30 天无 L3/L4 风险事件。</p>
+            <p className="text-muted-foreground">近 30 天无风险拦截事件（L4/L3/manual-gate）。</p>
           </CardContent>
         </Card>
       )}

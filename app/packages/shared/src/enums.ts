@@ -44,6 +44,16 @@ export type SourceType = z.infer<typeof SourceTypeSchema>
 export const RiskLevelSchema = z.enum(['L1', 'L2', 'L3', 'L4'])
 export type RiskLevel = z.infer<typeof RiskLevelSchema>
 
+// ── 风险事件分级（risk_events.level）——非 L1–L4 语义：
+//    L4/L3 为守门拦截，manual-gate 为人工档门禁（药品未经 OCR 确认，拒绝个体化解释）；
+//    L1/L2 正常回答不进 risk_events（api/db/schema.ts risk_events 注释同源）──
+export const RiskEventLevelSchema = z.enum(['L4', 'L3', 'manual-gate'])
+export type RiskEventLevel = z.infer<typeof RiskEventLevelSchema>
+
+// ── 风险事件类型（risk_events.type；细分口径，供医生端聚合展示）──
+export const RiskEventTypeSchema = z.enum(['emergency', 'refused', 'manual-blocked'])
+export type RiskEventType = z.infer<typeof RiskEventTypeSchema>
+
 // ── 相互作用分级（interaction_rules.level；PRD §7.8.1，四级，禁忌最高）──
 export const InteractionLevelSchema = z.enum(['禁忌', '慎用', '需监测', '注意'])
 export type InteractionLevel = z.infer<typeof InteractionLevelSchema>

@@ -9,7 +9,7 @@
  * ⚠️ LLM 边界类型（ConsultRawSections / AiClients）复用 lib/ai/types.ts（M3-T1 已建），
  *    摘要与咨询输出 schema 相同（summary/keyPoints/risks/nextAction/warning）。
  */
-import type { RiskLevel } from '@anxin/shared'
+import type { RiskEventLevel, RiskEventType, RiskLevel } from '@anxin/shared'
 import type { AiClients, ConsultRawSections } from '../../lib/ai/types.js'
 import type {
   AdherenceStats,
@@ -25,9 +25,17 @@ export type { AiClients, ConsultRawSections }
 // 5 个只读工具的聚合产物
 // ---------------------------------------------------------------------------
 
+/** 风险事件流聚合项（risk_events 行 → 医生端展示形态；level 含 manual-gate，非 RiskLevel）。 */
+export interface RiskEventItem {
+  date: string
+  level: RiskEventLevel
+  type: RiskEventType
+  detail: string
+}
+
 /** 风险事件流聚合（risk_events + consult_logs）。 */
 export interface RiskEventsSummary {
-  events: Array<{ date: string; level: string; type: string; detail: string }>
+  events: RiskEventItem[]
   consultCount: number
   lastQuestion: string
   blockedCount: number
@@ -96,7 +104,7 @@ export interface InsightRunResult {
 }
 
 /** risk_events 行 → RiskEventsSummary.events 项的映射（供 service 层组装）。 */
-export function toRiskEventItem(row: RiskEventRow): { date: string; level: string; type: string; detail: string } {
+export function toRiskEventItem(row: RiskEventRow): RiskEventItem {
   const detail = row.detail as { matchedKeyword?: string; questionRedacted?: string } | null
   return {
     date: row.occurredAt.toISOString().slice(0, 10),

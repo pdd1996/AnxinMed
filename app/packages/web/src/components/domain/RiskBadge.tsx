@@ -1,14 +1,21 @@
-import type { RiskLevel } from '@anxin/shared'
-import { CircleCheckIcon, InfoIcon, OctagonXIcon, TriangleAlertIcon } from 'lucide-react'
+import type { RiskEventLevel, RiskLevel } from '@anxin/shared'
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  LockKeyholeIcon,
+  OctagonXIcon,
+  TriangleAlertIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * 风险语义徽章（守门 L1–L4，L4 最高）。
+ * 风险语义徽章（守门 L1–L4，L4 最高；manual-gate 为人工档门禁，非风险分级）。
  * 老年向原则：图标 + 文字并用，不单靠颜色传达风险（技术方案 §8 / §11）；
- * 颜色走设计令牌 --risk-l1..l4（styles/index.css），L1 绿 / L2 蓝 / L3 橙 / L4 红。
+ * 颜色走设计令牌 --risk-l1..l4（styles/index.css），L1 绿 / L2 蓝 / L3 橙 / L4 红，
+ * manual-gate 走中性 muted（药品未经 OCR 确认，仅允许 L0 资料查询，同 AnswerCard 降级样式）。
  */
 const RISK_META: Record<
-  RiskLevel,
+  RiskLevel | RiskEventLevel,
   { label: string; hint: string; icon: typeof InfoIcon; className: string }
 > = {
   L1: {
@@ -35,6 +42,12 @@ const RISK_META: Record<
     icon: OctagonXIcon,
     className: 'border-risk-l4/35 bg-risk-l4/15 text-risk-l4',
   },
+  'manual-gate': {
+    label: '人工档',
+    hint: '未经 OCR 确认',
+    icon: LockKeyholeIcon,
+    className: 'border-muted-foreground/30 bg-muted text-muted-foreground',
+  },
 }
 
 export function RiskBadge({
@@ -42,7 +55,7 @@ export function RiskBadge({
   showHint = true,
   className,
 }: {
-  level: RiskLevel
+  level: RiskLevel | RiskEventLevel
   showHint?: boolean
   className?: string
 }) {

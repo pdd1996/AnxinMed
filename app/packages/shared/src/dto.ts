@@ -10,6 +10,8 @@ import {
   PlanSourceSchema,
   PlanStatusSchema,
   RecordStatusSchema,
+  RiskEventLevelSchema,
+  RiskEventTypeSchema,
   RiskLevelSchema,
   SourceTypeSchema,
   TagKindSchema,
@@ -222,7 +224,14 @@ export const InsightToolsSchema = z.object({
     lowStock: z.array(z.unknown()),
   }),
   riskEvents: z.object({
-    events: z.array(z.object({ date: z.string(), level: z.string(), type: z.string(), detail: z.string() })),
+    events: z.array(
+      z.object({
+        date: z.string(),
+        level: RiskEventLevelSchema,
+        type: RiskEventTypeSchema,
+        detail: z.string(),
+      }),
+    ),
     consultCount: z.number(),
     lastQuestion: z.string(),
     blockedCount: z.number(),

@@ -16,7 +16,14 @@
  * - 不做守门判断（走 services/consult/guards.ts 纯函数）；
  * - AI 客户端经 lib/ai/registry.ts 注入接缝取得（测试可 setAiClients(mock)）。
  */
-import { isPlanActiveOn, todayStr, type ConsultResponse, type RiskLevel } from '@anxin/shared'
+import {
+  isPlanActiveOn,
+  todayStr,
+  type ConsultResponse,
+  type RiskEventLevel,
+  type RiskEventType,
+  type RiskLevel,
+} from '@anxin/shared'
 import * as assetsRepo from '../repositories/assets.repo.js'
 import * as consultRepo from '../repositories/consult.repo.js'
 import * as drugsRepo from '../repositories/drugs.repo.js'
@@ -113,7 +120,7 @@ async function resolveActiveMasterIds(userId: string): Promise<string[]> {
  * 仅 L4/L3/manual-gate 是风险事件；'data-answered'（及 answered/limited/no-source 等）走
  * default 分支返回 null → 不进 risk_events（数据查询是 L1 事实读取，非风险）。
  */
-function toRiskEventLevel(status: string): 'L4' | 'L3' | 'manual-gate' | null {
+function toRiskEventLevel(status: string): RiskEventLevel | null {
   if (status === 'emergency') return 'L4'
   if (status === 'refused') return 'L3'
   if (status === 'manual-gate') return 'manual-gate'
@@ -121,7 +128,7 @@ function toRiskEventLevel(status: string): 'L4' | 'L3' | 'manual-gate' | null {
 }
 
 /** risk_events.type 映射（细分口径，供医生端聚合）。 */
-function toRiskEventType(status: string): 'emergency' | 'refused' | 'manual-blocked' | null {
+function toRiskEventType(status: string): RiskEventType | null {
   if (status === 'emergency') return 'emergency'
   if (status === 'refused') return 'refused'
   if (status === 'manual-gate') return 'manual-blocked'
@@ -129,7 +136,7 @@ function toRiskEventType(status: string): 'emergency' | 'refused' | 'manual-bloc
 }
 
 /** blockedAt 映射（consult_logs 列；answered/limited 为 null）。 */
-function toBlockedAt(status: string): 'L4' | 'L3' | 'manual-gate' | null {
+function toBlockedAt(status: string): RiskEventLevel | null {
   return toRiskEventLevel(status)
 }
 
