@@ -2,6 +2,8 @@
  * M2-T1 单测：三个 AI 客户端的「请求体组装 + 错误映射」，不真调 API（fetch mock）。
  * 覆盖：请求体只含约定字段；safeParse 失败抛 AIUnavailableError；网络/5xx 重试（退避后）后冒泡；
  * 4xx 不重试；缺 env 配置冒泡。OCR 为 qwen3.5-ocr chat 形态（行级转录）。
+ * 2026-09-07 补：OCR 端点结构化输出（坐标标注 A/B 形态）解包回归——当天线上格式漂移致
+ * Rp 严格等值锚点全量失配（上传处方全部降级 PARSE_FAILED），此处用真实端点返回形态钉住。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
@@ -14,6 +16,7 @@ import * as qwen from '../lib/ai/qwen.js'
 import * as ocr from '../lib/ai/ocr.js'
 import * as baichuan from '../lib/ai/baichuan.js'
 import { AIUnavailableError, type ImageInput } from '../lib/ai/types.js'
+import { cropBody } from '../services/sanitize/index.js'
 
 const IMG: ImageInput = { base64: 'aW1n', mime: 'image/png' }
 
@@ -128,6 +131,52 @@ describe('ocr 客户端（qwen3.5-ocr 行级转录）', () => {
     const r = await ocr.runOcr(IMG)
     expect(r.lines).toEqual(['Rp', '玻璃酸钠滴眼液 0.1%（10mL：10mg） ×1支'])
     expect(r.lines.some((l) => l.includes('```'))).toBe(false) // 无栅栏残留行
+  })
+
+  // 2026-09-07 线上实测形态 A：```json 栅栏包裹的 [{ rotate_rect: [x,y,w,h,angle], text }]（合法 JSON）
+  const RX_STRUCTURED_JSON =
+    '```json\n[\n\t{"rotate_rect": [380, 58, 31, 621, 90], "text": "萧山区第二人民医院（演示合成处方笺）"},\n\t{"rotate_rect": [236, 752, 11, 33, 90], "text": "Rp"},\n\t{"rotate_rect": [204, 124, 21, 267, 90], "text": "玻璃酸钠滴眼液 0.1%（10mL：10mg） ×1支"},\n\t{"rotate_rect": [136, 512, 21, 133, 90], "text": "处方完毕"}\n]\n```'
+
+  it('端点结构化形态A（栅栏 JSON + rotate_rect）→ 解包取 text，坐标/栅栏零残留，行序保持', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => mkRes({ choices: [{ message: { content: RX_STRUCTURED_JSON } }] })))
+    const r = await ocr.runOcr(IMG)
+    expect(r.lines).toEqual([
+      '萧山区第二人民医院（演示合成处方笺）',
+      'Rp',
+      '玻璃酸钠滴眼液 0.1%（10mL：10mg） ×1支',
+      '处方完毕',
+    ])
+    expect(r.lines.some((l) => l.includes('rotate_rect') || l.includes('```') || l.includes('{'))).toBe(false)
+  })
+
+  it('回归钉（2026-09-07 事故）：形态A 解包后的行可被 cropBody 命中 Rp 锚点并裁出正文', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => mkRes({ choices: [{ message: { content: RX_STRUCTURED_JSON } }] })))
+    const r = await ocr.runOcr(IMG)
+    const crop = cropBody(r)
+    expect(crop).not.toBeNull()
+    expect(crop!.anchors.startFound).toBe(true)
+    expect(crop!.anchors.endFound).toBe(true)
+    expect(crop!.bodyText).toBe('玻璃酸钠滴眼液 0.1%（10mL：10mg） ×1支')
+  })
+
+  it('端点结构化形态B（CSV 裸行 x,y,w,h,angle,text）→ 剥行首坐标前缀，文本内逗号不受影响', async () => {
+    // 2026-09-07 线上实测的另一序列化形态（同端点偶发，非 JSON）
+    const content =
+      '102,132,17,113,90,处方笺\n236,752,11,33,90,Rp\n448,764,9,333,90,1) 本处方药物的规格型号及用法用量请核对。\n564,720,9,201,90,开具日期：2024年09月01日'
+    vi.stubGlobal('fetch', vi.fn(async () => mkRes({ choices: [{ message: { content } }] })))
+    const r = await ocr.runOcr(IMG)
+    expect(r.lines).toEqual([
+      '处方笺',
+      'Rp',
+      '1) 本处方药物的规格型号及用法用量请核对。',
+      '开具日期：2024年09月01日',
+    ])
+  })
+
+  it('形态A 数组元素均无 text → 空转录 safeParse 失败 → AIUnavailableError（不猜）', async () => {
+    const content = '```json\n[{"rotate_rect": [1, 2, 3, 4, 90]}, {"foo": "bar"}]\n```'
+    vi.stubGlobal('fetch', vi.fn(async () => mkRes({ choices: [{ message: { content } }] })))
+    await expect(ocr.runOcr(IMG)).rejects.toBeInstanceOf(AIUnavailableError)
   })
 
   it('content 为空字符串 → AIUnavailableError（extractChatContent 拦截，不猜）', async () => {
