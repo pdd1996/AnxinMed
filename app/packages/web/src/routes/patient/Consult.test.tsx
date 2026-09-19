@@ -45,13 +45,14 @@ const DRUG_MANUAL: DrugDTOType = {
   confirmStatus: 'manual',
 }
 
-function renderConsult() {
+/** 默认带 drug-1 深链（对象药 = 药箱「问这个药」入口，本页无选药 UI）。 */
+function renderConsult(path = '/consult?drugId=drug-1') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <Consult />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -208,12 +209,8 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
 })
 
 describe('Consult 页 · manual 档提示（spec §T2.2）', () => {
-  it('选中 manual 档药 → 明确提示 "未经 OCR 确认，AI 个性化咨询不可用"', async () => {
-    renderConsult()
-    await screen.findByText('玻璃酸钠滴眼液')
-    // 打开选药 Sheet，点 manual 档药
-    fireEvent.click(screen.getByRole('button', { name: /咨询药品/ }))
-    fireEvent.click(screen.getByText('手动建档的测试药'))
+  it('深链带入 manual 档药 → 明确提示 "未经 OCR 确认，AI 个性化咨询不可用"', async () => {
+    renderConsult('/consult?drugId=drug-2')
     // 提示出现
     await waitFor(() => {
       expect(screen.getByText(/未经 OCR 确认/)).toBeTruthy()
@@ -254,7 +251,7 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
       consultLogId: 'clog-6',
     })
     mocks.fetchDrugs.mockResolvedValue([]) // 空药箱
-    renderConsult()
+    renderConsult('/consult')
     await waitFor(() => {
       expect(screen.getByText(/药箱为空/)).toBeTruthy()
     })
@@ -271,6 +268,36 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
     await waitFor(() => {
       expect(screen.getByText('数据查询')).toBeTruthy()
       expect(screen.getByText('来源：药箱清单')).toBeTruthy()
+    })
+  })
+})
+
+describe('Consult 页 · 深链对象药', () => {
+  it('drugId 指向不存在的药 → 可见提示不静默，说明书类快捷问题不渲染', async () => {
+    renderConsult('/consult?drugId=nope')
+    await waitFor(() => {
+      expect(screen.getByText(/未找到要咨询的药品/)).toBeTruthy()
+    })
+    expect(screen.queryByText('这个药通常用于什么？')).toBeNull()
+  })
+
+  it('无 drugId 参数 → 无对象药：说明书类不渲染，数据类可点（drugIds=[]）', async () => {
+    mocks.postConsult.mockResolvedValue({
+      riskLevel: 'L1',
+      status: 'data-answered',
+      answer: '共 2 种',
+      sections: { summary: '共 2 种', keyPoints: [], risks: [], nextAction: '', warning: '' },
+      citations: [],
+      blocked: false,
+      toolUsed: 'medication-list',
+      consultLogId: 'clog-7',
+    })
+    renderConsult('/consult')
+    await screen.findByText(/可直接问药箱数据/) // 药箱加载完成、无对象问候语出现
+    expect(screen.queryByText('这个药通常用于什么？')).toBeNull()
+    fireEvent.click(screen.getByText('我现在有多少药物？').closest('button')!)
+    await waitFor(() => {
+      expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [])
     })
   })
 })

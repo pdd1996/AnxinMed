@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
-import { AlertTriangle, Box as BoxIcon, FileText, Hand, Pause, Pencil, Pill, Play, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, Box as BoxIcon, Bot, FileText, Hand, Pause, Pencil, Pill, Play, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
 import { client, fetchDrugs, fetchPlans, unwrap } from '@/api/client'
 import { ManualDrugModal, type ManualDrugForm } from '@/components/domain/ManualDrugModal'
 import { PlanModal, type PlanFormResult } from '@/components/domain/PlanModal'
@@ -226,6 +226,11 @@ export default function Box() {
                   )}
 
                   <div className="flex flex-wrap items-center gap-2">
+                    <Button asChild variant="outline" size="sm" className="min-h-10">
+                      <Link to={`/consult?drugId=${drug.id}`}>
+                        <Bot className="size-4" aria-hidden /> 问这个药
+                      </Link>
+                    </Button>
                     <Button variant="outline" size="sm" className="min-h-10" onClick={() => setPlanTarget({ drug, plan })}>
                       <Pencil className="size-4" aria-hidden /> {plan ? '编辑计划' : '创建计划'}
                     </Button>

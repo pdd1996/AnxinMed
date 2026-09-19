@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Bot, ChevronDown, LoaderCircle, Send, ShieldCheck, User, X } from 'lucide-react'
+import { AlertTriangle, Bot, LoaderCircle, Send, ShieldCheck, User, X } from 'lucide-react'
 import { fetchDrugs, postConsult, type ConsultResponseDto } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { CONFIRM_STATUS_META } from '@anxin/shared'
-import { DrugPickerSheet } from '@/components/domain/consult/DrugPickerSheet'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
 
@@ -15,8 +14,8 @@ import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
  *
  * - 薄头部 + 一句问候语：原「头部副标题 / 空药箱灰框 / 空会话灰框 / 长 placeholder」四处重复
  *   文案合并为问候语一处，不再用边框灰块模拟系统消息；空药箱时问候语内嵌「去录入」链接。
- * - 对象药是「上下文」而非「展示列表」：头部只常驻一颗当前对象药丸（点开可搜索的
- *   DrugPickerSheet 换药），药箱到上千种页面结构不变；旧 DrugSelector 常驻 chip 枚举已删除。
+ * - 对象药是「会话上下文」而非页面控件：本页无任何选药 UI（chip 枚举与常驻药丸均已移除），
+ *   说明书咨询由药箱「问这个药」深链 /consult?drugId=… 带入对象；无对象时本页只答药箱数据类问题。
  * - 快捷问题为输入框上方单行横滑条：数据类始终可点；说明书类未选药时不渲染
  *   （原「置灰」方案让用户面对一排无解释的灰按钮，已废弃）。
  * - 输入区 sticky 固定在底部导航上方：bottom-16 对齐 BottomNav 高度（~61px），-mb-12 抵消
@@ -37,7 +36,7 @@ interface ChatMessage {
   response?: ConsultResponseDto
 }
 
-/** 快捷问题 · 说明书类（照搬 demo/src/pages/Consult.tsx:5-10；选中药品后才渲染）。 */
+/** 快捷问题 · 说明书类（照搬 demo/src/pages/Consult.tsx:5-10；仅深链带入对象药时渲染）。 */
 const QUICK_QUESTIONS = [
   '这个药通常用于什么？',
   '常见不良反应有哪些？',
@@ -65,14 +64,15 @@ export default function Consult() {
   const drugsQuery = useQuery({ queryKey: ['drugs'], queryFn: fetchDrugs })
   const drugs = drugsQuery.data ?? []
 
-  const [selectedDrugId, setSelectedDrugId] = useState<string | null>(null)
   const [question, setQuestion] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [pickerOpen, setPickerOpen] = useState(false)
 
-  // 默认选中第一支药（如有）
-  const selectedDrug = drugs.find((d) => d.id === selectedDrugId) ?? drugs[0] ?? null
+  // 对象药 = URL 深链上下文（药箱「问这个药」带入）；无参数即无对象，不做默认选中。
+  const [searchParams] = useSearchParams()
+  const drugIdParam = searchParams.get('drugId')
+  const selectedDrug = drugIdParam ? drugs.find((d) => d.id === drugIdParam) ?? null : null
   const effectiveDrugId = selectedDrug?.id ?? null
+  const invalidDrugLink = !!drugIdParam && !drugsQuery.isLoading && !selectedDrug && drugs.length > 0
 
   const consultMutation = useMutation({
     mutationFn: (q: string) => postConsult(q, effectiveDrugId ? [effectiveDrugId] : []),
@@ -99,31 +99,9 @@ export default function Consult() {
       <div className="flex min-h-[calc(100dvh-192px)] min-w-0 flex-col gap-4 lg:col-span-1">
         <Card className="flex-1">
           <CardContent className="space-y-4 p-4">
-            {/* 薄头部：标题 + 当前对象药丸（点开可搜索选药 Sheet 换药）；360px 下不放图标，保标题与药丸同行 */}
+            {/* 薄头部：只有标题——本页无选药 UI，对象药经药箱「问这个药」深链带入 */}
             <div className="flex items-center gap-2.5 border-b border-border pb-3">
               <h1 className="min-w-0 flex-1 truncate text-base font-bold">安心 AI 药师助手</h1>
-              <button
-                type="button"
-                onClick={() => setPickerOpen(true)}
-                aria-label={
-                  selectedDrug
-                    ? `咨询药品：${selectedDrug.genericName}，点击切换`
-                    : '选择咨询药品'
-                }
-                className="flex min-h-11 max-w-[45%] shrink-0 items-center gap-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
-              >
-                {drugsQuery.isLoading ? (
-                  <>
-                    <LoaderCircle className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-                    <span className="text-muted-foreground">载入中…</span>
-                  </>
-                ) : selectedDrug ? (
-                  <span className="truncate">{selectedDrug.genericName}</span>
-                ) : (
-                  <span className="text-muted-foreground">选择药品</span>
-                )}
-                <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              </button>
             </div>
 
             {/* manual 档提示（spec §T2.2） */}
@@ -149,8 +127,16 @@ export default function Consult() {
                       </Link>
                       添加药品后可咨询说明书；现在也能直接查药箱数据。
                     </>
+                  ) : selectedDrug ? (
+                    <>
+                      正在咨询「
+                      <span className="font-medium text-foreground">{selectedDrug.genericName}</span>
+                      」：说明书类问题围绕它回答，药箱数据也可直接问。
+                    </>
+                  ) : invalidDrugLink ? (
+                    '未找到要咨询的药品，请回到药箱从该药的「问这个药」重新进入。'
                   ) : (
-                    '点顶部药名可切换咨询对象，说明书类问题围绕它回答；药箱数据也可直接问。'
+                    '可直接问药箱数据；要咨询某支药的说明书，请到药箱点该药的「问这个药」。'
                   )}
                 </p>
               )}
@@ -273,14 +259,6 @@ export default function Consult() {
             AI 基于本地说明书库按键取数回答，不诊断、不处方、不建议自行调整剂量；不预测个体疗效。
           </p>
         </div>
-
-        <DrugPickerSheet
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          drugs={drugs}
-          selectedId={effectiveDrugId}
-          onSelect={setSelectedDrugId}
-        />
       </div>
 
       {/* 侧列：边界说明（照搬 demo/src/pages/Consult.tsx:123-126） */}
