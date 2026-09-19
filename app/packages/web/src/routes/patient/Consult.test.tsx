@@ -211,7 +211,8 @@ describe('Consult 页 · manual 档提示（spec §T2.2）', () => {
   it('选中 manual 档药 → 明确提示 "未经 OCR 确认，AI 个性化咨询不可用"', async () => {
     renderConsult()
     await screen.findByText('玻璃酸钠滴眼液')
-    // 点击 manual 档药 chip
+    // 打开选药 Sheet，点 manual 档药
+    fireEvent.click(screen.getByRole('button', { name: /咨询药品/ }))
     fireEvent.click(screen.getByText('手动建档的测试药'))
     // 提示出现
     await waitFor(() => {

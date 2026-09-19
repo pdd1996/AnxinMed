@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Bot, LoaderCircle, Send, ShieldCheck, Sparkles, User, X } from 'lucide-react'
+import { AlertTriangle, Bot, ChevronDown, LoaderCircle, Send, ShieldCheck, User, X } from 'lucide-react'
 import { fetchDrugs, postConsult, type ConsultResponseDto } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { CONFIRM_STATUS_META } from '@anxin/shared'
-import { DrugSelector } from '@/components/domain/consult/DrugSelector'
+import { DrugPickerSheet } from '@/components/domain/consult/DrugPickerSheet'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
 import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationButton'
@@ -16,6 +16,8 @@ import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationBu
  *
  * - 薄头部 + 一句问候语：原「头部副标题 / 空药箱灰框 / 空会话灰框 / 长 placeholder」四处重复
  *   文案合并为问候语一处，不再用边框灰块模拟系统消息；空药箱时问候语内嵌「去录入」链接。
+ * - 对象药是「上下文」而非「展示列表」：头部只常驻一颗当前对象药丸（点开可搜索的
+ *   DrugPickerSheet 换药），药箱到上千种页面结构不变；旧 DrugSelector 常驻 chip 枚举已删除。
  * - 快捷问题为输入框上方单行横滑条：数据类始终可点；说明书类未选药时不渲染
  *   （原「置灰」方案让用户面对一排无解释的灰按钮，已废弃）。
  * - 输入区 sticky 固定在底部导航上方：bottom-16 对齐 BottomNav 高度（~61px），-mb-12 抵消
@@ -66,6 +68,7 @@ export default function Consult() {
   const [selectedDrugId, setSelectedDrugId] = useState<string | null>(null)
   const [question, setQuestion] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   // 默认选中第一支药（如有）
   const selectedDrug = drugs.find((d) => d.id === selectedDrugId) ?? drugs[0] ?? null
@@ -95,31 +98,38 @@ export default function Consult() {
       <div className="flex min-w-0 flex-col gap-4 lg:col-span-1">
         <Card>
           <CardContent className="space-y-4 p-4">
-            {/* 薄头部：只留图标 + 标题，功能说明由问候语一处承担 */}
+            {/* 薄头部：标题 + 当前对象药丸（点开可搜索选药 Sheet 换药）；360px 下不放图标，保标题与药丸同行 */}
             <div className="flex items-center gap-2.5 border-b border-border pb-3">
-              <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Sparkles className="size-5" aria-hidden />
-              </div>
-              <h1 className="text-base font-bold">安心 AI 药师助手</h1>
+              <h1 className="min-w-0 flex-1 truncate text-base font-bold">安心 AI 药师助手</h1>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                aria-label={
+                  selectedDrug
+                    ? `咨询药品：${selectedDrug.genericName}，点击切换`
+                    : '选择咨询药品'
+                }
+                className="flex min-h-11 max-w-[45%] shrink-0 items-center gap-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+              >
+                {drugsQuery.isLoading ? (
+                  <>
+                    <LoaderCircle className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+                    <span className="text-muted-foreground">载入中…</span>
+                  </>
+                ) : selectedDrug ? (
+                  <span className="truncate">{selectedDrug.genericName}</span>
+                ) : (
+                  <span className="text-muted-foreground">选择药品</span>
+                )}
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
             </div>
-
-            {/* 药品选择器（空药箱不再渲染灰框，引导并入问候语） */}
-            {drugsQuery.isLoading ? (
-              <p className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                <LoaderCircle className="size-4 animate-spin" aria-hidden /> 正在载入药箱…
-              </p>
-            ) : drugs.length > 0 ? (
-              <DrugSelector drugs={drugs} selectedId={effectiveDrugId} onSelect={setSelectedDrugId} />
-            ) : null}
 
             {/* manual 档提示（spec §T2.2） */}
             {selectedDrug?.confirmStatus === 'manual' && (
               <p className="flex items-start gap-2 rounded-md border border-risk-l3/30 bg-risk-l3/10 p-2.5 text-xs text-risk-l3">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                <span>
-                  该药品未经 OCR 确认：AI 个性化咨询不可用，仅可查询药品资料（L0）。
-                  {CONFIRM_STATUS_META.manual.hint}
-                </span>
+                <span>该药品未经 OCR 确认：{CONFIRM_STATUS_META.manual.hint}</span>
               </p>
             )}
 
@@ -139,7 +149,7 @@ export default function Consult() {
                       添加药品后可咨询说明书；现在也能直接查药箱数据。
                     </>
                   ) : (
-                    '选上方药品可咨询对应说明书；不选药也能直接问药箱数据。'
+                    '点顶部药名可切换咨询对象，说明书类问题围绕它回答；药箱数据也可直接问。'
                   )}
                 </p>
               )}
@@ -200,7 +210,7 @@ export default function Consult() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="min-h-9 shrink-0 whitespace-nowrap border-primary/30 text-xs text-primary"
+                className="min-h-11 shrink-0 whitespace-nowrap border-primary/30 text-xs text-primary"
                 onClick={() => handleAsk(q)}
                 disabled={consultMutation.isPending}
               >
@@ -214,7 +224,7 @@ export default function Consult() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="min-h-9 shrink-0 whitespace-nowrap text-xs"
+                  className="min-h-11 shrink-0 whitespace-nowrap text-xs"
                   onClick={() => handleAsk(q)}
                   disabled={consultMutation.isPending}
                 >
@@ -270,6 +280,14 @@ export default function Consult() {
             AI 基于本地说明书库按键取数回答，不诊断、不处方、不建议自行调整剂量；不预测个体疗效。
           </p>
         </div>
+
+        <DrugPickerSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          drugs={drugs}
+          selectedId={effectiveDrugId}
+          onSelect={setSelectedDrugId}
+        />
       </div>
 
       {/* 侧列：边界说明（照搬 demo/src/pages/Consult.tsx:123-126） */}
