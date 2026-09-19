@@ -241,7 +241,7 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
     })
   })
 
-  it('未选药品（空药箱）时 → 说明书类快捷问题 disabled，数据查询类仍可点（意图路由 T5）', async () => {
+  it('未选药品（空药箱）时 → 说明书类快捷问题不渲染，数据查询类仍可点（意图路由 T5 · 千问式改版）', async () => {
     mocks.postConsult.mockResolvedValue({
       riskLevel: 'L1',
       status: 'data-answered',
@@ -257,9 +257,8 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
     await waitFor(() => {
       expect(screen.getByText(/药箱为空/)).toBeTruthy()
     })
-    // 说明书类快捷问题 disabled（需选药）
-    const quickBtn = screen.getByText('这个药通常用于什么？').closest('button')
-    expect(quickBtn?.disabled).toBe(true)
+    // 说明书类快捷问题不渲染（改版：置灰 → 未选药时隐藏，避免一排无解释的灰按钮）
+    expect(screen.queryByText('这个药通常用于什么？')).toBeNull()
     // 数据查询类快捷问题始终可点，点击后 drugIds=[]
     const dataBtn = screen.getByText('我现在有多少药物？').closest('button')
     expect(dataBtn?.disabled).toBe(false)

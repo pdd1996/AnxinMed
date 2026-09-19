@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils'
  * 药品选择器（M3-T2 · spec §T2.1）——围绕已确认药品提问。
  *
  * 老年向原则：
- * - chip 列表（大点击区域，min-h-11）；
+ * - 单行横滑 chip（大点击区域，min-h-11；H5 小屏下多支药不再竖排占满首屏，与快捷问题条同模式）；
  * - 每个 chip 显示 genericName + confirmStatus 小圆点（颜色语义：transcribed 绿 / ocr_matched 蓝 / manual 灰）；
  * - 选中态 border 高亮 + 背景色；
- * - 空列表时返回 null（Consult 页面渲染"请先确认药品"引导）。
+ * - 空列表时返回 null（引导文案由 Consult 页问候语承担）。
  *
  * ⚠️ 本组件为纯选择器（受控）；manual 档提示由 Consult 页面渲染（需结合当前选中药的完整信息）。
  */
@@ -31,7 +31,11 @@ export function DrugSelector({ drugs, selectedId, onSelect, className }: DrugSel
   if (drugs.length === 0) return null
 
   return (
-    <div className={cn('flex flex-wrap gap-2', className)} role="radiogroup" aria-label="选择咨询药品">
+    <div
+      className={cn('flex gap-2 overflow-x-auto py-0.5', className)}
+      role="radiogroup"
+      aria-label="选择咨询药品"
+    >
       {drugs.map((drug) => {
         const selected = drug.id === selectedId
         const meta = CONFIRM_STATUS_META[drug.confirmStatus]
@@ -43,7 +47,7 @@ export function DrugSelector({ drugs, selectedId, onSelect, className }: DrugSel
             aria-checked={selected}
             onClick={() => onSelect(drug.id)}
             className={cn(
-              'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+              'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors',
               selected
                 ? 'border-primary bg-primary/10 text-primary'
                 : 'border-border bg-background text-foreground hover:bg-muted',
