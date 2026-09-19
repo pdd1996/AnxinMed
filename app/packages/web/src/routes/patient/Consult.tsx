@@ -21,7 +21,8 @@ import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationBu
  * - 快捷问题为输入框上方单行横滑条：数据类始终可点；说明书类未选药时不渲染
  *   （原「置灰」方案让用户面对一排无解释的灰按钮，已废弃）。
  * - 输入区 sticky 固定在底部导航上方：bottom-16 对齐 BottomNav 高度（~61px），-mb-12 抵消
- *   PatientLayout main 的 pb-28 富余（112-48=64），使滚动钉住态与滚到底静止态落位一致。
+ *   PatientLayout main 的 pb-28 富余（112-48=64），使滚动钉住态与滚到底静止态落位一致；
+ *   主列 min-h 用 dvh 算满视口 + 聊天 Card flex-1，保证内容不足一屏时输入区也贴底（不留中段空白）。
  * - M3-T4：输入行含按键式语音（VoiceDictationButton），回答卡含中文播报（见 AnswerCard/EmergencyCard）；
  *   语音仅快捷入口，手动输入/发送等价保留，不支持环境自动降级（spec §T4.3）。
  * - 意图路由 T5：咨询不强制选药——不选药可直接问药箱数据类问题（后端意图路由直查库返回
@@ -94,9 +95,10 @@ export default function Consult() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_320px]">
-      {/* 主列：聊天卡片 + 底部固定输入区（min-w-0：否则横滑条的 nowrap 内容会撑宽网格列） */}
-      <div className="flex min-w-0 flex-col gap-4 lg:col-span-1">
-        <Card>
+      {/* 主列：min-h 用 dvh 算满视口（100dvh - 顶栏56 - main pt24 - main pb112），
+          内容不足一屏时 Card(flex-1) 撑开、输入区贴底；百分比 min-h 在 auto 高度父链下会算成 0，故不用 */}
+      <div className="flex min-h-[calc(100dvh-192px)] min-w-0 flex-col gap-4 lg:col-span-1">
+        <Card className="flex-1">
           <CardContent className="space-y-4 p-4">
             {/* 薄头部：标题 + 当前对象药丸（点开可搜索选药 Sheet 换药）；360px 下不放图标，保标题与药丸同行 */}
             <div className="flex items-center gap-2.5 border-b border-border pb-3">
