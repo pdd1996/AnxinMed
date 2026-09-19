@@ -9,7 +9,6 @@ import { CONFIRM_STATUS_META } from '@anxin/shared'
 import { DrugPickerSheet } from '@/components/domain/consult/DrugPickerSheet'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
-import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationButton'
 
 /**
  * 咨询页（M3-T2 · PRD §7.5 / spec §T2）——围绕已确认药品提问，移动端按「千问式」聊天首屏布局。
@@ -23,8 +22,8 @@ import { VoiceDictationButton } from '@/components/domain/voice/VoiceDictationBu
  * - 输入区 sticky 固定在底部导航上方：bottom-16 对齐 BottomNav 高度（~61px），-mb-12 抵消
  *   PatientLayout main 的 pb-28 富余（112-48=64），使滚动钉住态与滚到底静止态落位一致；
  *   主列 min-h 用 dvh 算满视口 + 聊天 Card flex-1，保证内容不足一屏时输入区也贴底（不留中段空白）。
- * - M3-T4：输入行含按键式语音（VoiceDictationButton），回答卡含中文播报（见 AnswerCard/EmergencyCard）；
- *   语音仅快捷入口，手动输入/发送等价保留，不支持环境自动降级（spec §T4.3）。
+ * - M3-T4：回答卡含中文播报（见 AnswerCard/EmergencyCard），不支持环境自动降级（spec §T4.3）；
+ *   按键式语音输入已按产品决定整体移除（2026-09-20），提问仅手动输入。
  * - 意图路由 T5：咨询不强制选药——不选药可直接问药箱数据类问题（后端意图路由直查库返回
  *   status='data-answered'，0 LLM）；选药后可问说明书问题。
  * - 消息历史用 useState 本地管理（咨询是会话式，不需要持久化到前端——consult_logs 已由后端落库）。
@@ -248,19 +247,11 @@ export default function Consult() {
               placeholder={
                 effectiveDrugId
                   ? '输入关于已确认药品的问题…'
-                  : '想问什么？输入或语音告诉我'
+                  : '想问什么？直接输入告诉我'
               }
               disabled={consultMutation.isPending}
               rows={2}
               className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            {/* M3-T4：语音提问（转写确认后追加到输入框）；浮层向上展开。 */}
-            <VoiceDictationButton
-              label="语音输入问题"
-              continuous
-              panelSide="top"
-              disabled={consultMutation.isPending}
-              onCommit={(text) => setQuestion((prev) => (prev.trim() ? `${prev.trimEnd()}${text}` : text))}
             />
             <Button
               type="button"
