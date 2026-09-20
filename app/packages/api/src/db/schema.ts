@@ -260,10 +260,15 @@ export const drafts = pgTable('drafts', {
 // ---------------------------------------------------------------------------
 // consult_logs · 咨询历史留痕（每次 POST /api/consult 一行）
 // 用途：医生端「咨询历史摘要」读库（M3-T3）+ 用户端「最近咨询」自查
+// M4-T5 会话化：session_id/turn_no 定位会话内轮次（可空 = M3 单轮行为不变）；intent 留痕
+// 命中的数据直答意图或透传的 skillId（可空 = 说明书管线兜底，对齐 insight_ask_logs 漏判口径）
 // ---------------------------------------------------------------------------
 export const consultLogs = pgTable('consult_logs', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),                     // → users.id（应用层过滤）
+  sessionId: text('session_id'),                         // → consult_sessions.id（M4-T5；null = 无会话单轮）
+  turnNo: integer('turn_no'),                            // 会话内轮次（1 起；M4-T5；null = 无会话单轮）
+  intent: text('intent'),                                // 命中意图（S2 意图名）或透传 skillId（M4-T5/T7）；null = 说明书管线兜底
   question: text('question').notNull(),                  // 用户提问，落库前过 scrubWithPatterns（L3 出口）
   drugIds: jsonb('drug_ids'),                            // string[]：咨询涉及的 drugs.id（用户域）；空数组表示无药上下文
   riskLevel: varchar('risk_level', { enum: ['L1', 'L2', 'L3', 'L4'] }).notNull(),
@@ -313,6 +318,19 @@ export const riskEvents = pgTable('risk_events', {
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// ---------------------------------------------------------------------------
+// consult_sessions · 咨询会话（M4-T5 · specs/04-T5）——短期记忆的落库形态
+// 一次提问无 sessionId → 服务端建会话（title=首问截断）并在首答回传；续问带 sessionId 续轮。
+// 不变式：userId 应用层过滤（跨用户不串会话）；会话内消息 = consult_logs.session_id 回放。
+// ---------------------------------------------------------------------------
+export const consultSessions = pgTable('consult_sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),                     // → users.id（应用层过滤）
+  title: text('title').notNull(),                        // 首问截断（脱敏后文本，建会话时定格，后续轮不改）
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  lastActiveAt: timestamp('last_active_at').defaultNow().notNull(),  // 每轮续问刷新（列表按此倒序）
 })
 
 // ---------------------------------------------------------------------------

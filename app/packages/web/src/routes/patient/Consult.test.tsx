@@ -15,6 +15,8 @@ import type { ConsultResponseDto } from '@/api/client'
 const mocks = vi.hoisted(() => ({
   fetchDrugs: vi.fn(),
   postConsult: vi.fn(),
+  fetchConsultSessions: vi.fn(),
+  fetchConsultSession: vi.fn(),
 }))
 vi.mock('@/api/client', () => mocks)
 
@@ -63,6 +65,8 @@ function renderConsult(path = '/consult?drugId=drug-1') {
 beforeEach(() => {
   mocks.fetchDrugs.mockReset()
   mocks.postConsult.mockReset()
+  mocks.fetchConsultSessions.mockReset()
+  mocks.fetchConsultSession.mockReset()
   mocks.fetchDrugs.mockResolvedValue([DRUG_HYCOSAN, DRUG_MANUAL])
 })
 afterEach(cleanup)
@@ -87,6 +91,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       l0Notice: null,
       blocked: false,
       consultLogId: 'clog-1',
+      sessionId: 'csess-1',
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -125,6 +130,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       l0Notice: null,
       blocked: true,
       consultLogId: 'clog-2',
+      sessionId: 'csess-1',
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -158,6 +164,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       l0Notice: null,
       blocked: true,
       consultLogId: 'clog-3',
+      sessionId: 'csess-1',
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -191,6 +198,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       l0Notice: null,
       blocked: false,
       consultLogId: 'clog-4',
+      sessionId: 'csess-1',
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -298,6 +306,140 @@ describe('Consult 页 · 深链对象药', () => {
     fireEvent.click(screen.getByText('我现在有多少药物？').closest('button')!)
     await waitFor(() => {
       expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [])
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 会话层（M4-T5 · specs/04-T5）：sessionId 续问带入 + 历史会话列表回放
+// ---------------------------------------------------------------------------
+
+/** 最小 answered 响应（sessionId 可指定；未指定字段走缺省）。 */
+function answeredResponse(sessionId: string, summary: string): ConsultResponseDto {
+  return {
+    riskLevel: 'L1',
+    status: 'answered',
+    answer: summary,
+    sections: { summary, keyPoints: [], risks: [], nextAction: '下一步', warning: '提示' },
+    citations: [],
+    notice: null,
+    l0Notice: null,
+    blocked: false,
+    consultLogId: `clog-${summary}`,
+    sessionId,
+  }
+}
+
+describe('Consult 页 · 会话层（M4-T5 sessionId 续问 + 历史回放）', () => {
+  it('首问响应回传 sessionId → 续问自动以三参带入同一会话', async () => {
+    mocks.postConsult
+      .mockResolvedValueOnce(answeredResponse('csess-1', '第一问回答'))
+      .mockResolvedValueOnce(answeredResponse('csess-1', '第二问回答'))
+    renderConsult()
+
+    await screen.findByText('玻璃酸钠滴眼液')
+    const textarea = screen.getByPlaceholderText(/输入关于已确认药品的问题/)
+    fireEvent.change(textarea, { target: { value: '第一个问题' } })
+    fireEvent.click(screen.getByLabelText('发送'))
+    await waitFor(() => expect(mocks.postConsult).toHaveBeenCalledTimes(1))
+    // 首问为两参调用（M3 形态不变）
+    expect(mocks.postConsult).toHaveBeenNthCalledWith(1, '第一个问题', ['drug-1'])
+
+    fireEvent.change(textarea, { target: { value: '第二个问题' } })
+    fireEvent.click(screen.getByLabelText('发送'))
+    await waitFor(() => {
+      // 续问自动携带响应回传的 sessionId
+      expect(mocks.postConsult).toHaveBeenLastCalledWith('第二个问题', ['drug-1'], { sessionId: 'csess-1' })
+    })
+    // 两问两答同窗累计
+    expect(screen.getByText('第一个问题')).toBeTruthy()
+    expect(screen.getByText('第二个问题')).toBeTruthy()
+  })
+
+  it('历史会话面板：列表渲染 → 点选回放消息 → 回放后续问接续该会话', async () => {
+    mocks.fetchConsultSessions.mockResolvedValue({
+      items: [
+        {
+          id: 'csess-9',
+          title: '之前问的干眼问题',
+          createdAt: '2026-09-19T10:00:00Z',
+          lastActiveAt: '2026-09-19T10:05:00Z',
+        },
+      ],
+    })
+    mocks.fetchConsultSession.mockResolvedValue({
+      session: {
+        id: 'csess-9',
+        title: '之前问的干眼问题',
+        createdAt: '2026-09-19T10:00:00Z',
+        lastActiveAt: '2026-09-19T10:05:00Z',
+      },
+      messages: [
+        {
+          consultLogId: 'clog-9',
+          turnNo: 1,
+          question: '玻璃酸钠有什么副作用？',
+          status: 'answered',
+          riskLevel: 'L1',
+          sectionsSnapshot: {
+            summary: '常见不良反应是眼部刺激感',
+            keyPoints: [],
+            risks: [],
+            nextAction: '如有不适请就诊',
+            warning: '提示',
+          },
+          citations: [{ drugName: '玻璃酸钠滴眼液', source: '丁香园', version: '2024-01', unverified: false }],
+          notice: null,
+          blockedAt: null,
+          intent: null,
+          createdAt: '2026-09-19T10:00:00Z',
+        },
+      ],
+    })
+    mocks.postConsult.mockResolvedValue(answeredResponse('csess-9', '回放后续问回答'))
+    renderConsult()
+
+    await screen.findByText('玻璃酸钠滴眼液')
+    fireEvent.click(screen.getByRole('button', { name: /历史会话/ }))
+    // 列表项出现 → 点选回放
+    const item = await screen.findByText('之前问的干眼问题')
+    fireEvent.click(item)
+    // 回放消息（user + assistant）渲染
+    await waitFor(() => {
+      expect(screen.getByText('玻璃酸钠有什么副作用？')).toBeTruthy()
+      expect(screen.getByText('常见不良反应是眼部刺激感')).toBeTruthy()
+    })
+    // 回放后续问 → 三参带入被回放的会话
+    const textarea = screen.getByPlaceholderText(/输入关于已确认药品的问题/)
+    fireEvent.change(textarea, { target: { value: '回放后的追问' } })
+    fireEvent.click(screen.getByLabelText('发送'))
+    await waitFor(() => {
+      expect(mocks.postConsult).toHaveBeenLastCalledWith('回放后的追问', ['drug-1'], { sessionId: 'csess-9' })
+    })
+  })
+
+  it('开新会话：清空本地会话与消息，再问回到两参首问形态', async () => {
+    mocks.postConsult
+      .mockResolvedValueOnce(answeredResponse('csess-1', '旧会话回答'))
+      .mockResolvedValueOnce(answeredResponse('csess-2', '新会话回答'))
+    renderConsult()
+
+    await screen.findByText('玻璃酸钠滴眼液')
+    const textarea = screen.getByPlaceholderText(/输入关于已确认药品的问题/)
+    fireEvent.change(textarea, { target: { value: '旧会话的问题' } })
+    fireEvent.click(screen.getByLabelText('发送'))
+    await waitFor(() => expect(screen.getByText('旧会话回答')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: /开新会话/ }))
+    // 消息清空（旧回答不再显示）
+    await waitFor(() => {
+      expect(screen.queryByText('旧会话回答')).toBeNull()
+    })
+    fireEvent.change(textarea, { target: { value: '新会话的问题' } })
+    fireEvent.click(screen.getByLabelText('发送'))
+    await waitFor(() => {
+      // 新首问不携带旧 sessionId
+      expect(mocks.postConsult).toHaveBeenLastCalledWith('新会话的问题', ['drug-1'])
     })
   })
 })

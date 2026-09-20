@@ -142,18 +142,38 @@ export async function intakeDrug(image: string) {
 
 /**
  * POST /api/consult：围绕已确认药品提问。
- * 响应经 hc<AppType> 端到端推导（shared ConsultResponseSchema + 后端 consultLogId）。
+ * 响应经 hc<AppType> 端到端推导（shared ConsultResponseSchema + 后端 consultLogId/sessionId）。
  * 守门与降级全部在后端 services/consult.service.ts 编排；本层不做业务判断。
  * L4/L3/manual-gate/no-source/ai-unavailable 均返回 200（守门正常路径，非错误），
  * 故用 unwrap（toast 仅在真错误时触发）；前端按 riskLevel/status/blocked 渲染各分支。
+ * M4-T5：opts.sessionId 续问（首问不传 = 服务端建会话并在响应回传 sessionId）；
+ * 无 opts 时保持两参调用形态（M3 行为与既有测试断言不变）。
  */
-export async function postConsult(question: string, drugIds: string[]) {
-  const res = await client.api.consult.$post({ json: { question, drugIds } })
+export async function postConsult(question: string, drugIds: string[], opts?: { sessionId: string }) {
+  const res = await client.api.consult.$post({
+    json: opts ? { question, drugIds, sessionId: opts.sessionId } : { question, drugIds },
+  })
   return unwrap(res)
 }
 
 /** 咨询响应 DTO（去掉 ok 字段；hc<AppType> 推导，web 不复制类型）。 */
 export type ConsultResponseDto = Omit<Awaited<ReturnType<typeof postConsult>>, 'ok'>
+
+// ── 咨询会话（M4-T5 · specs/04-T5）──
+
+/** GET /api/consult/sessions：本人会话列表（last_active_at 倒序）。 */
+export async function fetchConsultSessions() {
+  const res = await client.api.consult.sessions.$get()
+  return unwrap(res)
+}
+export type ConsultSessionsDto = Awaited<ReturnType<typeof fetchConsultSessions>>
+
+/** GET /api/consult/sessions/:id：会话详情（consult_logs 按 turn_no 回放）。 */
+export async function fetchConsultSession(id: string) {
+  const res = await client.api.consult.sessions[':id'].$get({ param: { id } })
+  return unwrap(res)
+}
+export type ConsultSessionDetailDto = Awaited<ReturnType<typeof fetchConsultSession>>
 
 // ── 医生端洞察（M3-T3）──
 

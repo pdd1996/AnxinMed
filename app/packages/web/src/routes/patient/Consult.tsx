@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Bot, LoaderCircle, Send, ShieldCheck, User, X } from 'lucide-react'
-import { fetchDrugs, postConsult, type ConsultResponseDto } from '@/api/client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, Bot, History, LoaderCircle, MessageSquarePlus, Send, ShieldCheck, User, X } from 'lucide-react'
+import {
+  fetchConsultSession,
+  fetchConsultSessions,
+  fetchDrugs,
+  postConsult,
+  type ConsultResponseDto,
+  type ConsultSessionDetailDto,
+} from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -31,7 +38,9 @@ import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
  *   status='data-answered'，0 LLM）；选药后可问说明书问题。
  * - 快捷问题契约收编（M4-T1）：chips 渲染自 shared 的 CONSULT_*_QUICK_QUESTIONS（与后端
  *   intent.ts 正则/skillId 同源），改文案只动 shared 一处。
- * - 消息历史用 useState 本地管理（M4-T5 会话层落地后持久化到 consult_sessions）。
+ * - 会话层（M4-T5）：首问不带 sessionId → 服务端建会话并在响应回传，前端保存后续问自动带入；
+ *   「历史会话」入口列出服务端会话（GET /sessions），点选回放（GET /sessions/:id 按 turnNo），
+ *   「开新会话」重置本地态。无 sessionId 路径 = M3 单轮行为。
  */
 
 /** 会话消息（一问一答；user 消息含 question，assistant 消息含完整响应）。 */
@@ -42,15 +51,54 @@ interface ChatMessage {
   response?: ConsultResponseDto
 }
 
+/** 会话回放行 → 聊天消息对（consult_logs 行不含 answer 字段，summary 即一句话回答）。 */
+function logToChatMessages(log: ConsultSessionDetailDto['messages'][number]): ChatMessage[] {
+  const snapshot = (log.sectionsSnapshot ?? null) as ConsultResponseDto['sections']
+  const response: ConsultResponseDto = {
+    riskLevel: log.riskLevel,
+    status: log.status,
+    answer: snapshot?.summary ?? log.question,
+    sections: snapshot,
+    citations: (log.citations ?? null) as ConsultResponseDto['citations'],
+    notice: log.notice,
+    l0Notice: null, // consult_logs 落库时 l0Notice 并入 notice（无独立列）
+    blocked: log.blockedAt != null,
+    toolUsed: log.status === 'data-answered' ? log.intent : null,
+    consultLogId: log.consultLogId,
+    sessionId: '',
+  }
+  return [
+    { id: `${log.consultLogId}-q`, role: 'user', question: log.question },
+    { id: log.consultLogId, role: 'assistant', response },
+  ]
+}
+
+/** 会话时间展示（老年向：月日 + 时分，不用 ISO 串）。 */
+function formatTime(iso: string | Date): string {
+  const d = typeof iso === 'string' ? new Date(iso) : iso
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 let msgSeq = 0
 const nextMsgId = () => `msg-${Date.now()}-${++msgSeq}`
 
 export default function Consult() {
   const drugsQuery = useQuery({ queryKey: ['drugs'], queryFn: fetchDrugs })
   const drugs = drugsQuery.data ?? []
+  const queryClient = useQueryClient()
 
   const [question, setQuestion] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  // 会话状态（M4-T5）：首问响应回传 sessionId，续问自动带入；「开新会话」清空回 null。
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+
+  // 历史会话列表（打开面板时才拉取）
+  const sessionsQuery = useQuery({
+    queryKey: ['consult-sessions'],
+    queryFn: fetchConsultSessions,
+    enabled: historyOpen,
+  })
 
   // 对象药 = URL 深链上下文（药箱「问这个药」带入）；无参数即无对象，不做默认选中。
   const [searchParams] = useSearchParams()
@@ -60,8 +108,11 @@ export default function Consult() {
   const invalidDrugLink = !!drugIdParam && !drugsQuery.isLoading && !selectedDrug && drugs.length > 0
 
   const consultMutation = useMutation({
-    mutationFn: (q: string) => postConsult(q, effectiveDrugId ? [effectiveDrugId] : []),
+    // 无 sessionId 保持两参调用（M3 行为）；续问带第三参（M4-T5）
+    mutationFn: (q: string) =>
+      sessionId ? postConsult(q, effectiveDrugId ? [effectiveDrugId] : [], { sessionId }) : postConsult(q, effectiveDrugId ? [effectiveDrugId] : []),
     onSuccess: (response, q) => {
+      setSessionId(response.sessionId)
       setMessages((prev) => [
         ...prev,
         { id: nextMsgId(), role: 'user', question: q },
@@ -77,6 +128,22 @@ export default function Consult() {
     consultMutation.mutate(text)
   }
 
+  /** 回放历史会话：拉详情 → 映射消息 → 会话续接到当前窗口。 */
+  const handleRestoreSession = async (id: string) => {
+    const detail = await fetchConsultSession(id)
+    setSessionId(detail.session.id)
+    setMessages(detail.messages.flatMap(logToChatMessages))
+    setHistoryOpen(false)
+  }
+
+  /** 开新会话：清空本地会话态（服务端历史保留，可从「历史会话」再进入）。 */
+  const handleNewSession = () => {
+    setSessionId(null)
+    setMessages([])
+    setHistoryOpen(false)
+    queryClient.invalidateQueries({ queryKey: ['consult-sessions'] })
+  }
+
   return (
     <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_320px]">
       {/* 主列：min-h 用 dvh 算满视口（100dvh - 顶栏56 - main pt24 - main pb112），
@@ -84,10 +151,55 @@ export default function Consult() {
       <div className="flex min-h-[calc(100dvh-192px)] min-w-0 flex-col gap-4 lg:col-span-1">
         <Card className="flex-1">
           <CardContent className="space-y-4 p-4">
-            {/* 薄头部：只有标题——本页无选药 UI，对象药经药箱「问这个药」深链带入 */}
-            <div className="flex items-center gap-2.5 border-b border-border pb-3">
+            {/* 薄头部：标题 + 会话操作（历史会话列表入口 / 开新会话；M4-T5） */}
+            <div className="flex items-center gap-2 border-b border-border pb-3">
               <h1 className="min-w-0 flex-1 truncate text-base font-bold">安心 AI 药师助手</h1>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-11 gap-1 px-2 text-xs text-muted-foreground"
+                onClick={() => setHistoryOpen((v) => !v)}
+                aria-expanded={historyOpen}
+              >
+                <History className="size-4" aria-hidden />
+                历史会话
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="min-h-11 gap-1 px-2 text-xs text-muted-foreground"
+                onClick={handleNewSession}
+              >
+                <MessageSquarePlus className="size-4" aria-hidden />
+                开新会话
+              </Button>
             </div>
+
+            {/* 历史会话面板（M4-T5：点选回放 consult_logs 按 turnNo 排序的消息） */}
+            {historyOpen && (
+              <div className="rounded-md border border-border bg-muted/20 p-2">
+                {sessionsQuery.isLoading && <p className="p-2 text-xs text-muted-foreground">加载中…</p>}
+                {sessionsQuery.data && sessionsQuery.data.items.length === 0 && (
+                  <p className="p-2 text-xs text-muted-foreground">还没有历史会话。</p>
+                )}
+                <ul className="space-y-1">
+                  {(sessionsQuery.data?.items ?? []).map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        className="flex w-full min-h-11 items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-muted/60"
+                        onClick={() => void handleRestoreSession(s.id)}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{s.title}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{formatTime(s.lastActiveAt)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* manual 档提示（spec §T2.2） */}
             {selectedDrug?.confirmStatus === 'manual' && (

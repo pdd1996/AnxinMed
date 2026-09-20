@@ -39,6 +39,8 @@ import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
 import { newId } from '../lib/util.js'
+import { ApiError } from '../lib/http.js'
+import { ERR_CODES } from '@anxin/shared'
 
 /** env 开关：本地未命中该药品时才兜底开 Baichuan 医疗搜索（默认 false，PRD §7.5）。 */
 function isMedicalSearchEnabled(): boolean {
@@ -146,12 +148,35 @@ function toBlockedAt(status: string): RiskEventLevel | null {
  * @param userId    当前用户（resolveUser 中间件注入）
  * @param question  用户提问（原文；本层内做 L3 出口脱敏后落库与送 LLM）
  * @param drugIds   咨询对象（drugs.id[]；可空——L4/L3 可在无药上下文时触发）
+ * @param opts      M4-T5 会话化可选参数：sessionId 续问（无效即 404，不静默改道）；
+ *                  skillId 技能快路径透传（本任务仅落 consult_logs.intent 留痕，路由消费在 T7）
  */
+
+/** consult 会话化可选参数（M4-T5 · 裁决 #1：不带 = 行为与 M3 单轮完全一致）。 */
+export interface ConsultOptions {
+  sessionId?: string | null
+  skillId?: string | null
+}
+
+/** 会话标题截断长度（首问截断，specs/04-T5）。 */
+const SESSION_TITLE_MAX = 30
+
 export async function consult(
   userId: string,
   question: string,
   drugIds: string[],
-): Promise<ConsultResponse & { consultLogId: string }> {
+  opts: ConsultOptions = {},
+): Promise<ConsultResponse & { consultLogId: string; sessionId: string }> {
+  // 0. 会话解析（M4-T5）：带 sessionId → 校验存在且属于本人（userId 隔离，跨用户 404 不泄漏存在性）；
+  //    不带 → 落库阶段建新会话（title=首问截断）并在响应首答回传。
+  let session: consultRepo.ConsultSessionRow | null = null
+  if (opts.sessionId) {
+    session = (await consultRepo.findConsultSession(userId, opts.sessionId)) ?? null
+    if (!session) {
+      throw new ApiError(404, ERR_CODES.NOT_FOUND, '会话不存在或已失效，请返回咨询页重新提问')
+    }
+  }
+
   // 1. 用户提问脱敏（L3 出口约束）：落库与送 LLM 都用脱敏后文本，绝不带原文 PII
   const questionRedacted = scrubWithPatterns(question, PII_ASSERT_PATTERNS)
 
@@ -228,11 +253,29 @@ export async function consult(
     }
   }
 
-  // 6. 落库：consult_logs（一次咨询一行）
+  // 6. 落库：会话解析收尾（M4-T5）+ consult_logs（一次咨询一行）
+  //    无 sessionId → 建新会话（title=首问截断）；有 → 刷新活跃时间。
+  //    turn_no = 会话内已有轮次 + 1（1 起）。intent = skillId 透传 ?? S2 意图；null = 说明书管线兜底
+  //    （对齐 insight_ask_logs 漏判留痕口径）。
+  if (!session) {
+    session = await consultRepo.insertConsultSession({
+      id: newId('csess'),
+      userId,
+      title: questionRedacted.slice(0, SESSION_TITLE_MAX),
+    })
+  } else {
+    await consultRepo.touchConsultSession(userId, session.id)
+  }
+  const turnNo = (await consultRepo.countSessionTurns(userId, session.id)) + 1
+  const intent = opts.skillId ?? (route.skill === 'S2' ? route.intent : null)
+
   const consultLogId = newId('clog')
   await consultRepo.insertConsultLog({
     id: consultLogId,
     userId,
+    sessionId: session.id,
+    turnNo,
+    intent,
     question: questionRedacted,
     drugIds: drugIds.length > 0 ? drugIds : [],
     riskLevel: result.riskLevel as RiskLevel,
@@ -262,7 +305,8 @@ export async function consult(
     })
   }
 
-  // 8. 返回前端（shared ConsultResponse 契约 + consultLogId 供前端"这次咨询"详情展开）
+  // 8. 返回前端（shared ConsultResponse 契约 + consultLogId 供"这次咨询"详情展开
+  //    + sessionId 供前端续问带入，M4-T5 首答回传）
   return {
     riskLevel: result.riskLevel,
     status: result.status,
@@ -274,5 +318,44 @@ export async function consult(
     blocked: result.blocked,
     toolUsed: result.toolUsed ?? null,
     consultLogId,
+    sessionId: session.id,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 会话只读查询（M4-T5 · specs/04-T5）——GET /api/consult/sessions[/tile:id] 的业务层
+// ---------------------------------------------------------------------------
+
+/** 会话列表（本人，last_active_at 倒序）。 */
+export function listSessions(userId: string) {
+  return consultRepo.listConsultSessions(userId)
+}
+
+/** 会话详情回放：会话头 + 会话内消息（consult_logs 按 turn_no 升序；跨用户/不存在 = null）。 */
+export async function getSessionDetail(userId: string, sessionId: string) {
+  const session = await consultRepo.findConsultSession(userId, sessionId)
+  if (!session) return null
+  const logs = await consultRepo.listConsultLogsBySession(userId, sessionId)
+  return {
+    session: {
+      id: session.id,
+      title: session.title,
+      createdAt: session.createdAt,
+      lastActiveAt: session.lastActiveAt,
+    },
+    messages: logs.map((l) => ({
+      consultLogId: l.id,
+      turnNo: l.turnNo,
+      question: l.question,
+      status: l.status,
+      riskLevel: l.riskLevel,
+      sectionsSnapshot: l.sectionsSnapshot,
+      citations: l.citations,
+      // consult_logs 无独立 l0Notice 列：落库时 notice = result.notice ?? result.l0Notice（二选一存此列）
+      notice: l.notice,
+      blockedAt: l.blockedAt,
+      intent: l.intent,
+      createdAt: l.createdAt,
+    })),
   }
 }

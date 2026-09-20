@@ -114,10 +114,16 @@ export type ProfilePatch = z.infer<typeof ProfilePatchSchema>
  * drugIds 允许为空数组：L4 紧急信号（胸痛/急救词）与 L3 拒答（停药/换药/剂量）
  * 可在无药上下文时触发（用户可能直接打「我胸痛」）；L1/L2/manual-gate/no-source
  * 路径要求至少一个已确认药品（service 层校验）。
+ *
+ * M4-T5 会话化（裁决 #1，可选字段向后兼容）：sessionId 续问（缺省 = 服务端建新会话并
+ * 在响应回传）；skillId 技能快路径透传（T5 仅落 consult_logs.intent 留痕，路由消费在 T7）。
+ * 两者都不带 = 行为与 M3 单轮完全一致。
  */
 export const ConsultRequestSchema = z.object({
   question: z.string().trim().min(1, '请输入咨询问题').max(2000),
   drugIds: z.array(z.string().min(1)).default([]),
+  sessionId: z.string().min(1).optional(),
+  skillId: z.string().min(1).optional(),
 })
 export type ConsultRequest = z.infer<typeof ConsultRequestSchema>
 

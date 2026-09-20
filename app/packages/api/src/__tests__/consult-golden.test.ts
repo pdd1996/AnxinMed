@@ -130,7 +130,8 @@ describe('不变量 ① 响应结构', () => {
     const res = await req('POST', '/api/consult', { question: '这个药通常用于什么？', drugIds: [DRUG] })
 
     expect(res.status).toBe(200)
-    // 响应体字段面：{ ok } 包装 + shared ConsultResponseSchema 全字段 + api 扩展的 consultLogId，不多不少
+    // 响应体字段面：{ ok } 包装 + shared ConsultResponseSchema 全字段 + api 扩展的
+    // consultLogId + sessionId（M4-T5 会话化首答回传），不多不少
     expect(Object.keys(res.body).sort()).toEqual(
       [
         'ok',
@@ -144,6 +145,7 @@ describe('不变量 ① 响应结构', () => {
         'blocked',
         'toolUsed',
         'consultLogId',
+        'sessionId',
       ].sort(),
     )
     // sections 五段结构 + api 内部 limited 标记透传（specs/04 附录 A4「五段 + limited 标记」；
