@@ -5,7 +5,11 @@ import { AlertTriangle, Bot, LoaderCircle, Send, ShieldCheck, User, X } from 'lu
 import { fetchDrugs, postConsult, type ConsultResponseDto } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { CONFIRM_STATUS_META } from '@anxin/shared'
+import {
+  CONFIRM_STATUS_META,
+  CONSULT_DATA_QUICK_QUESTIONS,
+  CONSULT_INSERT_QUICK_QUESTIONS,
+} from '@anxin/shared'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
 
@@ -25,7 +29,9 @@ import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
  *   按键式语音输入已按产品决定整体移除（2026-09-20），提问仅手动输入。
  * - 意图路由 T5：咨询不强制选药——不选药可直接问药箱数据类问题（后端意图路由直查库返回
  *   status='data-answered'，0 LLM）；选药后可问说明书问题。
- * - 消息历史用 useState 本地管理（咨询是会话式，不需要持久化到前端——consult_logs 已由后端落库）。
+ * - 快捷问题契约收编（M4-T1）：chips 渲染自 shared 的 CONSULT_*_QUICK_QUESTIONS（与后端
+ *   intent.ts 正则/skillId 同源），改文案只动 shared 一处。
+ * - 消息历史用 useState 本地管理（M4-T5 会话层落地后持久化到 consult_sessions）。
  */
 
 /** 会话消息（一问一答；user 消息含 question，assistant 消息含完整响应）。 */
@@ -35,27 +41,6 @@ interface ChatMessage {
   question?: string
   response?: ConsultResponseDto
 }
-
-/** 快捷问题 · 说明书类（照搬 demo/src/pages/Consult.tsx:5-10；仅深链带入对象药时渲染）。 */
-const QUICK_QUESTIONS = [
-  '这个药通常用于什么？',
-  '常见不良反应有哪些？',
-  '这个药是怎么作用的？（药理机制）',
-  '这个药应该怎么保存？',
-]
-
-/**
- * 快捷问题 · 药箱数据查询类（意图路由 T5；无需选药，始终可点）。
- * ⚠️ 文案与后端 intent.ts 的 INTENT_ROUTES 正则逐条对过（实测命中），且不得含解释词
- *    （副作用/禁忌/怎么吃等会被 EXPLAIN_INTENT_PATTERN 仲裁回说明书管线）；
- *    改文案必须同步核对后端正则，否则按钮点了会答非所问。
- */
-const DATA_QUICK_QUESTIONS = [
-  '我现在有多少药物？', // → medication-list
-  '我的依从性怎么样？', // → adherence
-  '有什么药快过期或快用完了？', // → expiry-stock
-  '我的药一起吃有冲突吗？', // → interaction-check
-]
 
 let msgSeq = 0
 const nextMsgId = () => `msg-${Date.now()}-${++msgSeq}`
@@ -191,31 +176,31 @@ export default function Consult() {
         {/* 底部固定输入区：快捷问题横滑条 + 输入行 + 免责小字（magic number 由来见文件头注释） */}
         <div className="sticky bottom-16 z-10 -mb-12 space-y-2 border-t border-border bg-background/95 pt-3 backdrop-blur">
           <div className="flex gap-2 overflow-x-auto py-0.5">
-            {DATA_QUICK_QUESTIONS.map((q) => (
+            {CONSULT_DATA_QUICK_QUESTIONS.map((q) => (
               <Button
-                key={q}
+                key={q.skillId}
                 type="button"
                 variant="outline"
                 size="sm"
                 className="min-h-11 shrink-0 whitespace-nowrap border-primary/30 text-xs text-primary"
-                onClick={() => handleAsk(q)}
+                onClick={() => handleAsk(q.question)}
                 disabled={consultMutation.isPending}
               >
-                {q}
+                {q.label}
               </Button>
             ))}
             {effectiveDrugId &&
-              QUICK_QUESTIONS.map((q) => (
+              CONSULT_INSERT_QUICK_QUESTIONS.map((q) => (
                 <Button
-                  key={q}
+                  key={q.question}
                   type="button"
                   variant="outline"
                   size="sm"
                   className="min-h-11 shrink-0 whitespace-nowrap text-xs"
-                  onClick={() => handleAsk(q)}
+                  onClick={() => handleAsk(q.question)}
                   disabled={consultMutation.isPending}
                 >
-                  {q}
+                  {q.label}
                 </Button>
               ))}
           </div>

@@ -16,8 +16,13 @@
  *    避免"看起来在路由但实际漏"。
  */
 
-/** 数据查询意图（4 值；service 层命中后走 dataquery.ts 的 runDataQuery 只读工具直查库）。 */
-export type QueryIntent = 'medication-list' | 'adherence' | 'expiry-stock' | 'interaction-check'
+import type { ConsultQueryIntent } from '@anxin/shared'
+
+/**
+ * 数据查询意图（service 层命中后走 dataquery.ts 的 runDataQuery 只读工具直查库）。
+ * 类型真相在 shared（M4-T1 契约收编：QuickQuestion.intent 与本表同源）；本文件持有正则本体。
+ */
+export type QueryIntent = ConsultQueryIntent
 
 /**
  * 解释类问题仲裁正则：问题命中这些"说明书词汇"时优先走现有说明书管线（返回 null）。
