@@ -4,6 +4,8 @@
  *   patterns.ts    三大正则（L4 emergency / L3 prohibited / L2 dosage）+ 段落路由
  *   sanitize.ts    sanitizeText / containsDosageAdvice / stripDosageAdvice
  *   guards.ts      detectEmergency / detectProhibited / detectManualGate / detectNoSource / guardConsult
+ *   intent.ts      classifyConsultIntent（4 意图正则白名单 + 解释类词仲裁）
+ *   registry.ts    SKILL_REGISTRY + routeSkill（M4-T3 注册表分发：S0 > S2 > S1{S3 从属}）
  *   sections.ts    pickInsertSections / normalizeSections / fallbackSectionsFromInsert
  *   citations.ts   insertCitation（三件套）/ webSearchCitation（unverified）
  *   run.ts         runConsult 编排（守门分派 + LLM/降级 + 归一化 + citations）
@@ -24,6 +26,7 @@
 export * from './patterns.js'
 export * from './sanitize.js'
 export * from './guards.js'
+export * from './registry.js'
 export * from './sections.js'
 export * from './citations.js'
 export * from './run.js'

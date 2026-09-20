@@ -33,8 +33,7 @@ import { PII_ASSERT_PATTERNS, scrubWithPatterns } from './sanitize/scan.js'
 import { nameMatches } from './identity/normalize.js'
 import { runConsult } from './consult/run.js'
 import { runDataQuery } from './consult/dataquery.js'
-import { classifyConsultIntent } from './consult/intent.js'
-import { detectEmergency, detectProhibited } from './consult/guards.js'
+import { routeSkill } from './consult/registry.js'
 import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
 import { newId } from '../lib/util.js'
@@ -176,27 +175,26 @@ export async function consult(
   // 4. AI 客户端（M2-T1 注入接缝；生产为 baichuan，测试可 setAiClients(mock)）
   const ai = getAiClients()
 
-  // 5. 编排分流：守门优先 → 意图路由 → 说明书管线（run.ts）
+  // 5. 编排分流：技能注册表分发（M4-T3 显式化；判定顺序与 M3 逐字一致，零行为变更）
   //
-  // ⚠️ 守门顺序纪律：L4 emergency → L3 refused → 意图路由 → 说明书管线。
-  //    混合句「我胸痛，还有多少药」必须走 L4，绝不被数据查询意图截胡；命中守门信号时
-  //    **不做**意图判定，直接走原 runConsult —— 其内部 guardConsult 会再次判 emergency/refused，
-  //    结果一致，且 risk_events 留痕逻辑保持单点（不在本层重复触发）。
-  // ⚠️ 语义边界：manual-gate 只限「个体化解释」（LLM 生成路径）；数据查询是 L0 以下的事实读取
-  //    （读本库 drugs/plans/records），不受 manual-gate 限制，故意图路由先于 manual-gate 判定。
-  let result: ConsultRunResult | null = null
+  // ⚠️ 分发纪律（判定顺序的真相源已收编至 consult/registry.ts，注释要点保留于此）：
+  // - S0 红线（L4 emergency → L3 refused）优先于一切技能：混合句「我胸痛，还有多少药」必须走
+  //   L4，绝不被数据查询意图截胡；S0 与 S1 都执行 runConsult——守门判定与 risk_events 留痕
+  //   单点在 guards.ts + run.ts（其内部 guardConsult 会再次判 emergency/refused，结果一致），
+  //   注册表只决定「是否先试 S2」，不复制守门逻辑。
+  // - S2 数据直答（0 次 LLM）：复用上面已取好的 activeMasterIds/interactionRules/drugNameById
+  //   （请求内数据共享，不重复查库）；入参一律用脱敏后的 questionRedacted（L3 出口约束）。
+  // - 语义边界：manual-gate 只限「个体化解释」（S1 内部门禁）；数据查询是 L0 以下的事实读取
+  //   （读本库 drugs/plans/records），不受 manual-gate 限制，故 S2 先于 runConsult 内部
+  //   manual-gate 判定。env 开关注释见 isIntentRouteEnabled。
+  const route = routeSkill({ question: questionRedacted, intentRouteEnabled: isIntentRouteEnabled() })
 
-  // 5a/5b. 开关开 + 守门未命中 + 命中 QueryIntent → runDataQuery 只读工具（0 次 LLM 调用）。
-  //        复用上面已取好的 activeMasterIds/interactionRules/drugNameById（请求内数据共享，不重复查库）。
-  //        入参一律用脱敏后的 questionRedacted（L3 出口约束，绝不带原文 PII）。
-  if (isIntentRouteEnabled() && !detectEmergency(questionRedacted) && !detectProhibited(questionRedacted)) {
-    const intent = classifyConsultIntent(questionRedacted)
-    if (intent) {
-      result = await runDataQuery({ userId, intent, activeMasterIds, interactionRules, drugNameById })
-    }
+  let result: ConsultRunResult | null = null
+  if (route.skill === 'S2') {
+    result = await runDataQuery({ userId, intent: route.intent, activeMasterIds, interactionRules, drugNameById })
   }
 
-  // 未命中意图 / 开关关 / 守门命中：原样走 run.ts 说明书管线（守门 + 生成 + 归一化 + citations）
+  // S0 / S1（以及开关关 / 意图未命中）：原样走 run.ts 说明书管线
   if (!result) {
     result = await runConsult({
       question: questionRedacted,
