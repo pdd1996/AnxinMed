@@ -112,4 +112,34 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
 
     await page.context().close()
   })
+
+  test('M4-T6-fix 回归 · 问「哪些药物快过期了」而只有库存不足 → 先答「没有过期/临期」再附带库存（不答非所问）', async ({
+    browser,
+  }) => {
+    // 自建一支无效期、库存 1 支的药（复现用户实测场景：过期桶空、库存桶有货）
+    const createRes = await fetch(`${API_BASE}/api/drugs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ genericName: 'E2E库存不足药', stock: { value: 1, unit: '支' } }),
+    })
+    if (!createRes.ok) throw new Error(`[e2e] 建档失败: HTTP ${createRes.status}`)
+    const created = (await createRes.json()) as { id: string }
+
+    const page = await openConsult(browser)
+    await page.locator('textarea').fill('我哪些药物快过期了')
+    await page.getByRole('button', { name: '发送' }).click()
+
+    const card = page.getByTestId('consult-answer-card')
+    await expect(card).toBeVisible()
+    await expect(card.getByText('数据查询')).toBeVisible()
+    await expect(card.getByText('来源：效期与库存')).toBeVisible()
+    // 先答所问（空桶明说），库存以「另外发现」附带——不得只报库存
+    await expect(card.getByText(/你的药箱里没有过期或 30 天内到期的药品/)).toBeVisible()
+    await expect(card.getByText(/另外发现库存不足：E2E库存不足药（库存剩余 1 支）/)).toBeVisible()
+
+    // 清理自建药，不影响其他用例的药箱状态
+    await fetch(`${API_BASE}/api/drugs/${created.id}`, { method: 'DELETE' })
+
+    await page.context().close()
+  })
 })

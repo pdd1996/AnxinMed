@@ -49,6 +49,9 @@ import type { ConsultRunResult, NormalizedSections } from './types.js'
 export interface DataQueryInput {
   userId: string
   intent: QueryIntent
+  /** 用户提问原文（脱敏后）——expiry-stock 模板据此推导「问的是效期还是库存」子焦点；
+   *  缺省 = both（兼容直调；生产链路经 consult.service 必传）。 */
+  question?: string
   /** 生效计划集合的 drug_master.id（interaction-check 用）。 */
   activeMasterIds: string[]
   /** 相互作用规则（service 层已从 assets.repo 取好，请求内共享）。 */
@@ -144,19 +147,40 @@ export function renderAdherenceSections(stats: AdherenceStats): NormalizedSectio
   }
 }
 
-/** expiry-stock 模板：效期/临期/低库存分类（只陈述库存量，不给服用建议）。 */
-export function renderExpiryStockSections(status: ExpiryStatus): NormalizedSections {
+/**
+ * 效期/库存子焦点（M4-T6-fix · 答非所问修正）：expiry-stock 一个意图底下捆了三个桶
+ * （已过期 / 30 天临期 / 库存不足），问「哪些药快过期了」的用户只想听过期——模板必须
+ * **先答所问的桶（空桶也明说"没有"）**，其余桶以「另外发现」附带，否则读感即答非所问。
+ */
+export type ExpiryStockFocus = 'expiry' | 'stock' | 'both'
+
+/** 效期词组 / 库存词组——必须与 intent.ts expiry-stock 正则的两个语义组保持同步（改一处改两处）。 */
+const EXPIRY_WORDS = /过期|临期/
+const STOCK_WORDS = /快用完|还剩多少|库存/
+
+/** 从提问推导子焦点（纯函数）：命中哪组词先答哪个桶；两组都命中或都未命中（理论不可达兜底）= both。 */
+export function deriveExpiryStockFocus(question: string): ExpiryStockFocus {
+  const q = String(question ?? '')
+  const asksExpiry = EXPIRY_WORDS.test(q)
+  const asksStock = STOCK_WORDS.test(q)
+  if (asksExpiry && asksStock) return 'both'
+  if (asksExpiry) return 'expiry'
+  if (asksStock) return 'stock'
+  return 'both'
+}
+
+/** 效期库存模板：效期/临期/低库存分类（只陈述库存量，不给服用建议）。
+ *  @param focus 子焦点（deriveExpiryStockFocus 产物）：先答所问，空桶明说，其余附带。 */
+export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpiryStockFocus = 'both'): NormalizedSections {
   const { expiring, expired, lowStock } = status
-  if (expiring.length === 0 && expired.length === 0 && lowStock.length === 0) {
-    return {
-      summary: '暂无过期、30 天内到期或库存不足的药品提醒。',
-      keyPoints: ['药品效期与库存为建档快照，请以实际包装为准。'],
-      risks: [],
-      nextAction: '可定期回来看看，临近到期或库存不足时会在这里提醒。',
-      warning: DATA_QUERY_WARNING,
-      limited: false,
-    }
-  }
+  const expiryParts: string[] = []
+  if (expired.length > 0) expiryParts.push(`${expired.length} 种已过期`)
+  if (expiring.length > 0) expiryParts.push(`${expiring.length} 种 30 天内到期`)
+  const hasExpiry = expiryParts.length > 0
+  const hasStock = lowStock.length > 0
+  const stockPart = `${lowStock.length} 种库存不足`
+
+  // keyPoints：全量桶明细（三桶都在时照旧全列；focus 只影响 summary 主句的组织）
   const keyPoints: string[] = []
   for (const m of expired) {
     keyPoints.push(`${m.genericName} 已过期 ${-m.days} 天`)
@@ -168,6 +192,7 @@ export function renderExpiryStockSections(status: ExpiryStatus): NormalizedSecti
     const stock = m.stock ? `（库存剩余 ${m.stock.value} ${m.stock.unit}）` : ''
     keyPoints.push(`${m.genericName} 库存不足${stock}`)
   }
+
   const risks: string[] = []
   if (expired.length > 0) {
     risks.push('过期药品请勿继续服用，请按药品说明书或药师指导处理。')
@@ -175,12 +200,61 @@ export function renderExpiryStockSections(status: ExpiryStatus): NormalizedSecti
   if (expiring.length > 0) {
     risks.push('临期药品请确认能否在效期内用完，不确定时咨询药师。')
   }
-  const parts: string[] = []
-  if (expired.length > 0) parts.push(`${expired.length} 种已过期`)
-  if (expiring.length > 0) parts.push(`${expiring.length} 种 30 天内到期`)
-  if (lowStock.length > 0) parts.push(`${lowStock.length} 种库存不足`)
+
+  /** 低库存附带句（≤2 个带药名+余量，多于 2 个只报数）。 */
+  const stockAside = () => {
+    if (!hasStock) return ''
+    if (lowStock.length <= 2) {
+      const named = lowStock
+        .map((m) => (m.stock ? `${m.genericName}（库存剩余 ${m.stock.value} ${m.stock.unit}）` : m.genericName))
+        .join('、')
+      return `另外发现库存不足：${named}。`
+    }
+    return `另外有 ${stockPart}的药品。`
+  }
+  const expiryAside = () => (hasExpiry ? `另外，有 ${expiryParts.join('、')}。` : '')
+
+  const IDLE_NEXT = '可定期回来看看，临近到期或库存不足时会在这里提醒。'
+
+  if (focus === 'expiry') {
+    let summary: string
+    if (hasExpiry) {
+      summary = `你的药箱有 ${expiryParts.join('、')}的药品。`
+      if (hasStock) summary += stockAside()
+    } else {
+      summary = `你的药箱里没有过期或 30 天内到期的药品。${stockAside()}`
+    }
+    const nextAction =
+      !hasExpiry && hasStock ? '前往「药箱」页面补充库存不足的药品。' : '前往「药箱」页面处理过期/临期药品。'
+    return { summary, keyPoints, risks, nextAction, warning: DATA_QUERY_WARNING, limited: false }
+  }
+
+  if (focus === 'stock') {
+    let summary: string
+    if (hasStock) {
+      summary = `你的药箱有 ${stockPart}的药品。${expiryAside()}`
+    } else {
+      summary = `你的药箱目前没有库存不足的药品。${expiryAside()}`
+    }
+    const nextAction = !hasStock && !hasExpiry ? IDLE_NEXT : '前往「药箱」页面处理过期/临期药品并补充库存。'
+    return { summary, keyPoints, risks, nextAction, warning: DATA_QUERY_WARNING, limited: false }
+  }
+
+  // both：两桶都明确作答（空桶也明说，不静默跳过）
+  if (!hasExpiry && !hasStock) {
+    return {
+      summary: '暂无过期、30 天内到期或库存不足的药品提醒。',
+      keyPoints: ['药品效期与库存为建档快照，请以实际包装为准。'],
+      risks: [],
+      nextAction: IDLE_NEXT,
+      warning: DATA_QUERY_WARNING,
+      limited: false,
+    }
+  }
+  const expiryClause = hasExpiry ? `有 ${expiryParts.join('、')}的药品` : '没有过期或临期药品'
+  const stockClause = hasStock ? `有 ${stockPart}` : '没有库存不足的药'
   return {
-    summary: `你的药箱有 ${parts.join('、')}的药品。`,
+    summary: `你的药箱${expiryClause}；${stockClause}。`,
     keyPoints,
     risks,
     nextAction: '前往「药箱」页面处理过期/临期药品并补充库存。',
@@ -270,7 +344,7 @@ export async function runDataQuery(input: DataQueryInput): Promise<ConsultRunRes
     }
     case 'expiry-stock': {
       const status = await getExpiryStatus(userId)
-      sections = renderExpiryStockSections(status)
+      sections = renderExpiryStockSections(status, deriveExpiryStockFocus(input.question ?? ''))
       break
     }
     case 'interaction-check': {

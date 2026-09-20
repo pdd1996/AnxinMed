@@ -227,7 +227,14 @@ export async function consult(
 
   let result: ConsultRunResult | null = null
   if (route.skill === 'S2') {
-    result = await runDataQuery({ userId, intent: route.intent, activeMasterIds, interactionRules, drugNameById })
+    result = await runDataQuery({
+      userId,
+      intent: route.intent,
+      question: questionRedacted,
+      activeMasterIds,
+      interactionRules,
+      drugNameById,
+    })
   }
 
   // S0 / S1（以及开关关 / 意图未命中）：原样走 run.ts 说明书管线

@@ -22,6 +22,7 @@ import {
   renderAdherenceSections,
   renderExpiryStockSections,
   renderInteractionsSections,
+  deriveExpiryStockFocus,
 } from '../services/consult/dataquery.js'
 import type { MedicationItem, AdherenceStats, ExpiryStatus } from '../repositories/insight.repo.js'
 import type { InteractionResult, InteractionRuleInput } from '../services/rules/index.js'
@@ -181,6 +182,77 @@ describe('renderExpiryStockSections · 效期库存模板（纯函数）', () =>
       lowStock: [],
     })
     expect(s.keyPoints.join('')).toContain('今天药 今天到期')
+  })
+})
+
+describe('renderExpiryStockSections · 子焦点（M4-T6-fix 答非所问修正）', () => {
+  const ONLY_LOW_STOCK = {
+    expired: [],
+    expiring: [],
+    lowStock: [mkMed({ genericName: '玻璃酸钠滴眼液', stock: { value: 1, unit: '支' } })],
+  }
+
+  it('deriveExpiryStockFocus：问过期 → expiry；问库存 → stock；两者都问 → both', () => {
+    expect(deriveExpiryStockFocus('我哪些药物快过期了')).toBe('expiry')
+    expect(deriveExpiryStockFocus('有什么药快用完了')).toBe('stock')
+    expect(deriveExpiryStockFocus('还剩多少库存')).toBe('stock')
+    expect(deriveExpiryStockFocus('有什么药快过期或快用完了？')).toBe('both')
+    expect(deriveExpiryStockFocus('')).toBe('both')
+  })
+
+  it('回归 · 问过期但只有低库存 → 先明说「没有过期或临期」，库存以「另外发现」附带', () => {
+    const s = renderExpiryStockSections(ONLY_LOW_STOCK, 'expiry')
+    expect(s.summary).toContain('你的药箱里没有过期或 30 天内到期的药品')
+    expect(s.summary).toContain('另外发现库存不足：玻璃酸钠滴眼液（库存剩余 1 支）')
+    // keyPoints 仍列库存明细
+    expect(s.keyPoints.join('')).toContain('玻璃酸钠滴眼液 库存不足')
+    expect(s.nextAction).toContain('补充库存')
+  })
+
+  it('问过期且确有临期 → 主句先答效期，库存附带', () => {
+    const s = renderExpiryStockSections(
+      {
+        expired: [],
+        expiring: [{ ...mkMed({ genericName: '临期药' }), days: 10 }],
+        lowStock: ONLY_LOW_STOCK.lowStock,
+      },
+      'expiry',
+    )
+    expect(s.summary).toContain('你的药箱有 1 种 30 天内到期的药品')
+    expect(s.summary).toContain('另外发现库存不足')
+    expect(s.risks.join('')).toContain('临期药品请确认')
+  })
+
+  it('问库存但只有临期 → 先明说「没有库存不足」，效期附带', () => {
+    const s = renderExpiryStockSections(
+      { expired: [], expiring: [{ ...mkMed({ genericName: '临期药' }), days: 10 }], lowStock: [] },
+      'stock',
+    )
+    expect(s.summary).toContain('你的药箱目前没有库存不足的药品')
+    expect(s.summary).toContain('另外，有 1 种 30 天内到期')
+  })
+
+  it('both（chips 文案）→ 两桶都明确作答，空桶也明说', () => {
+    const s = renderExpiryStockSections(ONLY_LOW_STOCK, 'both')
+    expect(s.summary).toContain('没有过期或临期药品')
+    expect(s.summary).toContain('有 1 种库存不足')
+  })
+
+  it('低库存超过 2 个 → 附带句只报数不列名', () => {
+    const s = renderExpiryStockSections(
+      {
+        expired: [],
+        expiring: [],
+        lowStock: [
+          mkMed({ genericName: '药甲', stock: { value: 1, unit: '支' } }),
+          mkMed({ genericName: '药乙', stock: { value: 2, unit: '片' } }),
+          mkMed({ genericName: '药丙', stock: { value: 3, unit: '粒' } }),
+        ],
+      },
+      'expiry',
+    )
+    expect(s.summary).toContain('另外有 3 种库存不足')
+    expect(s.summary).not.toContain('药甲')
   })
 })
 
