@@ -92,6 +92,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       blocked: false,
       consultLogId: 'clog-1',
       sessionId: 'csess-1',
+      suggestion: null,
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -131,6 +132,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       blocked: true,
       consultLogId: 'clog-2',
       sessionId: 'csess-1',
+      suggestion: null,
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -165,6 +167,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       blocked: true,
       consultLogId: 'clog-3',
       sessionId: 'csess-1',
+      suggestion: null,
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -199,6 +202,7 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
       blocked: false,
       consultLogId: 'clog-4',
       sessionId: 'csess-1',
+      suggestion: null,
     }
     mocks.postConsult.mockResolvedValue(response)
     renderConsult()
@@ -327,6 +331,7 @@ function answeredResponse(sessionId: string, summary: string): ConsultResponseDt
     blocked: false,
     consultLogId: `clog-${summary}`,
     sessionId,
+    suggestion: null,
   }
 }
 
