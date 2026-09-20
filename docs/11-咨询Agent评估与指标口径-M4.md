@@ -46,6 +46,24 @@
 | **全链 LLM 路径 P95** | 提问 → 回答全链路（含 Baichuan 调用）P95 | ≤ 15s（百川实测单次最小输出 5.2s + 余量，裁决 #5） | 请求级计时 | T10 基线收口：live 环境手动采样（fixture 回放不计时） |
 | **建议卡接受率** | accepted / (accepted + dismissed) | T6 落地后补基线（M4 内先落留痕，不设阈） | `consult_suggestions.status`（T6） | 上线后按月聚合 |
 
+### 2.1 意图漏判率抽检 · 操作细则（月度）
+
+1. **导出**：`cd app/packages/api && npm run eval:export-labels -- --month=2026-09 --count=30`（随机抽样当月 `consult_logs`；CSV 带 BOM，Excel 直开不乱码；重定向存 `data/consult-labels/YYYY-MM.csv`）；
+2. **标注**：只看 `question`（落库前已脱敏，导出后仍请过目一遍再入库）与 `status`/`tool_used` 两列，`label(应路由意图)` 列填人工判断：`medication-list` / `adherence` / `expiry-stock` / `interaction-check` / `next-dose`（T7 落地后）/ `说明书管线`（非数据查询）；
+3. **判定标准**：
+   - **漏判** = label 为数据意图 且 `status ≠ 'data-answered'`（走了说明书管线）；
+   - **误判** = `status='data-answered'` 但 label = 说明书管线；
+   - 2026-09-20（T5）之前的历史行 `tool_used`（intent 列）为空属正常——该列 T5 才落库，路由与否只看 `status`；
+   - `status ∈ {emergency, refused, manual-gate}` 的行不参与判定（守门优先于意图路由是验收行为，不是漏判）；
+4. **汇总回填**：漏判率 = 漏判数 / 抽样总数，连同误判数与漏判样本 question 原文回填 §2 表格及下方记录区；
+5. **裁决链**（08 附录 A.4）：漏判率连续两月 > 20%（经验阈值）→ 先扩正则/技能 → 仍不足再议两级路由 LLM 兜底（正则命中即秒答，仅正则漏判的长尾问 Qwen FC 二次分类，输出过 zod）；**启用由数据裁决，不由感觉裁决**。
+
+**抽检记录**（每次抽检追加一行）
+
+| 月份 | 抽样数 | 漏判数 | 漏判率 | 误判数 | 漏判样本摘要 | 处置 |
+|------|-------|--------|--------|--------|-------------|------|
+| （首检待做） | | | | | | |
+
 ## 3. 基线收口计划（T10）
 
 1. 全量回归（`pnpm -r typecheck` + api/web 测试 + E2E）通过后，跑骨架 P95 采样（consult 集成路径计时，≥50 次采样取 P95）；
