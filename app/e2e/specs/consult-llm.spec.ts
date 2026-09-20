@@ -3,9 +3,10 @@
  *
  * 与 consult-dataquery.spec.ts（数据路径 0 LLM，无 fixture 包）互补：本文件验证**说明书 LLM 生成路径**
  * 的接线——对象药深链 → 快捷问题 → runConsult proceed → ai.consultAnswer 回放 → 归一化 → 回答卡渲染。
- * 两场景（app/e2e/fixtures/consult-*.json，source=synthetic 人工审核录制）：
+ * 三场景（app/e2e/fixtures/consult-*.json，source=synthetic 人工审核录制）：
  *   consult-answered  干净输出 → status='answered'（L1）；
- *   consult-limited   输出含剂量残留（「每日…10次」且不含 strip 关键词）→ status='limited'（L2）+ 固定提示。
+ *   consult-limited   输出含剂量残留（「每日…10次」且不含 strip 关键词）→ status='limited'（L2）+ 固定提示；
+ *   consult-allergy   档案过敏史 ∩ 禁忌段命中 → 回答附加过敏警示 + 禁忌段引用，LLM 调用数不变（M4-T4）。
  *
  * 断言四层（对齐 golden-cases.spec.ts 风格）：
  *   1. UI：回答卡渲染 fixture 的 summary 内容 + status 徽章（已回答 / 已过滤剂量）+ L2 时 notice；
@@ -22,6 +23,10 @@ const DRUG_A = 'E2E测试药A'
 const DRUG_B = 'E2E测试药B'
 /** LLM 咨询对象：SQL 直建的 ocr_matched 药，挂 seed 的 dm-t9-hycosan（pi-e2e-hycosan 有说明书行）。 */
 const DRUG_CONSULT = 'drug-e2e-consult'
+/** 过敏覆盖层对象药（M4-T4）：独立 master/insert（禁忌含磺胺）+ 档案过敏史，验证覆盖层接线。 */
+const DRUG_ALLERGY = 'drug-e2e-allergy'
+const DM_ALLERGY = 'dm-e2e-allergy'
+const PI_ALLERGY = 'pi-e2e-allergy'
 
 let sql: postgres.Sql
 
@@ -51,10 +56,29 @@ test.beforeAll(async () => {
     insert into drugs (id, user_id, generic_name, brand_name, specification, form, drug_master_id, confirm_status)
     values (${DRUG_CONSULT}, 'p-001', '玻璃酸钠滴眼液', '海露', '0.1%', '滴眼液', 'dm-t9-hycosan', 'ocr_matched')
     on conflict (id) do nothing`
+  // 过敏覆盖层资产（M4-T4）：master/insert（禁忌含磺胺）+ ocr_matched 药；过敏史档案行在用例内建/清
+  await sql`
+    insert into drug_master (id, generic_name, specification, form, curation_status)
+    values (${DM_ALLERGY}, '磺胺嘧啶片', '0.5g', '片剂', 'mock')
+    on conflict (id) do nothing`
+  await sql`
+    insert into package_inserts (id, drug_id, generic_name, specification, form, indication, contraindications, source, version)
+    values (${PI_ALLERGY}, ${DM_ALLERGY}, '磺胺嘧啶片', '0.5g', '片剂',
+      '用于敏感菌引起的感染治疗',
+      '["对磺胺类药物过敏者禁用","孕妇及哺乳期妇女禁用"]'::jsonb,
+      '丁香园用药助手（演示抄录）', '2024-01')
+    on conflict (id) do nothing`
+  await sql`
+    insert into drugs (id, user_id, generic_name, specification, form, drug_master_id, confirm_status)
+    values (${DRUG_ALLERGY}, 'p-001', '磺胺嘧啶片', '0.5g', '片剂', ${DM_ALLERGY}, 'ocr_matched')
+    on conflict (id) do nothing`
 })
 
 test.afterAll(async () => {
-  await sql`delete from drugs where id = ${DRUG_CONSULT}`
+  await sql`delete from drugs where id in (${DRUG_CONSULT}, ${DRUG_ALLERGY})`
+  await sql`delete from package_inserts where id = ${PI_ALLERGY}`
+  await sql`delete from drug_master where id = ${DM_ALLERGY}`
+  await sql`delete from health_profiles where user_id = 'p-001' and field_key = '过敏史'`
   await sql?.end()
 })
 
@@ -112,6 +136,43 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
       where user_id='p-001' and question like '%不良反应%'
       order by created_at desc limit 1`
     expect(log.status).toBe('limited')
+
+    await page.context().close()
+  })
+
+  test('consult-allergy：档案过敏史 ∩ 禁忌段命中 → 回答附加过敏警示 + 禁忌段引用，LLM 调用数不变（specs/04-T4）', async ({
+    browser,
+  }) => {
+    // 档案过敏史（M4-T4 白名单只读字段）：用例内建、afterAll 清
+    await sql`
+      insert into health_profiles (id, user_id, field_key, value)
+      values ('hp-e2e-allergy', 'p-001', '过敏史', '对磺胺过敏')
+      on conflict (id) do nothing`
+
+    const page = await openConsult(browser, 'consult-allergy')
+    await page.goto(`/consult?drugId=${DRUG_ALLERGY}`)
+    await page.getByRole('button', { name: '这个药通常用于什么？' }).click()
+
+    // UI：fixture 回答正常渲染 + risks 追加过敏警示条目（确定性固定文案，非 LLM 生成）
+    const card = page.getByTestId('consult-answer-card')
+    await expect(card).toBeVisible()
+    await expect(card.getByText('已回答')).toBeVisible()
+    await expect(card.getByText('磺胺嘧啶片用于敏感菌引起的感染治疗。')).toBeVisible()
+    await expect(card.getByText(/过敏警示：你的档案过敏信息（磺胺）与该药禁忌相关/)).toBeVisible()
+
+    // 结构：LLM 恰 1 次（回答本身）——覆盖层零新增模型调用（ai-calls 计数不变）
+    const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=consult-allergy`)
+    const body = (await res.json()) as { calls: { consultAnswer: number; medicalSearch: number } }
+    expect(body.calls.consultAnswer).toBe(1)
+    expect(body.calls.medicalSearch).toBe(0)
+
+    // DB：citations 含禁忌段引用（sectionLabel=禁忌），快照含警示
+    const [log] = await sql`
+      select citations, sections_snapshot from consult_logs
+      where user_id='p-001' and question like '%通常用于什么%'
+      order by created_at desc limit 1`
+    expect(JSON.stringify(log.citations)).toContain('禁忌')
+    expect(JSON.stringify(log.sections_snapshot)).toContain('过敏警示')
 
     await page.context().close()
   })

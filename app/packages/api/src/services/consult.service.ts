@@ -31,9 +31,11 @@ import * as plansRepo from '../repositories/plans.repo.js'
 import { getAiClients } from '../lib/ai/registry.js'
 import { PII_ASSERT_PATTERNS, scrubWithPatterns } from './sanitize/scan.js'
 import { nameMatches } from './identity/normalize.js'
+import * as profilesRepo from '../repositories/profiles.repo.js'
 import { runConsult } from './consult/run.js'
 import { runDataQuery } from './consult/dataquery.js'
 import { routeSkill } from './consult/registry.js'
+import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
 import { newId } from '../lib/util.js'
@@ -153,11 +155,15 @@ export async function consult(
   // 1. 用户提问脱敏（L3 出口约束）：落库与送 LLM 都用脱敏后文本，绝不带原文 PII
   const questionRedacted = scrubWithPatterns(question, PII_ASSERT_PATTERNS)
 
-  // 2. 并行取数：咨询对象 + 生效计划集合 + 相互作用规则
-  const [drugs, activeMasterIds, ruleRows] = await Promise.all([
+  // 2. 并行取数：咨询对象 + 生效计划集合 + 相互作用规则 + 过敏史（M4-T4 覆盖层，白名单只读）
+  const [drugs, activeMasterIds, ruleRows, allergyKeywords] = await Promise.all([
     resolveConsultDrugs(userId, drugIds),
     resolveActiveMasterIds(userId),
     assetsRepo.listInteractionRules(),
+    // profiles.repo 首次进 consult 链路（M4-T4）：只读「过敏史」一个字段，其余档案字段不进咨询上下文
+    profilesRepo
+      .listByUser(userId)
+      .then((rows) => extractAllergyKeywords(rows.map((r) => ({ fieldKey: r.fieldKey, value: r.value })))),
   ])
 
   // 3. 组装规则引擎入参（复用 M2-T5 checkInteractions 的形态约定）
@@ -205,6 +211,21 @@ export async function consult(
       enableMedicalSearch: isMedicalSearchEnabled(),
       ai,
     })
+  }
+
+  // 5c. 过敏确定性覆盖层（M4-T4 · 零 LLM）：S1 管线输出后、归一化后附加。
+  //     只作用 S1（answered/limited/manual-gate）——S0 固定文案与 S2 数据直答无禁忌段上下文不附加。
+  //     命中 → risks 追加固定警示 + citations 追加禁忌段引用；不改 riskLevel、不进 risk_events
+  //     （提示非拦截，与相互作用注入同构）；未命中 → 原样返回（纯函数内判定）。
+  if (
+    (result.status === 'answered' || result.status === 'limited' || result.status === 'manual-gate') &&
+    result.sections
+  ) {
+    const primaryInsert = drugs.find((d) => d.insert !== null)?.insert ?? null
+    if (primaryInsert) {
+      const patched = allergyOverlay(allergyKeywords, primaryInsert.contraindications, result.sections, result.citations)
+      result = { ...result, sections: patched.sections, citations: patched.citations }
+    }
   }
 
   // 6. 落库：consult_logs（一次咨询一行）

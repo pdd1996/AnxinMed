@@ -118,6 +118,8 @@ export interface Citation {
   version: string
   /** 网络检索兜底时 true；本地说明书库为 false。 */
   unverified: boolean
+  /** 段落标记（M4-T4 过敏覆盖层的禁忌段引用）；M4-T9 升级为全量段落锚点 sectionKey。 */
+  sectionLabel?: string
 }
 
 /** runConsult 输入（路由层组装：DB 取数 + 用户提问 + env 开关）。 */

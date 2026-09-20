@@ -155,6 +155,11 @@ export const CitationSchema = z.object({
   version: z.string(),
   /** 兜底网络检索时为 true；前端渲染「未经本库核实」徐章。 */
   unverified: z.boolean().optional(),
+  /**
+   * 段落标记（M4-T4 过敏覆盖层：禁忌段引用）：该引用指向说明书的哪一段。
+   * 基础三件套引用无此字段；M4-T9 升级为全量段落锚点（sectionKey）。
+   */
+  sectionLabel: z.string().optional(),
 })
 export type Citation = z.infer<typeof CitationSchema>
 

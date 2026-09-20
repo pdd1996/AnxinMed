@@ -51,6 +51,7 @@ export function CitationsList({ citations, className }: { citations: Citation[];
                 <p>
                   <span className="font-medium text-foreground/80">来源：</span>
                   {c.source}
+                  {c.sectionLabel && <span>（{c.sectionLabel}段）</span>}
                 </p>
                 <p>
                   <span className="font-medium text-foreground/80">版本：</span>

@@ -1,0 +1,16 @@
+{
+  "scenario": "consult-allergy",
+  "entry": "A",
+  "source": "synthetic",
+  "detectLayers": [],
+  "extractIdentity": null,
+  "runOcr": null,
+  "fallbackParse": null,
+  "consultAnswer": {
+    "summary": "磺胺嘧啶片用于敏感菌引起的感染治疗。",
+    "keyPoints": ["处方药请遵医嘱使用", "用药期间多饮水"],
+    "risks": ["偶见皮疹等过敏表现"],
+    "nextAction": "如症状未缓解请复诊",
+    "warning": "不要根据 AI 回答自行调整处方"
+  }
+}
