@@ -28,8 +28,13 @@ api 以 `AI_MODE=fixtures` 启动时：
    回放 detectLayers / runOcr / extractIdentity / fallbackParse；
 3. `GET /api/_e2e/ai-calls?scenario=x`（仅 fixtures 模式注册）暴露调用计数，供「OCR 未调用」等结构断言。
 
-五个场景（PRD §16.1）：`rx-normal` / `rx-spec-conflict` / `rx-redacted` / `drug-box-labeled` /
+录入线五个场景（PRD §16.1）：`rx-normal` / `rx-spec-conflict` / `rx-redacted` / `drug-box-labeled` /
 `unsupported-loose-pills`，样张在 `app/fixtures/`（与 T9 共用）。
+
+咨询 LLM 路径场景（M4-T2，specs/04）：`consult-answered`（干净输出 → answered）/ `consult-limited`
+（剂量残留 → limited），包内 `consultAnswer` 字段为冻结的模型原始输出，E2E 见
+`specs/consult-llm.spec.ts`（对象药深链 + 快捷问题 → 回答卡 + ai-calls 计数 + consult_logs 落行）。
+重录纪律见 `docs/11-咨询Agent评估与指标口径-M4.md` §1.3。
 
 ## fixture 包的产生与重录
 

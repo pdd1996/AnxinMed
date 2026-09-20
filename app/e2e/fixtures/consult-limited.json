@@ -1,0 +1,16 @@
+{
+  "scenario": "consult-limited",
+  "entry": "A",
+  "source": "synthetic",
+  "detectLayers": [],
+  "extractIdentity": null,
+  "runOcr": null,
+  "fallbackParse": null,
+  "consultAnswer": {
+    "summary": "用于缓解干眼症状，一般每日使用不超过10次。",
+    "keyPoints": ["保湿润滑眼表", "偶见眼部刺激感"],
+    "risks": ["长期使用请关注眼部状况"],
+    "nextAction": "如有不适请咨询眼科医生",
+    "warning": "请按说明书或医嘱使用"
+  }
+}
