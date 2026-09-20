@@ -123,7 +123,7 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
       body: JSON.stringify({ genericName: 'E2E库存不足药', stock: { value: 1, unit: '支' } }),
     })
     if (!createRes.ok) throw new Error(`[e2e] 建档失败: HTTP ${createRes.status}`)
-    const created = (await createRes.json()) as { id: string }
+    const created = (await createRes.json()) as { drug: { id: string } }
 
     const page = await openConsult(browser)
     await page.locator('textarea').fill('我哪些药物快过期了')
@@ -138,7 +138,61 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
     await expect(card.getByText(/另外发现库存不足：E2E库存不足药（库存剩余 1 支）/)).toBeVisible()
 
     // 清理自建药，不影响其他用例的药箱状态
-    await fetch(`${API_BASE}/api/drugs/${created.id}`, { method: 'DELETE' })
+    await fetch(`${API_BASE}/api/drugs/${created.drug.id}`, { method: 'DELETE' })
+
+    await page.context().close()
+  })
+
+  test('next-dose（M4-T7）：chips 快路径问「今天我要吃哪些药」→ 今日待服安排（时点+已服状态，0 次 LLM）', async ({ browser }) => {
+    // 自建药 + 当日生效计划（08:00/20:00）+ 已服 08:00 → 混合态
+    const drugRes = await fetch(`${API_BASE}/api/drugs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ genericName: 'E2E今日药' }),
+    })
+    if (!drugRes.ok) throw new Error(`[e2e] 建药失败: HTTP ${drugRes.status} ${await drugRes.text()}`)
+    const drug = (await drugRes.json()) as { drug: { id: string } }
+    const today = new Date().toLocaleDateString('sv-SE') // 本地时区 YYYY-MM-DD
+    const planRes = await fetch(`${API_BASE}/api/plans`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        drugId: drug.drug.id,
+        dose: { value: 1, unit: '片' },
+        frequency: 2,
+        times: ['08:00', '20:00'],
+        cycleType: 'open',
+        startDate: today,
+      }),
+    })
+    if (!planRes.ok) throw new Error(`[e2e] 建计划失败: HTTP ${planRes.status} ${await planRes.text()}`)
+    const plan = (await planRes.json()) as { plan: { id: string } }
+    await fetch(`${API_BASE}/api/records`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ planId: plan.plan.id, date: today, time: '08:00', status: 'taken' }),
+    })
+
+    const page = await openConsult(browser)
+    // chips 快路径：点击即带 skillId=s2-next-dose 直达（跳过正则）
+    await page.getByRole('button', { name: '今天我要吃哪些药？' }).click()
+
+    const card = page.getByTestId('consult-answer-card')
+    await expect(card).toBeVisible()
+    await expect(card.getByText('数据查询')).toBeVisible()
+    await expect(card.getByText('来源：今日待服')).toBeVisible()
+    await expect(card.getByText(/今天共 2 次服药安排：已完成 1 次、待处理 1 次/)).toBeVisible()
+    await expect(card.getByText(/08:00 E2E今日药 · 已服/)).toBeVisible()
+    await expect(card.getByText(/20:00 E2E今日药 · 待服/)).toBeVisible()
+
+    // 结构：数据路径 0 次 LLM（快路径同样红线）
+    const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=${SCENARIO}`)
+    const body = (await res.json()) as { calls: { consultAnswer: number } }
+    expect(body.calls.consultAnswer).toBe(0)
+
+    // DB：intent 落解析后的意图名
+    const [log] = await sql`select intent from consult_logs where user_id='p-001' order by created_at desc limit 1`
+    expect(log.intent).toBe('next-dose')
 
     await page.context().close()
   })

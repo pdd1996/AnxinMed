@@ -43,6 +43,7 @@ export const EXPLAIN_INTENT_PATTERN =
  * 查询意图路由表（同构 SECTION_ROUTES 风格；按数组顺序短路匹配）。
  * 顺序即优先级（特异者在前）：
  *   interaction-check（要求双词共现，最特异）→ expiry-stock → adherence
+ *   → next-dose（「今天要吃」时间锚定，M4-T7 增补）
  *   → medication-list（「药箱里有什么」最泛，殿后防止截胡更具体的意图，
  *   如「有什么药快过期了」须归 expiry-stock 而非清单）。
  */
@@ -58,6 +59,11 @@ export const INTENT_ROUTES: ReadonlyArray<{
   },
   { intent: 'expiry-stock', re: /过期|临期|快用完|还剩多少|库存/, label: '效期与库存状态' },
   { intent: 'adherence', re: /依从|漏服|按时吃|执行率/, label: '近 30 天依从性统计' },
+  {
+    intent: 'next-dose',
+    re: /今天.{0,6}(该吃|要吃|吃什么|还吃)|今日待服/,
+    label: '今日待服安排',
+  },
   {
     intent: 'medication-list',
     re: /多少.{0,4}(种)?药|几种药|药箱.{0,6}(有|剩|还有)|还有什么药|用药清单|正在吃?哪些?药/,

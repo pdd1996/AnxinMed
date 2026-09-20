@@ -38,12 +38,13 @@ const STATUS_META: Record<
   'data-answered': { label: '数据查询', className: 'border-primary/30 bg-primary/10 text-primary', icon: Database },
 }
 
-/** toolUsed → 中文徽章名（意图路由 T5；值与后端 intent.ts QueryIntent 四值对齐，未知值不渲染）。 */
+/** toolUsed → 中文徽章名（意图路由 T5；值与后端 intent.ts QueryIntent 五值对齐，未知值不渲染）。 */
 const TOOL_LABELS: Record<string, string> = {
   'medication-list': '药箱清单',
   adherence: '依从性统计',
   'expiry-stock': '效期与库存',
   'interaction-check': '相互作用检查',
+  'next-dose': '今日待服',
 }
 
 export interface AnswerCardProps {

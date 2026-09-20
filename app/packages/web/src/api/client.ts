@@ -1,7 +1,7 @@
 import { hc } from 'hono/client'
 import { toast } from 'sonner'
 import type { AppType } from '@anxin/api'
-import type { DraftConfirm } from '@anxin/shared'
+import type { ConsultSkillId, DraftConfirm } from '@anxin/shared'
 
 /**
  * hc<AppType> 端到端类型客户端（技术方案 §1）。
@@ -146,12 +146,24 @@ export async function intakeDrug(image: string) {
  * 守门与降级全部在后端 services/consult.service.ts 编排；本层不做业务判断。
  * L4/L3/manual-gate/no-source/ai-unavailable 均返回 200（守门正常路径，非错误），
  * 故用 unwrap（toast 仅在真错误时触发）；前端按 riskLevel/status/blocked 渲染各分支。
- * M4-T5：opts.sessionId 续问（首问不传 = 服务端建会话并在响应回传 sessionId）；
+ * M4-T5：opts.sessionId 续问（首问不传 = 服务端建会话并在响应回传 sessionId）。
+ * M4-T7：opts.skillId 技能快路径（chips 显式指定，跳过正则）；自由文本不传（正则路径逐字不变）。
  * 无 opts 时保持两参调用形态（M3 行为与既有测试断言不变）。
  */
-export async function postConsult(question: string, drugIds: string[], opts?: { sessionId: string }) {
+export async function postConsult(
+  question: string,
+  drugIds: string[],
+  opts?: { sessionId?: string; skillId?: ConsultSkillId },
+) {
   const res = await client.api.consult.$post({
-    json: opts ? { question, drugIds, sessionId: opts.sessionId } : { question, drugIds },
+    json: opts
+      ? {
+          question,
+          drugIds,
+          ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
+          ...(opts.skillId ? { skillId: opts.skillId } : {}),
+        }
+      : { question, drugIds },
   })
   return unwrap(res)
 }

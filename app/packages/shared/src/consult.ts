@@ -10,10 +10,15 @@
  */
 
 /**
- * S2 数据直答意图（api consult/intent.ts 的 INTENT_ROUTES 正则路由落点；
- * T7 补第 5 意图 next-dose 时在此扩充，api 侧正则随任务同步）。
+ * S2 数据直答意图（api consult/intent.ts 的 INTENT_ROUTES 正则路由落点）。
+ * next-dose（今日待服）为 M4-T7 增补的第 5 意图。
  */
-export type ConsultQueryIntent = 'medication-list' | 'adherence' | 'expiry-stock' | 'interaction-check'
+export type ConsultQueryIntent =
+  | 'medication-list'
+  | 'adherence'
+  | 'expiry-stock'
+  | 'interaction-check'
+  | 'next-dose'
 
 /**
  * 咨询技能 ID（specs/04-T3 技能注册表行键）：
@@ -46,6 +51,12 @@ export const CONSULT_DATA_QUICK_QUESTIONS: readonly QuickQuestion[] = [
     question: '我现在有多少药物？',
     skillId: 's2-medication-list',
     intent: 'medication-list',
+  },
+  {
+    label: '今天我要吃哪些药？',
+    question: '今天我要吃哪些药？',
+    skillId: 's2-next-dose',
+    intent: 'next-dose',
   },
   {
     label: '我的依从性怎么样？',

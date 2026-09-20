@@ -84,6 +84,47 @@ describe('routeSkill · S1 说明书问答（兜底）', () => {
   })
 })
 
+describe('routeSkill · skillId 快路径（M4-T7）', () => {
+  it('正则不命中的自由写法 + skillId → 直达对应意图（与正则命中走同一路径）', () => {
+    // 该句不命中任何 INTENT_ROUTES 正则——快路径的存在意义
+    expect(routeSkill({ question: '帮我看看我现在都吃哪些药哦', intentRouteEnabled: true, skillId: 's2-medication-list' })).toEqual({
+      skill: 'S2',
+      intent: 'medication-list',
+    })
+    expect(routeSkill({ question: '今天吃啥药呀', intentRouteEnabled: true, skillId: 's2-next-dose' })).toEqual({
+      skill: 'S2',
+      intent: 'next-dose',
+    })
+  })
+
+  it('s1-insert 直达 S1：即使问题会被正则路由到 S2 也以显式指定为准', () => {
+    expect(routeSkill({ question: '我现在有多少药物', intentRouteEnabled: true, skillId: 's1-insert' })).toEqual({ skill: 'S1' })
+  })
+
+  it('守门仍优先于快路径：L4 问句即使带 skillId 也必须 S0', () => {
+    expect(routeSkill({ question: '我胸痛', intentRouteEnabled: true, skillId: 's2-medication-list' })).toEqual({
+      skill: 'S0',
+      kind: 'emergency',
+      matched: '胸痛',
+    })
+  })
+
+  it('快路径不受 intentRouteEnabled 开关影响（开关管「从自由文本猜意图」，快路径是显式指定）', () => {
+    expect(routeSkill({ question: '随便什么话', intentRouteEnabled: false, skillId: 's2-adherence' })).toEqual({
+      skill: 'S2',
+      intent: 'adherence',
+    })
+  })
+
+  it('不带 skillId → 行为与 T5 前逐字一致（正则路径不变）', () => {
+    expect(routeSkill({ question: '我现在有多少药物', intentRouteEnabled: true })).toEqual({
+      skill: 'S2',
+      intent: 'medication-list',
+    })
+    expect(routeSkill({ question: '这个药通常用于什么？', intentRouteEnabled: true })).toEqual({ skill: 'S1' })
+  })
+})
+
 describe('SKILL_REGISTRY 注册表声明', () => {
   it('四行齐备，行顺序 = 路由优先级（S0 → S2 → S1 → S3 从属声明）', () => {
     expect(SKILL_REGISTRY.map((r) => r.id)).toEqual(['S0', 'S2', 'S1', 'S3'])

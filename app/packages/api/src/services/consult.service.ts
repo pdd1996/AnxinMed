@@ -220,10 +220,16 @@ export async function consult(
   //   注册表只决定「是否先试 S2」，不复制守门逻辑。
   // - S2 数据直答（0 次 LLM）：复用上面已取好的 activeMasterIds/interactionRules/drugNameById
   //   （请求内数据共享，不重复查库）；入参一律用脱敏后的 questionRedacted（L3 出口约束）。
+  // - skillId 快路径（M4-T7）：chips/深链显式指定技能，跳过正则与仲裁（在 S0 之后——守门优先
+  //   于一切）；合法值经 shared ConsultSkillIdSchema 边界校验，未知值 400 不静默改道。
   // - 语义边界：manual-gate 只限「个体化解释」（S1 内部门禁）；数据查询是 L0 以下的事实读取
   //   （读本库 drugs/plans/records），不受 manual-gate 限制，故 S2 先于 runConsult 内部
   //   manual-gate 判定。env 开关注释见 isIntentRouteEnabled。
-  const route = routeSkill({ question: questionRedacted, intentRouteEnabled: isIntentRouteEnabled() })
+  const route = routeSkill({
+    question: questionRedacted,
+    intentRouteEnabled: isIntentRouteEnabled(),
+    skillId: opts.skillId ?? null,
+  })
 
   let result: ConsultRunResult | null = null
   if (route.skill === 'S2') {
@@ -279,7 +285,10 @@ export async function consult(
     await consultRepo.touchConsultSession(userId, session.id)
   }
   const turnNo = (await consultRepo.countSessionTurns(userId, session.id)) + 1
-  const intent = opts.skillId ?? (route.skill === 'S2' ? route.intent : null)
+  // intent 落列口径（M4-T7 更新）：S2 路径（正则或快路径）落**解析后的意图名**（如 'medication-list'，
+  // 供漏判率统计同构对比）；快路径 s1-insert 落 's1-insert'（快路径痕迹）；其余（自由文本走 S1）= null
+  // = 说明书管线兜底（对齐 insight_ask_logs 漏判留痕口径）。
+  const intent = route.skill === 'S2' ? route.intent : opts.skillId === 's1-insert' ? 's1-insert' : null
 
   const consultLogId = newId('clog')
   await consultRepo.insertConsultLog({

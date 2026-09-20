@@ -119,11 +119,25 @@ export type ProfilePatch = z.infer<typeof ProfilePatchSchema>
  * 在响应回传）；skillId 技能快路径透传（T5 仅落 consult_logs.intent 留痕，路由消费在 T7）。
  * 两者都不带 = 行为与 M3 单轮完全一致。
  */
+/** 技能快路径合法值（M4-T7）——必须与 consult.ts 的 ConsultSkillId 模板字面量联合同构。 */
+export const ConsultSkillIdSchema = z.enum([
+  's1-insert',
+  's2-medication-list',
+  's2-adherence',
+  's2-expiry-stock',
+  's2-interaction-check',
+  's2-next-dose',
+])
+export type ConsultSkillIdInput = z.infer<typeof ConsultSkillIdSchema>
+// 类型哨兵：枚举推断联合必须可赋给 ConsultSkillId（shared consult.ts 增删意图而此处未同步时编译红）
+const _skillIdShapeCheck: ConsultSkillIdInput extends import('./consult.js').ConsultSkillId ? true : false = true
+
 export const ConsultRequestSchema = z.object({
   question: z.string().trim().min(1, '请输入咨询问题').max(2000),
   drugIds: z.array(z.string().min(1)).default([]),
   sessionId: z.string().min(1).optional(),
-  skillId: z.string().min(1).optional(),
+  /** 技能快路径（M4-T7）：合法值 = ConsultSkillId 联合；未知值 400（不静默改道回正则）。 */
+  skillId: ConsultSkillIdSchema.optional(),
 })
 export type ConsultRequest = z.infer<typeof ConsultRequestSchema>
 

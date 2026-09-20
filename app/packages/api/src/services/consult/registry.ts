@@ -35,6 +35,9 @@ export interface SkillRouteInput {
   question: string
   /** env ENABLE_INTENT_ROUTE（默认开；显式 =false 才关——一行整体回滚语义不变）。 */
   intentRouteEnabled: boolean
+  /** 技能快路径（M4-T7）：chips/深链显式携带，直达对应技能（跳过正则与解释类仲裁）。
+   *  合法性由 shared ConsultSkillIdSchema 在 HTTP 边界校验（未知值 400），此处只做形状分发。 */
+  skillId?: string | null
 }
 
 /**
@@ -84,25 +87,35 @@ export const SKILL_REGISTRY: readonly SkillRow[] = [
 ]
 
 /**
- * 技能路由（纯函数，零 I/O、确定性）：按注册表行顺序短路判定。
- * 判定顺序 = 既有 service 层 if-else 的忠实显式化：
- *   1. S0：detectEmergency → detectProhibited（先命中先返回；命中时**不做**意图判定）；
- *   2. S2：开关开 + classifyConsultIntent 命中（宁漏勿误：漏判 = 走 S1 = 行为与无路由一致）；
- *   3. S1：兜底（manual-gate / no-source / proceed 由 runConsult 内部 guardConsult 全量决策）。
+ * 技能路由（纯函数，零 I/O、确定性）：按优先级短路判定。
+ * 顺序 = specs/04-T7 的完整分发契约：
+ *   1. S0：detectEmergency → detectProhibited（**守门优先于一切，含快路径**——混合句
+ *      「我胸痛」即使带 skillId 也必须走 L4）；
+ *   2. skillId 快路径：s1-insert → S1；s2-<intent> → S2/<intent>（不受 intentRouteEnabled
+ *      影响——开关管的是「从自由文本猜意图」，快路径是客户端显式指定）；
+ *   3. S2 正则：开关开 + classifyConsultIntent 命中（宁漏勿误：漏判 = 走 S1 = 行为与无路由一致）；
+ *   4. S1：兜底（manual-gate / no-source / proceed 由 runConsult 内部 guardConsult 全量决策）。
  */
 export function routeSkill(input: SkillRouteInput): SkillRouteDecision {
-  // 1. S0 红线：守门优先于意图路由（混合句用例见 consult-registry.test.ts）
+  // 1. S0 红线：守门优先于意图路由与快路径（混合句用例见 consult-registry.test.ts）
   const emergency = detectEmergency(input.question)
   if (emergency) return { skill: 'S0', kind: 'emergency', matched: emergency }
   const prohibited = detectProhibited(input.question)
   if (prohibited) return { skill: 'S0', kind: 'refused', matched: prohibited }
 
-  // 2. S2 数据直答：开关开 + 正则命中（解释类词仲裁在 classifyConsultIntent 内）
+  // 2. skillId 快路径（M4-T7）：跳过正则与解释类仲裁
+  if (input.skillId) {
+    if (input.skillId === 's1-insert') return { skill: 'S1' }
+    const intent = input.skillId.replace(/^s2-/, '') as QueryIntent
+    return { skill: 'S2', intent }
+  }
+
+  // 3. S2 数据直答：开关开 + 正则命中（解释类词仲裁在 classifyConsultIntent 内）
   if (input.intentRouteEnabled) {
     const intent = classifyConsultIntent(input.question)
     if (intent) return { skill: 'S2', intent }
   }
 
-  // 3. S1 说明书问答（兜底）
+  // 4. S1 说明书问答（兜底）
   return { skill: 'S1' }
 }

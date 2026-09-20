@@ -34,6 +34,7 @@ import {
   type InteractionRuleInput,
 } from '../rules/index.js'
 import { dbCitation } from './citations.js'
+import { getTodayTasks, type TodayTask } from '../tasks.service.js'
 import type { QueryIntent } from './intent.js'
 import type { ConsultRunResult, NormalizedSections } from './types.js'
 
@@ -263,6 +264,72 @@ export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpirySto
   }
 }
 
+/** 任务状态 → 中文（模板 keyPoints 用；pending = 无记录运行期态）。 */
+const TASK_STATUS_LABEL: Record<TodayTask['status'], string> = {
+  taken: '已服',
+  skipped: '已跳过',
+  later: '稍后',
+  pending: '待服',
+}
+
+/**
+ * next-dose 模板（M4-T7 · 今日待服）：计划时点 + 已服状态，直查库 0 次 LLM。
+ * 复用 tasks.service.getTodayTasks（与「今日」页同源口径：isPlanActiveOn × times × records 对账）。
+ * ⚠️ 不列剂量数值（「1 滴」类是计划数据但属剂量表述红线邻域，且「今日」页可看）——只列时间/药名/状态。
+ */
+export function renderNextDoseSections(today: {
+  items: TodayTask[]
+  summary: { total: number; taken: number; pending: number }
+}): NormalizedSections {
+  const { items, summary } = today
+  const skipped = items.filter((t) => t.status === 'skipped').length
+  const done = items.filter((t) => t.status === 'taken').length
+  const open = items.filter((t) => t.status === 'pending' || t.status === 'later')
+
+  if (items.length === 0) {
+    return {
+      summary: '你今天没有已安排的服药计划。',
+      keyPoints: ['在「药箱」页为药品创建计划后，这里会显示今天的服药安排。'],
+      risks: [],
+      nextAction: '前往「药箱」页面为药品创建用药计划。',
+      warning: DATA_QUERY_WARNING,
+      limited: false,
+    }
+  }
+
+  const risks =
+    skipped > 0 ? ['已有跳过记录：漏服后不要自行加倍补服，处理方式请咨询医生或药师。'] : []
+
+  // 边界：今日全处理完（无待服/稍后）
+  if (open.length === 0) {
+    const parts = [`完成 ${done} 次`]
+    if (skipped > 0) parts.push(`跳过 ${skipped} 次`)
+    return {
+      summary: `今天的服药已全部处理（${parts.join('、')}，共 ${summary.total} 次）。`,
+      keyPoints: items.slice(0, MAX_LIST_POINTS).map((t) => `${t.time} ${t.drugName} · ${TASK_STATUS_LABEL[t.status]}`),
+      risks,
+      nextAction: '今天的任务已完成，可前往「今日」页面查看打卡记录。',
+      warning: DATA_QUERY_WARNING,
+      limited: false,
+    }
+  }
+
+  // 常态：有待服/稍后
+  const next = open[0]
+  const keyPoints = items.slice(0, MAX_LIST_POINTS).map((t) => `${t.time} ${t.drugName} · ${TASK_STATUS_LABEL[t.status]}`)
+  if (items.length > MAX_LIST_POINTS) {
+    keyPoints.push(`……及其他 ${items.length - MAX_LIST_POINTS} 次安排`)
+  }
+  return {
+    summary: `今天共 ${summary.total} 次服药安排：已完成 ${done} 次、待处理 ${open.length} 次。下一次是 ${next.time} 的${next.drugName}。`,
+    keyPoints,
+    risks,
+    nextAction: '按时前往「今日」页面打卡；如需调整用药请咨询医生或药师。',
+    warning: DATA_QUERY_WARNING,
+    limited: false,
+  }
+}
+
 /** interaction-check 模板：在服组合相互作用检查（复用 checkInteractions 纯函数结果）。 */
 export function renderInteractionsSections(
   result: InteractionResult,
@@ -345,6 +412,12 @@ export async function runDataQuery(input: DataQueryInput): Promise<ConsultRunRes
     case 'expiry-stock': {
       const status = await getExpiryStatus(userId)
       sections = renderExpiryStockSections(status, deriveExpiryStockFocus(input.question ?? ''))
+      break
+    }
+    case 'next-dose': {
+      // 今日待服（M4-T7）：与「今日」页同源取数（计划时点 × 已服状态），0 次 LLM
+      const today = await getTodayTasks(userId)
+      sections = renderNextDoseSections(today)
       break
     }
     case 'interaction-check': {

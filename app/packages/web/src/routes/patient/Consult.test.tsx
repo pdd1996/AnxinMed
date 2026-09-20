@@ -247,7 +247,7 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
     // 点击快捷问题
     fireEvent.click(screen.getByText('这个药通常用于什么？'))
     await waitFor(() => {
-      expect(mocks.postConsult).toHaveBeenCalledWith('这个药通常用于什么？', ['drug-1'])
+      expect(mocks.postConsult).toHaveBeenCalledWith('这个药通常用于什么？', ['drug-1'], { skillId: 's1-insert' })
     })
   })
 
@@ -274,7 +274,7 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
     expect(dataBtn?.disabled).toBe(false)
     fireEvent.click(dataBtn!)
     await waitFor(() => {
-      expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [])
+      expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [], { skillId: 's2-medication-list' })
     })
     // data-answered 渲染：「数据查询」徽章 + toolUsed 小字徽章
     await waitFor(() => {
@@ -309,7 +309,7 @@ describe('Consult 页 · 深链对象药', () => {
     expect(screen.queryByText('这个药通常用于什么？')).toBeNull()
     fireEvent.click(screen.getByText('我现在有多少药物？').closest('button')!)
     await waitFor(() => {
-      expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [])
+      expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [], { skillId: 's2-medication-list' })
     })
   })
 })

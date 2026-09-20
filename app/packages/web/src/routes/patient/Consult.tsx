@@ -16,6 +16,7 @@ import {
   CONFIRM_STATUS_META,
   CONSULT_DATA_QUICK_QUESTIONS,
   CONSULT_INSERT_QUICK_QUESTIONS,
+  type ConsultSkillId,
   type ConsultSuggestion,
 } from '@anxin/shared'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
@@ -113,25 +114,31 @@ export default function Consult() {
   const invalidDrugLink = !!drugIdParam && !drugsQuery.isLoading && !selectedDrug && drugs.length > 0
 
   const consultMutation = useMutation({
-    // 无 sessionId 保持两参调用（M3 行为）；续问带第三参（M4-T5）
-    mutationFn: (q: string) =>
-      sessionId ? postConsult(q, effectiveDrugId ? [effectiveDrugId] : [], { sessionId }) : postConsult(q, effectiveDrugId ? [effectiveDrugId] : []),
+    // 无可选字段时保持两参调用（M3 形态）；sessionId 续问（M4-T5）/ skillId 快路径（M4-T7，chips 带入）
+    mutationFn: (input: { text: string; skillId?: ConsultSkillId }) => {
+      const drugIds = effectiveDrugId ? [effectiveDrugId] : []
+      const opts = {
+        ...(sessionId ? { sessionId } : {}),
+        ...(input.skillId ? { skillId: input.skillId } : {}),
+      }
+      return Object.keys(opts).length > 0 ? postConsult(input.text, drugIds, opts) : postConsult(input.text, drugIds)
+    },
     onSuccess: (response, q) => {
       setSessionId(response.sessionId)
       setSuggestion(response.suggestion ?? null)
       setMessages((prev) => [
         ...prev,
-        { id: nextMsgId(), role: 'user', question: q },
+        { id: nextMsgId(), role: 'user', question: (q as { text: string }).text },
         { id: nextMsgId(), role: 'assistant', response },
       ])
       setQuestion('')
     },
   })
 
-  const handleAsk = (q?: string) => {
+  const handleAsk = (q?: string, skillId?: ConsultSkillId) => {
     const text = (q ?? question).trim()
     if (!text || consultMutation.isPending) return
-    consultMutation.mutate(text)
+    consultMutation.mutate({ text, skillId })
   }
 
   /** 回放历史会话：拉详情 → 映射消息 → 会话续接到当前窗口。 */
@@ -306,7 +313,7 @@ export default function Consult() {
                 variant="outline"
                 size="sm"
                 className="min-h-11 shrink-0 whitespace-nowrap border-primary/30 text-xs text-primary"
-                onClick={() => handleAsk(q.question)}
+                onClick={() => handleAsk(q.question, q.skillId)}
                 disabled={consultMutation.isPending}
               >
                 {q.label}
@@ -320,7 +327,7 @@ export default function Consult() {
                   variant="outline"
                   size="sm"
                   className="min-h-11 shrink-0 whitespace-nowrap text-xs"
-                  onClick={() => handleAsk(q.question)}
+                  onClick={() => handleAsk(q.question, q.skillId)}
                   disabled={consultMutation.isPending}
                 >
                   {q.label}
