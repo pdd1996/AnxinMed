@@ -43,6 +43,7 @@ AnxinMed/
 
 | 层 | 选型 |
 |---|---|
+| 产品形态 | H5 移动端网页（手机浏览器/微信内置浏览器）：360×740 视口优先，触控目标 ≥44px，面向老年用户 |
 | 前端 | React 19 + TypeScript + Vite + react-router + zustand + TanStack Query + shadcn/ui + Tailwind + lucide-react |
 | 后端 | Hono + @hono/node-server + TypeScript，API 端口 8787 |
 | 校验 | zod（schema 定义在 shared 包，前后端一份真相） |
