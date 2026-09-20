@@ -43,6 +43,13 @@
       "when": 1789903087588,
       "tag": "0005_fluffy_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789906020420,
+      "tag": "0006_red_frog_thor",
+      "breakpoints": true
     }
   ]
 }

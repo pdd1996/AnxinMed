@@ -9,7 +9,7 @@
  */
 import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
-import { consultLogs, consultSessions, riskEvents } from '../db/schema.js'
+import { consultLogs, consultSessions, consultSuggestions, riskEvents } from '../db/schema.js'
 
 export type ConsultLogRow = typeof consultLogs.$inferSelect
 export type ConsultLogInsert = typeof consultLogs.$inferInsert
@@ -17,6 +17,8 @@ export type RiskEventRow = typeof riskEvents.$inferSelect
 export type RiskEventInsert = typeof riskEvents.$inferInsert
 export type ConsultSessionRow = typeof consultSessions.$inferSelect
 export type ConsultSessionInsert = typeof consultSessions.$inferInsert
+export type ConsultSuggestionRow = typeof consultSuggestions.$inferSelect
+export type ConsultSuggestionInsert = typeof consultSuggestions.$inferInsert
 
 // ---------------------------------------------------------------------------
 // 写入（一次咨询的事务内调用；consult.service 编排）
@@ -86,6 +88,74 @@ export async function touchConsultSession(userId: string, sessionId: string): Pr
     .update(consultSessions)
     .set({ lastActiveAt: sql`now()` })
     .where(and(eq(consultSessions.userId, userId), eq(consultSessions.id, sessionId)))
+}
+
+// ---------------------------------------------------------------------------
+// 建议卡（M4-T6 · specs/04-T6）—— add_drug 落库留痕；note_symptom 不落库（裁决 #4）
+// ---------------------------------------------------------------------------
+
+/** 写 consult_suggestions（add_drug 卡，pending 起步）。 */
+export async function insertConsultSuggestion(row: ConsultSuggestionInsert): Promise<ConsultSuggestionRow> {
+  const inserted = await db.insert(consultSuggestions).values(row).returning()
+  return inserted[0]
+}
+
+/** 按 id 取建议卡（userId 过滤；跨用户 = 未命中，不泄漏存在性）。 */
+export async function findConsultSuggestion(
+  userId: string,
+  suggestionId: string,
+): Promise<ConsultSuggestionRow | undefined> {
+  const rows = await db
+    .select()
+    .from(consultSuggestions)
+    .where(and(eq(consultSuggestions.userId, userId), eq(consultSuggestions.id, suggestionId)))
+    .limit(1)
+  return rows[0]
+}
+
+/** 置建议卡状态（accept → accepted / dismiss → dismissed；acted_at 用库时钟）。 */
+export async function setConsultSuggestionStatus(
+  userId: string,
+  suggestionId: string,
+  status: 'accepted' | 'dismissed',
+): Promise<ConsultSuggestionRow | undefined> {
+  const rows = await db
+    .update(consultSuggestions)
+    .set({ status, actedAt: sql`now()`, updatedAt: new Date() })
+    .where(and(eq(consultSuggestions.userId, userId), eq(consultSuggestions.id, suggestionId)))
+    .returning()
+  return rows[0]
+}
+
+/** 会话内已落库的 add_drug 卡数（频控「每会话 ≤3」；accept/dismiss 后仍计数）。 */
+export async function countSessionSuggestions(userId: string, sessionId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(consultSuggestions)
+    .where(
+      and(
+        eq(consultSuggestions.userId, userId),
+        eq(consultSuggestions.sessionId, sessionId),
+        eq(consultSuggestions.type, 'add_drug'),
+      ),
+    )
+  return row?.count ?? 0
+}
+
+/** 会话内 dismissed 的 add_drug 药名（dismissed 不复弹的排除集）。 */
+export async function listDismissedSuggestionNames(userId: string, sessionId: string): Promise<string[]> {
+  const rows = await db
+    .select({ payload: consultSuggestions.payload })
+    .from(consultSuggestions)
+    .where(
+      and(
+        eq(consultSuggestions.userId, userId),
+        eq(consultSuggestions.sessionId, sessionId),
+        eq(consultSuggestions.type, 'add_drug'),
+        eq(consultSuggestions.status, 'dismissed'),
+      ),
+    )
+  return rows.map((r) => String((r.payload as { drugName?: string } | null)?.drugName ?? '')).filter(Boolean)
 }
 
 /** 写 risk_events（L4/L3/manual-gate 触发；一次拦截 = 一行）。 */

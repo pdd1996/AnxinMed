@@ -175,6 +175,27 @@ export async function fetchConsultSession(id: string) {
 }
 export type ConsultSessionDetailDto = Awaited<ReturnType<typeof fetchConsultSession>>
 
+// ── 确认式建议卡（M4-T6 · specs/04-T6）──
+
+/**
+ * POST /api/consult/suggestions/:id/accept：置 accepted 并返回入口目标（不写业务表）。
+ * ocr → 既有 M2 录入线（/intake/drug）；manual → 既有手动建档预填（/box?manual=1&prefillDrug=…）。
+ * 实际写库均经既有确认页，manual 门禁不豁免（裁决 #7）。
+ */
+export async function acceptSuggestion(id: string, path: 'ocr' | 'manual') {
+  const res = await client.api.consult.suggestions[':id'].accept.$post({ param: { id }, json: { path } })
+  return unwrap(res)
+}
+
+/** POST /api/consult/suggestions/:id/dismiss：置 dismissed（本会话内同名药不复弹）。 */
+export async function dismissSuggestion(id: string) {
+  const res = await client.api.consult.suggestions[':id'].dismiss.$post({ param: { id } })
+  return unwrap(res)
+}
+
+/** 建议卡响应 DTO（hc<AppType> 推导）。 */
+export type SuggestionAcceptDto = Awaited<ReturnType<typeof acceptSuggestion>>
+
 // ── 医生端洞察（M3-T3）──
 
 /** GET /api/insight/patients：患者列表 + 概要。 */

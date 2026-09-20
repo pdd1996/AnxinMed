@@ -35,6 +35,7 @@ export default function Box() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showManual, setShowManual] = useState(false)
+  const [manualPrefillName, setManualPrefillName] = useState<string | null>(null)
   const [planTarget, setPlanTarget] = useState<{ drug: DrugItem; plan?: PlanItem } | null>(null)
 
   const drugsQuery = useQuery({ queryKey: ['drugs'], queryFn: fetchDrugs })
@@ -46,16 +47,22 @@ export default function Box() {
    * 确认页（M2-T7）跳转过来的一次性意图：
    *   ?manual=1        → 信息不符后手动建档（PRD §7.2.6）
    *   ?plan=<drugId>   → 入口B 药盒建档不产生计划，直接打开该药的计划弹窗（两步式录入）
+   *   ?prefillDrug=名  → 咨询建议卡「手动建档」路径（M4-T6）：打开弹窗并预填药名，
+   *                      其余字段仍需用户填写并确认（不新增写路径，manual 门禁不豁免）
    * 处理完立即清参数（replace），防刷新/回退重复弹窗；找不到药品则可见报错，不静默吞。
    */
   useEffect(() => {
     const manual = searchParams.get('manual')
     const planDrugId = searchParams.get('plan')
+    const prefillDrug = searchParams.get('prefillDrug')
     if (!manual && !planDrugId) return
     if (drugsQuery.isLoading) return // 等药箱数据到位再开（plan 需要 drug 对象）
     const drugList = drugsQuery.data ?? []
     const planList = plansQuery.data ?? []
-    if (manual) setShowManual(true)
+    if (manual) {
+      setManualPrefillName(prefillDrug)
+      setShowManual(true)
+    }
     if (planDrugId) {
       const drug = drugList.find((d) => d.id === planDrugId)
       if (drug) setPlanTarget({ drug, plan: planList.find((p) => p.drugId === drug.id) })
@@ -260,7 +267,12 @@ export default function Box() {
         </div>
       )}
 
-      <ManualDrugModal open={showManual} onClose={() => setShowManual(false)} onSave={(form) => createDrug.mutate(form)} />
+      <ManualDrugModal
+        open={showManual}
+        initialGenericName={manualPrefillName}
+        onClose={() => setShowManual(false)}
+        onSave={(form) => createDrug.mutate(form)}
+      />
       {planTarget && (
         <PlanModal
           open

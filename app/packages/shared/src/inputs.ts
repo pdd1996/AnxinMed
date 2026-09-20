@@ -127,6 +127,16 @@ export const ConsultRequestSchema = z.object({
 })
 export type ConsultRequest = z.infer<typeof ConsultRequestSchema>
 
+/**
+ * POST /api/consult/suggestions/:id/accept 入参（M4-T6 · 裁决 #4/#7）。
+ * accept 只置状态并返回入口目标，不写任何业务表：ocr → 既有 M2 录入线（confirmStatus=ocr_matched）；
+ * manual → 既有手动建档预填。两条路径都经既有确认页，manual 门禁不豁免。
+ */
+export const SuggestionAcceptSchema = z.object({
+  path: z.enum(['ocr', 'manual']),
+})
+export type SuggestionAccept = z.infer<typeof SuggestionAcceptSchema>
+
 // ── 医生端洞察（M3-T3 · PRD §7.7）──
 
 /** POST /api/insight/summary：选定患者 → 组装 5 类数据 → Baichuan 生成摘要。 */

@@ -12,7 +12,7 @@
  * 未预期错误经 app.onError 兜底为 500 INTERNAL。
  */
 import { Hono } from 'hono'
-import { ConsultRequestSchema, ERR_CODES } from '@anxin/shared'
+import { ConsultRequestSchema, SuggestionAcceptSchema, ERR_CODES } from '@anxin/shared'
 import type { AppEnv } from '../types.js'
 import { vJson, okJson, ApiError } from '../lib/http.js'
 import * as consultService from '../services/consult.service.js'
@@ -45,4 +45,14 @@ export const consultRoute = new Hono<AppEnv>()
       throw new ApiError(404, ERR_CODES.NOT_FOUND, '会话不存在或已失效')
     }
     return okJson(c, detail)
+  })
+  // 建议卡处理（M4-T6）：accept 只置状态并返回入口目标（不写业务表，零写入红线）；dismiss 置不复弹
+  .post('/suggestions/:id/accept', vJson(SuggestionAcceptSchema), async (c) => {
+    const { path } = c.req.valid('json')
+    const result = await consultService.acceptSuggestion(c.get('user').id, c.req.param('id'), path)
+    return okJson(c, result)
+  })
+  .post('/suggestions/:id/dismiss', async (c) => {
+    const result = await consultService.dismissSuggestion(c.get('user').id, c.req.param('id'))
+    return okJson(c, result)
   })

@@ -16,9 +16,11 @@ import {
   CONFIRM_STATUS_META,
   CONSULT_DATA_QUICK_QUESTIONS,
   CONSULT_INSERT_QUICK_QUESTIONS,
+  type ConsultSuggestion,
 } from '@anxin/shared'
 import { AnswerCard } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
+import { SuggestionCard } from '@/components/domain/consult/SuggestionCard'
 
 /**
  * 咨询页（M3-T2 · PRD §7.5 / spec §T2）——围绕已确认药品提问，移动端按「千问式」聊天首屏布局。
@@ -66,6 +68,7 @@ function logToChatMessages(log: ConsultSessionDetailDto['messages'][number]): Ch
     toolUsed: log.status === 'data-answered' ? log.intent : null,
     consultLogId: log.consultLogId,
     sessionId: '',
+    suggestion: null, // 历史轮次的卡片不回放（卡片只在产生它的一轮有效）
   }
   return [
     { id: `${log.consultLogId}-q`, role: 'user', question: log.question },
@@ -92,6 +95,8 @@ export default function Consult() {
   // 会话状态（M4-T5）：首问响应回传 sessionId，续问自动带入；「开新会话」清空回 null。
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
+  // 建议卡（M4-T6）：只保留最新一轮的卡（每轮 ≤1），accept/dismiss/开新会话即清。
+  const [suggestion, setSuggestion] = useState<ConsultSuggestion | null>(null)
 
   // 历史会话列表（打开面板时才拉取）
   const sessionsQuery = useQuery({
@@ -113,6 +118,7 @@ export default function Consult() {
       sessionId ? postConsult(q, effectiveDrugId ? [effectiveDrugId] : [], { sessionId }) : postConsult(q, effectiveDrugId ? [effectiveDrugId] : []),
     onSuccess: (response, q) => {
       setSessionId(response.sessionId)
+      setSuggestion(response.suggestion ?? null)
       setMessages((prev) => [
         ...prev,
         { id: nextMsgId(), role: 'user', question: q },
@@ -133,6 +139,7 @@ export default function Consult() {
     const detail = await fetchConsultSession(id)
     setSessionId(detail.session.id)
     setMessages(detail.messages.flatMap(logToChatMessages))
+    setSuggestion(null) // 回放历史轮次不重弹旧卡（卡片只在产生它的那一轮有效）
     setHistoryOpen(false)
   }
 
@@ -140,6 +147,7 @@ export default function Consult() {
   const handleNewSession = () => {
     setSessionId(null)
     setMessages([])
+    setSuggestion(null)
     setHistoryOpen(false)
     queryClient.invalidateQueries({ queryKey: ['consult-sessions'] })
   }
@@ -273,6 +281,9 @@ export default function Consult() {
                   </div>
                 ),
               )}
+
+              {/* 建议卡（M4-T6）：最新一轮的确认式引导，accept 跳既有建档入口、dismiss 不复弹 */}
+              {suggestion && <SuggestionCard suggestion={suggestion} />}
 
               {/* 加载中指示 */}
               {consultMutation.isPending && (

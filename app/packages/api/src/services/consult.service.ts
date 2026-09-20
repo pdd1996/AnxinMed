@@ -20,6 +20,7 @@ import {
   isPlanActiveOn,
   todayStr,
   type ConsultResponse,
+  type ConsultSuggestion,
   type RiskEventLevel,
   type RiskEventType,
   type RiskLevel,
@@ -36,6 +37,7 @@ import { runConsult } from './consult/run.js'
 import { runDataQuery } from './consult/dataquery.js'
 import { routeSkill } from './consult/registry.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
+import { matchAddDrug, matchSymptomGuide } from './consult/suggestion.js'
 import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
 import { newId } from '../lib/util.js'
@@ -161,12 +163,15 @@ export interface ConsultOptions {
 /** 会话标题截断长度（首问截断，specs/04-T5）。 */
 const SESSION_TITLE_MAX = 30
 
+/** add_drug 建议卡每会话上限（M4-T6 频控：每会话 ≤3；每轮 ≤1 由「命中第一个即返回」保证）。 */
+const SESSION_SUGGESTION_MAX = 3
+
 export async function consult(
   userId: string,
   question: string,
   drugIds: string[],
   opts: ConsultOptions = {},
-): Promise<ConsultResponse & { consultLogId: string; sessionId: string }> {
+): Promise<ConsultResponse & { consultLogId: string; sessionId: string; suggestion: ConsultSuggestion | null }> {
   // 0. 会话解析（M4-T5）：带 sessionId → 校验存在且属于本人（userId 隔离，跨用户 404 不泄漏存在性）；
   //    不带 → 落库阶段建新会话（title=首问截断）并在响应首答回传。
   let session: consultRepo.ConsultSessionRow | null = null
@@ -286,6 +291,15 @@ export async function consult(
     sectionsSnapshot: result.sections,
   })
 
+  // 6b. 确认式建议卡（M4-T6 · specs/04-T6）：确定性规则生成（非 LLM）。
+  //     S0 红线（emergency/refused）不打扰；add_drug 优先于症状引导；每轮 ≤1、每会话 ≤3、
+  //     dismissed 不复弹。卡片只是入口引导：accept 仅置状态并返回建档入口目标，
+  //     实际写库必经既有确认页（无用户确认零写入红线，裁决 #4/#7）。
+  let suggestion: ConsultSuggestion | null = null
+  if (result.status !== 'emergency' && result.status !== 'refused') {
+    suggestion = await buildSuggestion(userId, session.id, consultLogId, questionRedacted)
+  }
+
   // 7. 落库：risk_events（仅 L4/L3/manual-gate 触发；L1/L2 正常回答不算风险事件）
   const eventLevel = toRiskEventLevel(result.status)
   const eventType = toRiskEventType(result.status)
@@ -306,7 +320,7 @@ export async function consult(
   }
 
   // 8. 返回前端（shared ConsultResponse 契约 + consultLogId 供"这次咨询"详情展开
-  //    + sessionId 供前端续问带入，M4-T5 首答回传）
+  //    + sessionId 供前端续问带入（M4-T5 首答回传）+ suggestion 建议卡（M4-T6））
   return {
     riskLevel: result.riskLevel,
     status: result.status,
@@ -319,11 +333,83 @@ export async function consult(
     toolUsed: result.toolUsed ?? null,
     consultLogId,
     sessionId: session.id,
+    suggestion,
   }
 }
 
+/**
+ * 建议卡生成（M4-T6 · 确定性规则，specs/04-T6）。
+ * add_drug：提问命中 drug_master 名（规范化子串，宁漏勿误）且未在药箱、未在本会话被忽略、
+ *           会话卡数未达上限 → 落库 pending 卡；note_symptom：提问含不适词 → 纯引导卡（不落库）。
+ */
+async function buildSuggestion(
+  userId: string,
+  sessionId: string,
+  consultLogId: string,
+  question: string,
+): Promise<ConsultSuggestion | null> {
+  const [masters, boxRows, dismissedNames, cardCount] = await Promise.all([
+    assetsRepo.listDrugMasterCandidates(),
+    drugsRepo.listDrugs(userId),
+    consultRepo.listDismissedSuggestionNames(userId, sessionId),
+    consultRepo.countSessionSuggestions(userId, sessionId),
+  ])
+  const ownedNames = boxRows.flatMap((d) => [d.genericName, d.brandName].filter((n): n is string => Boolean(n)))
+
+  const match = matchAddDrug(question, masters, ownedNames, dismissedNames)
+  if (match && cardCount < SESSION_SUGGESTION_MAX) {
+    const row = await consultRepo.insertConsultSuggestion({
+      id: newId('csug'),
+      userId,
+      sessionId,
+      consultLogId,
+      type: 'add_drug',
+      payload: { drugName: match.drugName, matchedOn: match.matchedOn },
+    })
+    return { type: 'add_drug', id: row.id, drugName: match.drugName }
+  }
+  if (matchSymptomGuide(question)) {
+    return { type: 'note_symptom' }
+  }
+  return null
+}
+
 // ---------------------------------------------------------------------------
-// 会话只读查询（M4-T5 · specs/04-T5）——GET /api/consult/sessions[/tile:id] 的业务层
+// 建议卡处理（M4-T6 · specs/04-T6）——accept 只置状态并返回入口目标（无用户确认零写入红线）
+// ---------------------------------------------------------------------------
+
+/** 建议卡 accept 入口目标（不写业务表）：拍照 → 既有 M2 录入线；手动 → 既有手动建档预填。 */
+export async function acceptSuggestion(userId: string, suggestionId: string, path: 'ocr' | 'manual') {
+  const row = await consultRepo.findConsultSuggestion(userId, suggestionId)
+  if (!row) {
+    throw new ApiError(404, ERR_CODES.NOT_FOUND, '建议卡不存在或已失效')
+  }
+  if (row.status !== 'pending') {
+    throw new ApiError(409, ERR_CODES.CONFLICT, '该建议卡已处理过，请刷新')
+  }
+  if (row.type !== 'add_drug') {
+    throw new ApiError(409, ERR_CODES.CONFLICT, '该卡片不支持建档操作')
+  }
+  await consultRepo.setConsultSuggestionStatus(userId, suggestionId, 'accepted')
+  const drugName = String((row.payload as { drugName?: string } | null)?.drugName ?? '')
+  // 两条路径都经既有确认页/确认弹窗写库；manual 门禁不豁免（裁决 #7：通用名匹配不定身份）
+  return path === 'ocr'
+    ? { path, target: '/intake/drug', drugName }
+    : { path, target: `/box?manual=1&prefillDrug=${encodeURIComponent(drugName)}`, drugName }
+}
+
+/** 建议卡 dismiss：置 dismissed（本会话内同名药不复弹）。 */
+export async function dismissSuggestion(userId: string, suggestionId: string) {
+  const row = await consultRepo.findConsultSuggestion(userId, suggestionId)
+  if (!row) {
+    throw new ApiError(404, ERR_CODES.NOT_FOUND, '建议卡不存在或已失效')
+  }
+  await consultRepo.setConsultSuggestionStatus(userId, suggestionId, 'dismissed')
+  return { dismissed: true as const }
+}
+
+// ---------------------------------------------------------------------------
+// 会话只读查询（M4-T5 · specs/04-T5）——GET /api/consult/sessions[/:id] 的业务层
 // ---------------------------------------------------------------------------
 
 /** 会话列表（本人，last_active_at 倒序）。 */

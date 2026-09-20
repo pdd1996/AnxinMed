@@ -334,6 +334,29 @@ export const consultSessions = pgTable('consult_sessions', {
 })
 
 // ---------------------------------------------------------------------------
+// consult_suggestions · 确认式建议卡（M4-T6 · specs/04-T6）——咨询发现回档案的确认式通道
+// 规则：add_drug 卡由确定性规则生成（提问命中 drug_master 名且未在药箱，宁漏勿误，非 LLM）；
+//       accept 仅置状态并返回入口目标，实际建档必经既有确认页（无用户确认零写入红线）；
+//       note_symptom 为纯引导卡不落库（裁决 #4，存储形态下一期定）。
+// user_id 冗余于 session：仓库层直接 userId 过滤（M1-T7 纪律，不为隔离做 join）。
+// ---------------------------------------------------------------------------
+export const consultSuggestions = pgTable('consult_suggestions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),                     // → users.id（应用层过滤）
+  sessionId: text('session_id').notNull(),               // → consult_sessions.id（频控「每会话 ≤3」的作用域）
+  consultLogId: text('consult_log_id').notNull(),        // → consult_logs.id（产生本卡的咨询轮）
+  type: varchar('type', { enum: ['add_drug', 'note_symptom'] }).notNull(),
+  payload: jsonb('payload').notNull(),                   // add_drug: { drugName }（命中的 master 通用名）
+  status: varchar('status', { enum: ['pending', 'accepted', 'dismissed'] })
+    .notNull()
+    .default('pending'),                                 // 待处理 / 已接受（跳建档入口）/ 已忽略（dismissed 不复弹）
+  actedAt: timestamp('acted_at'),                        // accept/dismiss 时刻（接受率指标口径用）
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// ---------------------------------------------------------------------------
 // insight_ask_logs · 医生端问答留痕（T7 · ADR #17 保留项：漏判留痕作为工具集扩充依据）
 // 用途：POST /api/insight/ask 每问一行；intent 为空 = 正则漏判（长尾）——漏判率高时优先
 //       扩语义工具，绝不放开 SQL（ADR #17 禁 text-to-SQL）

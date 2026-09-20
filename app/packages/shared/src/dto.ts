@@ -183,6 +183,27 @@ export const ConsultResponseSchema = z.object({
 })
 export type ConsultResponse = z.infer<typeof ConsultResponseSchema>
 
+/**
+ * 确认式建议卡（M4-T6 · specs/04-T6，确定性规则生成非 LLM）：
+ * - add_drug：提问命中 drug_master 名且未在药箱 → 「加入药箱」卡（落库留痕，accept/dismiss 有 id）；
+ *   透明告知双路径：手动建档仅可查说明书资料（L0）；拍照建档保留完整咨询（裁决 #4/#7，
+ *   不豁免 manual 门禁——通用名匹配不定身份）。
+ * - note_symptom：纯引导卡（跳健康信息页），不落库（裁决 #4），无 id。
+ * 两者都只是「入口引导」：实际写库必经既有确认页，无用户确认零写入。
+ */
+export const ConsultSuggestionSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('add_drug'),
+    id: z.string(),
+    /** 命中的 drug_master 通用名（建议的规范名）。 */
+    drugName: z.string(),
+  }),
+  z.object({
+    type: z.literal('note_symptom'),
+  }),
+])
+export type ConsultSuggestion = z.infer<typeof ConsultSuggestionSchema>
+
 // ── 医生端洞察响应（M3-T3 · PRD §7.7）──
 
 /** 患者列表项（GET /api/insight/patients）。 */

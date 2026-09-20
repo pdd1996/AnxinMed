@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import {
   Dialog,
@@ -23,18 +23,30 @@ export interface ManualDrugForm {
 /**
  * 手动建档弹窗（任务书 T9，参照 demo ManualDrugModal）。
  * 不经识别的兜底路径：confirmStatus 由服务端固定为 manual，标注「未经 OCR 确认」。
+ * M4-T6：initialGenericName 支持建议卡「手动建档」路径的药名预填（其余字段仍需用户手填，
+ * 预填名不等于身份确认——通用名匹配不定身份，manual 门禁不豁免）。
  */
 export function ManualDrugModal({
   open,
   onClose,
   onSave,
+  initialGenericName,
 }: {
   open: boolean
   onClose: () => void
   onSave: (data: ManualDrugForm) => void
+  /** 打开时预填的药名（建议卡「手动建档」路径传入）；每次打开以该值重置药名框。 */
+  initialGenericName?: string | null
 }) {
   const [form, setForm] = useState({ genericName: '', specification: '', form: '', stock: '1', stockUnit: '片' })
   const valid = form.genericName.trim() && form.specification.trim() && form.form.trim()
+
+  // 每次打开按 initialGenericName 重置药名（仅预填名，其余字段保持用户上次输入的干净态为空）
+  useEffect(() => {
+    if (open) {
+      setForm({ genericName: initialGenericName ?? '', specification: '', form: '', stock: '1', stockUnit: '片' })
+    }
+  }, [open, initialGenericName])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

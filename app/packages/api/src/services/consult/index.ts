@@ -7,6 +7,7 @@
  *   intent.ts      classifyConsultIntent（4 意图正则白名单 + 解释类词仲裁）
  *   registry.ts    SKILL_REGISTRY + routeSkill（M4-T3 注册表分发：S0 > S2 > S1{S3 从属}）
  *   allergy.ts     过敏确定性覆盖层（M4-T4：关键词∩禁忌段 → 追加警示+禁忌段引用，零 LLM）
+ *   suggestion.ts  确认式建议卡规则（M4-T6：add_drug 命中匹配 / note_symptom 引导，零 LLM）
  *   sections.ts    pickInsertSections / normalizeSections / fallbackSectionsFromInsert
  *   citations.ts   insertCitation（三件套）/ webSearchCitation（unverified）
  *   run.ts         runConsult 编排（守门分派 + LLM/降级 + 归一化 + citations）
@@ -29,6 +30,7 @@ export * from './sanitize.js'
 export * from './guards.js'
 export * from './registry.js'
 export * from './allergy.js'
+export * from './suggestion.js'
 export * from './sections.js'
 export * from './citations.js'
 export * from './run.js'
