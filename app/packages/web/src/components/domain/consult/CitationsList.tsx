@@ -12,6 +12,26 @@ import { cn } from '@/lib/utils'
  * ⚠️ citations 数据从后端透传到 UI 无丢失（spec §T2 完成标准）：本组件不做任何过滤/裁剪，
  *    按数组顺序全量渲染；空数组时返回 null（不占空间）。
  */
+/** sectionKey → 中文段落名（M4-T9 段落锚点透传；键与 api patterns.ts SECTION_ROUTES 的 key 对齐，注释互指）。 */
+const SECTION_KEY_LABELS: Record<string, string> = {
+  indication: '适应症段',
+  pharmacology: '药理毒理段',
+  interactions: '相互作用段',
+  adverse: '不良反应段',
+  contraindication: '禁忌段',
+  components: '成份段',
+  precautions: '注意事项段',
+  storage: '储存说明',
+  dosage: '医嘱提示',
+}
+
+/** 引用的段落展示文本：优先 sectionLabel（T4 禁忌段标记，补「段」字），否则按 sectionKey 查表（M4-T9）。 */
+function sectionText(c: Citation): string | null {
+  if (c.sectionLabel) return `${c.sectionLabel}段`
+  if (c.sectionKey) return SECTION_KEY_LABELS[c.sectionKey] ?? null
+  return null
+}
+
 export function CitationsList({ citations, className }: { citations: Citation[]; className?: string }) {
   const [open, setOpen] = useState(false)
 
@@ -51,7 +71,7 @@ export function CitationsList({ citations, className }: { citations: Citation[];
                 <p>
                   <span className="font-medium text-foreground/80">来源：</span>
                   {c.source}
-                  {c.sectionLabel && <span>（{c.sectionLabel}段）</span>}
+                  {sectionText(c) && <span>（{sectionText(c)}）</span>}
                 </p>
                 <p>
                   <span className="font-medium text-foreground/80">版本：</span>

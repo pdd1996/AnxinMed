@@ -157,12 +157,14 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     // manual 档也可能命中说明书（demo findInsertByDrug 的 nameMatches 兜底路径）
     if (primary?.insert) {
       const sections = fallbackSectionsFromInsert(question, primary.insert)
+      const picked = pickInsertSections(question, primary.insert)
       return {
         riskLevel: 'L1',
         status: 'manual-gate',
         answer: sections.summary,
         sections,
-        citations: [insertCitation(primary.insert)],
+        citations: [{ ...insertCitation(primary.insert), sectionKey: picked.key }],
+        evidence: { sections: [{ drugName: primary.insert.genericName, sectionKey: picked.key }] },
         notice: null,
         l0Notice: MANUAL_GATE_NOTICE,
         blocked: true, // 个体化解释被拒绝（但 L0 资料查询仍返回）
@@ -243,6 +245,16 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
 
   const insert = primary.insert
   const section = pickInsertSections(question, insert)
+  // M4-T9 多药全量注入：其余对象药身份快照（替代单药截断；其说明书段落不注入，prompt 禁止虚构）。
+  // 规格/剂型从各自 insert 切片取（无说明书命中则 null——快照仍含通用名/商品名身份）。
+  const otherDrugs = drugs
+    .filter((d) => d.id !== primary.id)
+    .map((d) => ({
+      genericName: d.genericName,
+      brandName: d.brandName,
+      specification: d.insert?.specification ?? null,
+      form: d.insert?.form ?? null,
+    }))
   const interactions = buildInteractionContext(
     primary.drugMasterId,
     activeMasterIds,
@@ -268,6 +280,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
       section: { label: section.label, version: insert.version, text: section.text },
       interactionsText: renderInteractionsForPrompt(interactions),
       conditions: input.conditions,
+      otherDrugs,
     })
     sections = normalizeSections(raw, {
       summaryFallback: section.text.replace(/^[^：:]+[：:]/, '').slice(0, 120),
@@ -288,8 +301,9 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     }
   }
 
-  // 6b. 组装 citations（三件套：药名 + source + version）
-  const citations: Citation[] = [insertCitation(insert)]
+  // 6b. 组装 citations（三件套 + M4-T9 段落锚点）并登记本轮证据集合（coverage 校验的管线产物）
+  const citations: Citation[] = [{ ...insertCitation(insert), sectionKey: section.key }]
+  const evidence = { sections: [{ drugName: insert.genericName, sectionKey: section.key }] }
 
   // 6c. L2 剂量过滤命中 → riskLevel 升 L2 + status='limited' + 固定提示语
   const notice = sections.limited
@@ -302,6 +316,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     answer: sections.summary,
     sections,
     citations,
+    evidence,
     notice,
     l0Notice,
     blocked: false,

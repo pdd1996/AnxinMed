@@ -92,8 +92,9 @@ export function allergyOverlay(
   // 固定警示条目（单条；matched 全列出）。追加在归一化后的 risks 之后（可超 LLM 输出的 ≤3 约束——
   // 安全覆盖层不裁剪，前端列表自然渲染）。
   const warning = `${ALLERGY_WARNING_PREFIX}：你的档案过敏信息（${matched.join('、')}）与该药禁忌相关，请核对禁忌并咨询医生或药师。`
-  // 禁忌段引用：克隆基础三件套（S1 路径 citations[0] 即对象药 insert 引用）+ sectionLabel 标记
-  const sectionCitation: Citation = { ...citations[0], sectionLabel: '禁忌' }
+  // 禁忌段引用：克隆基础三件套 + 显式锚定禁忌段（sectionKey 覆写——不继承主引用的段落锚点；
+  // 该段落由确定性覆盖层作为本轮证据使用，consult.service 会登记进 evidence）
+  const sectionCitation: Citation = { ...citations[0], sectionLabel: '禁忌', sectionKey: 'contraindication' }
 
   return {
     sections: { ...sections, risks: [...sections.risks, warning] },

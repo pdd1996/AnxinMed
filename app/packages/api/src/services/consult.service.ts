@@ -38,6 +38,7 @@ import { runDataQuery } from './consult/dataquery.js'
 import { routeSkill } from './consult/registry.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
+import { validateCitationCoverage } from './consult/coverage.js'
 import { matchAddDrug, matchSymptomGuide } from './consult/suggestion.js'
 import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
@@ -279,7 +280,36 @@ export async function consult(
         result.sections,
         result.citations,
       )
+      // allergyOverlay 未命中返回同一引用；命中返回新对象 → 以引用差异判定命中
+      const overlayHit = patched.sections !== result.sections
       result = { ...result, sections: patched.sections, citations: patched.citations }
+      // 覆盖层命中 → 禁忌段作为本轮确定性证据登记进证据集合（供 coverage 校验）
+      if (overlayHit) {
+        result.evidence = {
+          sections: [
+            ...(result.evidence?.sections ?? []),
+            { drugName: primaryInsert.genericName, sectionKey: 'contraindication' },
+          ],
+        }
+      }
+    }
+  }
+
+  // 5d. 引用注入完整性校验（M4-T9）：带段落锚点的 citation 必须 ∈ 本轮证据集合；
+  //     越界锚点剥离（保留三件套基础引用，回答不受影响）+ console.error 留痕（失败可见不静默）。
+  //     citation-washing（回答不忠实于所引段落）为接受的残余风险——本层只保证「锚点 ∈ 证据」，
+  //     缓解 = prompt「只基于给定段落回答」硬性规则 + docs/11 不变量 golden 抽样复审。
+  if (result.evidence) {
+    const coverage = validateCitationCoverage(result.citations, result.evidence)
+    if (!coverage.ok) {
+      console.error('[consult] 引用完整性校验未通过，已剥离越界锚点：', coverage.violation)
+      const evidence = result.evidence
+      result = {
+        ...result,
+        citations: result.citations.filter(
+          (c) => !c.sectionKey || evidence.sections.some((s) => s.drugName === c.drugName && s.sectionKey === c.sectionKey),
+        ),
+      }
     }
   }
 

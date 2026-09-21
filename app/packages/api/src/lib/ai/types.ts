@@ -77,6 +77,16 @@ export interface ConsultPromptPayload {
    * 缺省/空 = 不注入（prompt 不含该块）。allergy 不进此通道（走 T4 确定性覆盖层）。
    */
   conditions?: string[]
+  /**
+   * 同轮咨询的其余对象药身份快照（M4-T9 多药全量注入：替代单药截断；只含身份字段，
+   * 其说明书段落不注入——不得虚构其资料）。缺省/空 = 单药咨询。
+   */
+  otherDrugs?: Array<{
+    genericName: string
+    brandName: string | null
+    specification: string | null
+    form: string | null
+  }>
 }
 
 /**

@@ -118,8 +118,10 @@ export interface Citation {
   version: string
   /** 网络检索兜底时 true；本地说明书库为 false。 */
   unverified: boolean
-  /** 段落标记（M4-T4 过敏覆盖层的禁忌段引用）；M4-T9 升级为全量段落锚点 sectionKey。 */
+  /** 段落标记（M4-T4 过敏覆盖层的禁忌段引用）。 */
   sectionLabel?: string
+  /** 段落锚点（M4-T9）：指向的说明书段落键，且必须 ∈ 本轮证据集合（coverage 校验）。 */
+  sectionKey?: string
 }
 
 /** runConsult 输入（路由层组装：DB 取数 + 用户提问 + env 开关）。 */
@@ -163,6 +165,11 @@ export interface ConsultRunResult {
   matchedKeyword: string | null
   /** 触发拦截的药品 id（供 risk_events.drugId 留痕）。 */
   triggerDrugId: string | null
+  /**
+   * 本轮证据集合（M4-T9 coverage 校验的管线产物）：带段落锚点的 citation 必须登记在册，
+   * 否则 consult.service 剥离越界锚点。缺省 = 该路径无可锚定证据（no-source/data 等）。
+   */
+  evidence?: { sections: Array<{ drugName: string; sectionKey: string }> }
   /**
    * 数据查询路径（status='data-answered'）使用的只读工具名（= QueryIntent 值，如
    * 'medication-list'）；其余回答路径缺省。可选——run.ts 现有返回路径不含此字段亦合法。

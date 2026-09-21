@@ -160,6 +160,11 @@ export const CitationSchema = z.object({
    * 基础三件套引用无此字段；M4-T9 升级为全量段落锚点（sectionKey）。
    */
   sectionLabel: z.string().optional(),
+  /**
+   * 段落锚点（M4-T9）：引用指向的说明书段落键（SECTION_ROUTES 的 key，如 indication/contraindication），
+   * 且必须 ∈ 本轮证据集合（注入完整性校验，services/consult/coverage.ts）。数据直答/网络检索引用无此字段。
+   */
+  sectionKey: z.string().optional(),
 })
 export type Citation = z.infer<typeof CitationSchema>
 

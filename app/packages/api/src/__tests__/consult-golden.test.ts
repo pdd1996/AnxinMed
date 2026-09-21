@@ -154,8 +154,12 @@ describe('不变量 ① 响应结构', () => {
     expect(Object.keys(res.body.sections).sort()).toEqual(
       ['summary', 'keyPoints', 'risks', 'nextAction', 'warning', 'limited'].sort(),
     )
-    // citations 元素结构（三件套 + unverified）
-    expect(Object.keys(res.body.citations[0]).sort()).toEqual(['drugName', 'source', 'version', 'unverified'].sort())
+    // citations 元素结构：三件套 + unverified 基底；M4-T4/T9 增可选段落标记（sectionLabel）与锚点（sectionKey）
+    const citationKeys = Object.keys(res.body.citations[0]).sort()
+    expect(citationKeys).toEqual(expect.arrayContaining(['drugName', 'source', 'version']))
+    for (const k of citationKeys) {
+      expect(['drugName', 'source', 'version', 'unverified', 'sectionKey', 'sectionLabel']).toContain(k)
+    }
     // 标量字段类型面
     expect(typeof res.body.answer).toBe('string')
     expect(typeof res.body.blocked).toBe('boolean')
