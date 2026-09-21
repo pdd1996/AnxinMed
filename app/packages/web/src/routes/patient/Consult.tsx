@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Bot, History, LoaderCircle, MessageSquarePlus, Send, ShieldCheck, User, X } from 'lucide-react'
+import { AlertTriangle, History, LoaderCircle, MessageSquarePlus, Send, ShieldCheck, X } from 'lucide-react'
 import {
   fetchConsultSession,
   fetchConsultSessions,
@@ -39,6 +39,9 @@ import { SpeakButton } from '@/components/domain/voice/SpeakButton'
  * - M3-T4：回答可中文播报（spec §T4.2），播放入口在薄头部（播最新一条回答，纯图标；
  *   L4 急救卡另有专属播报），不支持环境自动降级（spec §T4.3）；
  *   按键式语音输入已按产品决定整体移除（2026-09-20），提问仅手动输入。
+ * - 消息去头像（2026-09-21 UI 改版，对齐阿福式聊天首屏）：1:1 会话头像无信息量、还占
+ *   360px 视口约 11% 宽度；说话方区分靠位置+颜色双编码（老年用户色觉弱，单靠颜色不可靠）：
+ *   用户消息右对齐 + primary 填色白字（对比度 6.5:1 过 AA），AI 回答维持左对齐全宽白卡。
  * - 意图路由 T5：咨询不强制选药——不选药可直接问药箱数据类问题（后端意图路由直查库返回
  *   status='data-answered'，0 LLM）；选药后可问说明书问题。
  * - 快捷问题契约收编（M4-T1）：chips 渲染自 shared 的 CONSULT_*_QUICK_QUESTIONS（与后端
@@ -172,16 +175,16 @@ export default function Consult() {
         <Card className="flex-1">
           <CardContent className="space-y-4 p-4">
             {/* 薄头部：标题 + 会话操作（播放最新回答 / 历史会话列表入口 / 开新会话）；
-                纯图标（44px 触控目标），无障碍名走 aria-label */}
+                纯图标（44px 触控目标），无障碍名走 aria-label；
+                播放入口常驻（无可播回答时置灰），避免空会话下找不到按钮 */}
             <div className="flex items-center gap-1 border-b border-border pb-3">
               <h1 className="min-w-0 flex-1 truncate text-base font-bold">安心 AI 药师助手</h1>
-              {lastResponse && (
-                <SpeakButton
-                  text={buildSpeakText(lastResponse.sections ?? null, lastResponse.answer, lastResponse.notice)}
-                  variant="ghost"
-                  className="size-11 text-muted-foreground"
-                />
-              )}
+              <SpeakButton
+                text={lastResponse ? buildSpeakText(lastResponse.sections ?? null, lastResponse.answer, lastResponse.notice) : ''}
+                label="播放最新回答"
+                variant="ghost"
+                className="size-11 text-muted-foreground"
+              />
               <Button
                 type="button"
                 variant="ghost"
@@ -268,36 +271,28 @@ export default function Consult() {
 
               {messages.map((msg) =>
                 msg.role === 'user' ? (
-                  <div key={msg.id} className="flex items-start gap-2">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                      <User className="size-4" aria-hidden />
-                    </div>
-                    <div className="flex-1 rounded-lg rounded-tl-none border border-border bg-muted/30 p-3">
-                      <p className="text-sm text-foreground">{msg.question}</p>
+                  <div key={msg.id} className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-none bg-primary p-3 text-primary-foreground">
+                      <p className="text-sm">{msg.question}</p>
                     </div>
                   </div>
                 ) : (
-                  <div key={msg.id} className="flex items-start gap-2">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <Bot className="size-4" aria-hidden />
-                    </div>
-                    <div className="flex-1">
-                      {msg.response?.riskLevel === 'L4' && msg.response.sections ? (
-                        <EmergencyCard sections={msg.response.sections} />
-                      ) : msg.response ? (
-                        <AnswerCard
-                          riskLevel={msg.response.riskLevel}
-                          status={msg.response.status}
-                          answer={msg.response.answer}
-                          sections={msg.response.sections ?? null}
-                          citations={msg.response.citations ?? []}
-                          notice={msg.response.notice}
-                          l0Notice={msg.response.l0Notice}
-                          blocked={msg.response.blocked}
-                          toolUsed={msg.response.toolUsed}
-                        />
-                      ) : null}
-                    </div>
+                  <div key={msg.id}>
+                    {msg.response?.riskLevel === 'L4' && msg.response.sections ? (
+                      <EmergencyCard sections={msg.response.sections} />
+                    ) : msg.response ? (
+                      <AnswerCard
+                        riskLevel={msg.response.riskLevel}
+                        status={msg.response.status}
+                        answer={msg.response.answer}
+                        sections={msg.response.sections ?? null}
+                        citations={msg.response.citations ?? []}
+                        notice={msg.response.notice}
+                        l0Notice={msg.response.l0Notice}
+                        blocked={msg.response.blocked}
+                        toolUsed={msg.response.toolUsed}
+                      />
+                    ) : null}
                   </div>
                 ),
               )}
