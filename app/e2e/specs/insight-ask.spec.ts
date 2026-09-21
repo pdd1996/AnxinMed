@@ -67,8 +67,12 @@ async function openDoctor(browser: Browser): Promise<Page> {
 async function askAndExpect(page: Page, question: string, toolLabel: string) {
   await page.getByTestId('ask-input').fill(question)
   await page.getByTestId('ask-send').click()
+  // 必须先锚定新一轮 exchange 的问题文本：ask-answer testid 始终挂在最后一轮卡片上，
+  // 点击后、响应返回前上一轮卡片（同工具 → 同徽章）就能满足下方全部断言，POST 仍在途
+  // 会把落痕竞态漏给后面的 DB 断言。问题文本只在响应返回、setExchanges 追加后才渲染。
+  const exchange = page.getByTestId('ask-exchange')
+  await expect(exchange.getByText(question)).toBeVisible()
   const card = page.getByTestId('ask-answer')
-  await expect(card).toBeVisible()
   await expect(card.getByText('数据查询')).toBeVisible()
   await expect(card.getByText(`来源：${toolLabel}`)).toBeVisible()
 }
@@ -113,13 +117,28 @@ test.describe('医生端问答 E2E（队列固定问法 · 0 次 LLM）', () => 
   })
 
   test('DB：insight_ask_logs 留痕 intent 非空（漏判留痕口径可审计）', async () => {
+    // expect.poll 兜底慢机器：断言依据（响应返回 ⇒ 落痕已提交）在 askAndExpect 已保证，
+    // 这里只是不让任何残余时序抖动打红 CI（10s 上限远大于 data 路径实际写入耗时）
+    await expect
+      .poll(
+        async () =>
+          (
+            await sql`
+              select question, mode, intent, tool_used
+              from insight_ask_logs
+              where patient_id is null and mode = 'data'
+              order by created_at desc
+              limit 6`
+          ).length,
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThanOrEqual(6)
     const rows = await sql`
       select question, mode, intent, tool_used
       from insight_ask_logs
       where patient_id is null and mode = 'data'
       order by created_at desc
       limit 6`
-    expect(rows.length).toBeGreaterThanOrEqual(6)
     for (const row of rows) {
       expect(row.intent).not.toBeNull()
       expect(['adherence_distribution', 'patient_cohort', 'risk_event_rollup']).toContain(row.tool_used)
