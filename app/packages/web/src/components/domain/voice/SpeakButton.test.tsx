@@ -14,6 +14,7 @@ interface MockUtterance {
   rate: number
   onstart: (() => void) | null
   onend: (() => void) | null
+  onerror: (() => void) | null
 }
 
 function stubSynthesis() {
@@ -27,6 +28,7 @@ function stubSynthesis() {
     volume = 1
     onstart: (() => void) | null = null
     onend: (() => void) | null = null
+    onerror: (() => void) | null = null
     constructor(public text: string) {
       utterances.push(this as unknown as MockUtterance)
     }
@@ -89,5 +91,32 @@ describe('SpeakButton · 播放/停止（spec §T4.2）', () => {
     stubSynthesis()
     render(<SpeakButton text="回答" label="朗读这条回答" />)
     expect(screen.getByRole('button', { name: '朗读这条回答' })).toBeTruthy()
+  })
+})
+
+describe('SpeakButton · 播放态复位兜底（2026-09-21 加固）', () => {
+  it('合成失败（只发 onerror 不发 onend，如缺中文语音包）→ 复位为播放态', () => {
+    const { utterances } = stubSynthesis()
+    render(<SpeakButton text="回答" />)
+    fireEvent.click(screen.getByRole('button', { name: '播放回答' }))
+    expect(screen.getByRole('button', { name: '停止播放' })).toBeTruthy()
+    act(() => utterances[0]?.onerror?.())
+    expect(screen.getByRole('button', { name: '播放回答' })).toBeTruthy()
+  })
+
+  it('WebView 静默吞 speak()（onstart/onend/error 均不回调）→ 看门狗 3s 后复位', () => {
+    vi.useFakeTimers()
+    try {
+      stubSynthesis()
+      render(<SpeakButton text="回答" />)
+      fireEvent.click(screen.getByRole('button', { name: '播放回答' }))
+      expect(screen.getByRole('button', { name: '停止播放' })).toBeTruthy()
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(screen.getByRole('button', { name: '播放回答' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

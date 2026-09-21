@@ -42,7 +42,12 @@ export function speak(text: string, options: SpeakOptions = {}): void {
   utterance.pitch = pitch
   utterance.volume = volume
   if (onStart) utterance.onstart = onStart
-  if (onEnd) utterance.onend = onEnd
+  if (onEnd) {
+    utterance.onend = onEnd
+    // 合成失败（如浏览器缺中文语音包）只发 error 不发 end：错误也走同一复位回调，
+    // 避免消费方播放态卡死（按钮永远显示「停止」）。
+    utterance.onerror = onEnd
+  }
   window.speechSynthesis.speak(utterance)
 }
 
