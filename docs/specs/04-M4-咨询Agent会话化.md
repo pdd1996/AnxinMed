@@ -119,3 +119,19 @@ NormalizedSections 五段：summary / keyPoints（≤3）/ risks（≤3）/ next
 
 **A5 上下文确认**
 citations 与 toolUsed 透传前端折叠展示，用户可展开核对 AI 依据的说明书来源（source/version）与数据工具；发送第三方模型的内容仅含说明书资料与白名单用户信息（衔接 PRD §12.2 脱敏出口约束）；健康信息上下文一律标「用户提供、未经医学验证」。M4 起：conditions 注入块受 ai-clients 请求体白名单断言约束（T8），过敏经确定性覆盖层附加警示而非模型联想（T4）。
+
+## 附录 B · M4 落地增量回写（2026-09-21，T10）
+
+> 附录 A 为重锚版咨询细则（基线 = M3 验收实现）；本节回写 M4 T1–T9 落地后的增量，与附录 A 正文冲突时以本节为准。
+
+- **A2 可答范围**：数据直答 4+1 意图——`next-dose`（今日待服：计划时点 × 已服状态直查库）已落地（T7）；快捷问题 chips 契约收编 shared（`CONSULT_DATA/INSERT_QUICK_QUESTIONS`）并带 skillId 快路径直达（跳过正则；守门 S0 仍优先；未知 skillId 400）。
+- **A3 拒答与拦截**：新增**过敏确定性覆盖层**（T4）——档案「过敏史」关键词 ∩ 对象药禁忌段命中 → `sections.risks` 追加固定警示 + citations 追加禁忌段引用（显式锚定 `contraindication`）；提示非拦截，不改 riskLevel、不进 risk_events；不经模型联想（裁决 #3）。
+- **A4 回答结构**：citations 升级为「三件套 + `sectionKey` 段落锚点（M4-T9，且 ∈ 本轮证据集合——`coverage.ts` 注入完整性校验，越界锚点剥离）+ 可选 `sectionLabel`（T4 禁忌标记）」；多药咨询主药按键段落 + 其余对象药身份快照（说明书段落不注入，prompt 禁止虚构，T9）。
+- **A5 上下文确认**：conditions 注入已落地（T8）——档案「诊断」字段、标「用户提供、未经医学验证」、硬性约束「说明书事实 × 用户慢病事实的交集陈述，禁止推断」、≤10 条/200 字封顶、L3 出口脱敏；请求体白名单断言 + 注入前后守门/过滤行为一致专项 golden 背书。
+- **会话与回写（D1/D5 差距闭合）**：`consult_sessions` 会话层落地（首答建会话回传 sessionId、续问 turn_no 递增、历史列表/回放端点）；确认式建议卡 `consult_suggestions` 落地（add_drug 确定性规则 + accept 双路径只置状态零写入 + dismissed 不复弹）。
+
+## 附录 C · T10 验收证据索引（2026-09-21）
+
+- §16.3 六条增补逐项证据：PRD §16.3 表内括注（集成/ web / E2E 用例数）+ 各任务交付说明（git 提交 69f10e2…da64189）。
+- 全量回归：`pnpm -r typecheck` + api 508 + web 134 测试 + E2E consult 10 条（fixture 全量回放即逐字节重验——咨询包 source=synthetic 人工复核后无漂移，复核记录见 docs/11 §1.3）。
+- 指标基线：骨架 P95 P50=10.4ms / P95=17.1ms（perf:consult，docs/11 §2）；strip 触发率与意图漏判率抽检见 docs/11 §2.1 记录表（漏判首检需人工标注）。

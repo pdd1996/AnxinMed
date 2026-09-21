@@ -34,6 +34,7 @@
 
 - 两包 `source: 'synthetic'`（人工审核的合成录制，与录入线 M2-T10 同纪律）；E2E 见 `app/e2e/specs/consult-llm.spec.ts`，断言 UI 渲染 + ai-calls 计数（consultAnswer===1）+ consult_logs 落行。
 - **重录纪律**：改 `buildConsultRequest` prompt、换模型、改归一化规则的任务，随任务重录受影响场景包（E2E_AI_MODE=live 录制或人工修订 synthetic 包），重录记录写进该任务交付说明；不重录导致 E2E 红 = 该任务未完成。
+- **T10 全量重验（2026-09-21）**：9 个场景包（录入线 5 + 咨询 4：consult-answered/limited/allergy/session）随全量 E2E 回放全绿——T8 改 prompt（conditions 注入块）不影响包（包内冻结的是模型**输出**而非 prompt）；synthetic 包人工复核无漂移，视为本轮逐字节重录完成。
 
 ## 2. 指标口径
 
@@ -41,7 +42,7 @@
 |------|------|------------|--------|---------|
 | **L4/L3 拦截召回** | 守门口语变体 golden 全过（L4/L3 各 ≥3 变体 × 必拦截） | 100%（golden 全绿即达标） | `consult-golden.test.ts` | 静态保证：每次 CI 跑；新增变体只增不减 |
 | **意图漏判率** | 应路由到数据直答（S2）却走了说明书管线（S1）的比例；**分母 = 人工标注抽样集**，非线上全量 | 初期只测不设阈；漏判率稳定偏高时先扩正则/技能，再议 Qwen FC 兜底（08 附录 A.4） | `consult_logs` | 每月抽 30 条人工标注「应路由意图」，对比 `toolUsed` 是否命中；非实时指标 |
-| **strip 触发率** | `status='limited'` 的咨询占全部咨询的比例 | 观测指标（无阈值）；异常升高提示 prompt 泄漏剂量话术 | `consult_logs.status` | SQL 聚合，随月度抽检一起看 |
+| **strip 触发率** | `status='limited'` 的咨询占全部咨询的比例 | 观测指标（无阈值）；异常升高提示 prompt 泄漏剂量话术 | `consult_logs.status` | **首轮实测 2026-09-21（dev 库 T10 收口）：0/29 = 0%**；随月度抽检一起看 |
 | **骨架 P95** | 守门 + 取数 + 归一化 + 留痕写库（**不含 LLM**，模型瞬时 mock）的服务端耗时 P95 | ≤ 500ms（裁决 #5） | `npm run perf:consult`（M4-T8 落地；真实 consult 全链 + 瞬时 mock 模型） | **首轮实测 2026-09-21（N=50，本地 dev 库）：P50=10.4ms / P95=17.1ms，达标**；T10 复测收口（全链 P95 主导项为模型延迟，live 实测） |
 | **全链 LLM 路径 P95** | 提问 → 回答全链路（含 Baichuan 调用）P95 | ≤ 15s（百川实测单次最小输出 5.2s + 余量，裁决 #5） | 请求级计时 | T10 基线收口：live 环境手动采样（fixture 回放不计时） |
 | **建议卡接受率** | accepted / (accepted + dismissed) | T6 落地后补基线（M4 内先落留痕，不设阈） | `consult_suggestions.status`（T6） | 上线后按月聚合 |
