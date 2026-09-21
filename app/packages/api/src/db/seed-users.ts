@@ -3,9 +3,11 @@
  *
  * 导出 seedUsers(db) 供两处复用：① CLI 直接运行对 dev 库执行；② 测试 globalSetup 对测试库执行。
  * 背景：drug-crawler 工作流已把 dev 库药品改为 drug-*，seed.ts 的资产部分（读 mock-* 的 mock-data.json）
- *       不可再对 dev 库跑（会污染）；但患者（p-*）未受改名影响，patients 仍是有效的用户来源。
- * 范围：8 名患者 → users（id + name；email/phone 为 null，mock-data 无此数据，不编造）。
- *       health_profiles / plans / records 的 p-001 演示数据留 M1-T9。
+ *       不可再对 dev 库跑（会污染）；但患者（p-*）未受改名影响，仍是有效的用户来源。
+ * 数据源 seed-patients.json（同目录）：demo/server/mock-data.json 的 patients 冻结副本，仅保留
+ *       users 表需要的 id + name（2026-09-21 固化）。demo/ 是嵌套只读参照仓库，不入 git，
+ *       CI checkout 无该文件，故包内自持 fixture；demo 已冻结不再演进，无漂移风险。
+ * 范围：8 名患者 → users（email/phone 为 null，源数据无此字段，不编造）。
  */
 import 'dotenv/config'
 import { readFileSync } from 'node:fs'
@@ -16,13 +18,11 @@ import { db as devDb, client } from './client.js'
 import { users } from './schema.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-// src/db → 上溯 5 级到工作区根目录
-const mockDataPath = join(__dirname, '..', '..', '..', '..', '..', 'demo', 'server', 'mock-data.json')
+const patientsPath = join(__dirname, 'seed-patients.json')
 
-/** 把 mock-data.json 的 patients 写入 users（幂等）。可传入测试库实例；返回写入行数。 */
+/** 把冻结的 patients 写入 users（幂等）。可传入测试库实例；返回写入行数。 */
 export async function seedUsers(db: PostgresJsDatabase<any> = devDb): Promise<number> {
-  const raw = readFileSync(mockDataPath, 'utf8')
-  const patients: any[] = JSON.parse(raw).patients ?? []
+  const patients: any[] = JSON.parse(readFileSync(patientsPath, 'utf8'))
   for (const p of patients) {
     await db
       .insert(users)
