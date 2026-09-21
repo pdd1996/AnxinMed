@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --watch --import tsx src/index.ts",
     "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --external:postgres --external:drizzle-orm --external:hono --external:@hono/node-server --external:@hono/zod-validator --external:dotenv --external:zod",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",

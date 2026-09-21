@@ -29,7 +29,7 @@ pnpm dev
 ```
 
 打开 http://localhost:5173 。首次进入会显示免责声明引导；seed 后「今日任务」即有演示数据。
-> 注：`pnpm dev` 下 api 为 `tsx watch`，**首次冷编译约 30–60s**（之后秒起）；web 就绪早于 api 属正常。
+> 注：`pnpm dev` 下 api 为 `node --watch --import tsx`（Node 内置 watch + tsx 加载器；不用 `tsx watch`，其在 Windows + pnpm `-r --parallel` 管道 stdio 下会死锁：进程活、无输出、8787 不监听，参见 tsx#623）。web 就绪早于 api 属正常。
 
 ## 测试与质量
 
