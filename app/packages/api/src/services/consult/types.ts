@@ -135,6 +135,8 @@ export interface ConsultRunInput {
   drugNameById: Record<string, string>
   /** env 开关：本地未命中该药品时才兜底开 Baichuan 医疗搜索（默认 false）。 */
   enableMedicalSearch: boolean
+  /** 用户自述慢病（M4-T8 · 已过 L3 出口脱敏 + 条数/字数封顶；空/缺省 = 不注入 prompt）。 */
+  conditions?: string[]
   /** AI 客户端注入接缝（M2-T1）；测试注入 mock，生产为 baichuan。 */
   ai: AiClients
 }

@@ -23,6 +23,7 @@
     "db:audit": "tsx src/db/data-audit.ts",
     "perf:intake": "tsx src/scripts/perf-intake.ts",
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",
+    "perf:consult": "tsx src/scripts/perf-consult.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

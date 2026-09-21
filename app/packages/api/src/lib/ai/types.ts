@@ -72,6 +72,11 @@ export interface ConsultPromptPayload {
   section: { label: string; version: string | null; text: string }
   /** 相互作用上下文渲染后的文本（已含「未覆盖 ≠ 无风险」提示）。 */
   interactionsText: string
+  /**
+   * 用户自述慢病（M4-T8 · 裁决 #3：仅 conditions 交集陈述注入；已过 L3 出口脱敏 + 条数/字数上限）。
+   * 缺省/空 = 不注入（prompt 不含该块）。allergy 不进此通道（走 T4 确定性覆盖层）。
+   */
+  conditions?: string[]
 }
 
 /**

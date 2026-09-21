@@ -58,7 +58,14 @@ export async function fallbackParse(bodyText: string, missingFields: string[]): 
  * 与 demo/server/index.js:1019-1050 等价，拆出为独立函数便于单测与 E2E fixture 回放。
  */
 export function buildConsultRequest(payload: ConsultPromptPayload) {
-  const { question, drug, section, interactionsText } = payload
+  const { question, drug, section, interactionsText, conditions } = payload
+  // M4-T8 conditions 交集注入（裁决 #3）：仅「用户提供、未经医学验证」的慢病清单 + 交集陈述
+  // 硬性约束；空/缺省 = 不注入。allergy 不走此通道（T4 确定性覆盖层，不经模型）。
+  const conditionsBlock =
+    conditions && conditions.length > 0
+      ? `用户自述慢病（用户提供、未经医学验证）：${conditions.join('、')}
+硬性约束：回答只能是「上方说明书事实 × 用户慢病事实的交集陈述」——只陈述说明书段落中与用户慢病直接相关的内容；说明书未覆盖的慢病关联不得推断、不得扩展，明确说明资料未覆盖。`
+      : ''
   const content = `你是"安心用药"药品资料解释助手，基于已确认药品的本地说明书库回答问题。
 
 硬性规则：
@@ -77,7 +84,7 @@ JSON 格式：
 ${drug.isManual ? '注意：该药品为用户手动建档（未经 OCR 确认），回答仅做一般性资料解释（L0），不得结合个体情况展开。' : ''}
 本次取用的说明书段落（${section.label}，版本 ${section.version || '未标注'}）：
 ${section.text}
-
+${conditionsBlock ? `\n${conditionsBlock}\n` : ''}
 ${interactionsText}
 
 用户问题：${question}`

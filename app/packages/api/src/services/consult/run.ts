@@ -267,6 +267,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
       },
       section: { label: section.label, version: insert.version, text: section.text },
       interactionsText: renderInteractionsForPrompt(interactions),
+      conditions: input.conditions,
     })
     sections = normalizeSections(raw, {
       summaryFallback: section.text.replace(/^[^：:]+[：:]/, '').slice(0, 120),

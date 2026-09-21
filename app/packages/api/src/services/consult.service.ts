@@ -37,6 +37,7 @@ import { runConsult } from './consult/run.js'
 import { runDataQuery } from './consult/dataquery.js'
 import { routeSkill } from './consult/registry.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
+import { extractConditions } from './consult/conditions.js'
 import { matchAddDrug, matchSymptomGuide } from './consult/suggestion.js'
 import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
@@ -185,15 +186,20 @@ export async function consult(
   // 1. 用户提问脱敏（L3 出口约束）：落库与送 LLM 都用脱敏后文本，绝不带原文 PII
   const questionRedacted = scrubWithPatterns(question, PII_ASSERT_PATTERNS)
 
-  // 2. 并行取数：咨询对象 + 生效计划集合 + 相互作用规则 + 过敏史（M4-T4 覆盖层，白名单只读）
-  const [drugs, activeMasterIds, ruleRows, allergyKeywords] = await Promise.all([
+  // 2. 并行取数：咨询对象 + 生效计划集合 + 相互作用规则 + 档案白名单字段（M4-T4 过敏史 / M4-T8 慢病）
+  const [drugs, activeMasterIds, ruleRows, profileContext] = await Promise.all([
     resolveConsultDrugs(userId, drugIds),
     resolveActiveMasterIds(userId),
     assetsRepo.listInteractionRules(),
-    // profiles.repo 首次进 consult 链路（M4-T4）：只读「过敏史」一个字段，其余档案字段不进咨询上下文
-    profilesRepo
-      .listByUser(userId)
-      .then((rows) => extractAllergyKeywords(rows.map((r) => ({ fieldKey: r.fieldKey, value: r.value })))),
+    // profiles.repo 进 consult 链路的白名单只读：只取「过敏史」（T4 覆盖层）与「诊断」（T8 交集注入）
+    // 两个字段，其余档案字段一律不进咨询上下文；诊断值逐个过 L3 出口脱敏后才进 prompt 通道
+    profilesRepo.listByUser(userId).then((rows) => {
+      const slim = rows.map((r) => ({ fieldKey: r.fieldKey, value: r.value }))
+      return {
+        allergyKeywords: extractAllergyKeywords(slim),
+        conditions: extractConditions(slim).map((c) => scrubWithPatterns(c, PII_ASSERT_PATTERNS)),
+      }
+    }),
   ])
 
   // 3. 组装规则引擎入参（复用 M2-T5 checkInteractions 的形态约定）
@@ -252,6 +258,7 @@ export async function consult(
       interactionRules,
       drugNameById,
       enableMedicalSearch: isMedicalSearchEnabled(),
+      conditions: profileContext.conditions,
       ai,
     })
   }
@@ -266,7 +273,12 @@ export async function consult(
   ) {
     const primaryInsert = drugs.find((d) => d.insert !== null)?.insert ?? null
     if (primaryInsert) {
-      const patched = allergyOverlay(allergyKeywords, primaryInsert.contraindications, result.sections, result.citations)
+      const patched = allergyOverlay(
+        profileContext.allergyKeywords,
+        primaryInsert.contraindications,
+        result.sections,
+        result.citations,
+      )
       result = { ...result, sections: patched.sections, citations: patched.citations }
     }
   }

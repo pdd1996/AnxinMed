@@ -218,6 +218,39 @@ describe('ocr 客户端（qwen3.5-ocr 行级转录）', () => {
   })
 })
 
+describe('buildConsultRequest 白名单（M4-T8 conditions 注入）', () => {
+  const basePayload = {
+    question: '这个药通常用于什么？',
+    drug: { genericName: '玻璃酸钠滴眼液', brandName: '海露', specification: '0.1%', form: '滴眼液', isManual: false },
+    section: { label: '适应症段', version: '2024-01', text: '适应症：用于缓解干眼症状' },
+    interactionsText: '生效计划集合中未见已知相互作用。',
+  }
+
+  it('有 conditions：注入块含「用户提供、未经医学验证」标注 + 逐值出现 + 交集陈述硬性约束', () => {
+    const req = baichuan.buildConsultRequest({ ...basePayload, conditions: ['高血压', '青光眼'] })
+    const content = req.messages[0].content as string
+    expect(content).toContain('用户自述慢病（用户提供、未经医学验证）：高血压、青光眼')
+    expect(content).toContain('交集陈述')
+    expect(content).toContain('不得推断、不得扩展')
+    // 逐字段：每个慢病值都进了 prompt
+    for (const c of ['高血压', '青光眼']) expect(content).toContain(c)
+  })
+
+  it('无 conditions / 空数组：prompt 不含注入块（缺省 = M3 行为）', () => {
+    for (const payload of [basePayload, { ...basePayload, conditions: [] }]) {
+      const content = (baichuan.buildConsultRequest(payload).messages[0].content as string)
+      expect(content).not.toContain('用户自述慢病')
+      expect(content).not.toContain('交集陈述')
+    }
+  })
+
+  it('temperature/model 契约不变（temperature 0.1，baichuan 默认模型）', () => {
+    const req = baichuan.buildConsultRequest({ ...basePayload, conditions: ['高血压'] })
+    expect(req.temperature).toBe(0.1)
+    expect(req.model).toBe('baichuan-m3-plus')
+  })
+})
+
 describe('baichuan 客户端', () => {
   it('fallbackParse 成功', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => chatRes({ frequency: '1' })))
