@@ -12,6 +12,7 @@ interface MockUtterance {
   text: string
   lang: string
   rate: number
+  onstart: (() => void) | null
   onend: (() => void) | null
 }
 
@@ -66,9 +67,8 @@ describe('SpeakButton · 播放/停止（spec §T4.2）', () => {
     expect(speakFn).toHaveBeenCalledTimes(1)
     expect(utterances[0]?.text).toBe('该药用于缓解干眼症状')
     expect(utterances[0]?.lang).toBe('zh-CN')
-    // 播放态：文案与 aria-label 切换为停止
+    // 播放态：纯图标按钮，aria-label 切换为停止（无可见文字可断言）
     expect(screen.getByRole('button', { name: '停止播放' })).toBeTruthy()
-    expect(screen.getByText('停止')).toBeTruthy()
 
     // 再点 → 停止（cancel 再次被调用）
     fireEvent.click(screen.getByRole('button', { name: '停止播放' }))

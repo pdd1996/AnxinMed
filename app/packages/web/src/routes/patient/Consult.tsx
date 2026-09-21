@@ -19,9 +19,10 @@ import {
   type ConsultSkillId,
   type ConsultSuggestion,
 } from '@anxin/shared'
-import { AnswerCard } from '@/components/domain/consult/AnswerCard'
+import { AnswerCard, buildSpeakText } from '@/components/domain/consult/AnswerCard'
 import { EmergencyCard } from '@/components/domain/consult/EmergencyCard'
 import { SuggestionCard } from '@/components/domain/consult/SuggestionCard'
+import { SpeakButton } from '@/components/domain/voice/SpeakButton'
 
 /**
  * 咨询页（M3-T2 · PRD §7.5 / spec §T2）——围绕已确认药品提问，移动端按「千问式」聊天首屏布局。
@@ -35,7 +36,8 @@ import { SuggestionCard } from '@/components/domain/consult/SuggestionCard'
  * - 输入区 sticky 固定在底部导航上方：bottom-16 对齐 BottomNav 高度（~61px），-mb-12 抵消
  *   PatientLayout main 的 pb-28 富余（112-48=64），使滚动钉住态与滚到底静止态落位一致；
  *   主列 min-h 用 dvh 算满视口 + 聊天 Card flex-1，保证内容不足一屏时输入区也贴底（不留中段空白）。
- * - M3-T4：回答卡含中文播报（见 AnswerCard/EmergencyCard），不支持环境自动降级（spec §T4.3）；
+ * - M3-T4：回答可中文播报（spec §T4.2），播放入口在薄头部（播最新一条回答，纯图标；
+ *   L4 急救卡另有专属播报），不支持环境自动降级（spec §T4.3）；
  *   按键式语音输入已按产品决定整体移除（2026-09-20），提问仅手动输入。
  * - 意图路由 T5：咨询不强制选药——不选药可直接问药箱数据类问题（后端意图路由直查库返回
  *   status='data-answered'，0 LLM）；选药后可问说明书问题。
@@ -159,6 +161,9 @@ export default function Consult() {
     queryClient.invalidateQueries({ queryKey: ['consult-sessions'] })
   }
 
+  // 最新一条回答（头部播放入口的播报对象；卡内不再重复放播放按钮，2026-09-21 UI 改版）
+  const lastResponse = [...messages].reverse().find((m) => m.role === 'assistant' && m.response)?.response
+
   return (
     <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_320px]">
       {/* 主列：min-h 用 dvh 算满视口（100dvh - 顶栏56 - main pt24 - main pb112），
@@ -166,29 +171,37 @@ export default function Consult() {
       <div className="flex min-h-[calc(100dvh-192px)] min-w-0 flex-col gap-4 lg:col-span-1">
         <Card className="flex-1">
           <CardContent className="space-y-4 p-4">
-            {/* 薄头部：标题 + 会话操作（历史会话列表入口 / 开新会话；M4-T5） */}
-            <div className="flex items-center gap-2 border-b border-border pb-3">
+            {/* 薄头部：标题 + 会话操作（播放最新回答 / 历史会话列表入口 / 开新会话）；
+                纯图标（44px 触控目标），无障碍名走 aria-label */}
+            <div className="flex items-center gap-1 border-b border-border pb-3">
               <h1 className="min-w-0 flex-1 truncate text-base font-bold">安心 AI 药师助手</h1>
+              {lastResponse && (
+                <SpeakButton
+                  text={buildSpeakText(lastResponse.sections ?? null, lastResponse.answer, lastResponse.notice)}
+                  variant="ghost"
+                  className="size-11 text-muted-foreground"
+                />
+              )}
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="min-h-11 gap-1 px-2 text-xs text-muted-foreground"
+                size="icon"
+                className="size-11 text-muted-foreground"
                 onClick={() => setHistoryOpen((v) => !v)}
                 aria-expanded={historyOpen}
+                aria-label="历史会话"
               >
-                <History className="size-4" aria-hidden />
-                历史会话
+                <History className="size-5" aria-hidden />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="min-h-11 gap-1 px-2 text-xs text-muted-foreground"
+                size="icon"
+                className="size-11 text-muted-foreground"
                 onClick={handleNewSession}
+                aria-label="开新会话"
               >
-                <MessageSquarePlus className="size-4" aria-hidden />
-                开新会话
+                <MessageSquarePlus className="size-5" aria-hidden />
               </Button>
             </div>
 

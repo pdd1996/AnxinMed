@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Square, Volume2 } from 'lucide-react'
+import { Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { isSpeechSynthesisSupported, speak, stopSpeaking } from '@/lib/speech'
@@ -7,7 +7,8 @@ import { isSpeechSynthesisSupported, speak, stopSpeaking } from '@/lib/speech'
 /**
  * 中文语音播报按钮（M3-T4 · spec §T4.2）——咨询回答可播放。
  *
- * - 播放/停止切换：点击播放 → speechSynthesis 中文播报；再点击 → cancel 停止；
+ * - 纯图标（2026-09-21 UI 改版：去「播放/停止」文字，无障碍名走 aria-label/title）；
+ * - 播放/停止切换：点击播放 → speechSynthesis 中文播报；再点击 → cancel 停止（VolumeX 静音图标）；
  * - 播报结束（onend）自动复位播放态；卸载时停止，避免离开页面仍在念；
  * - 降级（spec §T4.3）：speechSynthesis 不可用或无文本时置灰 + title 文案说明，不抛错。
  *
@@ -21,6 +22,8 @@ export interface SpeakButtonProps {
   /** 不支持语音合成时的降级文案。 */
   unsupportedHint?: string
   disabled?: boolean
+  /** 按钮视觉变体（透传 Button）：与所在行的图标按钮族对齐，默认 outline。 */
+  variant?: 'outline' | 'ghost'
   className?: string
 }
 
@@ -29,6 +32,7 @@ export function SpeakButton({
   label = '播放回答',
   unsupportedHint = '当前浏览器不支持语音播报。',
   disabled = false,
+  variant = 'outline',
   className,
 }: SpeakButtonProps) {
   const [supported] = useState<boolean>(() => isSpeechSynthesisSupported())
@@ -66,16 +70,15 @@ export function SpeakButton({
   return (
     <Button
       type="button"
-      variant="outline"
-      size="sm"
+      variant={variant}
+      size="icon"
       disabled={isDisabled}
       onClick={handleClick}
       aria-label={playing ? '停止播放' : label}
       title={supported ? (playing ? '停止播放' : label) : unsupportedHint}
-      className={cn('min-h-9 gap-1.5', className)}
+      className={cn('min-h-9 min-w-9', className)}
     >
-      {playing ? <Square className="size-4" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
-      <span>{playing ? '停止' : '播放'}</span>
+      {playing ? <VolumeX className="size-5" aria-hidden /> : <Volume2 className="size-5" aria-hidden />}
     </Button>
   )
 }

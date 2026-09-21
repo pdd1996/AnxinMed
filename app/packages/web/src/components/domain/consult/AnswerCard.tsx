@@ -2,7 +2,6 @@ import { AlertTriangle, ChevronRight, Database, Info, ShieldCheck } from 'lucide
 import type { ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { RiskBadge } from '@/components/domain/RiskBadge'
 import { Card, CardContent } from '@/components/ui/card'
-import { SpeakButton } from '@/components/domain/voice/SpeakButton'
 import { CitationsList } from './CitationsList'
 import type { Citation } from '@anxin/shared'
 
@@ -63,8 +62,10 @@ export interface AnswerCardProps {
 /**
  * 组装中文播报文本（spec §T4.2）：结构化 sections 按「结论→需要知道→注意风险→下一步→提醒」顺序朗读，
  * 否则用一句话 answer；末尾附 notice（如 L2 过滤提示）。去除尾部句号避免叠字。
+ *
+ * 导出供咨询页头部播放入口复用（2026-09-21 UI 改版：播放入口从卡内移到页头部，播最新一条回答）。
  */
-function buildSpeakText(sections: ConsultSections | null, answer: string, notice?: string | null): string {
+export function buildSpeakText(sections: ConsultSections | null, answer: string, notice?: string | null): string {
   const parts: string[] = []
   if (sections) {
     parts.push(sections.summary)
@@ -103,7 +104,7 @@ export function AnswerCard({
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
       <CardContent className="space-y-3 p-4">
-        {/* 顶部：RiskBadge + status 徽章 + toolUsed 小字徽章 + 播报（M3-T4 §T4.2） */}
+        {/* 顶部：RiskBadge + status 徽章 + toolUsed 小字徽章（播放入口已移到页头部，见 Consult.tsx） */}
         <div className="flex flex-wrap items-center gap-2">
           <RiskBadge level={riskLevel} showHint />
           <span
@@ -117,7 +118,6 @@ export function AnswerCard({
               来源：{toolLabel}
             </span>
           )}
-          <SpeakButton text={buildSpeakText(sections, answer, notice)} className="ml-auto" />
         </div>
 
         {/* 中部：sections 结构化（如有）；否则仅 answer 一句话 */}

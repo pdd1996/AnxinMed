@@ -31,7 +31,7 @@ export function EmergencyCard({ sections }: { sections: ConsultSections }) {
             <h2 className="text-lg font-bold text-risk-l4">紧急风险提示</h2>
             <p className="text-sm font-medium text-foreground">{sections.summary}</p>
           </div>
-          <SpeakButton text={speakText} label="播报急救指引" className="shrink-0" />
+          <SpeakButton text={speakText} label="播报急救指引" className="size-11 shrink-0" />
         </div>
 
         {sections.risks.length > 0 && (
