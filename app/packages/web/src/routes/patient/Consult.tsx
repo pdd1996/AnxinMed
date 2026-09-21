@@ -378,9 +378,6 @@ export default function Consult() {
             </Button>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            AI 基于本地说明书库按键取数回答，不诊断、不处方、不建议自行调整剂量；不预测个体疗效。
-          </p>
         </div>
       </div>
 
