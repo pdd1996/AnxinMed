@@ -34,3 +34,9 @@ demo/
 .zcode/
 
 gui-test-screenshots/
+# ── 爬虫工具与数据（含登录凭证，永不入库；内容版权归丁香园，见 PRD §13.1/§14）──
+tools/drug-crawler/
+data/crawled/
+data/category-manifests/
+data/import-log.jsonl
+data/crawled-总账.md
