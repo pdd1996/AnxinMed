@@ -32,3 +32,5 @@ app/e2e/shot-*.png
 demo/
 
 .zcode/
+
+gui-test-screenshots/
