@@ -30,3 +30,5 @@ app/e2e/shot-*.png
 
 # ── demo：嵌套 git 仓库，只读迁移参照物，不纳入本仓库跟踪（保留其独立历史）──
 demo/
+
+.zcode/
