@@ -1,6 +1,6 @@
 # 安心用药 · app（正式工程）
 
-把一个人所有来源的药放进同一个药箱——管依从、管冲突、管效期。本目录为 pnpm 单仓正式工程（M1 地基 → M3 打磨）。演示参照物在仓库 `demo/`（只读），真相源文档在 `docs/`。
+把一个人所有来源的药放进同一个药箱——管依从、管冲突、管效期。本目录为 pnpm 单仓正式工程（M1 地基 → M3 打磨 → M4 咨询改革）。演示参照物在工作区根 `demo/`（只读，嵌套独立 git 仓库，不入本仓库跟踪），真相源文档在 `docs/`。
 
 ## 前置
 
@@ -34,11 +34,11 @@ pnpm dev
 ## 测试与质量
 
 ```bash
-pnpm test            # shared 纯函数 + api 集成(独立测试库 anxin_medication_test) + web 冒烟
+pnpm test            # shared 纯函数 + api 集成(独立测试库 anxin_medication_test) + web 冒烟 + mcp 工具面
 pnpm test:e2e        # M2-T10 golden case E2E（Playwright + fixture 回放，无 key 可跑；独立端口 8797/5174）
 pnpm test:e2e:live   # 有 key 环境跑真实管线（发布前手动，非回归）
 pnpm --filter @anxin/api perf:intake  # M3-T5 医嘱线打点采样：上传→草稿 非模型开销 P50/P95（详见 docs/09）
-pnpm -r typecheck    # 四包类型检查（shared/api/web/e2e）
+pnpm -r typecheck    # 五包类型检查（shared/api/web/mcp/e2e）
 pnpm lint            # ESLint（MVP 阶段部分规则为 warn）
 pnpm -r build        # web: vite build；api: esbuild bundle → dist
 ```
@@ -52,7 +52,8 @@ app/
 ├── packages/
 │   ├── shared/   # 领域契约：zod schema / 枚举 / 元数据 / 纯函数（前后端一份真相）
 │   ├── api/      # Hono API：routes(薄) → services(业务) → repositories(Drizzle)；db/(schema/迁移/seed)
-│   └── web/      # React SPA：router / routes / stores(zustand) / components(shadcn+domain) / api(hc 客户端)
+│   ├── web/      # React SPA：router / routes / stores(zustand) / components(shadcn+domain) / api(hc 客户端)
+│   └── mcp/      # 医生端只读 MCP Server（stdio，把 3 个守门端点包成 MCP 工具，ADR #19）
 ├── e2e/               # M2-T10 Playwright golden case E2E（fixture 回放 + 独立测试库）
 ├── fixtures/          # golden case 样张真相源（golden-cases.json + PNG + 渲染器，T9/T10 共用）
 ├── docker-compose.yml   # 生产形态：api(多阶段镜像) + db

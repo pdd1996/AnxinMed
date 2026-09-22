@@ -33,11 +33,11 @@
 
 | 目录 | 说明 |
 | --- | --- |
-| [`app/`](app/) | 正式工程。pnpm 单仓：`packages/shared`（zod 契约）+ `packages/api`（Hono API）+ `packages/web`（React 前端），另有 `e2e/`（Playwright golden case）、`fixtures/`（AI 回放样张）与 Docker 编排 |
-| [`data/`](data/) | 说明书数据整理区：`crawled/` 草稿 + 总账 + 入库台账（git 版本化；人工核对后升 reviewed） |
-| [`demo/`](demo/) | MVP 演示版，正式工程的迁移参照物。**只读冻结，不再演进** |
+| [`app/`](app/) | 正式工程。pnpm 单仓：`packages/shared`（zod 契约）+ `packages/api`（Hono API）+ `packages/web`（React 前端）+ `packages/mcp`（医生端只读 MCP Server，ADR #19），另有 `e2e/`（Playwright golden case）、`fixtures/`（AI 回放样张）与 Docker 编排 |
+| [`data/`](data/) | 说明书数据整理区：`crawled/` 草稿 + 总账 + 入库台账（内容版权归丁香园，**不入库仅本地保留**，见 `.gitignore`；人工核对后升 reviewed） |
+| `demo/` | MVP 演示版，正式工程的迁移参照物。**只读冻结，不再演进**（嵌套独立 git 仓库，不入本仓库跟踪） |
 | [`docs/`](docs/) | 真相源文档：PRD / ADR / 技术方案 / 任务书 / 验收清单 |
-| [`tools/`](tools/) | 辅助工具：`drug-crawler`（说明书爬虫）、`ocr-bench`（OCR 基准） |
+| [`tools/`](tools/) | 辅助工具：`ocr-bench`（OCR 基准，入库）、`drug-crawler`（说明书爬虫，含登录凭证与版权内容，不入库仅本地） |
 
 ## 技术栈
 
@@ -46,7 +46,7 @@
 | 前端 | React 19 + TypeScript + Vite 6 + react-router 8 + zustand + TanStack Query + shadcn/ui + Tailwind CSS 4 + lucide-react |
 | 后端 | Hono + @hono/node-server（端口 8787）；routes → services → repositories 三层；`hc<AppType>` 端到端类型推断 |
 | 校验 | zod（schema 定义在 shared 包，前后端一份真相） |
-| 数据 | PostgreSQL 16 + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git，12 张表） |
+| 数据 | PostgreSQL 16 + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git，15 张表） |
 | AI | Qwen3-VL / qwen3.5-ocr 云端（医嘱线行级转录，ADR #16）/ Baichuan；统一 AiClients 注入接缝；E2E 用 fixtures 回放 |
 | 测试 | Vitest（单测 + `app.request()` 集成，独立测试库）+ Playwright（5 条 golden case E2E） |
 | 仓库 | pnpm 11 workspace（Node >= 20，ESM） |
@@ -130,17 +130,14 @@ api 多阶段镜像同时托管 web 构建产物，浏览器直接打开 <http:/
 
 ## 项目状态
 
-M1 / M2 / M3 全部完成：golden case E2E 全过、PRD §16 验收项通过，详见 [docs/specs/acceptance-MVP.md](docs/specs/acceptance-MVP.md)。
+M1 / M2 / M3 / M4 全部完成（`m1-done` ~ `m4-done` tag 均已打）：golden case E2E 全过、PRD §16 验收项通过，详见 [docs/specs/acceptance-MVP.md](docs/specs/acceptance-MVP.md)；M4 咨询 Agent 架构改革见 [docs/10-咨询Agent架构改革方案.md](docs/10-咨询Agent架构改革方案.md) 与 [docs/11-咨询Agent评估与指标口径-M4.md](docs/11-咨询Agent评估与指标口径-M4.md)。
 
 **性能数据**（详见 [docs/09-性能与健壮性报告-M3-T5.md](docs/09-性能与健壮性报告-M3-T5.md)）：非模型开销 P50 = 6.2ms / P95 = 10.6ms；首屏 143.54KB gzip。
 
-**三项待复测保留项**（如实列出）：
+CI 已于 push main 后实跑确认全绿（原第三项保留项销项）。**两项待复测保留项**（如实列出）：
 
 1. 真实医嘱线 P95 ≤ 15s 的 live 实测（当前为离线/回放口径）
 2. 生产 docker 形态端到端验证
-3. CI 推送 main 后实跑确认
-
-`m1-done` / `m3-done` tag 暂缓至上述保留项补齐后补打。
 
 ## 工程原则（安全不变式）
 
@@ -163,9 +160,12 @@ M1 / M2 / M3 全部完成：golden case E2E 全过、PRD §16 验收项通过，
 | [docs/specs/01-M1-地基.md](docs/specs/01-M1-地基.md) · [02-M2-录入主线.md](docs/specs/02-M2-录入主线.md) · [03-M3-打磨与验收.md](docs/specs/03-M3-打磨与验收.md) | 里程碑任务书 |
 | [docs/specs/acceptance-MVP.md](docs/specs/acceptance-MVP.md) | MVP 验收清单 |
 | [docs/09-性能与健壮性报告-M3-T5.md](docs/09-性能与健壮性报告-M3-T5.md) | 性能与健壮性报告 |
+| [docs/10-咨询Agent架构改革方案.md](docs/10-咨询Agent架构改革方案.md) | M4 咨询 Agent 架构改革方案 |
+| [docs/11-咨询Agent评估与指标口径-M4.md](docs/11-咨询Agent评估与指标口径-M4.md) | M4 评估与指标口径（意图漏判率抽检） |
+| [docs/12-安心用药-Agent整体架构.md](docs/12-安心用药-Agent整体架构.md) | Agent 整体架构 |
 | [app/README.md](app/README.md) | 正式工程详情（命令 / 结构） |
-| [demo/README.md](demo/README.md) | 演示版说明 |
-| [tools/drug-crawler/README.md](tools/drug-crawler/README.md) | 说明书爬虫工具 |
+| `demo/README.md`（仅本地，demo/ 不入库） | 演示版说明 |
+| `tools/drug-crawler/README.md`（仅本地，不入库） | 说明书爬虫工具 |
 
 ## Windows 开发提示
 
