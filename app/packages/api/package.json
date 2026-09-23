@@ -25,7 +25,8 @@
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",
     "perf:consult": "tsx src/scripts/perf-consult.ts",
     "db:studio": "drizzle-kit studio",
-    "eval:record-consult-fixtures": "tsx src/scripts/record-consult-fixtures.ts"
+    "eval:record-consult-fixtures": "tsx src/scripts/record-consult-fixtures.ts",
+    "eval:consult-bakeoff": "tsx src/scripts/consult-bakeoff.ts"
   },
   "dependencies": {
     "@anxin/shared": "workspace:*",

@@ -82,10 +82,10 @@ pnpm dev        # api :8787 + web :5173
 | --- | --- | --- |
 | `DATABASE_URL` | **是** | PostgreSQL 连接串。角色需 CREATEDB 权限（测试库 `anxin_medication_test` 由此 URL 派生自建） |
 | `QWEN_API_KEY` / `QWEN_BASE_URL` | 否 | Qwen3-VL：处方层检测 / 身份线提取 |
-| `BAICHUAN_API_KEY` / `BAICHUAN_BASE_URL` | 否 | Baichuan：医嘱兜底解析 / 咨询 / 医生端摘要 |
+| `CONSULT_PROVIDER` / `CONSULT_MODEL` | 否 | 咨询文本链（ADR #20）：默认 `qwen`（qwen3.8-flash 非思考）；`deepseek` 对照；`baichuan` 回滚 |
 | `OCR_BASE_URL` | 否 | qwen3.5-ocr 云端 OpenAI 兼容端点（医嘱线行级转录，ADR #16） |
 | `OCR_API_KEY` / `OCR_MODEL` | 否 | OCR 密钥 / 模型名（默认 `qwen3.5-ocr`） |
-| `QWEN_MODEL` / `BAICHUAN_MODEL` | 否 | 模型名覆盖 |
+| `QWEN_MODEL` / `BAICHUAN_MODEL` / `DEEPSEEK_MODEL` | 否 | 模型名覆盖（DEEPSEEK_* 为对照档，含 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL`） |
 | `ENABLE_MEDICAL_SEARCH` | 否 | 医疗搜索开关，默认 `false`（PRD §7.5：仅本地说明书未命中才兜底，且标注未经本库核实） |
 | `PORT` | 否 | API 端口，默认 8787 |
 | `NODE_ENV` | 否 | 环境标识 |

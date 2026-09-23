@@ -40,3 +40,6 @@ data/crawled/
 data/category-manifests/
 data/import-log.jsonl
 data/crawled-总账.md
+
+# 对打明细（模型输出引用说明书原文，DXY 版权纪律不入库；summary.md 保留）
+data/consult-bakeoff/*.json
