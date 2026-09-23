@@ -9,14 +9,14 @@
  *   allergy.ts     过敏确定性覆盖层（M4-T4：关键词∩禁忌段 → 追加警示+禁忌段引用，零 LLM）
  *   suggestion.ts  确认式建议卡规则（M4-T6：add_drug 命中匹配 / note_symptom 引导，零 LLM）
  *   sections.ts    pickInsertSections / normalizeSections / fallbackSectionsFromInsert
- *   citations.ts   insertCitation（三件套）/ webSearchCitation（unverified）
+ *   citations.ts   insertCitation（三件套）/ dbCitation（数据直答）
  *   run.ts         runConsult 编排（守门分派 + LLM/降级 + 归一化 + citations）
  *   types.ts       InsertSlice / ConsultDrug / GuardDecision / ConsultRunInput / ConsultRunResult
  *
  * 全部纯函数（零 I/O、确定性）+ 编排层（run.ts）；DB 取数在 repositories/consult.repo.ts，
  * HTTP 层在 routes/consult.ts，业务编排在 services/consult.service.ts。
  *
- * LLM 请求体组装（buildConsultRequest / buildMedicalSearchRequest）在 lib/ai/baichuan.ts，
+ * LLM 请求体组装（buildConsultRequest）在 lib/ai/baichuan.ts，
  * 与 M2-T1 buildFallbackParseRequest 同款纪律（纯函数可测，只含白名单文本）。
  *
  * 参照物：demo/server/index.js:940-1410（守门逻辑已实测）；迁移为 TS 并按 PRD §7.5 强化：

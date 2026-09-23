@@ -131,8 +131,8 @@ describe('SKILL_REGISTRY 注册表声明', () => {
   })
 
   it('S3 不参与 routeSkill 返回值（从属 S1 内部 no-source 分支，判定留在 run.ts）', () => {
-    // no-source 的判定需要 drugs 上下文（detectNoSource）与 ENABLE_MEDICAL_SEARCH，
-    // 属 runConsult 内部决策——routeSkill 入参无 drugs，结构上不可能返回 S3
+    // no-source 的判定需要 drugs 上下文（detectNoSource），属 runConsult 内部决策——
+    // routeSkill 入参无 drugs，结构上不可能返回 S3
     const d = routeSkill({ question: '这个药通常用于什么？', intentRouteEnabled: true })
     expect(d.skill).not.toBe('S3')
   })

@@ -8,9 +8,9 @@
  *   S1 说明书问答  runConsult 路径（manual-gate 为 S1 内部门禁，非独立技能；
  *                  proceed → 按键取数 → Baichuan → 归一化）
  *   S2 数据直答    classifyConsultIntent 命中 → runDataQuery 只读工具（0 次 LLM）
- *   S3 搜索兜底    S1 内部 no-source 分支且 ENABLE_MEDICAL_SEARCH 开（Baichuan 医疗搜索，
- *                  必标「未经本库核实」）——判定依赖 drugs 上下文与 env，留在 run.ts，
- *                  注册表仅声明其从属关系与降级文案，不做路由返回值
+ *   S3 搜索兜底    S1 内部 no-source 分支 → 固定话术（搜索已移除 · 2026-09 决议：
+ *                  本地未收录/未绑定药品诚实拒答，零 LLM；判定依赖 drugs 上下文，
+ *                  留在 run.ts，注册表仅声明其从属关系，不做路由返回值）
  *
  * ⚠️ 分发纪律：S0 与 S1 都执行 runConsult——守门判定与 risk_events 留痕单点在 guards.ts +
  *    run.ts，本注册表只决定「是否先试 S2」，绝不复制守门逻辑（避免双处判定漂移）。
@@ -79,10 +79,10 @@ export const SKILL_REGISTRY: readonly SkillRow[] = [
   },
   {
     id: 'S3',
-    label: '搜索兜底（从属 S1 no-source 分支）',
-    trigger: 'S1 内部 detectNoSource(drugs) 且 ENABLE_MEDICAL_SEARCH=true（默认关）',
+    label: '搜索兜底（从属 S1 no-source 分支；已退化为固定话术）',
+    trigger: 'S1 内部 detectNoSource(drugs) 或 proceed 无说明书命中 → 固定话术（搜索已移除）',
     executor: 'runConsult 内部（no-source 分支）',
-    degrade: '搜索失败 → no-source 固定文案；必标「基于网络检索，未经本库核实」',
+    degrade: '—（纯固定文案，零 LLM 零搜索；consult_logs 留痕供无源问题统计）',
   },
 ]
 

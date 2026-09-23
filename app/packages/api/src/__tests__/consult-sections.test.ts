@@ -8,9 +8,8 @@
  * - stripDosageAdvice × 3（切除/不误伤/边界）
  * - containsDosageAdvice × 2
  * - insertCitation × 2（三件套齐备/缺失兜底）
- * - webSearchCitation × 1（unverified=true）
  *
- * = 20 case。
+ * = 19 case。
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -23,7 +22,7 @@ import {
   normalizeSections,
   pickInsertSections,
 } from '../services/consult/sections.js'
-import { insertCitation, webSearchCitation } from '../services/consult/citations.js'
+import { insertCitation } from '../services/consult/citations.js'
 import type { InsertSlice } from '../services/consult/types.js'
 
 // ---------------------------------------------------------------------------
@@ -244,12 +243,5 @@ describe('citations · 引用三件套', () => {
     const c = insertCitation(mkInsert({ source: null, version: null }))
     expect(c.source).toContain('未标注')
     expect(c.version).toContain('未标注')
-  })
-
-  it('webSearchCitation：unverified=true（前端渲染"未经本库核实"徽章）', () => {
-    const c = webSearchCitation('测试药', new Date('2026-09-06T12:00:00Z'))
-    expect(c.unverified).toBe(true)
-    expect(c.source).toContain('网络检索')
-    expect(c.version).toContain('2026-09-06')
   })
 })

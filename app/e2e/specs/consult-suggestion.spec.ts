@@ -64,9 +64,8 @@ test.describe('确认式建议卡 E2E（M4-T6 · 双路径 golden）', () => {
 
     // 零调用红线：no-source 回答路径 0 次 LLM（卡片为确定性规则生成）
     const callsRes = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=${SCENARIO}`)
-    const calls = (await callsRes.json()) as { calls: { consultAnswer: number; medicalSearch: number } }
+    const calls = (await callsRes.json()) as { calls: { consultAnswer: number } }
     expect(calls.calls.consultAnswer).toBe(0)
-    expect(calls.calls.medicalSearch).toBe(0)
 
     // accept(ocr) → 跳既有 M2 录入线
     await card.getByRole('button', { name: /拍照建档/ }).click()

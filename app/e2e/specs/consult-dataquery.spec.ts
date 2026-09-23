@@ -9,7 +9,7 @@
  *   1. UI：回答卡出现「数据查询」status 徽章 + toolUsed 小字徽章 + 两支自建药名（medication-list）
  *          / 空数据友好文案（adherence）；
  *   2. 结构（PRD 红线）：`GET /api/_e2e/ai-calls?scenario=consult-dataquery` 的 consultAnswer === 0
- *          （medicalSearch 亦为 0）——数据查询路径绝不触发任何模型调用；
+ *          ——数据查询路径绝不触发任何模型调用；
  *   3. DB：直连测试库验证 consult_logs 落一行 status='data-answered' 且 citations 含 DB 来源。
  *
  * ⚠️ 不建 fixture 包的理由（计划 T6 明示「无需则不建，写明理由」）：
@@ -78,11 +78,10 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
     await expect(card.getByText(DRUG_A)).toBeVisible()
     await expect(card.getByText(DRUG_B)).toBeVisible()
 
-    // 结构（PRD 红线）：数据查询路径 0 次 LLM 调用（consultAnswer / medicalSearch 均为 0）
+    // 结构（PRD 红线）：数据查询路径 0 次 LLM 调用（consultAnswer 为 0）
     const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=${SCENARIO}`)
-    const body = (await res.json()) as { calls: { consultAnswer: number; medicalSearch: number } }
+    const body = (await res.json()) as { calls: { consultAnswer: number } }
     expect(body.calls.consultAnswer).toBe(0)
-    expect(body.calls.medicalSearch).toBe(0)
 
     // DB：consult_logs 落一行 status='data-answered' + citations 含 DB 来源（drugName='我的用药数据'）
     const [log] = await sql`select status, citations from consult_logs where user_id='p-001' order by created_at desc limit 1`

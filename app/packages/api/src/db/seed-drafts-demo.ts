@@ -82,9 +82,6 @@ function fakeClients(o: FakeOptions): AiClients {
     async consultAnswer() {
       throw new AIUnavailableError('baichuan', '演示 seed 不走咨询路径')
     },
-    async medicalSearch() {
-      throw new AIUnavailableError('baichuan', '演示 seed 不走医疗搜索路径')
-    },
     // M3-T3 扩展：seed 脚本不走医生端摘要路径
     async insightSummary() {
       throw new AIUnavailableError('baichuan', '演示 seed 不走医生端摘要路径')

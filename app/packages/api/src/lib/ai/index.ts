@@ -14,7 +14,6 @@ export function createAiClients(): AiClients {
     runOcr: ocr.runOcr,
     fallbackParse: baichuan.fallbackParse,
     consultAnswer: baichuan.consultAnswer,
-    medicalSearch: baichuan.medicalSearch,
     insightSummary: baichuan.insightSummary,
     queueSummary: baichuan.queueSummary,
   }
@@ -26,7 +25,6 @@ export { buildOcrRequest } from './ocr.js'
 export {
   buildFallbackParseRequest,
   buildConsultRequest,
-  buildMedicalSearchRequest,
   buildInsightRequest,
   buildQueueSummaryRequest,
 } from './baichuan.js'

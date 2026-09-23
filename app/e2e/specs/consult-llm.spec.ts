@@ -97,9 +97,8 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
 
     // 结构（评估安全网）：consult LLM 恰被调用 1 次
     const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=consult-answered`)
-    const body = (await res.json()) as { calls: { consultAnswer: number; medicalSearch: number } }
+    const body = (await res.json()) as { calls: { consultAnswer: number } }
     expect(body.calls.consultAnswer).toBe(1)
-    expect(body.calls.medicalSearch).toBe(0)
 
     // DB：consult_logs 落行 status='answered'，citations 为说明书三件套（drugName=玻璃酸钠滴眼液）
     const [log] = await sql`
@@ -162,9 +161,8 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
 
     // 结构：LLM 恰 1 次（回答本身）——覆盖层零新增模型调用（ai-calls 计数不变）
     const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=consult-allergy`)
-    const body = (await res.json()) as { calls: { consultAnswer: number; medicalSearch: number } }
+    const body = (await res.json()) as { calls: { consultAnswer: number } }
     expect(body.calls.consultAnswer).toBe(1)
-    expect(body.calls.medicalSearch).toBe(0)
 
     // DB：citations 含禁忌段引用（sectionLabel=禁忌），快照含警示
     const [log] = await sql`

@@ -4,7 +4,7 @@
  * 验证「两级意图路由 + 队列只读工具」（spec §T7 完成标准 1）：
  *   /doctor/insight 队列视图追问框 → 6 条 golden 固定问法（分布/差档队列/事件聚合各 2）→
  *   后端 classifyQueueIntent 命中 → runQueueTool 直查库 → mode='data' + toolUsed 徽章，
- *   全程**不调任何模型**（queueSummary/consultAnswer/insightSummary/medicalSearch 全 0）。
+ *   全程**不调任何模型**（queueSummary/consultAnswer/insightSummary 全 0）。
  *
  * 断言三层（对齐 consult-dataquery.spec.ts 风格）：
  *   1. UI：回答卡出现「数据查询」徽章 + 「来源：<工具名>」徽章 + 统计事实文案；
@@ -87,12 +87,11 @@ test.describe('医生端问答 E2E（队列固定问法 · 0 次 LLM）', () => 
     // 结构（PRD 红线）：全程 0 次 LLM 调用
     const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=${SCENARIO}`)
     const body = (await res.json()) as {
-      calls: { queueSummary: number; consultAnswer: number; insightSummary: number; medicalSearch: number }
+      calls: { queueSummary: number; consultAnswer: number; insightSummary: number }
     }
     expect(body.calls.queueSummary).toBe(0)
     expect(body.calls.consultAnswer).toBe(0)
     expect(body.calls.insightSummary).toBe(0)
-    expect(body.calls.medicalSearch).toBe(0)
 
     await page.context().close()
   })

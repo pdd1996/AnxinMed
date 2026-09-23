@@ -46,11 +46,6 @@ import { newId } from '../lib/util.js'
 import { ApiError } from '../lib/http.js'
 import { ERR_CODES } from '@anxin/shared'
 
-/** env 开关：本地未命中该药品时才兜底开 Baichuan 医疗搜索（默认 false，PRD §7.5）。 */
-function isMedicalSearchEnabled(): boolean {
-  return String(process.env.ENABLE_MEDICAL_SEARCH ?? '').toLowerCase() === 'true'
-}
-
 /**
  * env 开关：意图路由灰度（默认开；仅显式 ENABLE_INTENT_ROUTE=false 才关）。
  * 关闭即回到旧行为（所有问题走 run.ts 说明书管线）——一行判断即整体回滚。
@@ -258,7 +253,6 @@ export async function consult(
       activeMasterIds,
       interactionRules,
       drugNameById,
-      enableMedicalSearch: isMedicalSearchEnabled(),
       conditions: profileContext.conditions,
       ai,
     })

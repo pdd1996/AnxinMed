@@ -37,8 +37,6 @@ export interface FixturePack {
   fallbackParse: FallbackFields | null
   /** M3-T1 咨询回答录制（可选：M2 fixture 包无此字段，走咨询路径明确抛错，不静默通过）。 */
   consultAnswer?: ConsultRawSections | null
-  /** M3-T1 医疗搜索兜底录制（可选）。 */
-  medicalSearch?: ConsultRawSections | null
   /** M3-T3 医生端摘要录制（可选）。 */
   insightSummary?: ConsultRawSections | null
   /** T7 队列摘要录制（可选）。 */
@@ -69,7 +67,6 @@ export interface AiCallCounts {
   extractIdentity: number
   fallbackParse: number
   consultAnswer: number
-  medicalSearch: number
   insightSummary: number
   queueSummary: number
 }
@@ -82,7 +79,6 @@ export function aiCallLog(scenario: string): AiCallCounts {
       extractIdentity: 0,
       fallbackParse: 0,
       consultAnswer: 0,
-      medicalSearch: 0,
       insightSummary: 0,
       queueSummary: 0,
     }
@@ -125,13 +121,6 @@ export class FixtureAiClients implements AiClients {
     const raw = loadPack(s).consultAnswer
     // M2 fixture 包无此字段 → 明确抛错（不静默通过）；M3 咨询 E2E 录制时补上即可回放。
     if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无咨询回答录制`)
-    return raw
-  }
-  async medicalSearch(_question: string, _drugName: string | null): Promise<ConsultRawSections> {
-    const s = currentScenario()
-    bump(s, 'medicalSearch')
-    const raw = loadPack(s).medicalSearch
-    if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无医疗搜索录制`)
     return raw
   }
   async insightSummary(_payload: InsightPromptPayload): Promise<ConsultRawSections> {

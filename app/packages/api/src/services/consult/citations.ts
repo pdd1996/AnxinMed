@@ -3,7 +3,7 @@
  *
  * 两种来源：
  * - 本地说明书库（`insertCitation`）：unverified=false，来源三件套从 package_inserts 直接取；
- * - 网络检索兜底（`webSearchCitation`）：unverified=true，前端渲染"未经本库核实"徽章。
+ * - 本库数据直答（`dbCitation`）：unverified=false，来源标注本人三表。
  *
  * ⚠️ citations 是 PRD §7.5 硬约束——L1 正常回答必含三件套；缺 source/version 视为回答不完整。
  */
@@ -20,23 +20,9 @@ export function insertCitation(insert: InsertSlice): Citation {
 }
 
 /**
- * 网络检索兜底引用（PRD §7.5：本地未命中且 ENABLE_MEDICAL_SEARCH=true 才触发）。
- * version 用检索时间戳（ISO 秒级），unverified=true 强制前端渲染"未经本库核实"徽章。
- * drugName=null = 无对象药的自由文本提问（引用不含药名，用固定标签说明来源性质）。
- */
-export function webSearchCitation(drugName: string | null, retrievedAt: Date = new Date()): Citation {
-  return {
-    drugName: drugName ?? '一般用药咨询（未绑定药箱药品）',
-    source: 'Baichuan 医疗搜索（网络检索）',
-    version: retrievedAt.toISOString().slice(0, 19).replace('T', ' '),
-    unverified: true,
-  }
-}
-
-/**
  * 患者数据查询引用（意图路由 data-answered 路径 · 计划 T3）。
- * source 说明数据来自本人建档三表（drugs/plans/records）；version 用查询时刻 ISO 时间戳
- * （与 webSearchCitation 时间戳风格同构）；unverified=false——本库事实而非网络检索。
+ * source 说明数据来自本人建档三表（drugs/plans/records）；version 用查询时刻 ISO 时间戳；
+ * unverified=false——本库事实而非网络检索。
  */
 export function dbCitation(queriedAt: Date = new Date()): Citation {
   return {

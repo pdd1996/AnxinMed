@@ -1,5 +1,5 @@
 /**
- * Baichuan-M3-Plus 客户端（M2-T1 兜底解析 + M3-T1 咨询回答/医疗搜索）。
+ * Baichuan-M3-Plus 客户端（M2-T1 兜底解析 + M3-T1 咨询回答；CONSULT_PROVIDER=baichuan 回滚通道）。
  * 发给模型的内容只含 L0 裁剪后的白名单文本（不含图像/PII 之外内容），由请求体组装单测保证。
  */
 import {
@@ -123,62 +123,6 @@ export async function consultAnswer(payload: ConsultPromptPayload): Promise<Cons
   const parsed = ConsultRawSectionsSchema.safeParse(raw)
   if (!parsed.success) {
     throw new AIUnavailableError('baichuan', `咨询回答输出不符合约定：${parsed.error.message}`)
-  }
-  return parsed.data
-}
-
-/**
- * 医疗搜索兜底请求体（纯函数，可测）：PRD §7.5，本地未命中且 ENABLE_MEDICAL_SEARCH=true 才触发。
- * 明确标注"基于网络检索，未经本库核实"，且只做一般性资料解释。
- * drugName=null = 无对象药的自由文本提问（如两药联用知识问题），检索只依据问题本身。
- */
-export function buildMedicalSearchRequest(question: string, drugName: string | null) {
-  const contextLine = drugName
-    ? `本地说明书库未收录「${drugName}」，请基于网络检索结果回答用户问题。`
-    : '该提问未绑定用户药箱中的药品（一般性用药知识咨询），请基于网络检索结果回答用户问题。'
-  const content = `你是"安心用药"医疗资料检索助手。${contextLine}
-
-硬性规则：
-1. 只输出严格 JSON（格式同下），禁止 Markdown。
-2. 总字数 150-250 汉字。
-3. 不得给出具体剂量/频次/疗程数字。
-4. 不得诊断、开处方、建议停换药；不预测个体疗效。
-5. 明确标注"基于网络检索，未经本库核实"；只做一般性资料解释，不结合个体情况。
-6. 检索不到的内容明确说明"未检索到可靠资料"，不编造。
-
-JSON 格式：
-{"summary":"一句话直接回答","keyPoints":["最多3条"],"risks":["最多3条"],"nextAction":"下一步建议","warning":"不要自行调整处方的提示"}
-
-用户问题：${question}
-药品名：${drugName ?? '（未指定）'}`
-
-  return {
-    model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
-    temperature: 0.1,
-    messages: [{ role: 'user' as const, content }],
-  }
-}
-
-/** 医疗搜索兜底：未配置 BAICHUAN_API_KEY 或未实现时抛 AIUnavailableError，上层转 no-source 降级。 */
-export async function medicalSearch(question: string, drugName: string | null): Promise<ConsultRawSections> {
-  const baseUrl = process.env.BAICHUAN_BASE_URL
-  const key = process.env.BAICHUAN_API_KEY
-  if (!baseUrl || !key) {
-    throw new AIUnavailableError('baichuan', '医疗搜索兜底不可用：缺少 BAICHUAN_BASE_URL / BAICHUAN_API_KEY 配置')
-  }
-  const res = await callJson<ChatResponse>(
-    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-      body: JSON.stringify(buildMedicalSearchRequest(question, drugName)),
-    },
-    { client: 'baichuan' },
-  )
-  const raw = parseModelJson(extractChatContent(res, 'baichuan'), 'baichuan')
-  const parsed = ConsultRawSectionsSchema.safeParse(raw)
-  if (!parsed.success) {
-    throw new AIUnavailableError('baichuan', `医疗搜索输出不符合约定：${parsed.error.message}`)
   }
   return parsed.data
 }

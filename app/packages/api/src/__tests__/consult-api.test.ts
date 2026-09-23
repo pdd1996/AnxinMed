@@ -304,16 +304,16 @@ describe('POST /api/consult · no-source（本地说明书库未命中）', () =
     expect(res.body.status).toBe('no-source')
     expect(res.body.answer).toContain('本地说明书库未收录')
     expect(res.body.citations).toEqual([])
-    // 默认 ENABLE_MEDICAL_SEARCH=false → notice 提示正式版会开兜底
-    expect(res.body.notice).toContain('医疗搜索')
+    // 搜索兜底已移除 → 无附加 notice（固定文案即全部信息）
+    expect(res.body.notice).toBeNull()
   })
 })
 
 // ---------------------------------------------------------------------------
-// 无对象药自由文本提问（医疗搜索兜底接通 · PRD §7.5）
+// 无对象药自由文本提问（no-source 恒固定文案 · S3 搜索兜底已移除）
 // ---------------------------------------------------------------------------
 
-describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 走 no-source 兜底）', () => {
+describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 恒走 no-source 固定文案）', () => {
   const question = '奥美拉唑×氯吡格雷 可以一起吃吗'
   let prevSearchFlag: string | undefined
 
@@ -325,49 +325,9 @@ describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 走 no-
     else process.env.ENABLE_MEDICAL_SEARCH = prevSearchFlag
   })
 
-  it('搜索开 + Baichuan 可用 → answered + unverified 引用（固定标签，不虚构药名）', async () => {
+  it('env 残留 true → 仍固定文案且 0 次 LLM 调用（搜索移除后的防回归红线）', async () => {
     const calls = newCalls()
-    prevClients = setAiClients(
-      mockClients({
-        calls,
-        medical: {
-          summary: '两药联用需关注出血风险，建议咨询医师评估替代方案',
-          keyPoints: ['奥美拉唑可能影响氯吡格雷活化'],
-          risks: ['联用可能增加心血管事件风险'],
-          nextAction: '请咨询医生或药师',
-          warning: '不要自行调整处方',
-        },
-      }),
-    )
-    process.env.ENABLE_MEDICAL_SEARCH = 'true'
-
-    const res = await req('POST', '/api/consult', { question, drugIds: [] })
-
-    expect(res.status).toBe(200)
-    expect(res.body.status).toBe('answered')
-    expect(res.body.riskLevel).toBe('L1')
-    expect(res.body.answer).toContain('出血风险')
-    expect(res.body.notice).toContain('未经本库核实')
-    // 引用：网络检索兜底 unverified=true；无对象药 → 固定标签而非「该药品」占位词
-    expect(res.body.citations[0]).toMatchObject({
-      drugName: '一般用药咨询（未绑定药箱药品）',
-      source: 'Baichuan 医疗搜索（网络检索）',
-      unverified: true,
-    })
-    // 结构红线：只调 medicalSearch，绝不进说明书生成管线
-    expect(calls.medicalSearch).toBe(1)
-    expect(calls.consultAnswer).toBe(0)
-    // 正常回答不进 risk_events；consult_logs 留痕 status=answered
-    const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
-    expect(events).toHaveLength(0)
-    const logs = await db.select().from(consultLogs).where(eq(consultLogs.userId, USER))
-    expect(logs[0].status).toBe('answered')
-  })
-
-  it('搜索开但 Baichuan 不可用 → 降级固定文案（不出现「该药品」占位词）', async () => {
-    prevClients = setAiClients(
-      mockClients({ medicalSearchError: new AIUnavailableError('baichuan', '模拟医疗搜索不可用') }),
-    )
+    prevClients = setAiClients(mockClients({ calls }))
     process.env.ENABLE_MEDICAL_SEARCH = 'true'
 
     const res = await req('POST', '/api/consult', { question, drugIds: [] })
@@ -375,12 +335,20 @@ describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 走 no-
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('no-source')
     expect(res.body.answer).toContain('未关联药箱药品')
-    expect(res.body.answer).toContain('医疗搜索兜底不可用')
     expect(res.body.answer).not.toContain('该药品')
     expect(res.body.citations).toEqual([])
+    expect(res.body.notice).toBeNull()
+    // 结构红线：搜索兜底已移除，任何 env 组合下都不允许触发模型调用
+    expect(calls.consultAnswer).toBe(0)
+    expect(calls.insightSummary).toBe(0)
+    // no-source 不进 risk_events；consult_logs 留痕 status=no-source（爬虫采购单探针）
+    const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
+    expect(events).toHaveLength(0)
+    const logs = await db.select().from(consultLogs).where(eq(consultLogs.userId, USER))
+    expect(logs[0].status).toBe('no-source')
   })
 
-  it('搜索默认关 → 固定文案，medicalSearch 不被调用', async () => {
+  it('env 未设 → 同样固定文案，0 次 LLM 调用', async () => {
     const calls = newCalls()
     prevClients = setAiClients(mockClients({ calls }))
     delete process.env.ENABLE_MEDICAL_SEARCH
@@ -390,9 +358,9 @@ describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 走 no-
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('no-source')
     expect(res.body.answer).toContain('未关联药箱药品')
-    expect(res.body.answer).toContain('医疗搜索默认关闭')
     expect(res.body.answer).not.toContain('该药品')
-    expect(calls.medicalSearch).toBe(0)
+    expect(res.body.citations).toEqual([])
+    expect(calls.consultAnswer).toBe(0)
   })
 })
 
