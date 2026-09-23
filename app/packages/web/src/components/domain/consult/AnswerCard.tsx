@@ -104,9 +104,11 @@ export function AnswerCard({
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
       <CardContent className="space-y-3 p-4">
-        {/* 顶部：RiskBadge + status 徽章 + toolUsed 小字徽章（播放入口已移到页头部，见 Consult.tsx） */}
+        {/* 顶部：RiskBadge + status 徽章 + toolUsed 小字徽章（播放入口已移到页头部，见 Consult.tsx）；
+            no-source 不渲染 RiskBadge——后端 no-source 固定为 L1（无个体化建议=低风险），但
+            「低风险」与正文"无法回答"语义打架，状态徽章「本地未收录」已足够表意 */}
         <div className="flex flex-wrap items-center gap-2">
-          <RiskBadge level={riskLevel} showHint />
+          {status !== 'no-source' && <RiskBadge level={riskLevel} showHint />}
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusMeta.className}`}
           >

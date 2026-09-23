@@ -17,6 +17,7 @@ import * as ocr from '../lib/ai/ocr.js'
 import * as baichuan from '../lib/ai/baichuan.js'
 import { AIUnavailableError, type ImageInput } from '../lib/ai/types.js'
 import { cropBody } from '../services/sanitize/index.js'
+import { extractFirstJsonBlock, parseModelJson } from '../lib/ai/http.js'
 
 const IMG: ImageInput = { base64: 'aW1n', mime: 'image/png' }
 
@@ -278,5 +279,52 @@ describe('错误映射与重试（AIUnavailableError 冒泡）', () => {
     vi.stubGlobal('fetch', f)
     await expect(baichuan.fallbackParse('t', ['f'])).rejects.toBeInstanceOf(AIUnavailableError)
     expect(f).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// parseModelJson · JSON 外夹带噪声的确定性裁剪（医疗搜索兜底接通任务补强）
+// 实测 baichuan-m3 检索模型会在答案 JSON 后追加第二轮追问 JSON → 严格 parse 炸；
+// 裁剪只负责"拿到候选 JSON"，内容合法性仍由下游 zod safeParse 把关。
+// ---------------------------------------------------------------------------
+
+describe('parseModelJson / extractFirstJsonBlock（JSON 外噪声裁剪）', () => {
+  it('纯 JSON 原样 parse（不进裁剪分支）', () => {
+    expect(parseModelJson('{"a":1}', 'baichuan')).toEqual({ a: 1 })
+  })
+
+  it('JSON 后追加第二轮 JSON（baichuan-m3 实测形态）→ 取首个配平块', () => {
+    const content = '{"summary":"答案"}\n\n{"summary":"需要我进一步检索吗？"}'
+    expect(parseModelJson(content, 'baichuan')).toEqual({ summary: '答案' })
+  })
+
+  it('```json 栅栏包裹 → 取首个配平块', () => {
+    const content = '```json\n{"a":1}\n```'
+    expect(parseModelJson(content, 'qwen')).toEqual({ a: 1 })
+  })
+
+  it('JSON 前有说明文字 → 取首个配平块', () => {
+    expect(parseModelJson('好的，以下是结果：{"a":1}', 'baichuan')).toEqual({ a: 1 })
+  })
+
+  it('字符串内的花括号/引号转义不干扰配平', () => {
+    const content = '{"text":"包含 } 与 \\" 转义与 { 嵌套","b":2}尾部噪声'
+    expect(parseModelJson(content, 'baichuan')).toEqual({ text: '包含 } 与 " 转义与 { 嵌套', b: 2 })
+  })
+
+  it('数组块也能提取', () => {
+    expect(parseModelJson('说明 [1,2,3] 尾', 'ocr')).toEqual([1, 2, 3])
+  })
+
+  it('无任何 JSON → AIUnavailableError', () => {
+    expect(() => parseModelJson('完全不是 JSON 的输出', 'baichuan')).toThrow(AIUnavailableError)
+  })
+
+  it('对象未闭合（截断输出）→ AIUnavailableError', () => {
+    expect(() => parseModelJson('{"a":1', 'baichuan')).toThrow(AIUnavailableError)
+  })
+
+  it('extractFirstJsonBlock：首块之后的噪声不带回', () => {
+    expect(extractFirstJsonBlock('{"a":1} xyz {"b":2}')).toBe('{"a":1}')
   })
 })

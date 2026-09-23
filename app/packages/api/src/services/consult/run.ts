@@ -9,6 +9,9 @@
  *   proceed     → 选主咨询药 → pickInsertSections → checkInteractions → ai.consultAnswer
  *                 → AIUnavailable 降级 fallbackSectionsFromInsert → normalizeSections → citations
  *
+ * 无对象药（drugs=[]，自由文本提问）在守门处返回 proceed，落到选药防御分支——同样走
+ * no-source 兜底：医疗搜索开 → 可答知识性问题（引用标注"未经本库核实"）；关 → 固定文案。
+ *
  * ⚠️ 编排纪律：
  * - 守门决策为纯函数产物（guards.ts），本层只做分派与 I/O 编排；
  * - LLM 输出必过 normalizeSections（stripDosageAdvice + 兜底），绝不直通前端；
@@ -18,6 +21,7 @@
  */
 import { checkInteractions, type InteractionRuleInput } from '../rules/index.js'
 import { AIUnavailableError } from '../../lib/ai/types.js'
+import type { AiClients } from '../../lib/ai/types.js'
 import { insertCitation, webSearchCitation } from './citations.js'
 import { guardConsult } from './guards.js'
 import { fallbackSectionsFromInsert, normalizeSections, pickInsertSections } from './sections.js'
@@ -54,18 +58,21 @@ const REFUSED_SECTIONS: NormalizedSections = {
 const MANUAL_GATE_NOTICE =
   '该药品为用户手动建档（未经 OCR 确认），AI 个性化咨询不可用，仅可查询药品资料（L0）。'
 
-/** no-source 固定文案（本地未命中且医疗搜索默认关；照搬 demo:982-995）。 */
-function buildNoSourceResult(drugName: string, enableMedicalSearch: boolean): ConsultRunResult {
-  const summary = `本地说明书库未收录「${drugName}」，${
-    enableMedicalSearch ? '医疗搜索兜底不可用' : '医疗搜索默认关闭'
-  }，我无法提供可追溯的资料解释。请查看药品说明书或咨询医生、药师。`
+/** no-source 固定文案（照搬 demo:982-995；drugName=null = 无对象药，不虚构药名）。 */
+function buildNoSourceResult(drugName: string | null, enableMedicalSearch: boolean): ConsultRunResult {
+  const searchNote = enableMedicalSearch ? '医疗搜索兜底不可用' : '医疗搜索默认关闭'
+  const summary = drugName
+    ? `本地说明书库未收录「${drugName}」，${searchNote}，我无法提供可追溯的资料解释。请查看药品说明书或咨询医生、药师。`
+    : `该问题未关联药箱药品，${searchNote}，我无法提供可追溯的资料解释。请查看药品说明书或咨询医生、药师。`
   return {
     riskLevel: 'L1',
     status: 'no-source',
     answer: summary,
     sections: {
       summary,
-      keyPoints: ['本地说明书库按 drugId 直查，该药品未命中'],
+      keyPoints: drugName
+        ? ['本地说明书库按 drugId 直查，该药品未命中']
+        : ['咨询对象药仅来自药箱「问这个药」入口，本问未绑定药品'],
       risks: [],
       nextAction: '请查看药品说明书或咨询医生、药师。',
       warning: '不要根据未标注来源的网络资料自行调整用药。',
@@ -80,6 +87,53 @@ function buildNoSourceResult(drugName: string, enableMedicalSearch: boolean): Co
     matchedKeyword: null,
     triggerDrugId: null,
   }
+}
+
+/**
+ * 无本地来源的兜底（PRD §7.5）：医疗搜索开且可用 → 检索回答（unverified 引用）；
+ * 失败/关闭 → 固定文案。drugName=null = 无对象药的自由文本提问——检索只依据问题本身，
+ * 引用挂固定标签（不虚构药名）；守门（L4/L3）与数据查询意图在分派上游已处理，不会进入本函数。
+ */
+async function answerWithoutSource(
+  question: string,
+  drugName: string | null,
+  enableMedicalSearch: boolean,
+  ai: AiClients,
+): Promise<ConsultRunResult> {
+  // 医疗搜索兜底（env 开关 ENABLE_MEDICAL_SEARCH，默认 false）
+  if (enableMedicalSearch && ai.medicalSearch) {
+    try {
+      const raw = await ai.medicalSearch(question, drugName)
+      const sections = normalizeSections(raw, {
+        summaryFallback: drugName
+          ? `关于「${drugName}」的网络检索资料请以说明书为准。`
+          : '网络检索的一般性资料请以药品说明书为准。',
+      })
+      return {
+        riskLevel: sections.limited ? 'L2' : 'L1',
+        status: sections.limited ? 'limited' : 'answered',
+        answer: sections.summary,
+        sections,
+        citations: [webSearchCitation(drugName)],
+        notice: sections.limited
+          ? '已过滤具体剂量建议。用量请按医生处方或说明书执行。'
+          : '基于网络检索，未经本库核实。',
+        l0Notice: null,
+        blocked: false,
+        matchedKeyword: null,
+        triggerDrugId: null,
+      }
+    } catch (e) {
+      // 医疗搜索失败 → 降级为 no-source 固定文案（不炸整体）
+      if (e instanceof AIUnavailableError) {
+        return buildNoSourceResult(drugName, true)
+      }
+      throw e
+    }
+  }
+
+  // 医疗搜索默认关 → 固定文案
+  return buildNoSourceResult(drugName, enableMedicalSearch)
 }
 
 /** 相互作用上下文组装（复用 M2-T5 checkInteractions，按主咨询药 + 生效计划集合匹配）。 */
@@ -200,47 +254,15 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
   // ── 5. no-source：本地未命中 ──
   if (decision.kind === 'no-source') {
     const primary = pickPrimaryDrug(drugs)
-    const drugName = primary?.genericName ?? '该药品'
-
-    // 5a. 医疗搜索兜底（PRD §7.5：env 开关 ENABLE_MEDICAL_SEARCH，默认 false）
-    if (enableMedicalSearch && ai.medicalSearch) {
-      try {
-        const raw = await ai.medicalSearch(question, drugName)
-        const sections = normalizeSections(raw, {
-          summaryFallback: `关于「${drugName}」的网络检索资料请以说明书为准。`,
-        })
-        return {
-          riskLevel: sections.limited ? 'L2' : 'L1',
-          status: sections.limited ? 'limited' : 'answered',
-          answer: sections.summary,
-          sections,
-          citations: [webSearchCitation(drugName)],
-          notice: sections.limited
-            ? '已过滤具体剂量建议。用量请按医生处方或说明书执行。'
-            : '基于网络检索，未经本库核实。',
-          l0Notice: null,
-          blocked: false,
-          matchedKeyword: null,
-          triggerDrugId: null,
-        }
-      } catch (e) {
-        // 医疗搜索失败 → 降级为 no-source 固定文案（不炸整体）
-        if (e instanceof AIUnavailableError) {
-          return buildNoSourceResult(drugName, true)
-        }
-        throw e
-      }
-    }
-
-    // 5b. 医疗搜索默认关 → 固定文案
-    return buildNoSourceResult(drugName, enableMedicalSearch)
+    return answerWithoutSource(question, primary?.genericName ?? null, enableMedicalSearch, ai)
   }
 
   // ── 6. proceed：进入生成路径 ──
   const primary = pickPrimaryDrug(drugs)
   if (!primary?.insert) {
-    // 理论不可达（guardConsult 已过滤 no-source）；防御性兜底
-    return buildNoSourceResult(primary?.genericName ?? '该药品', enableMedicalSearch)
+    // 无对象药（drugs=[]，自由文本提问，守门对空药箱返回 proceed）或防御性兜底：
+    // 同走 no-source 兜底——医疗搜索开则可答知识性问题（标注"未经本库核实"），关则固定文案
+    return answerWithoutSource(question, primary?.genericName ?? null, enableMedicalSearch, ai)
   }
 
   const insert = primary.insert

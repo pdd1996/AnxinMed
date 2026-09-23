@@ -130,9 +130,13 @@ export async function consultAnswer(payload: ConsultPromptPayload): Promise<Cons
 /**
  * 医疗搜索兜底请求体（纯函数，可测）：PRD §7.5，本地未命中且 ENABLE_MEDICAL_SEARCH=true 才触发。
  * 明确标注"基于网络检索，未经本库核实"，且只做一般性资料解释。
+ * drugName=null = 无对象药的自由文本提问（如两药联用知识问题），检索只依据问题本身。
  */
-export function buildMedicalSearchRequest(question: string, drugName: string) {
-  const content = `你是"安心用药"医疗资料检索助手。本地说明书库未收录「${drugName}」，请基于网络检索结果回答用户问题。
+export function buildMedicalSearchRequest(question: string, drugName: string | null) {
+  const contextLine = drugName
+    ? `本地说明书库未收录「${drugName}」，请基于网络检索结果回答用户问题。`
+    : '该提问未绑定用户药箱中的药品（一般性用药知识咨询），请基于网络检索结果回答用户问题。'
+  const content = `你是"安心用药"医疗资料检索助手。${contextLine}
 
 硬性规则：
 1. 只输出严格 JSON（格式同下），禁止 Markdown。
@@ -146,7 +150,7 @@ JSON 格式：
 {"summary":"一句话直接回答","keyPoints":["最多3条"],"risks":["最多3条"],"nextAction":"下一步建议","warning":"不要自行调整处方的提示"}
 
 用户问题：${question}
-药品名：${drugName}`
+药品名：${drugName ?? '（未指定）'}`
 
   return {
     model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
@@ -156,7 +160,7 @@ JSON 格式：
 }
 
 /** 医疗搜索兜底：未配置 BAICHUAN_API_KEY 或未实现时抛 AIUnavailableError，上层转 no-source 降级。 */
-export async function medicalSearch(question: string, drugName: string): Promise<ConsultRawSections> {
+export async function medicalSearch(question: string, drugName: string | null): Promise<ConsultRawSections> {
   const baseUrl = process.env.BAICHUAN_BASE_URL
   const key = process.env.BAICHUAN_API_KEY
   if (!baseUrl || !key) {

@@ -127,7 +127,7 @@ export class FixtureAiClients implements AiClients {
     if (!raw) throw new AIUnavailableError('baichuan', `fixture ${s} 无咨询回答录制`)
     return raw
   }
-  async medicalSearch(_question: string, _drugName: string): Promise<ConsultRawSections> {
+  async medicalSearch(_question: string, _drugName: string | null): Promise<ConsultRawSections> {
     const s = currentScenario()
     bump(s, 'medicalSearch')
     const raw = loadPack(s).medicalSearch

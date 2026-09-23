@@ -66,11 +66,51 @@ export function extractChatContent(res: ChatResponse, client: 'qwen' | 'ocr' | '
   return content
 }
 
-/** 把模型输出的 JSON 字符串安全 parse 为 unknown（非 JSON → AIUnavailableError，不猜）。 */
+/**
+ * 从模型输出中提取首个配平的 JSON 块（对象或数组；正确跳过字符串内的括号与转义）。
+ * 模型常在 JSON 外夹带噪声——Markdown 栅栏、说明文字、追问（实测 baichuan-m3 检索模型
+ * 会在答案 JSON 后追加第二轮 JSON）；这是确定性裁剪，不是内容猜测。
+ */
+export function extractFirstJsonBlock(content: string): string | null {
+  const start = content.search(/[{[]/)
+  if (start < 0) return null
+  const open = content[start]
+  const close = open === '{' ? '}' : ']'
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < content.length; i++) {
+    const ch = content[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === open) depth++
+    else if (ch === close && --depth === 0) return content.slice(start, i + 1)
+  }
+  return null
+}
+
+/**
+ * 把模型输出的 JSON 字符串安全 parse 为 unknown。
+ * 严格 parse 失败 → 截取首个配平 JSON 块重试；仍失败 → AIUnavailableError，不猜。
+ * 内容合法性由下游 zod safeParse 把关（本函数只负责拿到候选 JSON）。
+ */
 export function parseModelJson(content: string, client: 'qwen' | 'ocr' | 'baichuan'): unknown {
   try {
     return JSON.parse(content)
   } catch (e) {
+    const block = extractFirstJsonBlock(content)
+    if (block !== null) {
+      try {
+        return JSON.parse(block)
+      } catch {
+        // 首块也不是合法 JSON → 落入统一报错
+      }
+    }
     throw new AIUnavailableError(client, `${client} 输出不是合法 JSON`, e)
   }
 }

@@ -359,7 +359,8 @@ describe('意图路由 · (d) 开关回退旧行为', () => {
       expect(res.body.status).not.toBe('data-answered')
       expect(res.body.status).toBe('no-source')
       expect(res.body.toolUsed).toBeNull()
-      expect(res.body.answer).toContain('本地说明书库未收录')
+      // 无对象药 → 文案不虚构「该药品」占位词（医疗搜索兜底接通任务改版）
+      expect(res.body.answer).toContain('未关联药箱药品')
     } finally {
       // 恢复 env，避免污染后续用例
       if (prevIntentRoute === undefined) delete process.env.ENABLE_INTENT_ROUTE

@@ -22,10 +22,11 @@ export function insertCitation(insert: InsertSlice): Citation {
 /**
  * 网络检索兜底引用（PRD §7.5：本地未命中且 ENABLE_MEDICAL_SEARCH=true 才触发）。
  * version 用检索时间戳（ISO 秒级），unverified=true 强制前端渲染"未经本库核实"徽章。
+ * drugName=null = 无对象药的自由文本提问（引用不含药名，用固定标签说明来源性质）。
  */
-export function webSearchCitation(drugName: string, retrievedAt: Date = new Date()): Citation {
+export function webSearchCitation(drugName: string | null, retrievedAt: Date = new Date()): Citation {
   return {
-    drugName,
+    drugName: drugName ?? '一般用药咨询（未绑定药箱药品）',
     source: 'Baichuan 医疗搜索（网络检索）',
     version: retrievedAt.toISOString().slice(0, 19).replace('T', ' '),
     unverified: true,

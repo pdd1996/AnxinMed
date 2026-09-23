@@ -110,7 +110,7 @@ export function mockClients(o: MockOverrides = {}): AiClients {
       if (!o.consult) throw new AIUnavailableError('baichuan', 'mock 未提供 consultAnswer override')
       return o.consult
     },
-    async medicalSearch(_question: string, _drugName: string) {
+    async medicalSearch(_question: string, _drugName: string | null) {
       calls.medicalSearch++
       if (o.medicalSearchError) throw o.medicalSearchError
       if (!o.medical) throw new AIUnavailableError('baichuan', 'mock 未提供 medicalSearch override')

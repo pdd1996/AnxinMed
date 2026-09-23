@@ -9,7 +9,7 @@
  *
  * 测试库 globalSetup 只 seed users（无资产域数据），故本文件自建 fixture，afterAll 清理。
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
 import { app } from '../app.js'
 import { db } from '../db/client.js'
@@ -306,6 +306,93 @@ describe('POST /api/consult · no-source（本地说明书库未命中）', () =
     expect(res.body.citations).toEqual([])
     // 默认 ENABLE_MEDICAL_SEARCH=false → notice 提示正式版会开兜底
     expect(res.body.notice).toContain('医疗搜索')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 无对象药自由文本提问（医疗搜索兜底接通 · PRD §7.5）
+// ---------------------------------------------------------------------------
+
+describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 走 no-source 兜底）', () => {
+  const question = '奥美拉唑×氯吡格雷 可以一起吃吗'
+  let prevSearchFlag: string | undefined
+
+  beforeEach(() => {
+    prevSearchFlag = process.env.ENABLE_MEDICAL_SEARCH
+  })
+  afterEach(() => {
+    if (prevSearchFlag === undefined) delete process.env.ENABLE_MEDICAL_SEARCH
+    else process.env.ENABLE_MEDICAL_SEARCH = prevSearchFlag
+  })
+
+  it('搜索开 + Baichuan 可用 → answered + unverified 引用（固定标签，不虚构药名）', async () => {
+    const calls = newCalls()
+    prevClients = setAiClients(
+      mockClients({
+        calls,
+        medical: {
+          summary: '两药联用需关注出血风险，建议咨询医师评估替代方案',
+          keyPoints: ['奥美拉唑可能影响氯吡格雷活化'],
+          risks: ['联用可能增加心血管事件风险'],
+          nextAction: '请咨询医生或药师',
+          warning: '不要自行调整处方',
+        },
+      }),
+    )
+    process.env.ENABLE_MEDICAL_SEARCH = 'true'
+
+    const res = await req('POST', '/api/consult', { question, drugIds: [] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('answered')
+    expect(res.body.riskLevel).toBe('L1')
+    expect(res.body.answer).toContain('出血风险')
+    expect(res.body.notice).toContain('未经本库核实')
+    // 引用：网络检索兜底 unverified=true；无对象药 → 固定标签而非「该药品」占位词
+    expect(res.body.citations[0]).toMatchObject({
+      drugName: '一般用药咨询（未绑定药箱药品）',
+      source: 'Baichuan 医疗搜索（网络检索）',
+      unverified: true,
+    })
+    // 结构红线：只调 medicalSearch，绝不进说明书生成管线
+    expect(calls.medicalSearch).toBe(1)
+    expect(calls.consultAnswer).toBe(0)
+    // 正常回答不进 risk_events；consult_logs 留痕 status=answered
+    const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
+    expect(events).toHaveLength(0)
+    const logs = await db.select().from(consultLogs).where(eq(consultLogs.userId, USER))
+    expect(logs[0].status).toBe('answered')
+  })
+
+  it('搜索开但 Baichuan 不可用 → 降级固定文案（不出现「该药品」占位词）', async () => {
+    prevClients = setAiClients(
+      mockClients({ medicalSearchError: new AIUnavailableError('baichuan', '模拟医疗搜索不可用') }),
+    )
+    process.env.ENABLE_MEDICAL_SEARCH = 'true'
+
+    const res = await req('POST', '/api/consult', { question, drugIds: [] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('no-source')
+    expect(res.body.answer).toContain('未关联药箱药品')
+    expect(res.body.answer).toContain('医疗搜索兜底不可用')
+    expect(res.body.answer).not.toContain('该药品')
+    expect(res.body.citations).toEqual([])
+  })
+
+  it('搜索默认关 → 固定文案，medicalSearch 不被调用', async () => {
+    const calls = newCalls()
+    prevClients = setAiClients(mockClients({ calls }))
+    delete process.env.ENABLE_MEDICAL_SEARCH
+
+    const res = await req('POST', '/api/consult', { question, drugIds: [] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('no-source')
+    expect(res.body.answer).toContain('未关联药箱药品')
+    expect(res.body.answer).toContain('医疗搜索默认关闭')
+    expect(res.body.answer).not.toContain('该药品')
+    expect(calls.medicalSearch).toBe(0)
   })
 })
 

@@ -164,10 +164,11 @@ export interface AiClients {
    */
   consultAnswer(payload: ConsultPromptPayload): Promise<ConsultRawSections>
   /**
-   * 医疗搜索兜底（M3-T1 · PRD §7.5，默认关）：仅当 ENABLE_MEDICAL_SEARCH=true 且本地未命中时触发。
+   * 医疗搜索兜底（M3-T1 · PRD §7.5，默认关）：仅当 ENABLE_MEDICAL_SEARCH=true 且本地未命中时触发
+   * （含无对象药的自由文本提问——drugName=null 表示未绑定药箱药品，检索只依据问题本身）。
    * 未实现时抛 AIUnavailableError（上层转 no-source 降级）。
    */
-  medicalSearch?(question: string, drugName: string): Promise<ConsultRawSections>
+  medicalSearch?(question: string, drugName: string | null): Promise<ConsultRawSections>
   /**
    * 医生端摘要（M3-T3 · PRD §7.7）：5 个只读工具输出 + 患者信息 → 结构化摘要。
    * 输出 schema 与咨询相同（ConsultRawSectionsSchema）；非法抛 AIUnavailableError。
