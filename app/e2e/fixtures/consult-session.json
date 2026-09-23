@@ -1,16 +1,24 @@
 {
   "scenario": "consult-session",
   "entry": "A",
-  "source": "synthetic",
+  "source": "live",
   "detectLayers": [],
   "extractIdentity": null,
   "runOcr": null,
   "fallbackParse": null,
   "consultAnswer": {
-    "summary": "玻璃酸钠滴眼液用于缓解干眼症状，请按说明书使用。",
-    "keyPoints": ["保湿润滑作用", "局部用药几乎不吸收"],
-    "risks": ["偶见眼部刺激感"],
-    "nextAction": "如症状持续请咨询眼科医生",
-    "warning": "不要根据 AI 回答自行调整处方"
+    "summary": "当前本地资料库未收录该药品的适应症信息，无法直接回答其通常用途。",
+    "keyPoints": [
+      "说明书适应症段落显示为未收录状态",
+      "缺乏官方批准的临床使用范围描述",
+      "仅确认药品名称、规格及剂型基本信息"
+    ],
+    "risks": [
+      "依据不完整资料用药可能导致误用风险",
+      "无法判断是否适合您的具体眼部症状",
+      "存在因信息缺失而忽略禁忌症的可能"
+    ],
+    "nextAction": "请查阅随药附带的完整纸质说明书或咨询眼科医生获取准确适应症。",
+    "warning": "在明确适应症前请勿自行使用该滴眼液，务必遵医嘱用药。"
   }
 }

@@ -1,16 +1,24 @@
 {
   "scenario": "consult-answered",
   "entry": "A",
-  "source": "synthetic",
+  "source": "live",
   "detectLayers": [],
   "extractIdentity": null,
   "runOcr": null,
   "fallbackParse": null,
   "consultAnswer": {
-    "summary": "玻璃酸钠滴眼液用于缓解干眼症状，如眼睛干涩、异物感、疲劳等。",
-    "keyPoints": ["玻璃酸钠具有保湿和润滑作用", "局部用药几乎不吸收入血", "开封后一个月内使用完毕"],
-    "risks": ["偶见眼部刺激感、异物感"],
-    "nextAction": "如症状持续或加重，请咨询眼科医生",
-    "warning": "不要根据 AI 回答自行调整处方"
+    "summary": "当前本地资料库未收录该药品的适应症信息，无法直接回答其通常用途。",
+    "keyPoints": [
+      "说明书中适应症段落缺失",
+      "仅确认药品为玻璃酸钠滴眼液",
+      "需查阅完整官方说明书获取准确信息"
+    ],
+    "risks": [
+      "缺乏适应症依据可能导致误用",
+      "自行推测用途存在健康风险",
+      "资料不全影响用药安全判断"
+    ],
+    "nextAction": "请通过正规渠道获取完整药品说明书或咨询专业医师药师。",
+    "warning": "请勿在缺乏明确适应症指导的情况下擅自使用该药物。"
   }
 }

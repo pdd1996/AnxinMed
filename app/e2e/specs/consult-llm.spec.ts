@@ -3,10 +3,11 @@
  *
  * 与 consult-dataquery.spec.ts（数据路径 0 LLM，无 fixture 包）互补：本文件验证**说明书 LLM 生成路径**
  * 的接线——对象药深链 → 快捷问题 → runConsult proceed → ai.consultAnswer 回放 → 归一化 → 回答卡渲染。
- * 三场景（app/e2e/fixtures/consult-*.json，source=synthetic 人工审核录制）：
- *   consult-answered  干净输出 → status='answered'（L1）；
- *   consult-limited   输出含剂量残留（「每日…10次」且不含 strip 关键词）→ status='limited'（L2）+ 固定提示；
- *   consult-allergy   档案过敏史 ∩ 禁忌段命中 → 回答附加过敏警示 + 禁忌段引用，LLM 调用数不变（M4-T4）。
+ * 三场景（app/e2e/fixtures/consult-*.json）：
+ *   consult-answered / consult-allergy / consult-session —— P0-T3 起source=live（qwen3.8-flash 非思考
+ *     真实输出，重录脚本 eval:record-consult-fixtures）；诚实产出「资料未覆盖即说明」文案；
+ *   consult-limited —— 保持 synthetic：对抗性「输出含剂量残留」录制，live 构造不可能（prompt 禁剂量），
+ *     strip 规则未变，人工复核无漂移。
  *
  * 断言四层（对齐 golden-cases.spec.ts 风格）：
  *   1. UI：回答卡渲染 fixture 的 summary 内容 + status 徽章（已回答 / 已过滤剂量）+ L2 时 notice；
@@ -93,7 +94,7 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
     await expect(card.getByText('已回答')).toBeVisible()
-    await expect(card.getByText('玻璃酸钠滴眼液用于缓解干眼症状，如眼睛干涩、异物感、疲劳等。')).toBeVisible()
+    await expect(card.getByText('当前本地资料库未收录该药品的适应症信息，无法直接回答其通常用途。')).toBeVisible()
 
     // 结构（评估安全网）：consult LLM 恰被调用 1 次
     const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=consult-answered`)
@@ -156,7 +157,7 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
     await expect(card.getByText('已回答')).toBeVisible()
-    await expect(card.getByText('磺胺嘧啶片用于敏感菌引起的感染治疗。')).toBeVisible()
+    await expect(card.getByText('该药主要用于治疗由敏感细菌引起的各类感染。')).toBeVisible()
     await expect(card.getByText(/过敏警示：你的档案过敏信息（磺胺）与该药禁忌相关/)).toBeVisible()
 
     // 结构：LLM 恰 1 次（回答本身）——覆盖层零新增模型调用（ai-calls 计数不变）

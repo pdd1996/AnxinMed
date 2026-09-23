@@ -43,7 +43,7 @@ test.describe('会话内续问 golden（M4-T5 · fixture 回放）', () => {
 
     // 第一轮：快捷问题（首问，无 sessionId → 服务端建会话）
     await page.getByRole('button', { name: '这个药通常用于什么？' }).click()
-    const firstAnswer = '玻璃酸钠滴眼液用于缓解干眼症状，请按说明书使用。'
+    const firstAnswer = '当前本地资料库未收录该药品的适应症信息，无法直接回答其通常用途。'
     await expect(page.getByTestId('consult-answer-card').getByText(firstAnswer)).toBeVisible()
 
     // 第二轮：自由文本续问（前端自动带上首答回传的 sessionId）
