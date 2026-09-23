@@ -3,10 +3,10 @@
  * 4xx（除 429）不重试（请求本身有问题）；5xx/429/网络/超时重试前退避（500ms 基数 + 随机抖动）
  * 后仍失败 → AIUnavailableError。
  */
-import { AIUnavailableError, type ImageInput } from './types.js'
+import { AIUnavailableError, type AiClientName, type ImageInput } from './types.js'
 
 export interface CallOptions {
-  client: 'qwen' | 'ocr' | 'baichuan'
+  client: AiClientName
   timeoutMs?: number
   retries?: number
 }
@@ -55,15 +55,27 @@ export function dataUrl(image: ImageInput): string {
 
 /** OpenAI-compatible chat 响应 → 模型输出的 JSON 字符串 content。 */
 export interface ChatResponse {
-  choices?: { message?: { content?: string } }[]
+  choices?: { message?: { content?: string; reasoning_content?: string } }[]
 }
 
-export function extractChatContent(res: ChatResponse, client: 'qwen' | 'ocr' | 'baichuan'): string {
+export function extractChatContent(res: ChatResponse, client: AiClientName): string {
   const content = res.choices?.[0]?.message?.content
   if (typeof content !== 'string' || content.length === 0) {
     throw new AIUnavailableError(client, `${client} 响应缺少 content`)
   }
   return content
+}
+
+/**
+ * 严格模式取 content（P0 · docs/13 §4.3 #2）：`reasoning_content` 非空 = 思考泄漏，
+ * 按契约判失败（默认失败更安全，不做 strip 放行）；content 空/缺失同样抛。
+ */
+export function extractChatContentStrict(res: ChatResponse, client: AiClientName): string {
+  const msg = res.choices?.[0]?.message
+  if (typeof msg?.reasoning_content === 'string' && msg.reasoning_content.length > 0) {
+    throw new AIUnavailableError(client, `${client} 响应含思考泄漏（reasoning_content 非空），按契约判失败`)
+  }
+  return extractChatContent(res, client)
 }
 
 /**
@@ -99,7 +111,7 @@ export function extractFirstJsonBlock(content: string): string | null {
  * 严格 parse 失败 → 截取首个配平 JSON 块重试；仍失败 → AIUnavailableError，不猜。
  * 内容合法性由下游 zod safeParse 把关（本函数只负责拿到候选 JSON）。
  */
-export function parseModelJson(content: string, client: 'qwen' | 'ocr' | 'baichuan'): unknown {
+export function parseModelJson(content: string, client: AiClientName): unknown {
   try {
     return JSON.parse(content)
   } catch (e) {

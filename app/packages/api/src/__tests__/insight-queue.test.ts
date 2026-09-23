@@ -207,13 +207,13 @@ describe('GET /api/insight/queue · 队列视图数据（spec §T7.7）', () => 
 
 describe('POST /api/insight/queue-summary · 队列摘要（spec §T7.6）', () => {
   const withKey = async (fn: () => Promise<void>) => {
-    const origKey = process.env.BAICHUAN_API_KEY
-    process.env.BAICHUAN_API_KEY = 'test-key'
+    const origKey = process.env.QWEN_API_KEY
+    process.env.QWEN_API_KEY = 'test-key'
     try {
       await fn()
     } finally {
-      if (origKey === undefined) delete process.env.BAICHUAN_API_KEY
-      else process.env.BAICHUAN_API_KEY = origKey
+      if (origKey === undefined) delete process.env.QWEN_API_KEY
+      else process.env.QWEN_API_KEY = origKey
     }
   }
 
@@ -243,17 +243,17 @@ describe('POST /api/insight/queue-summary · 队列摘要（spec §T7.6）', () 
     })
   })
 
-  it('无 BAICHUAN_API_KEY → 离线降级（规则拼装，含分档统计）', async () => {
-    const origKey = process.env.BAICHUAN_API_KEY
-    delete process.env.BAICHUAN_API_KEY
+  it('无 QWEN_API_KEY → 离线降级（规则拼装，含分档统计）', async () => {
+    const origKey = process.env.QWEN_API_KEY
+    delete process.env.QWEN_API_KEY
     try {
       const res = await req('POST', '/api/insight/queue-summary', {})
       expect(res.status).toBe(200)
       expect(res.body.snapshot.mode).toBe('offline-fallback')
-      expect(res.body.notice).toContain('未配置 BAICHUAN_API_KEY')
+      expect(res.body.notice).toContain('未配置咨询文本模型')
       expect(res.body.sections.summary).toContain('执行率优')
     } finally {
-      if (origKey !== undefined) process.env.BAICHUAN_API_KEY = origKey
+      if (origKey !== undefined) process.env.QWEN_API_KEY = origKey
     }
   })
 

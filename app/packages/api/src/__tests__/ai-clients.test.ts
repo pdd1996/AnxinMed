@@ -1,7 +1,9 @@
 /**
- * M2-T1 单测：三个 AI 客户端的「请求体组装 + 错误映射」，不真调 API（fetch mock）。
+ * M2-T1 单测：AI 客户端的「请求体组装 + 错误映射」，不真调 API（fetch mock）。
  * 覆盖：请求体只含约定字段；safeParse 失败抛 AIUnavailableError；网络/5xx 重试（退避后）后冒泡；
  * 4xx 不重试；缺 env 配置冒泡。OCR 为 qwen3.5-ocr chat 形态（行级转录）。
+ * P0 扩（docs/13）：qwen-text（默认咨询文本链，R4 非思考写死 + reasoning 泄漏断言）与
+ * deepseek（对照档，thinking disabled 写死）两组契约测试。
  * 2026-09-07 补：OCR 端点结构化输出（坐标标注 A/B 形态）解包回归——当天线上格式漂移致
  * Rp 严格等值锚点全量失配（上传处方全部降级 PARSE_FAILED），此处用真实端点返回形态钉住。
  */
@@ -15,6 +17,8 @@ import {
 import * as qwen from '../lib/ai/qwen.js'
 import * as ocr from '../lib/ai/ocr.js'
 import * as baichuan from '../lib/ai/baichuan.js'
+import * as qwenText from '../lib/ai/qwen-text.js'
+import * as deepseek from '../lib/ai/deepseek.js'
 import { AIUnavailableError, type ImageInput } from '../lib/ai/types.js'
 import { cropBody } from '../services/sanitize/index.js'
 import { extractFirstJsonBlock, parseModelJson } from '../lib/ai/http.js'
@@ -252,7 +256,7 @@ describe('buildConsultRequest 白名单（M4-T8 conditions 注入）', () => {
   })
 })
 
-describe('baichuan 客户端', () => {
+describe('baichuan 客户端（CONSULT_PROVIDER=baichuan 回滚通道）', () => {
   it('fallbackParse 成功', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => chatRes({ frequency: '1' })))
     await expect(baichuan.fallbackParse('Rp ...', ['frequency'])).resolves.toEqual({ frequency: '1' })
@@ -261,6 +265,112 @@ describe('baichuan 客户端', () => {
   it('fallbackParse 输出非对象 → AIUnavailableError', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => chatRes(['x'])))
     await expect(baichuan.fallbackParse('Rp ...', ['frequency'])).rejects.toBeInstanceOf(AIUnavailableError)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// P0（docs/13 §3/§4）：qwen-text 默认文本链 + deepseek 对照档的契约测试
+// ---------------------------------------------------------------------------
+
+const TEXT_PAYLOAD = {
+  question: '这个药通常用于什么？',
+  drug: { genericName: '玻璃酸钠滴眼液', brandName: '海露', specification: '0.1%', form: '滴眼液', isManual: false },
+  section: { label: '适应症段', version: '2024-01', text: '适应症：用于缓解干眼症状' },
+  interactionsText: '生效计划集合中未见已知相互作用。',
+}
+
+describe('qwen-text 客户端（P0 · 咨询文本默认链）', () => {
+  it('请求体契约：非思考写死 + JSON 约束 + temperature 0 + 默认模型（R4 / §4.1）', async () => {
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_u: unknown, init?: { body?: unknown }) => {
+      bodies.push(String(init?.body))
+      return chatRes({ summary: '用于缓解干眼症状' })
+    }))
+    await qwenText.consultAnswer(TEXT_PAYLOAD)
+    const body = JSON.parse(bodies[0])
+    expect(body.model).toBe('qwen3.8-flash') // CONSULT_MODEL 未设 → 默认
+    expect(body.temperature).toBe(0)
+    expect(body.response_format).toEqual({ type: 'json_object' })
+    expect(body.enable_thinking).toBe(false)
+    expect(body.preserve_thinking).toBe(false)
+    // prompt 与 baichuan 同源（同一套 prompt 才有对打可比性）
+    expect(String(body.messages[0].content)).toContain('药品资料解释助手')
+  })
+
+  it('CONSULT_MODEL 可覆盖默认模型名', async () => {
+    process.env.CONSULT_MODEL = 'qwen3.8-flash-custom'
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_u: unknown, init?: { body?: unknown }) => {
+      bodies.push(String(init?.body))
+      return chatRes({ summary: 'x' })
+    }))
+    await qwenText.consultAnswer(TEXT_PAYLOAD)
+    expect(JSON.parse(bodies[0]).model).toBe('qwen3.8-flash-custom')
+  })
+
+  it('响应含 reasoning_content（思考泄漏）→ AIUnavailableError（§4.3 #2，不 strip 放行）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      mkRes({ choices: [{ message: { content: '{"summary":"x"}', reasoning_content: '用户问的是…' } }] }),
+    ))
+    await expect(qwenText.consultAnswer(TEXT_PAYLOAD)).rejects.toThrow(/思考泄漏/)
+  })
+
+  it('reasoning_content 为空串 → 不算泄漏，正常取 content', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      mkRes({ choices: [{ message: { content: '{"summary":"x"}', reasoning_content: '' } }] }),
+    ))
+    await expect(qwenText.consultAnswer(TEXT_PAYLOAD)).resolves.toEqual({ summary: 'x' })
+  })
+
+  it('缺 QWEN_API_KEY → AIUnavailableError（不发请求）', async () => {
+    delete process.env.QWEN_API_KEY
+    vi.stubGlobal('fetch', vi.fn())
+    await expect(qwenText.consultAnswer(TEXT_PAYLOAD)).rejects.toBeInstanceOf(AIUnavailableError)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('fallbackParse 成功（与 baichuan 同 prompt 同 schema）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => chatRes({ frequency: '1' })))
+    await expect(qwenText.fallbackParse('Rp ...', ['frequency'])).resolves.toEqual({ frequency: '1' })
+  })
+})
+
+describe('deepseek 客户端（P0 · 对照档）', () => {
+  it('buildDeepseekConsultRequest：thinking disabled 写死 + temperature 0 + 默认模型', () => {
+    const body = deepseek.buildDeepseekConsultRequest(TEXT_PAYLOAD)
+    expect(body.model).toBe('deepseek-flash')
+    expect(body.temperature).toBe(0)
+    expect(body.thinking).toEqual({ type: 'disabled' })
+    expect('reasoning_effort' in body).toBe(false) // docs/13 §4.2：不传 reasoning_effort
+    expect('enable_thinking' in body).toBe(false) // 不混用 qwen 参数
+  })
+
+  it('DEEPSEEK_MODEL 可覆盖默认模型名', () => {
+    process.env.DEEPSEEK_MODEL = 'deepseek-flash-custom'
+    expect(deepseek.buildDeepseekConsultRequest(TEXT_PAYLOAD).model).toBe('deepseek-flash-custom')
+  })
+
+  it('缺 DEEPSEEK_API_KEY → AIUnavailableError（不发请求）', async () => {
+    delete process.env.DEEPSEEK_API_KEY
+    vi.stubGlobal('fetch', vi.fn())
+    await expect(deepseek.consultAnswer(TEXT_PAYLOAD)).rejects.toBeInstanceOf(AIUnavailableError)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('思考开关失效（服务端仍回 reasoning_content）→ AIUnavailableError', async () => {
+    process.env.DEEPSEEK_API_KEY = 'dk'
+    process.env.DEEPSEEK_BASE_URL = 'http://ds.test'
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      mkRes({ choices: [{ message: { content: '{"summary":"x"}', reasoning_content: '思考中…' } }] }),
+    ))
+    await expect(deepseek.consultAnswer(TEXT_PAYLOAD)).rejects.toThrow(/思考泄漏/)
+  })
+
+  it('consultAnswer 成功路径', async () => {
+    process.env.DEEPSEEK_API_KEY = 'dk'
+    process.env.DEEPSEEK_BASE_URL = 'http://ds.test'
+    vi.stubGlobal('fetch', vi.fn(async () => chatRes({ summary: '用于缓解干眼症状' })))
+    await expect(deepseek.consultAnswer(TEXT_PAYLOAD)).resolves.toEqual({ summary: '用于缓解干眼症状' })
   })
 })
 

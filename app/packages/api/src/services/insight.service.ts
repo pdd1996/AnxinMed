@@ -6,7 +6,7 @@
  *   2. generateSummary(patientId)：
  *      - 查患者信息（listPatientsWithStats 里找）；
  *      - 组装 5 个只读工具（adherence / medicationList / interactions / expiry / riskEvents）；
- *      - 调 services/insight/run.ts 的 runInsightSummary（或 runInsightSummaryOffline 如无 BAICHUAN_API_KEY）；
+ *      - 调 services/insight/run.ts 的 runInsightSummary（或 runInsightSummaryOffline 如文本链未配 key）；
  *      - 返回 InsightSummaryResponse（shared 契约）。
  *
  * ⚠️ 分层纪律：
@@ -21,6 +21,7 @@ import * as drugsRepo from '../repositories/drugs.repo.js'
 import * as insightRepo from '../repositories/insight.repo.js'
 import * as plansRepo from '../repositories/plans.repo.js'
 import { getAiClients } from '../lib/ai/registry.js'
+import { isTextProviderConfigured } from '../lib/ai/index.js'
 import { checkInteractions, type InteractionRuleInput } from './rules/index.js'
 import { runInsightSummary, runInsightSummaryOffline, toRiskEventItem, toLastQuestion } from './insight/index.js'
 import { countGrades, rollupTimeline, runQueueTool, type AdherenceDistributionResult, type PatientCohortResult, type RiskEventRollupResult } from './insight/tools.js'
@@ -139,9 +140,8 @@ export async function generateSummary(patientId: string, question?: string): Pro
   const tools: InsightTools = { adherence, medicationList, interactions, expiry, riskEvents }
   const dateRange = `${addDaysStr(todayStr(), -29)} ~ ${todayStr()}`
 
-  // 3. 调编排层（有 BAICHUAN_API_KEY 走 LLM，否则离线降级）
-  const hasKey = Boolean(process.env.BAICHUAN_API_KEY)
-  if (!hasKey) {
+  // 3. 调编排层（文本链已配 key 走 LLM，否则离线降级）
+  if (!isTextProviderConfigured()) {
     return runInsightSummaryOffline({ patient, tools, dateRange })
   }
 
@@ -152,7 +152,7 @@ export async function generateSummary(patientId: string, question?: string): Pro
 /**
  * 生成队列摘要（POST /api/insight/queue-summary · T7.6）。
  * 数字全部来自工具计算结果（listPatientsWithStats / listRiskEventsWindow），
- * 百川仅在链路末端做叙述，过 guardSummary 二次守门；无 key / LLM 失败走规则降级。
+ * 咨询文本模型仅在链路末端做叙述，过 guardSummary 二次守门；无 key / LLM 失败走规则降级。
  */
 export async function generateQueueSummary(question?: string) {
   const days = 30
@@ -178,7 +178,7 @@ export async function generateQueueSummary(question?: string) {
     question,
   }
 
-  if (!process.env.BAICHUAN_API_KEY) {
+  if (!isTextProviderConfigured()) {
     return runQueueSummaryOffline({ payload, grades, riskEvents })
   }
   const ai = getAiClients()
@@ -241,7 +241,7 @@ const PATIENT_CITATION = '本地患者数据（演示数据，未经医学审核
  *   2. 意图路由（宁漏勿误）：
  *      患者维度 → classifyConsultIntent（4 查询意图 + 解释类词仲裁）→ runDataQuery 直查库；
  *      队列维度 → classifyQueueIntent（3 工具意图 + 同一仲裁表）→ runQueueTool 直查库；
- *   3. 漏判长尾 → 复用既有摘要编排（百川末端叙述 + guardSummary + 规则降级）；
+ *   3. 漏判长尾 → 复用既有摘要编排（咨询模型末端叙述 + guardSummary + 规则降级）；
  *   4. 每问一行 insight_ask_logs 留痕——intent=null 即漏判，作为扩工具依据（绝不放开 SQL）。
  */
 export async function insightAsk(question: string, patientId: string | null): Promise<InsightAskResponse> {

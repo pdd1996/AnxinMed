@@ -102,21 +102,21 @@ export function mockClients(o: MockOverrides = {}): AiClients {
       calls.consultAnswer++
       if (o.consultAnswerError) throw o.consultAnswerError
       // 默认抛 AIUnavailableError：M2 管线测试不走咨询路径，如意外走到则明确失败（不静默通过）
-      if (!o.consult) throw new AIUnavailableError('baichuan', 'mock 未提供 consultAnswer override')
+      if (!o.consult) throw new AIUnavailableError('qwen-text', 'mock 未提供 consultAnswer override')
       return o.consult
     },
     async insightSummary(_payload: InsightPromptPayload) {
       calls.insightSummary++
       if (o.insightSummaryError) throw o.insightSummaryError
       // 默认抛 AIUnavailableError：M2/M3-T1 测试不走摘要路径，如意外走到则明确失败（不静默通过）
-      if (!o.insight) throw new AIUnavailableError('baichuan', 'mock 未提供 insightSummary override')
+      if (!o.insight) throw new AIUnavailableError('qwen-text', 'mock 未提供 insightSummary override')
       return o.insight
     },
     async queueSummary(_payload: QueuePromptPayload) {
       calls.queueSummary++
       if (o.queueSummaryError) throw o.queueSummaryError
       // 默认抛 AIUnavailableError：不走队列摘要路径的测试如意外走到则明确失败（不静默通过）
-      if (!o.queue) throw new AIUnavailableError('baichuan', 'mock 未提供 queueSummary override')
+      if (!o.queue) throw new AIUnavailableError('qwen-text', 'mock 未提供 queueSummary override')
       return o.queue
     },
   }

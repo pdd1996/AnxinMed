@@ -183,9 +183,9 @@ describe('POST /api/insight/summary · 摘要生成（spec §T3.3）', () => {
       }),
     )
 
-    // 临时设 BAICHUAN_API_KEY 让 service 走 LLM 路径
-    const origKey = process.env.BAICHUAN_API_KEY
-    process.env.BAICHUAN_API_KEY = 'test-key'
+    // 临时设 QWEN_API_KEY 让 service 走 LLM 路径
+    const origKey = process.env.QWEN_API_KEY
+    process.env.QWEN_API_KEY = 'test-key'
     try {
       const res = await req('POST', '/api/insight/summary', { patientId: USER })
       expect(res.status).toBe(200)
@@ -206,23 +206,23 @@ describe('POST /api/insight/summary · 摘要生成（spec §T3.3）', () => {
       // insightSummary 被调用
       expect(calls.insightSummary).toBe(1)
     } finally {
-      if (origKey === undefined) delete process.env.BAICHUAN_API_KEY
-      else process.env.BAICHUAN_API_KEY = origKey
+      if (origKey === undefined) delete process.env.QWEN_API_KEY
+      else process.env.QWEN_API_KEY = origKey
     }
   })
 
-  it('无 BAICHUAN_API_KEY → 离线降级（snapshot.mode=offline-fallback）', async () => {
-    const origKey = process.env.BAICHUAN_API_KEY
-    delete process.env.BAICHUAN_API_KEY
+  it('无 QWEN_API_KEY → 离线降级（snapshot.mode=offline-fallback）', async () => {
+    const origKey = process.env.QWEN_API_KEY
+    delete process.env.QWEN_API_KEY
     try {
       const res = await req('POST', '/api/insight/summary', { patientId: USER })
       expect(res.status).toBe(200)
       expect(res.body.snapshot.mode).toBe('offline-fallback')
-      expect(res.body.notice).toContain('未配置 BAICHUAN_API_KEY')
+      expect(res.body.notice).toContain('未配置咨询文本模型')
       // 降级摘要仍含患者信息
       expect(res.body.sections.summary).toContain('张某某')
     } finally {
-      if (origKey !== undefined) process.env.BAICHUAN_API_KEY = origKey
+      if (origKey !== undefined) process.env.QWEN_API_KEY = origKey
     }
   })
 
@@ -233,16 +233,16 @@ describe('POST /api/insight/summary · 摘要生成（spec §T3.3）', () => {
       }),
     )
 
-    const origKey = process.env.BAICHUAN_API_KEY
-    process.env.BAICHUAN_API_KEY = 'test-key'
+    const origKey = process.env.QWEN_API_KEY
+    process.env.QWEN_API_KEY = 'test-key'
     try {
       const res = await req('POST', '/api/insight/summary', { patientId: USER })
       expect(res.status).toBe(200)
       expect(res.body.snapshot.mode).toBe('error-fallback')
       expect(res.body.notice).toContain('LLM 调用失败')
     } finally {
-      if (origKey === undefined) delete process.env.BAICHUAN_API_KEY
-      else process.env.BAICHUAN_API_KEY = origKey
+      if (origKey === undefined) delete process.env.QWEN_API_KEY
+      else process.env.QWEN_API_KEY = origKey
     }
   })
 
@@ -259,16 +259,16 @@ describe('POST /api/insight/summary · 摘要生成（spec §T3.3）', () => {
       }),
     )
 
-    const origKey = process.env.BAICHUAN_API_KEY
-    process.env.BAICHUAN_API_KEY = 'test-key'
+    const origKey = process.env.QWEN_API_KEY
+    process.env.QWEN_API_KEY = 'test-key'
     try {
       const res = await req('POST', '/api/insight/summary', { patientId: USER })
       expect(res.status).toBe(200)
       expect(res.body.riskLevel).toBe('L4')
       expect(res.body.sections.summary).toContain('紧急风险信号')
     } finally {
-      if (origKey === undefined) delete process.env.BAICHUAN_API_KEY
-      else process.env.BAICHUAN_API_KEY = origKey
+      if (origKey === undefined) delete process.env.QWEN_API_KEY
+      else process.env.QWEN_API_KEY = origKey
     }
   })
 
@@ -296,8 +296,8 @@ describe('POST /api/insight/summary · 风险事件流（spec §T3.1）', () => 
     await req('POST', '/api/consult', { question: '我胸痛', drugIds: [] })
 
     // 再生成摘要
-    const origKey = process.env.BAICHUAN_API_KEY
-    delete process.env.BAICHUAN_API_KEY
+    const origKey = process.env.QWEN_API_KEY
+    delete process.env.QWEN_API_KEY
     try {
       const res = await req('POST', '/api/insight/summary', { patientId: USER })
       expect(res.status).toBe(200)
@@ -305,7 +305,7 @@ describe('POST /api/insight/summary · 风险事件流（spec §T3.1）', () => 
       expect(res.body.tools.riskEvents.hasL4).toBe(true)
       expect(res.body.tools.riskEvents.consultCount).toBeGreaterThan(0)
     } finally {
-      if (origKey !== undefined) process.env.BAICHUAN_API_KEY = origKey
+      if (origKey !== undefined) process.env.QWEN_API_KEY = origKey
     }
   })
 })

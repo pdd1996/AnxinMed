@@ -66,9 +66,9 @@ export async function runQueueSummary(input: QueueRunInput): Promise<QueueRunRes
   }
 }
 
-/** 离线降级路径（无 BAICHUAN_API_KEY 时）：规则拼装，不调 LLM。 */
+/** 离线降级路径（文本链未配 key 时）：规则拼装，不调 LLM。 */
 export function runQueueSummaryOffline(input: Omit<QueueRunInput, 'ai'>): QueueRunResult {
-  return finalizeFallback(input, new Date().toISOString(), 'offline-fallback', '未配置 BAICHUAN_API_KEY，摘要为规则降级生成。')
+  return finalizeFallback(input, new Date().toISOString(), 'offline-fallback', '未配置咨询文本模型 key，摘要为规则降级生成。')
 }
 
 function finalizeFallback(

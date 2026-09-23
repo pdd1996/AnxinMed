@@ -105,7 +105,7 @@ export async function runInsightSummary(input: InsightRunInput): Promise<Insight
 }
 
 /**
- * 离线降级路径（无 BAICHUAN_API_KEY 时）：直接用规则拼装，不调 LLM。
+ * 离线降级路径（文本链未配 key 时）：直接用规则拼装，不调 LLM。
  * 与 demo:1331-1345 等价；snapshot.mode='offline-fallback'。
  */
 export function runInsightSummaryOffline(input: Omit<InsightRunInput, 'ai'>): InsightRunResult {
@@ -120,6 +120,6 @@ export function runInsightSummaryOffline(input: Omit<InsightRunInput, 'ai'>): In
     tools,
     snapshot: { generatedAt, dateRange, toolChain: TOOL_CHAIN, mode: 'offline-fallback' },
     citations: ['本地患者数据（演示数据，未经医学审核）'],
-    notice: '未配置 BAICHUAN_API_KEY，摘要为规则降级生成。',
+    notice: '未配置咨询文本模型 key，摘要为规则降级生成。',
   }
 }

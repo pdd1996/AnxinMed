@@ -267,7 +267,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     if (e instanceof AIUnavailableError) {
       // Baichuan 不可用 → 降级为说明书规则拼装（不炸整体，附 notice 说明）
       sections = fallbackSectionsFromInsert(question, insert)
-      aiNotice = '百川服务不可用，回答由本地说明书库规则拼装（演示降级）。'
+      aiNotice = '咨询模型服务不可用，回答由本地说明书库规则拼装（降级）。'
     } else {
       throw e
     }

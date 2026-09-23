@@ -184,8 +184,8 @@ describe('POST /api/insight/ask · 患者维度', () => {
         },
       }),
     )
-    const origKey = process.env.BAICHUAN_API_KEY
-    process.env.BAICHUAN_API_KEY = 'test-key'
+    const origKey = process.env.QWEN_API_KEY
+    process.env.QWEN_API_KEY = 'test-key'
     try {
       const res = await req('POST', '/api/insight/ask', { question: '他的药有什么副作用', patientId: PATIENT })
       expect(res.status).toBe(200)
@@ -196,8 +196,8 @@ describe('POST /api/insight/ask · 患者维度', () => {
       expect(log.mode).toBe('llm')
       expect(log.intent).toBeNull() // 漏判留痕
     } finally {
-      if (origKey === undefined) delete process.env.BAICHUAN_API_KEY
-      else process.env.BAICHUAN_API_KEY = origKey
+      if (origKey === undefined) delete process.env.QWEN_API_KEY
+      else process.env.QWEN_API_KEY = origKey
     }
   })
 
@@ -209,16 +209,16 @@ describe('POST /api/insight/ask · 患者维度', () => {
         queue: { summary: '队列整体平稳', keyPoints: [], risks: [], nextAction: '常规随访', warning: '仅供参考' },
       }),
     )
-    const origKey = process.env.BAICHUAN_API_KEY
-    process.env.BAICHUAN_API_KEY = 'test-key'
+    const origKey = process.env.QWEN_API_KEY
+    process.env.QWEN_API_KEY = 'test-key'
     try {
       const res = await req('POST', '/api/insight/ask', { question: '给本单位一个整体评价' })
       expect(res.status).toBe(200)
       expect(res.body.mode).toBe('llm')
       expect(calls.queueSummary).toBe(1)
     } finally {
-      if (origKey === undefined) delete process.env.BAICHUAN_API_KEY
-      else process.env.BAICHUAN_API_KEY = origKey
+      if (origKey === undefined) delete process.env.QWEN_API_KEY
+      else process.env.QWEN_API_KEY = origKey
     }
   })
 })

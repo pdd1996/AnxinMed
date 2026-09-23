@@ -369,7 +369,7 @@ describe('POST /api/consult · 无对象药自由文本提问（drugs=[] 恒走 
 // ---------------------------------------------------------------------------
 
 describe('POST /api/consult · AI 不可用降级（PRD §7.5 / spec §T1 完成标准）', () => {
-  it('Baichuan 抛 AIUnavailableError → 降级 fallbackSectionsFromInsert + notice 说明', async () => {
+  it('咨询文本模型抛 AIUnavailableError → 降级 fallbackSectionsFromInsert + notice 说明', async () => {
     prevClients = setAiClients(
       mockClients({
         consultAnswerError: new AIUnavailableError('baichuan', '模拟服务不可用'),
@@ -384,7 +384,8 @@ describe('POST /api/consult · AI 不可用降级（PRD §7.5 / spec §T1 完成
     expect(res.status).toBe(200) // 降级不炸整体
     expect(res.body.riskLevel).toBe('L1')
     expect(res.body.status).toBe('answered')
-    expect(res.body.notice).toContain('百川服务不可用')
+    // notice 明示降级（失败可见不静默；P0 起措辞与具体厂商解耦）
+    expect(res.body.notice).toContain('咨询模型服务不可用')
     expect(res.body.notice).toContain('本地说明书库规则拼装')
     // citations 仍三件套齐备（降级路径也用本地说明书）
     expect(res.body.citations[0]).toMatchObject({

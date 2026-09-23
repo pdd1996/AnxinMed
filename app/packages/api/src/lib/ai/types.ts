@@ -5,10 +5,13 @@
  */
 import type { LayerLabel } from '@anxin/shared'
 
-/** 模型不可用（超时/重试后仍失败/5xx）→ 上层走降级路径，绝不静默。 */
+/** 客户端归因名（AIUnavailableError.client + http CallOptions.client 共用；新增客户端在此扩）。 */
+export type AiClientName = 'qwen' | 'ocr' | 'baichuan' | 'qwen-text' | 'deepseek'
+
+/** 模型不可用（超时/重试后仍失败/5xx/响应不合契约）→ 上层走降级路径，绝不静默。 */
 export class AIUnavailableError extends Error {
   constructor(
-    public readonly client: 'qwen' | 'ocr' | 'baichuan',
+    public readonly client: AiClientName,
     message: string,
     public readonly cause?: unknown,
   ) {

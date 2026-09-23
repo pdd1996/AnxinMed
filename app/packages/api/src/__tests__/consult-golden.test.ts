@@ -286,7 +286,7 @@ describe('不变量 ③ 非拦截回答 citations 三件套非空', () => {
 
   it('降级拼装路径（AI 不可用）citations 三件套非空', async () => {
     prevClients = setAiClients(
-      mockClients({ consultAnswerError: new AIUnavailableError('baichuan', '模拟服务不可用') }),
+      mockClients({ consultAnswerError: new AIUnavailableError('qwen-text', '模拟服务不可用') }),
     )
     const res = await req('POST', '/api/consult', { question: '这个药通常用于什么？', drugIds: [DRUG] })
     expect(res.body.status).toBe('answered')
@@ -304,9 +304,9 @@ describe('不变量 ③ 非拦截回答 citations 三件套非空', () => {
 // ---------------------------------------------------------------------------
 
 describe('不变量 ④ 降级语义', () => {
-  it('Baichuan 不可用 → 200 + answered + 回答来自说明书段落（非 LLM）+ notice 说明降级', async () => {
+  it('咨询模型不可用 → 200 + answered + 回答来自说明书段落（非 LLM）+ notice 说明降级', async () => {
     prevClients = setAiClients(
-      mockClients({ consultAnswerError: new AIUnavailableError('baichuan', '模拟服务不可用') }),
+      mockClients({ consultAnswerError: new AIUnavailableError('qwen-text', '模拟服务不可用') }),
     )
 
     const res = await req('POST', '/api/consult', { question: '这个药通常用于什么？', drugIds: [DRUG] })
@@ -317,8 +317,8 @@ describe('不变量 ④ 降级语义', () => {
     expect(res.body.blocked).toBe(false)
     // 回答内容来自说明书适应症段规则拼装（fallbackSectionsFromInsert）
     expect(res.body.sections.summary).toContain('缓解干眼症状')
-    // notice 明示降级（失败可见不静默）
-    expect(res.body.notice).toContain('百川服务不可用')
+    // notice 明示降级（失败可见不静默；P0 起措辞与具体厂商解耦）
+    expect(res.body.notice).toContain('咨询模型服务不可用')
     expect(res.body.notice).toContain('规则拼装')
   })
 })

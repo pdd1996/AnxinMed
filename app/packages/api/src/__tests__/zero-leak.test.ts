@@ -4,8 +4,8 @@
  * 对管线**全路径产物**运行 assertNoPii / findPii，golden case 样张含姓名/电话/病历号/地址时命中数必须 = 0：
  *   1. DB 落库内容：drafts.payload + confirm 四表（sources / drugs / plans / health_profiles）；
  *   2. 日志输出：捕获 console（hono logger + onError）全程断言零 PII；
- *   3. 第三方请求体：fetch mock 捕获真实 AI 客户端组装的请求（qwen/ocr/baichuan），剥离图像 base64 后断言零 PII
- *      —— 其中 Baichuan 兜底请求是唯一的处方文本出口，必须只含 L0 裁剪后的正文（前记 PII 已裁掉）。
+ *   3. 第三方请求体：fetch mock 捕获真实 AI 客户端组装的请求（qwen/ocr/文本链），剥离图像 base64 后断言零 PII
+ *      —— 其中兜底解析请求是唯一的处方文本出口，必须只含 L0 裁剪后的正文（前记 PII 已裁掉）。
  *
  * 样张真相源 = app/fixtures/golden-cases.json（与 make-fixtures.py / T10 共用）：
  * mock OCR 输入 = lines 去掉 redact 行（涂黑后 OCR 读不到），与 PNG 渲染同源，永不漂移。
@@ -92,7 +92,7 @@ interface Captured {
   url: string
   body: string
 }
-/** 安装 fetch mock：按 URL 路由 canned 响应（ocr=chat 多行转录/qwen 层检测/qwen 身份/baichuan 兜底），并记录全部请求体。 */
+/** 安装 fetch mock：按 URL 路由 canned 响应（ocr=chat 多行转录/qwen 层检测/qwen 身份/qwen-text 兜底），并记录全部请求体。 */
 function installFetchMock(sc: Scenario): Captured[] {
   const captured: Captured[] = []
   const ocrContent = mkOcr(ocrLines(sc)).lines.join('\n')
@@ -105,6 +105,8 @@ function installFetchMock(sc: Scenario): Captured[] {
       captured.push({ url: u, body })
       if (u.includes('ocr.test')) return mkRes({ choices: [{ message: { content: ocrContent } }] })
       if (u.includes('bc.test')) return chatRes(fb)
+      // 文本模型请求（P0 后兜底解析走 QWEN_BASE_URL）：按请求体特征路由（response_format 为文本链独有）
+      if (u.includes('qwen.test') && body.includes('response_format')) return chatRes(fb)
       if (u.includes('qwen.test')) {
         const parsed = JSON.parse(body || '{}')
         const first = parsed?.messages?.[0]?.content?.[0]
@@ -284,7 +286,7 @@ describe('零泄漏 · rx-normal 全路径产物（DB 落库 + 日志）', () =>
 })
 
 describe('零泄漏 · rx-redacted 第三方请求体 + 降级草稿', () => {
-  it('发给 Baichuan 的请求体只含 L0 正文（前记 PII 已裁掉）零 PII；降级草稿零 PII；回链拦截不预填', async () => {
+  it('发给文本模型的请求体只含 L0 正文（前记 PII 已裁掉）零 PII；降级草稿零 PII；回链拦截不预填', async () => {
     useRealClientsWithFetchMock()
     const captured = installFetchMock(REDACTED)
     const { logs } = captureConsole()
@@ -303,11 +305,12 @@ describe('零泄漏 · rx-redacted 第三方请求体 + 降级草稿', () => {
     expect(payload.planDraft.dose).toBeNull() // 兜底幻觉值被回链拦截，未预填
     expect(payload.backlinkIntercepted).toBeGreaterThanOrEqual(1)
 
-    // 第三方请求体：Baichuan 兜底被触发，其请求体（唯一处方文本出口）剥离 base64 后零 PII
-    const bc = captured.filter((c) => c.url.includes('bc.test'))
-    expect(bc.length).toBeGreaterThan(0) // 兜底确实被调用（缺项触发）
-    for (const c of bc) {
-      expectClean('Baichuan 兜底请求体', stripImage(c.body))
+    // 第三方请求体：兜底解析被触发（缺项），其请求体（唯一处方文本出口）剥离 base64 后零 PII
+    // P0 后兜底解析走 qwen-text（QWEN_BASE_URL），按请求体 response_format 特征识别文本请求
+    const textReq = captured.filter((c) => c.url.includes('qwen.test') && c.body.includes('response_format'))
+    expect(textReq.length).toBeGreaterThan(0) // 兜底确实被调用（缺项触发）
+    for (const c of textReq) {
+      expectClean('兜底解析请求体', stripImage(c.body))
       // 且请求体只含裁剪正文的药品行，绝不含前记 PII 原文
       expect(c.body).not.toContain(PII.name)
       expect(c.body).not.toContain(PII.phone)

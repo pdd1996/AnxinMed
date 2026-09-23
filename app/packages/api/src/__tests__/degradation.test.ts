@@ -130,7 +130,7 @@ describe('降级演练 · 记录一：kill Qwen（层检测 / 身份线 VLM）',
     // 核心功能（药箱/计划/今日/记录）全可用
     await expectCoreFeaturesUp()
 
-    // 咨询走 baichuan + 本地说明书，不依赖 qwen → 200 正常回答
+    // 咨询走文本链（qwen3.8-flash 非思考）+ 本地说明书，不依赖视觉链 → 200 正常回答
     const cs = await req('POST', '/api/consult', { question: '这个药通常用于什么', drugIds: [DRUG] })
     expect(cs.status).toBe(200)
     expect(cs.body.riskLevel).toBe('L1')
@@ -156,17 +156,17 @@ describe('降级演练 · 记录二：kill OCR（医嘱线 runOcr）', () => {
   })
 })
 
-describe('降级演练 · 记录三：kill Baichuan（兜底解析 / 咨询回答 / 摘要）', () => {
-  it('咨询 → 200 离线兜底（notice「百川服务不可用」），非 5xx；录入A 完整处方不需兜底 → 201；核心功能不受影响', async () => {
+describe('降级演练 · 记录三：kill 咨询文本链（兜底解析 / 咨询回答 / 摘要）', () => {
+  it('咨询 → 200 离线兜底（notice「咨询模型服务不可用」），非 5xx；录入A 完整处方不需兜底 → 201；核心功能不受影响', async () => {
     setAiClients(
       mockClients({ layers: ['处方层'], ocr: mkOcr(RX), identity: IDENTITY, fallbackError: kill('baichuan'), consultAnswerError: kill('baichuan') }),
     )
 
-    // 咨询：baichuan 挂 → fallbackSectionsFromInsert 离线兜底（200 + notice），绝不 5xx
+    // 咨询：文本链挂 → fallbackSectionsFromInsert 离线兜底（200 + notice），绝不 5xx
     const cs = await req('POST', '/api/consult', { question: '这个药通常用于什么', drugIds: [DRUG] })
     expect(cs.status).toBe(200)
     expect(cs.body.ok).toBe(true)
-    expect(String(cs.body.notice)).toContain('百川服务不可用')
+    expect(String(cs.body.notice)).toContain('咨询模型服务不可用')
 
     // 录入A：RX 字段完整 → 不触发 fallbackParse（仅缺项才调）→ 201 正常
     const rx = await req('POST', '/api/intake/prescription', { image: IMG_DATAURL })
