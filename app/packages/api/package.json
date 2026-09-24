@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-users": "tsx src/db/seed-users.ts",
+    "db:seed-interaction-rules": "tsx src/db/seed-interaction-rules.ts",
     "db:seed-demo": "tsx src/db/seed-demo.ts",
     "db:seed-drafts": "tsx src/db/seed-drafts-demo.ts",
     "db:import-crawled": "tsx src/db/import-crawled.ts",
