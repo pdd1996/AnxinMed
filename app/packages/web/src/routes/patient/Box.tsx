@@ -134,12 +134,13 @@ export default function Box() {
 
   return (
     <div className="space-y-5">
-      <header className="flex items-end justify-between gap-3">
+      {/* 移动端标题独占一行（360px 下 headline 恰好单行），按钮等宽一行；md+ 恢复左右布局 */}
+      <header className="space-y-3 md:flex md:items-end md:justify-between md:gap-3 md:space-y-0">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">我的药箱</p>
-          <h1 className="text-2xl font-bold">所有来源的药，同一个药箱</h1>
+          <h1 className="text-2xl font-bold text-balance">所有来源的药，同一个药箱</h1>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
           <Button variant="outline" className="min-h-11" onClick={() => setShowManual(true)}>
             <Hand className="size-4" aria-hidden /> 手动建档
           </Button>
@@ -217,9 +218,9 @@ export default function Box() {
                     </p>
                   )}
 
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">{planChip(plan)}</span>
-                    {plan?.tags?.dose && <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground">抄录/自填用量</span>}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="whitespace-nowrap rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">{planChip(plan)}</span>
+                    {plan?.tags?.dose && <span className="whitespace-nowrap rounded-full bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground">抄录/自填用量</span>}
                   </div>
                   {plan && (
                     <p className="text-sm text-muted-foreground">
