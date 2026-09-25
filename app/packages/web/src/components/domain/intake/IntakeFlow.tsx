@@ -50,7 +50,6 @@ const ENTRY_TABS: { entry: Entry; label: string; icon: typeof FileText }[] = [
 export interface IntakeCopy {
   entry: Entry
   pageTitle: string
-  pageLead: string
   uploadTitle: string
   uploadHint: string
   otherEntryLabel: string
@@ -196,7 +195,6 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
       <header>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">拍照录入</p>
         <h1 className="text-2xl font-bold">{copy.pageTitle}</h1>
-        <p className="text-sm text-muted-foreground">{copy.pageLead}</p>
       </header>
 
       {step === 'upload' && (

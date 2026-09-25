@@ -26,7 +26,6 @@ vi.mock('@/lib/intake', async (importOriginal) => {
 const COPY_A: IntakeCopy = {
   entry: 'A',
   pageTitle: '拍处方笺录入',
-  pageLead: 'lead',
   uploadTitle: '上传平铺完整的处方笺照片',
   uploadHint: '覆盖 Rp 至「处方完毕」',
   otherEntryLabel: '拍药品',
