@@ -29,7 +29,6 @@ const COPY_A: IntakeCopy = {
   pageLead: 'lead',
   uploadTitle: '上传平铺完整的处方笺照片',
   uploadHint: '覆盖 Rp 至「处方完毕」',
-  guidePoints: ['处方笺平铺完整入镜'],
   otherEntryLabel: '拍药品',
   otherEntryPath: '/intake/drug',
 }

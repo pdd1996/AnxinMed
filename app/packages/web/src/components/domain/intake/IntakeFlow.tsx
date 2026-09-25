@@ -28,7 +28,6 @@ import {
   mapIntakeFailure,
   QUALITY_HINTS,
   QUALITY_ISSUE_LABEL,
-  RETAKE_CHECKLIST,
   SAFETY_NOTE,
   STAGE_TEXT,
   validateFile,
@@ -48,7 +47,6 @@ export interface IntakeCopy {
   pageLead: string
   uploadTitle: string
   uploadHint: string
-  guidePoints: string[]
   otherEntryLabel: string
   otherEntryPath: string
 }
@@ -186,296 +184,256 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-      <div className="space-y-4">
-        <header>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-            Capture &amp; extract · 入口{copy.entry}
-          </p>
-          <h1 className="text-2xl font-bold">{copy.pageTitle}</h1>
-          <p className="text-sm text-muted-foreground">{copy.pageLead}</p>
-        </header>
+    <div className="space-y-4">
+      <header>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+          Capture &amp; extract · 入口{copy.entry}
+        </p>
+        <h1 className="text-2xl font-bold">{copy.pageTitle}</h1>
+        <p className="text-sm text-muted-foreground">{copy.pageLead}</p>
+      </header>
 
-        {step === 'upload' && (
-          <Card>
-            <CardContent className="space-y-4 py-6">
-              <button
-                type="button"
-                className="flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-input bg-muted/40 p-6 hover:border-primary/60"
-                onClick={() => fileRef.current?.click()}
-              >
-                <span className="relative grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
-                  <ImagePlus className="size-8" aria-hidden />
-                </span>
-                <strong className="text-lg">{copy.uploadTitle}</strong>
-                <span className="text-sm text-muted-foreground">{copy.uploadHint}</span>
-                <span className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
-                  <Camera className="size-4" aria-hidden /> 拍摄 / 选择照片
-                </span>
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
-                aria-label="上传照片"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) void onFile(file)
-                  e.target.value = ''
-                }}
-              />
-              <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
-                上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只做白名单解析与四层脱敏，原文即用即弃、不存图片字节。
-              </p>
-              <Button variant="ghost" className="min-h-10" onClick={() => navigate(copy.otherEntryPath)}>
-                <SwitchCamera className="size-4" aria-hidden /> 换个入口（{copy.otherEntryLabel}）
+      {step === 'upload' && (
+        <Card>
+          <CardContent className="space-y-4 py-6">
+            <button
+              type="button"
+              className="flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-input bg-muted/40 p-6 hover:border-primary/60"
+              onClick={() => fileRef.current?.click()}
+            >
+              <span className="relative grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <ImagePlus className="size-8" aria-hidden />
+              </span>
+              <strong className="text-lg">{copy.uploadTitle}</strong>
+              <span className="text-sm text-muted-foreground">{copy.uploadHint}</span>
+              <span className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+                <Camera className="size-4" aria-hidden /> 拍摄 / 选择照片
+              </span>
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              aria-label="上传照片"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void onFile(file)
+                e.target.value = ''
+              }}
+            />
+            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
+              上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只做白名单解析与四层脱敏，原文即用即弃、不存图片字节。
+            </p>
+            <Button variant="ghost" className="min-h-10" onClick={() => navigate(copy.otherEntryPath)}>
+              <SwitchCamera className="size-4" aria-hidden /> 换个入口（{copy.otherEntryLabel}）
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'quality' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TriangleAlert className="size-5 text-risk-l3" aria-hidden />
+              照片质量可能影响识别
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <ul className="space-y-2">
+              {issues.map((issue) => (
+                <li key={issue} className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>
+                    <strong className="mr-1">{QUALITY_ISSUE_LABEL[issue]}：</strong>
+                    {QUALITY_HINTS[issue]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              这是浏览器本地的拍照建议（不上传、不做识别判断）。质量差时识别会降级为人工补，不会编造。
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" className="min-h-11 flex-1" onClick={backToUpload}>
+                <RotateCcw className="size-4" aria-hidden /> 重拍 / 换一张
               </Button>
-            </CardContent>
-          </Card>
-        )}
+              <Button className="min-h-11 flex-1" onClick={() => image && void run(copy.entry, image)}>
+                <Camera className="size-4" aria-hidden /> 仍要上传
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {step === 'quality' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TriangleAlert className="size-5 text-risk-l3" aria-hidden />
-                照片质量可能影响识别
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <ul className="space-y-2">
-                {issues.map((issue) => (
-                  <li key={issue} className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    <span>
-                      <strong className="mr-1">{QUALITY_ISSUE_LABEL[issue]}：</strong>
-                      {QUALITY_HINTS[issue]}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted-foreground">
-                这是浏览器本地的拍照建议（不上传、不做识别判断）。质量差时识别会降级为人工补，不会编造。
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button variant="outline" className="min-h-11 flex-1" onClick={backToUpload}>
-                  <RotateCcw className="size-4" aria-hidden /> 重拍 / 换一张
-                </Button>
-                <Button className="min-h-11 flex-1" onClick={() => image && void run(copy.entry, image)}>
-                  <Camera className="size-4" aria-hidden /> 仍要上传
-                </Button>
+      {step === 'processing' && (
+        <Card>
+          <CardContent className="space-y-4 py-6">
+            {image ? (
+              <div className="relative overflow-hidden rounded-lg border">
+                <img src={image} alt="待识别图片" className="max-h-72 w-full object-contain" />
+                <span className="scanline absolute inset-x-0 h-0.5 bg-primary/70" aria-hidden />
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 'processing' && (
-          <Card>
-            <CardContent className="space-y-4 py-6">
-              {image ? (
-                <div className="relative overflow-hidden rounded-lg border">
-                  <img src={image} alt="待识别图片" className="max-h-72 w-full object-contain" />
-                  <span className="scanline absolute inset-x-0 h-0.5 bg-primary/70" aria-hidden />
-                </div>
-              ) : (
-                <p className="grid place-items-center gap-2 rounded-lg border bg-muted/40 p-6 text-sm text-muted-foreground">
-                  <ScanLine className="size-6" aria-hidden /> 正在准备图片…
-                </p>
-              )}
-              <p className="flex items-center gap-2 text-lg font-bold">
-                <LoaderCircle className="size-5 animate-spin text-primary" aria-hidden /> 正在识别（{copy.entry === 'A' ? '处方笺' : '药品'}）
+            ) : (
+              <p className="grid place-items-center gap-2 rounded-lg border bg-muted/40 p-6 text-sm text-muted-foreground">
+                <ScanLine className="size-6" aria-hidden /> 正在准备图片…
               </p>
-              <ol className="space-y-1.5">
-                {stages.map((stage, i) => (
-                  <li
-                    key={stage}
-                    className={cn(
-                      'flex items-center gap-2 text-sm',
-                      i < stageIdx ? 'text-muted-foreground' : i === stageIdx ? 'font-semibold' : 'text-muted-foreground/60',
-                    )}
-                  >
-                    {i < stageIdx ? (
-                      <Check className="size-4 shrink-0 text-risk-l1" aria-hidden />
-                    ) : i === stageIdx ? (
-                      <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
-                    ) : (
-                      <span className="size-4 shrink-0 rounded-full border" aria-hidden />
-                    )}
-                    {stage}
-                  </li>
-                ))}
-              </ol>
-            </CardContent>
-          </Card>
-        )}
+            )}
+            <p className="flex items-center gap-2 text-lg font-bold">
+              <LoaderCircle className="size-5 animate-spin text-primary" aria-hidden /> 正在识别（{copy.entry === 'A' ? '处方笺' : '药品'}）
+            </p>
+            <ol className="space-y-1.5">
+              {stages.map((stage, i) => (
+                <li
+                  key={stage}
+                  className={cn(
+                    'flex items-center gap-2 text-sm',
+                    i < stageIdx ? 'text-muted-foreground' : i === stageIdx ? 'font-semibold' : 'text-muted-foreground/60',
+                  )}
+                >
+                  {i < stageIdx ? (
+                    <Check className="size-4 shrink-0 text-risk-l1" aria-hidden />
+                  ) : i === stageIdx ? (
+                    <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
+                  ) : (
+                    <span className="size-4 shrink-0 rounded-full border" aria-hidden />
+                  )}
+                  {stage}
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      )}
 
-        {step === 'mismatch' && mismatch && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <ShieldAlert className="size-5 text-risk-l3" aria-hidden />
-                检测结果与所选入口不符
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {handoffNote && <p className="text-sm text-muted-foreground">{handoffNote}</p>}
-              <p className="text-sm">{mismatch.suggestion}</p>
+      {step === 'mismatch' && mismatch && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ShieldAlert className="size-5 text-risk-l3" aria-hidden />
+              检测结果与所选入口不符
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {handoffNote && <p className="text-sm text-muted-foreground">{handoffNote}</p>}
+            <p className="text-sm">{mismatch.suggestion}</p>
+            <p className="flex flex-wrap gap-2">
+              {mismatch.detected.map((layer) => (
+                <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
+                  {layer}
+                </span>
+              ))}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              层检测是<strong>校验</strong>而不是分流 —— 系统不会静默改道。服务端对入口有硬校验，按当前入口继续通常仍会被拒绝。
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button className="min-h-11 flex-1" onClick={switchEntry}>
+                <SwitchCamera className="size-4" aria-hidden /> 切换到「{copy.otherEntryLabel}」重跑
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-11 flex-1"
+                onClick={() => image && void run(copy.entry, image)}
+              >
+                检测错了 · 按当前入口重试
+              </Button>
+              <Button variant="ghost" className="min-h-11 flex-1" onClick={backToUpload}>
+                <RotateCcw className="size-4" aria-hidden /> 重新上传
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'failure' && feedback && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <AlertTriangle className="size-5 text-risk-l4" aria-hidden />
+              {feedback.title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm">{feedback.body}</p>
+            {feedback.detected.length > 0 && (
               <p className="flex flex-wrap gap-2">
-                {mismatch.detected.map((layer) => (
+                {feedback.detected.map((layer) => (
                   <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
                     {layer}
                   </span>
                 ))}
               </p>
-              <p className="text-xs text-muted-foreground">
-                层检测是<strong>校验</strong>而不是分流 —— 系统不会静默改道。服务端对入口有硬校验，按当前入口继续通常仍会被拒绝。
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button className="min-h-11 flex-1" onClick={switchEntry}>
-                  <SwitchCamera className="size-4" aria-hidden /> 切换到「{copy.otherEntryLabel}」重跑
-                </Button>
-                <Button
-                  variant="outline"
-                  className="min-h-11 flex-1"
-                  onClick={() => image && void run(copy.entry, image)}
-                >
-                  检测错了 · 按当前入口重试
-                </Button>
-                <Button variant="ghost" className="min-h-11 flex-1" onClick={backToUpload}>
-                  <RotateCcw className="size-4" aria-hidden /> 重新上传
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 'failure' && feedback && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <AlertTriangle className="size-5 text-risk-l4" aria-hidden />
-                {feedback.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm">{feedback.body}</p>
-              {feedback.detected.length > 0 && (
-                <p className="flex flex-wrap gap-2">
-                  {feedback.detected.map((layer) => (
-                    <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
-                      {layer}
-                    </span>
-                  ))}
-                </p>
-              )}
-              <ul className="space-y-1 text-sm text-muted-foreground">
-                {feedback.hints.map((hint) => (
-                  <li key={hint} className="flex items-start gap-2">
-                    <ChevronRight className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    {hint}
-                  </li>
-                ))}
-              </ul>
-              <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-                {SAFETY_NOTE}
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button className="min-h-11 flex-1" onClick={backToUpload}>
-                  <RotateCcw className="size-4" aria-hidden /> 重新上传
-                </Button>
-                {feedback.allowManual && (
-                  <Button variant="outline" className="min-h-11 flex-1" onClick={() => navigate('/box?manual=1')}>
-                    <Hand className="size-4" aria-hidden /> 手动建档（不经识别）
-                  </Button>
-                )}
-                {feedback.allowSwitch && (
-                  <Button variant="ghost" className="min-h-11 flex-1" onClick={() => navigate(copy.otherEntryPath)}>
-                    <SwitchCamera className="size-4" aria-hidden /> 换到「{copy.otherEntryLabel}」
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === 'drafts' && result && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <ListChecks className="size-5 text-primary" aria-hidden />
-                识别完成：{result.drafts.length} 份草稿待确认
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                一张处方笺含多个药品时拆成多份「档案 + 计划」草稿；确认页是唯一闸门，请<strong>逐个</strong>核对确认。
-              </p>
-              <ul className="space-y-2">
-                {result.drafts.map((draft, i) => (
-                  <li key={draft.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
-                      {draft.type === 'prescription' ? <FileText className="size-4" aria-hidden /> : <Package className="size-4" aria-hidden />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-base">{draft.drugName || `条目 ${i + 1}`}</strong>
-                      <span className="flex flex-wrap gap-1.5">
-                        <DraftChips draft={draft} />
-                      </span>
-                    </span>
-                    <Button className="min-h-10 shrink-0" onClick={() => navigate(`/drafts/${draft.id}`)}>
-                      去确认 <ChevronRight className="size-4" aria-hidden />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <Button variant="ghost" className="min-h-10" onClick={backToUpload}>
-                <RotateCcw className="size-4" aria-hidden /> 再传一张
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <aside className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{copy.entry === 'A' ? '处方笺拍摄要点' : '药盒拍摄要点'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {copy.guidePoints.map((point) => (
-                <li key={point} className="flex items-start gap-2">
-                  <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-                  {point}
+            )}
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {feedback.hints.map((hint) => (
+                <li key={hint} className="flex items-start gap-2">
+                  <ChevronRight className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  {hint}
                 </li>
               ))}
             </ul>
+            <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              {SAFETY_NOTE}
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button className="min-h-11 flex-1" onClick={backToUpload}>
+                <RotateCcw className="size-4" aria-hidden /> 重新上传
+              </Button>
+              {feedback.allowManual && (
+                <Button variant="outline" className="min-h-11 flex-1" onClick={() => navigate('/box?manual=1')}>
+                  <Hand className="size-4" aria-hidden /> 手动建档（不经识别）
+                </Button>
+              )}
+              {feedback.allowSwitch && (
+                <Button variant="ghost" className="min-h-11 flex-1" onClick={() => navigate(copy.otherEntryPath)}>
+                  <SwitchCamera className="size-4" aria-hidden /> 换到「{copy.otherEntryLabel}」
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
+      )}
+
+      {step === 'drafts' && result && (
         <Card>
-          <CardContent className="space-y-3 py-4 text-sm">
-            <p className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <span>
-                <strong>四层脱敏</strong>：版面裁剪 / 闭合白名单 / 兜底扫描 / 出口约束。患者姓名、电话等身份信息结构上进不了系统。
-              </span>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ListChecks className="size-5 text-primary" aria-hidden />
+              识别完成：{result.drafts.length} 份草稿待确认
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              一张处方笺含多个药品时拆成多份「档案 + 计划」草稿；确认页是唯一闸门，请<strong>逐个</strong>核对确认。
             </p>
-            <p className="flex items-start gap-2">
-              <ScanLine className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-              <span>
-                <strong>只抄录不生成</strong>：用法用量只来自处方原文；药盒 / 医院标签上的用法不会被自动抄录。
-              </span>
-            </p>
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-              重拍清单：{RETAKE_CHECKLIST.join('；')}。
-            </p>
+            <ul className="space-y-2">
+              {result.drafts.map((draft, i) => (
+                <li key={draft.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
+                    {draft.type === 'prescription' ? <FileText className="size-4" aria-hidden /> : <Package className="size-4" aria-hidden />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-base">{draft.drugName || `条目 ${i + 1}`}</strong>
+                    <span className="flex flex-wrap gap-1.5">
+                      <DraftChips draft={draft} />
+                    </span>
+                  </span>
+                  <Button className="min-h-10 shrink-0" onClick={() => navigate(`/drafts/${draft.id}`)}>
+                    去确认 <ChevronRight className="size-4" aria-hidden />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <Button variant="ghost" className="min-h-10" onClick={backToUpload}>
+              <RotateCcw className="size-4" aria-hidden /> 再传一张
+            </Button>
           </CardContent>
         </Card>
-      </aside>
+      )}
     </div>
   )
 }
