@@ -1,0 +1,23 @@
+[
+  {
+    "id": "ir-001",
+    "drugIds": ["drug-amlodipine-5", "drug-atorvastatin-20"],
+    "level": "需监测",
+    "note": "氨氯地平与阿托伐他汀联用时，少数患者可能出现肌痛或肝酶升高，需关注。",
+    "source": "两药说明书相互作用段（演示抄录）"
+  },
+  {
+    "id": "ir-002",
+    "drugIds": ["drug-metformin-500", "drug-glipizide-5"],
+    "level": "需监测",
+    "note": "二甲双胍与格列吡嗪联用可能增加低血糖风险，需关注血糖监测。",
+    "source": "两药说明书注意事项段（演示抄录）"
+  },
+  {
+    "id": "ir-003",
+    "drugIds": ["drug-hycosan-01", "drug-levofloxacin-eye-01"],
+    "level": "需监测",
+    "note": "两种滴眼液同时使用需间隔至少 30 分钟，先后顺序请咨询医生或药师。",
+    "source": "海露说明书注意事项②（演示抄录，docs/data-curation/mock-hycosan-01-海露.md）"
+  }
+]
