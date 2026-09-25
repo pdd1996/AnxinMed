@@ -243,3 +243,25 @@ describe('上传前置校验', () => {
     expect(screen.getByText('上传平铺完整的处方笺照片')).toBeTruthy()
   })
 })
+
+describe('双入口平级 tab：拍药盒是一等入口', () => {
+  it('上传步渲染两入口 tab，当前入口 aria-current 高亮；点另一个 tab 跳对方入口页并高亮随之切换', async () => {
+    renderFlow('A')
+    const rxTab = screen.getByRole('button', { name: '拍处方笺' })
+    const drugTab = screen.getByRole('button', { name: '拍药品' })
+    expect(rxTab.getAttribute('aria-current')).toBe('true')
+    expect(drugTab.getAttribute('aria-current')).toBeNull()
+    fireEvent.click(drugTab)
+    expect(await screen.findByText('拍药品建档')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '拍药品' }).getAttribute('aria-current')).toBe('true')
+  })
+
+  it('照片进入流程后 tab 收起：换入口只能走纠偏/失败卡的显式动作，不留静默改道口子', async () => {
+    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
+    mocks.intakePrescription.mockResolvedValue(intakeOk([summary()]))
+    renderFlow('A')
+    upload()
+    expect(await screen.findByText('确认页占位')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '拍药品' })).toBeNull()
+  })
+})

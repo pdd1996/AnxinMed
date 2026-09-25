@@ -41,6 +41,12 @@ type IntakeOk = Extract<Awaited<ReturnType<typeof intakePrescription>>, { ok: tr
 type DraftSummary = IntakeOk['drafts'][number]
 type Failure = Extract<Awaited<ReturnType<typeof intakePrescription>>, { ok: false }>
 
+/** 双入口 tab（PRD §7.2.1 A/B 平级展示）：标签图标固定在此，跳转路径仍由注入的 otherEntryPath 决定。 */
+const ENTRY_TABS: { entry: Entry; label: string; icon: typeof FileText }[] = [
+  { entry: 'A', label: '拍处方笺', icon: FileText },
+  { entry: 'B', label: '拍药品', icon: Package },
+]
+
 export interface IntakeCopy {
   entry: Entry
   pageTitle: string
@@ -55,7 +61,9 @@ type Step = 'upload' | 'quality' | 'processing' | 'mismatch' | 'failure' | 'draf
 
 /**
  * 录入流程壳（M2-T8 · PRD §7.2.1 / §7.2.6 / §10.1）：上传 → 本地质量预检 → 层检测（可纠正）→ 管线 → 草稿。
- * 两入口共用；文案经 IntakeCopy 注入。所有失败分支渲染成可见卡片 + 可行动作，禁止静默吞错。
+ * 两入口共用；文案经 IntakeCopy 注入。上传步以平级 tab 呈现两入口（拍处方笺 / 拍药品），
+ * 切换即路由跳转；照片进入流程后 tab 收起，换入口只走纠偏/失败卡的显式动作（层检测不静默改道）。
+ * 所有失败分支渲染成可见卡片 + 可行动作，禁止静默吞错。
  */
 export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
   const navigate = useNavigate()
@@ -186,51 +194,69 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
   return (
     <div className="space-y-4">
       <header>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-          Capture &amp; extract · 入口{copy.entry}
-        </p>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">拍照录入</p>
         <h1 className="text-2xl font-bold">{copy.pageTitle}</h1>
         <p className="text-sm text-muted-foreground">{copy.pageLead}</p>
       </header>
 
       {step === 'upload' && (
-        <Card>
-          <CardContent className="space-y-4 py-6">
-            <button
-              type="button"
-              className="flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-input bg-muted/40 p-6 hover:border-primary/60"
-              onClick={() => fileRef.current?.click()}
-            >
-              <span className="relative grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <ImagePlus className="size-8" aria-hidden />
-              </span>
-              <strong className="text-lg">{copy.uploadTitle}</strong>
-              <span className="text-sm text-muted-foreground">{copy.uploadHint}</span>
-              <span className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
-                <Camera className="size-4" aria-hidden /> 拍摄 / 选择照片
-              </span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sr-only"
-              aria-label="上传照片"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) void onFile(file)
-                e.target.value = ''
-              }}
-            />
-            <p className="flex items-start gap-2 text-xs text-muted-foreground">
-              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
-              上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只做白名单解析与四层脱敏，原文即用即弃、不存图片字节。
-            </p>
-            <Button variant="ghost" className="min-h-10" onClick={() => navigate(copy.otherEntryPath)}>
-              <SwitchCamera className="size-4" aria-hidden /> 换个入口（{copy.otherEntryLabel}）
-            </Button>
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            {ENTRY_TABS.map((tab) => {
+              const active = tab.entry === copy.entry
+              return (
+                <button
+                  key={tab.entry}
+                  type="button"
+                  aria-current={active || undefined}
+                  onClick={active ? undefined : () => navigate(copy.otherEntryPath)}
+                  className={cn(
+                    'flex min-h-12 items-center justify-center gap-2 rounded-xl border text-base font-semibold transition-colors',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-input bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground',
+                  )}
+                >
+                  <tab.icon className="size-5" aria-hidden /> {tab.label}
+                </button>
+              )
+            })}
+          </div>
+          <Card>
+            <CardContent className="space-y-4 py-6">
+              <button
+                type="button"
+                className="flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-input bg-muted/40 p-6 hover:border-primary/60"
+                onClick={() => fileRef.current?.click()}
+              >
+                <span className="relative grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+                  <ImagePlus className="size-8" aria-hidden />
+                </span>
+                <strong className="text-lg">{copy.uploadTitle}</strong>
+                <span className="text-sm text-muted-foreground">{copy.uploadHint}</span>
+                <span className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+                  <Camera className="size-4" aria-hidden /> 拍摄 / 选择照片
+                </span>
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                aria-label="上传照片"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void onFile(file)
+                  e.target.value = ''
+                }}
+              />
+              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
+                上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只做白名单解析与四层脱敏，原文即用即弃、不存图片字节。
+              </p>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {step === 'quality' && (
