@@ -13,6 +13,7 @@
 | `packages/api/src/__tests__/zero-leak.test.ts` | 据同一份 `lines`（去掉 `redact` 行 = OCR 可见文本）生成 mock OCR，驱动**真管线**做零泄漏断言 |
 
 T10 E2E 的 `FixtureAiClients` 回放与 live 上传同样以本目录为准（场景名 = `x-test-scenario`）。
+E2E 回放包 `e2e/fixtures/*.json` 由 `e2e/scripts/make-fixtures.ts` 从本目录 `golden-cases.json` 编译生成——源在此、产物在彼，改用例只改这里。
 
 ## 资产清单
 
