@@ -46,11 +46,11 @@
 | 前端 | React 19 + TypeScript + Vite 6 + react-router 8 + zustand + TanStack Query + shadcn/ui + Tailwind CSS 4 + lucide-react |
 | 后端 | Hono + @hono/node-server（端口 8787）；routes → services → repositories 三层；`hc<AppType>` 端到端类型推断 |
 | 校验 | zod（schema 定义在 shared 包，前后端一份真相） |
-| 数据 | PostgreSQL 16 + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git，15 张表） |
+| 数据 | PostgreSQL 18 + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git，15 张表） |
 | AI | Qwen3-VL / qwen3.5-ocr 云端（医嘱线行级转录，ADR #16）/ Baichuan；统一 AiClients 注入接缝；E2E 用 fixtures 回放 |
 | 测试 | Vitest（单测 + `app.request()` 集成，独立测试库）+ Playwright（5 条 golden case E2E） |
 | 仓库 | pnpm 11 workspace（Node >= 20，ESM） |
-| 部署 | docker-compose：api 多阶段镜像托管 web dist + `/api`；postgres:16-alpine |
+| 部署 | docker-compose：api 多阶段镜像托管 web dist + `/api`；postgres:18-alpine |
 
 ## 快速开始
 
@@ -61,7 +61,7 @@
 corepack enable
 
 cd app
-docker compose up -d db        # 或本机直装 PostgreSQL 16，并在 .env 配置 DATABASE_URL
+docker compose up -d db        # 或本机直装 PostgreSQL 18，并在 .env 配置 DATABASE_URL
 
 pnpm install
 pnpm --filter @anxin/api db:migrate
@@ -110,7 +110,7 @@ CI：[`.github/workflows/ci.yml`](.github/workflows/ci.yml)，push `main` / PR �
 - **quality**：lint + typecheck（shared/api/web/e2e）+ 全部单测与集成测试
 - **e2e**：golden case E2E（fixtures 回放路径，无需 AI key；失败时上传 Playwright trace）
 
-两个 job 均起 `postgres:16-alpine` service；测试库由 globalSetup 从 `DATABASE_URL` 派生自建 + 迁移 + seed，CI 无需手动 migrate/seed。**AI key 不进 CI**。
+两个 job 均起 `postgres:18-alpine` service；测试库由 globalSetup 从 `DATABASE_URL` 派生自建 + 迁移 + seed，CI 无需手动 migrate/seed。**AI key 不进 CI**。
 
 ## 生产部署（Docker）
 

@@ -22,7 +22,7 @@ services:
       DATABASE_URL: postgres://anxin:anxin_dev_2026@db:5432/anxin_medication
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: anxin-db
     restart: unless-stopped
     ports:
@@ -32,7 +32,8 @@ services:
       POSTGRES_PASSWORD: anxin_dev_2026
       POSTGRES_DB: anxin_medication
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PG18 镜像 PGDATA 默认 /var/lib/postgresql/18/docker（挂载点须为父目录，否则数据不随卷持久化）
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U anxin -d anxin_medication"]
       interval: 5s

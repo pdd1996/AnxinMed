@@ -66,7 +66,7 @@ pnpm --filter @anxin/api db:seed       # 从 demo/server/mock-data.json 导入�
 pnpm --filter @anxin/api db:studio     # Drizzle Studio
 
 # 数据库：本机直装 PostgreSQL 18（当前 .env 指向 localhost:5432/anxin_medication）
-# 或：cd app && docker compose up -d （postgres:16-alpine）
+# 或：cd app && docker compose up -d （postgres:18-alpine）
 ```
 
 ## Git 约定

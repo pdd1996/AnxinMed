@@ -46,7 +46,7 @@
                     └──────┬───────────┬─────────┬─────┘
                            │           │         │
               ┌────────────▼──┐   ┌────▼────┐   ┌▼──────────────┐
-              │ PostgreSQL 16 │   │ 模型出口 │   │ MCP stdio 可选 │
+              │ PostgreSQL 18 │   │ 模型出口 │   │ MCP stdio 可选 │
               │ 用户数据+三库  │   │ OCR/VLM │   │ 转发既有守门    │
               │ Mock→可替换    │   │ 咨询文本 │   │ 端点，不碰库    │
               └───────────────┘   └─────────┘   └────────────────┘
@@ -58,7 +58,7 @@
 - 身份 VLM：Qwen3-VL-Flash / 同族多模态
 - 咨询生成：qwen3.8-flash 非思考（ADR #20；CONSULT_PROVIDER=baichuan 留回滚）
 - 医生端长尾叙述：同一百川；正则漏判不接 FC 主路径
-- 部署：docker-compose = api（托管 web dist）+ postgres:16
+- 部署：docker-compose = api（托管 web dist）+ postgres:18
 
 ---
 

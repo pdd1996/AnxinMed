@@ -6,7 +6,7 @@
 
 - Node ≥ 20、pnpm 11（`corepack enable`）
 - 数据库二选一：
-  - Docker：`docker compose up -d db`（postgres:16-alpine，暴露 5432）
+  - Docker：`docker compose up -d db`（postgres:18-alpine，暴露 5432）
   - 本机直装 PostgreSQL：自行建库并配置 `DATABASE_URL`
 
 ## 启动（本地开发）
@@ -100,7 +100,7 @@ curl localhost:8787/api/health        # 期望 200 {"ok":true,...}
 
 ## 持续集成（CI）
 
-`.github/workflows/ci.yml`（仓库根）：push `main` / PR 触发，`postgres:16` service：
+`.github/workflows/ci.yml`（仓库根）：push `main` / PR 触发，`postgres:18` service：
 
 - **quality** job：`pnpm lint` + `pnpm -r typecheck` + `pnpm test`（shared 纯函数 + api 集成 + web）；api 测试 globalSetup 自建测试库 + 迁移 + seed。
 - **e2e** job（独立）：`pnpm test:e2e` golden case 回放（`AI_MODE=fixtures`，**AI key 不进 CI**）。
