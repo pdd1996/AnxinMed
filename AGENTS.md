@@ -1,7 +1,7 @@
 # AGENTS.md — 安心用药
 
 > 本文件是 AI 编码代理的入口指引。动手前必读；细节以链接指向的真相源文档为准。
-> 版本：V1.1（2026-09-22）
+> 版本：V1.2（2026-09-26）
 
 ## 项目一句话
 
@@ -44,13 +44,14 @@ AnxinMed/
 
 | 层 | 选型 |
 |---|---|
-| 产品形态 | H5 移动端网页（手机浏览器/微信内置浏览器）：360×740 视口优先，触控目标 ≥44px，面向老年用户 |
+| 产品形态 | 患者端 RN 安卓 APK（M5 起主力，真实模拟阶段不上商店）/ 患者端 H5 冻结兜底 / 医生端 web；面向老年用户，触控目标 ≥44px |
 | 前端 | React 19 + TypeScript + Vite + react-router + zustand + TanStack Query + shadcn/ui + Tailwind + lucide-react |
+| 移动端 | React Native + Expo（最新稳定 SDK）+ expo-router + NativeWind v4 + react-native-reusables（M5-T3 起；ADR #15 增补） |
 | 后端 | Hono + @hono/node-server + TypeScript，API 端口 8787 |
 | 校验 | zod（schema 定义在 shared 包，前后端一份真相） |
 | 数据 | PostgreSQL + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git） |
 | 测试 | Vitest（单测 + `app.request()` 集成）+ Playwright（golden case E2E） |
-| 仓库 | pnpm 11 workspace（app/ 下 shared / api / web / mcp 四包 + e2e；demo 仍用 npm） |
+| 仓库 | pnpm 11 workspace（app/ 下 shared / api / web / mcp + e2e，mobile 包 M5-T3 起；demo 仍用 npm） |
 
 ## 常用命令
 
@@ -64,6 +65,10 @@ pnpm --filter @anxin/api db:generate   # 生成迁移
 pnpm --filter @anxin/api db:migrate    # 执行迁移
 pnpm --filter @anxin/api db:seed       # 从 demo/server/mock-data.json 导入资产域三库
 pnpm --filter @anxin/api db:studio     # Drizzle Studio
+
+# mobile（RN 安卓患者端，M5-T3 起落地；本机工具链已配 ANDROID_HOME=D:\Android\SDK）
+pnpm --filter @anxin/mobile android:dev      # metro 真机调试
+pnpm --filter @anxin/mobile android:release  # release APK 出包
 
 # 数据库：本机直装 PostgreSQL 18（当前 .env 指向 localhost:5432/anxin_medication）
 # 或：cd app && docker compose up -d （postgres:18-alpine）
