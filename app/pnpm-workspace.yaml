@@ -2,6 +2,10 @@ packages:
   - 'packages/*'
   - 'e2e'
 
+# RN/Expo monorepo 必须扁平布局（npm 同款）：隔离布局下 babel 转译器解析不到传递依赖、
+# C++ 编译超 Windows 260 字符路径上限（.pnpm 超长哈希目录）。Expo 官方建议 node-linker=hoisted。
+nodeLinker: hoisted
+
 # pnpm 10+ 默认拦截依赖的构建脚本；esbuild（vite / tsx 的底层）需显式放行才能装好平台二进制。
 # 注意：pnpm 11 起该设置从 package.json 的 "pnpm" 字段迁到此处（pnpm-workspace.yaml）。
 onlyBuiltDependencies:
