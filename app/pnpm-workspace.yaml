@@ -12,3 +12,11 @@ onlyBuiltDependencies:
   - esbuild
 allowBuilds:
   esbuild: true
+
+# M5-T3 补修（随 M5-T2 验证发现）：hoisted 布局下 mobile 精确钉 react 19.2.3、web 的 ^19.0.0
+# 解析成 19.2.8，两份 React 并存 → @tanstack/react-query 取到副本 React，hooks dispatcher 为 null，
+# web 渲染类测试 82 例全炸（错误签名 Cannot read properties of null (reading 'useEffect')）。
+# 统一钉到 Expo SDK 57 要求的 19.2.3：单一副本，mobile 版本不变。
+overrides:
+  react: 19.2.3
+  react-dom: 19.2.3

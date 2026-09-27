@@ -68,6 +68,18 @@ export default tseslint.config(
     },
   },
   {
+    // M5-T3 补修（随 M5-T2 验证发现）：mobile 的 CJS 配置文件（babel/metro/tailwind）不是 TS，
+    // 上面那段只给 **/*.{ts,tsx} 配了语言环境 → 这些文件里的 module/require/__dirname 全报 no-undef。
+    // 本段补 Node 全局并放行 require 写法（不改上游脚手架产物形态，Expo 生成的就是 CJS 配置）。
+    files: ['packages/mobile/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     // shadcn/ui 组件（拷入仓库）会连同 variants 常量一起导出，react-refresh 的
     // only-export-components 对其为误报；保持与上游一致，不为此改动组件源码。
     files: ['packages/web/src/components/ui/**/*.{ts,tsx}'],
