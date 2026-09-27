@@ -11,7 +11,7 @@
 
 ```
 AnxinMed/
-├── app/      # 正式工程（pnpm workspace：packages/shared 契约 · api · web · mcp，另有 e2e / fixtures）
+├── app/      # 正式工程（pnpm workspace：packages/shared 契约 · core 前端逻辑层 · api · web · mcp，另有 e2e / fixtures）
 ├── data/     # 说明书数据整理区（crawled 草稿 + 总账 + 入库台账；内容版权归丁香园，不入库仅本地保留，见 .gitignore；人工核对后升 reviewed）
 ├── demo/     # 可运行的演示应用 —— 迁移参照物，只读，不再演进（嵌套独立 git 仓库，不入本仓库跟踪）
 ├── docs/     # 真相源文档（PRD / ADR / 技术方案 / 任务书 / M4 咨询改革 docs 10–12）
@@ -51,7 +51,7 @@ AnxinMed/
 | 校验 | zod（schema 定义在 shared 包，前后端一份真相） |
 | 数据 | PostgreSQL + Drizzle ORM + drizzle-kit（迁移为纯 SQL 进 git） |
 | 测试 | Vitest（单测 + `app.request()` 集成）+ Playwright（golden case E2E） |
-| 仓库 | pnpm 11 workspace（app/ 下 shared / api / web / mcp + e2e，mobile 包 M5-T3 起；demo 仍用 npm） |
+| 仓库 | pnpm 11 workspace（app/ 下 shared / core（前端逻辑层，M5-T2）/ api / web / mcp + e2e，mobile 包 M5-T3 起；demo 仍用 npm） |
 
 ## 常用命令
 

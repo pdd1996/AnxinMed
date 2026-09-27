@@ -51,8 +51,9 @@ pnpm -r build        # web: vite build；api: esbuild bundle → dist
 app/
 ├── packages/
 │   ├── shared/   # 领域契约：zod schema / 枚举 / 元数据 / 纯函数（前后端一份真相）
+│   ├── core/     # M5-T2 前端逻辑层：hc 客户端 / zustand store / 纯函数 / 录入状态机；web 与 RN 共用，禁 DOM（平台触点靠注入）
 │   ├── api/      # Hono API：routes(薄) → services(业务) → repositories(Drizzle)；db/(schema/迁移/seed)
-│   ├── web/      # React SPA：router / routes / stores(zustand) / components(shadcn+domain) / api(hc 客户端)
+│   ├── web/      # React SPA：router / routes / components(shadcn+domain) / stores+lib 装配层；逻辑一律走 @anxin/core
 │   └── mcp/      # 医生端只读 MCP Server（stdio，把 3 个守门端点包成 MCP 工具，ADR #19）
 ├── e2e/               # M2-T10 Playwright golden case E2E（fixture 回放 + 独立测试库）
 ├── fixtures/          # golden case 样张真相源（golden-cases.json + PNG + 渲染器，T9/T10 共用）
