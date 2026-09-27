@@ -1,6 +1,6 @@
 import { AlertTriangle, Check, FileText, ImageOff, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { DraftPayload } from '@/lib/draft'
+import type { DraftPayload } from '@anxin/core'
 
 /** 人工补清单 → 中文标签 + 该行原文（缺失时明确说「原文缺失」，绝不编造）。 */
 const NEED_META: Record<string, { label: string; original: (p: DraftPayload) => string }> = {

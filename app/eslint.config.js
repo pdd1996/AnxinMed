@@ -27,6 +27,35 @@ export default tseslint.config(
     },
   },
   {
+    // M5-T2 架构纪律：core 是 web / RN 共用的逻辑层，禁一切 DOM 用途与 react-dom。
+    // 按「用途」限制全局（setInterval/setTimeout 这类 RN 亦有的全局不误伤）；
+    // 与 core tsconfig 的无 DOM lib 互为两道闸门——报错说明闸门在工作，不是环境问题。
+    files: ['packages/core/**/*.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        'document',
+        'window',
+        'navigator',
+        'localStorage',
+        'sessionStorage',
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'sonner', message: 'core 禁 sonner：API 错误提示由平台层经 setApiNotifier 装配。' },
+            { name: 'react-native', message: 'core 禁 react-native：平台专属实现留在各端注入。' },
+            { name: 'expo', message: 'core 禁 expo：平台专属实现留在各端注入。' },
+          ],
+          patterns: [
+            { group: ['react-dom', 'react-dom/*'], message: 'core 禁 react-dom：渲染层专属。' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // 前端专属：react-hooks / react-refresh
     files: ['packages/web/**/*.{ts,tsx}'],
     plugins: {

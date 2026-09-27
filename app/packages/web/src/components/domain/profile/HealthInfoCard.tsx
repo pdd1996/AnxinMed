@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronRight, Info, Trash2, UserRound } from 'lucide-react'
-import { client, fetchProfile, unwrap } from '@/api/client'
+import { client, fetchProfile, unwrap } from '@anxin/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {

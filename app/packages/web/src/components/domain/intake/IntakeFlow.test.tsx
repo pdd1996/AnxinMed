@@ -1,15 +1,14 @@
 /**
  * M2-T8 · 录入页组件断言：五个 golden case 场景在 UI 上可达且反馈正确（任务书完成标准，mock 管线响应）。
  *
- * 只 mock 传输层（@/api/client 三函数）与像素统计（computeImageStats，jsdom 无 canvas）；
- * 流程状态机、失败映射、会话 store 交接全走真代码。
+ * 只 mock 传输层（@anxin/core 的三个 intake 函数）与像素统计（本端 canvas 实现，jsdom 无 canvas）；
+ * 流程状态机（M5-T2 起在 @anxin/core）、失败映射、会话 store 交接全走真代码。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { IntakeFlow, type IntakeCopy } from './IntakeFlow'
-import { useIntakeSession } from '@/stores/intakeSession'
-import { SAFETY_NOTE } from '@/lib/intake'
+import { SAFETY_NOTE, useIntakeSession } from '@anxin/core'
 
 const mocks = vi.hoisted(() => ({
   detectImage: vi.fn(),
@@ -17,11 +16,11 @@ const mocks = vi.hoisted(() => ({
   intakeDrug: vi.fn(),
   computeImageStats: vi.fn(),
 }))
-vi.mock('@/api/client', () => mocks)
-vi.mock('@/lib/intake', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/intake')>()
-  return { ...actual, computeImageStats: (...args: unknown[]) => mocks.computeImageStats(...args) }
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // 只替换传输层三函数，状态机与 store 走真代码
 })
+vi.mock('@/lib/imageStats', () => ({ computeImageStats: mocks.computeImageStats }))
 
 const COPY_A: IntakeCopy = {
   entry: 'A',

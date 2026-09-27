@@ -9,8 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { INTERACTION_LEVEL_ORDER, type InteractionLevel } from '@anxin/shared'
-import type { confirmDraft } from '@/api/client'
-import type { DraftPayload } from '@/lib/draft'
+import type { confirmDraft, DraftPayload } from '@anxin/core'
 
 /** confirm 响应（含对**最终确认值**重跑的规则检查）。 */
 export type ConfirmResult = Awaited<ReturnType<typeof confirmDraft>>

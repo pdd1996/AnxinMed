@@ -3,7 +3,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { AlertTriangle, Check, ChevronRight, Hand, ListChecks, LoaderCircle, X } from 'lucide-react'
-import { confirmDraft, fetchDraft, rejectDraft, type DraftDto } from '@/api/client'
+import {
+  buildConfirm,
+  confirmDraft,
+  fetchDraft,
+  initialConfirmState,
+  rejectDraft,
+  unmetReasons,
+  useIntakeSession,
+  type ConfirmFormState,
+  type DraftDto,
+} from '@anxin/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -23,8 +33,6 @@ import {
   InteractionCard,
   type ConfirmResult,
 } from '@/components/domain/draft/RiskCards'
-import { useIntakeSession } from '@/stores/intakeSession'
-import { buildConfirm, initialConfirmState, unmetReasons, type ConfirmFormState } from '@/lib/draft'
 import { CONFIRM_STATUS_META } from '@anxin/shared'
 
 /**

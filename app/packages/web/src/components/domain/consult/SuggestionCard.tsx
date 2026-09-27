@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router'
 import { useState } from 'react'
 import { Camera, Hand, MessageSquareHeart, Pill } from 'lucide-react'
-import { acceptSuggestion, dismissSuggestion } from '@/api/client'
+import { acceptSuggestion, dismissSuggestion } from '@anxin/core'
 import type { ConsultSuggestion } from '@anxin/shared'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'

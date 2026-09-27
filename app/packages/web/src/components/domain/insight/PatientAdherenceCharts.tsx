@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { fetchPatientAdherenceSeries, type InsightAdherenceSeriesDto } from '@/api/client'
+import { fetchPatientAdherenceSeries, type InsightAdherenceSeriesDto } from '@anxin/core'
 
 const DAY_OPTIONS = [7, 30] as const
 

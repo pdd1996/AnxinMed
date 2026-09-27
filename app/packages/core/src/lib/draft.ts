@@ -7,7 +7,7 @@
  *   ③ **健康勾选 ⊆ 建议清单**：fieldKey 一律取自 payload.healthSuggestions（服务端会 400 拒绝清单外字段）。
  */
 import { addDaysStr, estimateStockDays, todayStr, type CycleType, type DraftConfirm, type PlanTags } from '@anxin/shared'
-import type { DraftPayloadDto } from '@/api/client'
+import type { DraftPayloadDto } from '../api/client'
 
 /** 草稿载荷（api 侧 DraftPayload 经 hc<AppType> 推导，web 不复制类型）。 */
 export type DraftPayload = DraftPayloadDto

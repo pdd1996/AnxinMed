@@ -11,5 +11,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
+    // 与 main.tsx 同源的平台装配（ApiNotifier / SpeechAdapter 注入），M5-T2 起。
+    setupFiles: ['src/test/setup.ts'],
   },
 })

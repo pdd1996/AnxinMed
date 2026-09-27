@@ -1,16 +1,19 @@
 /**
  * M3-T6 · Records 页组件断言：按日/周/月查询接线 + 列表 + 导出按钮态。
- * 只 mock 传输层 fetchRecords，页面/纯函数走真代码；CSV 文本正确性由 lib/records.test.ts 覆盖。
+ * 只 mock 传输层 fetchRecords，页面/纯函数走真代码；CSV 文本正确性由 core 的 lib/records.test.ts 覆盖。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Records from './Records'
-import { computeRange } from '@/lib/records'
+import { computeRange } from '@anxin/core'
 
 const mocks = vi.hoisted(() => ({ fetchRecords: vi.fn() }))
-vi.mock('@/api/client', () => mocks)
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // M5-T2：只替换传输层函数，core 的其余导出走真代码
+})
 
 const ITEMS = [
   { id: 'r1', planId: 'p1', drugName: '玻璃酸钠滴眼液', scheduledDate: '2026-09-05', scheduledTime: '08:00', status: 'taken', actedAt: '2026-09-05T00:01:00.000Z' },

@@ -18,28 +18,29 @@ import {
   SwitchCamera,
   TriangleAlert,
 } from 'lucide-react'
-import { detectImage, intakeDrug, intakePrescription } from '@/api/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useIntakeSession } from '@/stores/intakeSession'
 import {
-  assessQuality,
-  computeImageStats,
-  mapIntakeFailure,
+  detectImage,
+  initialIntakeFlowState,
+  intakeDrug,
+  intakePrescription,
   QUALITY_HINTS,
   QUALITY_ISSUE_LABEL,
   SAFETY_NOTE,
   STAGE_TEXT,
+  transitionIntakeFlow,
+  useIntakeSession,
   validateFile,
   type Entry,
-  type IntakeFeedback,
-  type QualityIssue,
-} from '@/lib/intake'
+  type IntakeDraftSummary,
+  type IntakeFlowAction,
+  type IntakeFlowCtx,
+  type IntakeFlowEvent,
+  type IntakeFlowState,
+} from '@anxin/core'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { computeImageStats } from '@/lib/imageStats'
 import { cn } from '@/lib/utils'
-
-type IntakeOk = Extract<Awaited<ReturnType<typeof intakePrescription>>, { ok: true }>['data']
-type DraftSummary = IntakeOk['drafts'][number]
-type Failure = Extract<Awaited<ReturnType<typeof intakePrescription>>, { ok: false }>
 
 /** 双入口 tab（PRD §7.2.1 A/B 平级展示）：标签图标固定在此，跳转路径仍由注入的 otherEntryPath 决定。 */
 const ENTRY_TABS: { entry: Entry; label: string; icon: typeof FileText }[] = [
@@ -56,138 +57,112 @@ export interface IntakeCopy {
   otherEntryPath: string
 }
 
-type Step = 'upload' | 'quality' | 'processing' | 'mismatch' | 'failure' | 'drafts'
-
 /**
  * 录入流程壳（M2-T8 · PRD §7.2.1 / §7.2.6 / §10.1）：上传 → 本地质量预检 → 层检测（可纠正）→ 管线 → 草稿。
  * 两入口共用；文案经 IntakeCopy 注入。上传步以平级 tab 呈现两入口（拍处方笺 / 拍药品），
  * 切换即路由跳转；照片进入流程后 tab 收起，换入口只走纠偏/失败卡的显式动作（层检测不静默改道）。
  * 所有失败分支渲染成可见卡片 + 可行动作，禁止静默吞错。
+ *
+ * M5-T2 接缝 #8：六步流转的**决策**已抽到 @anxin/core 的 intakeFlow 状态机（纯函数、可单测）；
+ * 本组件只做两件事——渲染 state，以及执行状态机给出的动作清单
+ * （网络请求、FileReader、canvas 像素统计、navigate、toast、内存会话读写、900ms 阶段定时器）。
  */
 export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [step, setStep] = useState<Step>('upload')
-  const [image, setImage] = useState<string | null>(null)
-  const [issues, setIssues] = useState<QualityIssue[]>([])
-  const [stageIdx, setStageIdx] = useState(0)
-  const [feedback, setFeedback] = useState<IntakeFeedback | null>(null)
-  const [mismatch, setMismatch] = useState<{ detected: string[]; suggestion: string } | null>(null)
-  const [result, setResult] = useState<IntakeOk | null>(null)
-  const [handoffNote, setHandoffNote] = useState<string | null>(null)
+  const [state, setState] = useState<IntakeFlowState>(initialIntakeFlowState)
+  // 动作解释器要在异步回调里读到最新状态（而非发起时的闭包值）；状态只经 dispatch 写入，故 ref 与 state 同源。
+  const stateRef = useRef(state)
 
   const stages = STAGE_TEXT[copy.entry]
+  const ctx: IntakeFlowCtx = { entry: copy.entry, otherEntryPath: copy.otherEntryPath, stageCount: stages.length }
 
-  // 上传中阶段文案推进（处理中状态明确，PRD §10.1）
-  useEffect(() => {
-    if (step !== 'processing') {
-      setStageIdx(0)
-      return
+  /** 执行 core 决策产出的动作（本端副作用；结果再以事件回灌状态机）。 */
+  function runActions(actions: IntakeFlowAction[]) {
+    for (const action of actions) {
+      switch (action.type) {
+        case 'toast':
+          toast.error(action.message)
+          break
+        case 'compute_stats':
+          void computeImageStats(action.dataUrl).then((stats) =>
+            dispatch({ type: 'stats_checked', stats }),
+          )
+          break
+        case 'detect':
+          void detectImage(action.dataUrl, action.entry).then((det) => {
+            if (!det.ok) {
+              dispatch({ type: 'detect_failed', failure: det })
+              return
+            }
+            dispatch({
+              type: 'detect_ok',
+              dataUrl: action.dataUrl,
+              layers: det.data.layers,
+              unsupported: det.data.unsupported,
+              mismatch: det.data.mismatch,
+            })
+          })
+          break
+        case 'intake':
+          void (action.entry === 'A' ? intakePrescription(action.dataUrl) : intakeDrug(action.dataUrl)).then(
+            (res) => {
+              if (!res.ok) {
+                dispatch({ type: 'intake_failed', failure: res })
+                return
+              }
+              dispatch({ type: 'intake_ok', dataUrl: action.dataUrl, result: res.data })
+            },
+          )
+          break
+        case 'session_set_images':
+          useIntakeSession.getState().setSession(action.draftIds, action.dataUrl)
+          break
+        case 'session_set_pending_image':
+          useIntakeSession.getState().setPendingImage(action.pending)
+          break
+        case 'session_clear_pending_image':
+          useIntakeSession.getState().setPendingImage(null)
+          break
+        case 'navigate':
+          navigate(action.path)
+          break
+      }
     }
-    const timer = window.setInterval(() => setStageIdx((i) => Math.min(i + 1, stages.length - 1)), 900)
+  }
+
+  /** 单步迁移：core 决策（纯）→ 落状态 → 执行动作。setState 保持纯净，副作用只在这里同步跑一次。 */
+  function dispatch(event: IntakeFlowEvent) {
+    const next = transitionIntakeFlow(stateRef.current, event, ctx)
+    stateRef.current = next.state
+    setState(next.state)
+    runActions(next.actions)
+  }
+
+  // 上传中阶段文案推进（处理中状态明确，PRD §10.1）；下标归零由状态机负责
+  useEffect(() => {
+    if (state.step !== 'processing') return
+    const timer = window.setInterval(() => dispatch({ type: 'stage_tick' }), 900)
     return () => window.clearInterval(timer)
-  }, [step, stages.length])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step, stages.length])
 
   /** 层检测纠偏的跨入口交接：对方入口页留下原图时，本页直接重跑（用户不必重新选文件）。 */
   useEffect(() => {
-    const pending = useIntakeSession.getState().pendingImage
-    if (pending && pending.fromEntry !== copy.entry) {
-      setImage(pending.dataUrl)
-      setHandoffNote(pending.note)
-      void run(copy.entry, pending.dataUrl)
-    }
+    dispatch({ type: 'handoff', pending: useIntakeSession.getState().pendingImage })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  function applyFailure(f: Failure) {
-    setFeedback(mapIntakeFailure(f))
-    setStep('failure')
-  }
-
-  async function run(targetEntry: Entry, dataUrl: string) {
-    setStep('processing')
-    const det = await detectImage(dataUrl, targetEntry)
-    if (!det.ok) {
-      applyFailure(det)
-      return
-    }
-    if (det.data.unsupported) {
-      setFeedback(
-        mapIntakeFailure({
-          status: 422,
-          code: 'UNSUPPORTED_OBJECT',
-          message: '层检测判定为不支持的对象（如散装药片），本次不进入提取管线。',
-          details: { detected: det.data.layers },
-        }),
-      )
-      setStep('failure')
-      return
-    }
-    if (det.data.mismatch) {
-      setMismatch({ detected: det.data.layers, suggestion: det.data.mismatch })
-      setStep('mismatch')
-      return
-    }
-    const res = targetEntry === 'A' ? await intakePrescription(dataUrl) : await intakeDrug(dataUrl)
-    if (!res.ok) {
-      applyFailure(res)
-      return
-    }
-    // 原图进内存会话（确认页原文对照用）；交接图用完即清
-    useIntakeSession.getState().setSession(res.data.draftIds, dataUrl)
-    useIntakeSession.getState().setPendingImage(null)
-    if (res.data.draftIds.length === 1) {
-      navigate(`/drafts/${res.data.draftIds[0]}`)
-      return
-    }
-    setResult(res.data)
-    setStep('drafts')
-  }
 
   async function onFile(file: File) {
     const problem = validateFile(file)
     if (problem) {
-      toast.error(problem)
+      dispatch({ type: 'file_rejected', message: problem })
       return
     }
     const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = String(reader.result)
-      setImage(dataUrl)
-      void (async () => {
-        const stats = await computeImageStats(dataUrl)
-        const found = stats ? assessQuality(stats) : []
-        if (found.length > 0) {
-          setIssues(found)
-          setStep('quality')
-          return
-        }
-        await run(copy.entry, dataUrl)
-      })()
-    }
+    reader.onload = () => dispatch({ type: 'file_read', dataUrl: String(reader.result) })
     reader.onerror = () => toast.error('读取图片失败，请重试')
     reader.readAsDataURL(file)
-  }
-
-  function backToUpload() {
-    useIntakeSession.getState().setPendingImage(null)
-    setImage(null)
-    setIssues([])
-    setFeedback(null)
-    setMismatch(null)
-    setResult(null)
-    setHandoffNote(null)
-    setStep('upload')
-  }
-
-  function switchEntry() {
-    if (!image) return
-    useIntakeSession.getState().setPendingImage({
-      dataUrl: image,
-      fromEntry: copy.entry,
-      note: mismatch?.suggestion ?? feedback?.body ?? '',
-    })
-    navigate(copy.otherEntryPath)
   }
 
   return (
@@ -197,7 +172,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
         <h1 className="text-2xl font-bold">{copy.pageTitle}</h1>
       </header>
 
-      {step === 'upload' && (
+      {state.step === 'upload' && (
         <>
           <div className="grid grid-cols-2 gap-2">
             {ENTRY_TABS.map((tab) => {
@@ -207,7 +182,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
                   key={tab.entry}
                   type="button"
                   aria-current={active || undefined}
-                  onClick={active ? undefined : () => navigate(copy.otherEntryPath)}
+                  onClick={active ? undefined : () => dispatch({ type: 'goto_other_entry' })}
                   className={cn(
                     'flex min-h-12 items-center justify-center gap-2 rounded-xl border text-base font-semibold transition-colors',
                     active
@@ -257,7 +232,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
         </>
       )}
 
-      {step === 'quality' && (
+      {state.step === 'quality' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -267,7 +242,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
           </CardHeader>
           <CardContent className="space-y-3">
             <ul className="space-y-2">
-              {issues.map((issue) => (
+              {state.issues.map((issue) => (
                 <li key={issue} className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
                   <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
                   <span>
@@ -281,10 +256,10 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               这是浏览器本地的拍照建议（不上传、不做识别判断）。质量差时识别会降级为人工补，不会编造。
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button variant="outline" className="min-h-11 flex-1" onClick={backToUpload}>
+              <Button variant="outline" className="min-h-11 flex-1" onClick={() => dispatch({ type: 'retake' })}>
                 <RotateCcw className="size-4" aria-hidden /> 重拍 / 换一张
               </Button>
-              <Button className="min-h-11 flex-1" onClick={() => image && void run(copy.entry, image)}>
+              <Button className="min-h-11 flex-1" onClick={() => dispatch({ type: 'retry' })}>
                 <Camera className="size-4" aria-hidden /> 仍要上传
               </Button>
             </div>
@@ -292,12 +267,12 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
         </Card>
       )}
 
-      {step === 'processing' && (
+      {state.step === 'processing' && (
         <Card>
           <CardContent className="space-y-4 py-6">
-            {image ? (
+            {state.image ? (
               <div className="relative overflow-hidden rounded-lg border">
-                <img src={image} alt="待识别图片" className="max-h-72 w-full object-contain" />
+                <img src={state.image} alt="待识别图片" className="max-h-72 w-full object-contain" />
                 <span className="scanline absolute inset-x-0 h-0.5 bg-primary/70" aria-hidden />
               </div>
             ) : (
@@ -314,12 +289,12 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
                   key={stage}
                   className={cn(
                     'flex items-center gap-2 text-sm',
-                    i < stageIdx ? 'text-muted-foreground' : i === stageIdx ? 'font-semibold' : 'text-muted-foreground/60',
+                    i < state.stageIdx ? 'text-muted-foreground' : i === state.stageIdx ? 'font-semibold' : 'text-muted-foreground/60',
                   )}
                 >
-                  {i < stageIdx ? (
+                  {i < state.stageIdx ? (
                     <Check className="size-4 shrink-0 text-risk-l1" aria-hidden />
-                  ) : i === stageIdx ? (
+                  ) : i === state.stageIdx ? (
                     <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
                   ) : (
                     <span className="size-4 shrink-0 rounded-full border" aria-hidden />
@@ -332,7 +307,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
         </Card>
       )}
 
-      {step === 'mismatch' && mismatch && (
+      {state.step === 'mismatch' && state.mismatch && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -341,10 +316,10 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {handoffNote && <p className="text-sm text-muted-foreground">{handoffNote}</p>}
-            <p className="text-sm">{mismatch.suggestion}</p>
+            {state.handoffNote && <p className="text-sm text-muted-foreground">{state.handoffNote}</p>}
+            <p className="text-sm">{state.mismatch.suggestion}</p>
             <p className="flex flex-wrap gap-2">
-              {mismatch.detected.map((layer) => (
+              {state.mismatch.detected.map((layer) => (
                 <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
                   {layer}
                 </span>
@@ -354,17 +329,17 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               层检测是<strong>校验</strong>而不是分流 —— 系统不会静默改道。服务端对入口有硬校验，按当前入口继续通常仍会被拒绝。
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button className="min-h-11 flex-1" onClick={switchEntry}>
+              <Button className="min-h-11 flex-1" onClick={() => dispatch({ type: 'switch_entry' })}>
                 <SwitchCamera className="size-4" aria-hidden /> 切换到「{copy.otherEntryLabel}」重跑
               </Button>
               <Button
                 variant="outline"
                 className="min-h-11 flex-1"
-                onClick={() => image && void run(copy.entry, image)}
+                onClick={() => dispatch({ type: 'retry' })}
               >
                 检测错了 · 按当前入口重试
               </Button>
-              <Button variant="ghost" className="min-h-11 flex-1" onClick={backToUpload}>
+              <Button variant="ghost" className="min-h-11 flex-1" onClick={() => dispatch({ type: 'retake' })}>
                 <RotateCcw className="size-4" aria-hidden /> 重新上传
               </Button>
             </div>
@@ -372,19 +347,19 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
         </Card>
       )}
 
-      {step === 'failure' && feedback && (
+      {state.step === 'failure' && state.feedback && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <AlertTriangle className="size-5 text-risk-l4" aria-hidden />
-              {feedback.title}
+              {state.feedback.title}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm">{feedback.body}</p>
-            {feedback.detected.length > 0 && (
+            <p className="text-sm">{state.feedback.body}</p>
+            {state.feedback.detected.length > 0 && (
               <p className="flex flex-wrap gap-2">
-                {feedback.detected.map((layer) => (
+                {state.feedback.detected.map((layer) => (
                   <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
                     {layer}
                   </span>
@@ -392,7 +367,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               </p>
             )}
             <ul className="space-y-1 text-sm text-muted-foreground">
-              {feedback.hints.map((hint) => (
+              {state.feedback.hints.map((hint) => (
                 <li key={hint} className="flex items-start gap-2">
                   <ChevronRight className="mt-0.5 size-4 shrink-0" aria-hidden />
                   {hint}
@@ -404,16 +379,16 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               {SAFETY_NOTE}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button className="min-h-11 flex-1" onClick={backToUpload}>
+              <Button className="min-h-11 flex-1" onClick={() => dispatch({ type: 'retake' })}>
                 <RotateCcw className="size-4" aria-hidden /> 重新上传
               </Button>
-              {feedback.allowManual && (
-                <Button variant="outline" className="min-h-11 flex-1" onClick={() => navigate('/box?manual=1')}>
+              {state.feedback.allowManual && (
+                <Button variant="outline" className="min-h-11 flex-1" onClick={() => dispatch({ type: 'goto_manual' })}>
                   <Hand className="size-4" aria-hidden /> 手动建档（不经识别）
                 </Button>
               )}
-              {feedback.allowSwitch && (
-                <Button variant="ghost" className="min-h-11 flex-1" onClick={() => navigate(copy.otherEntryPath)}>
+              {state.feedback.allowSwitch && (
+                <Button variant="ghost" className="min-h-11 flex-1" onClick={() => dispatch({ type: 'goto_other_entry' })}>
                   <SwitchCamera className="size-4" aria-hidden /> 换到「{copy.otherEntryLabel}」
                 </Button>
               )}
@@ -422,12 +397,12 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
         </Card>
       )}
 
-      {step === 'drafts' && result && (
+      {state.step === 'drafts' && state.result && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <ListChecks className="size-5 text-primary" aria-hidden />
-              识别完成：{result.drafts.length} 份草稿待确认
+              识别完成：{state.result.drafts.length} 份草稿待确认
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -435,7 +410,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               一张处方笺含多个药品时拆成多份「档案 + 计划」草稿；确认页是唯一闸门，请<strong>逐个</strong>核对确认。
             </p>
             <ul className="space-y-2">
-              {result.drafts.map((draft, i) => (
+              {state.result.drafts.map((draft, i) => (
                 <li key={draft.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-3">
                   <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                     {draft.type === 'prescription' ? <FileText className="size-4" aria-hidden /> : <Package className="size-4" aria-hidden />}
@@ -446,13 +421,13 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
                       <DraftChips draft={draft} />
                     </span>
                   </span>
-                  <Button className="min-h-10 shrink-0" onClick={() => navigate(`/drafts/${draft.id}`)}>
+                  <Button className="min-h-10 shrink-0" onClick={() => dispatch({ type: 'open_draft', draftId: draft.id })}>
                     去确认 <ChevronRight className="size-4" aria-hidden />
                   </Button>
                 </li>
               ))}
             </ul>
-            <Button variant="ghost" className="min-h-10" onClick={backToUpload}>
+            <Button variant="ghost" className="min-h-10" onClick={() => dispatch({ type: 'retake' })}>
               <RotateCcw className="size-4" aria-hidden /> 再传一张
             </Button>
           </CardContent>
@@ -463,7 +438,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
 }
 
 /** 草稿概要徽章：冲突 / 需人工补 / 标签不抄录 / 降级 —— 让用户在列表页就知道每份草稿要核对什么。 */
-function DraftChips({ draft }: { draft: DraftSummary }) {
+function DraftChips({ draft }: { draft: IntakeDraftSummary }) {
   const chips: { text: string; tone: string }[] = []
   if (draft.matchStatus === 'conflict' || draft.matchStatus === 'ambiguous') {
     chips.push({ text: '冲突待核对', tone: 'border-risk-l3/40 bg-risk-l3/10 text-risk-l3' })

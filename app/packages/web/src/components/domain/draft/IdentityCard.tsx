@@ -12,7 +12,7 @@ import {
   selectableCandidates,
   type ConfirmFormState,
   type DraftPayload,
-} from '@/lib/draft'
+} from '@anxin/core'
 
 /** 库条目 / 识别抄录字段的对照行。 */
 function FieldRow({ label, value }: { label: string; value?: string | null }) {

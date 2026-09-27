@@ -8,8 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { speak } from '@/lib/speech'
-import type { PlanGroup, TaskStatus } from '@/lib/tasks'
+import { speak, type PlanGroup, type TaskStatus } from '@anxin/core'
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   pending: '待服用',

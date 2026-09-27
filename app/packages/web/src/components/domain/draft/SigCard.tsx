@@ -14,7 +14,7 @@ import {
   type ConfirmFormState,
   type CycleChoice,
   type DraftPayload,
-} from '@/lib/draft'
+} from '@anxin/core'
 
 const CYCLES: { value: CycleChoice; title: string; desc: (days: number) => string }[] = [
   { value: 'longterm', title: '长期服用', desc: () => '开放式 · 无结束日期，持续提醒直到暂停/结束' },

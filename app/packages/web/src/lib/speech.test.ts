@@ -1,10 +1,13 @@
 /**
- * M3-T4 · 语音合成（TTS）纯助手单测（spec §T4.2/T4.3：中文播报 + 不支持环境自动降级不报错）。
+ * M3-T4 · 语音合成（TTS）web 实现单测（spec §T4.2/T4.3：中文播报 + 不支持环境自动降级不报错）。
+ * M5-T2 后本端实现是 core SpeechAdapter 的 web 装配体，断言不变。
  *
  * jsdom 默认不实现 speechSynthesis，天然覆盖「降级」分支；「支持」分支用 vi.stubGlobal 注入 mock。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { isSpeechSynthesisSupported, speak, stopSpeaking } from './speech'
+import { webSpeechAdapter } from './speech'
+
+const { isSupported: isSpeechSynthesisSupported, speak, stopSpeaking } = webSpeechAdapter
 
 /** 最小 speechSynthesis + SpeechSynthesisUtterance mock。 */
 function stubSynthesis() {

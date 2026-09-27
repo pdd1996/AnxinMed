@@ -1,19 +1,22 @@
 /**
  * T7 · 患者下钻打卡时序图表卡片冒烟测试。
  *
- * jsdom 无 canvas：mock @antv/g2（Chart 链式 API）与 @/api/client 传输层；
+ * jsdom 无 canvas：mock @antv/g2（Chart 链式 API）与 @anxin/core 传输层；
  * 断言数据链路（query → 两张图数据 + 汇总文案）、窗口切换触发重查、空态与错误态可见。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PatientAdherenceCharts } from './PatientAdherenceCharts'
-import type { InsightAdherenceSeriesDto } from '@/api/client'
+import type { InsightAdherenceSeriesDto } from '@anxin/core'
 
 const mocks = vi.hoisted(() => ({
   fetchPatientAdherenceSeries: vi.fn(),
 }))
-vi.mock('@/api/client', () => mocks)
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // M5-T2：只替换传输层函数，core 的其余导出走真代码
+})
 
 // G2 5 fluent API 链式 mock：记录调用即可，render 即刻 resolve
 const chartInstance = vi.hoisted(() => {

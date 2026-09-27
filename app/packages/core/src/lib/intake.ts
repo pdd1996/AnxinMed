@@ -1,9 +1,12 @@
 /**
- * 录入页纯逻辑（M2-T8）—— 失败分支映射 / 本地图片质量预检 / 管线阶段文案。
+ * 录入页纯逻辑（M2-T8，M5-T2 迁入 core）—— 失败分支映射 / 质量判读 / 管线阶段文案 / 上传前置校验。
  *
  * 原则（PRD §7.2.6：全部「看得见地失败」）：任何失败都必须渲染成用户可理解的卡片 + 可行动的下一步
  * （重拍 / 换入口 / 人工补 / 手动建档），禁止静默吞错；质量预检只是**建议**，不拦用户（仍要上传可选）。
- * 质量预检在浏览器本地做（不下传、不依赖模型）：过暗 / 反光 / 模糊 / 分辨率过低四类具体重拍建议。
+ *
+ * 平台边界（M5-T2 接缝 #5）：像素统计（图片解码 + 逐像素采样）是平台能力，留在各端实现
+ * （web=canvas，mobile 一期可降级不预检）；本模块只做「统计值 → 质量问题」的纯判读，
+ * 由 ImageStatsProvider 类型把这条接缝固化下来。
  */
 import { ERR_CODES } from '@anxin/shared'
 
@@ -122,7 +125,7 @@ export const RETAKE_CHECKLIST = [
   '扶稳对焦、移开手指或物件遮挡',
 ]
 
-// ── 本地图片质量预检（纯函数部分；像素统计由 computeImageStats 产出）──
+// ── 本地图片质量预检（纯判读部分；像素统计由各端实现 ImageStatsProvider）──
 
 export interface ImageStats {
   /** 0–255 平均亮度。 */
@@ -134,6 +137,13 @@ export interface ImageStats {
   width: number
   height: number
 }
+
+/**
+ * 像素统计 provider 接缝（M5-T2）：平台层注入（web=canvas 实现）。
+ * 返回 null = 本端不做/不能做预检（环境无 canvas、RN 一期降级）→ 调用方跳过建议、主流程照走
+ * （预检只是建议，不拦用户）。
+ */
+export type ImageStatsProvider = (dataUrl: string) => Promise<ImageStats | null>
 
 export type QualityIssue = 'too-dark' | 'glare' | 'blurry' | 'too-small'
 
@@ -165,70 +175,16 @@ export function assessQuality(s: ImageStats): QualityIssue[] {
 }
 
 /**
- * dataURL → 像素统计（缩到 ≤512 边长再统计，成本可忽略）。
- * 环境不支持 canvas（如 jsdom 未装 canvas 包）→ 返回 null，调用方跳过预检（不报错、不阻塞）。
+ * 可上传文件的形状（M5-T2 接缝：不引用 DOM File —— web 的 File、RN 的 expo-image-picker asset 天然满足）。
  */
-export async function computeImageStats(dataUrl: string): Promise<ImageStats | null> {
-  try {
-    // 先探 canvas 能力（jsdom 无 canvas 包时 getContext 为 null）：不支持则跳过预检，
-    // 避免再走图片解码（无资源加载器时 onload 永不触发，会挂死调用方）。
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    const img = await loadImage(dataUrl)
-    const scale = Math.min(1, 512 / Math.max(img.width, img.height))
-    const width = Math.max(1, Math.round(img.width * scale))
-    const height = Math.max(1, Math.round(img.height * scale))
-    canvas.width = width
-    canvas.height = height
-    ctx.drawImage(img, 0, 0, width, height)
-    const { data } = ctx.getImageData(0, 0, width, height)
-
-    const luma = new Float64Array(width * height)
-    let sum = 0
-    let clipped = 0
-    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-      const v = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]
-      luma[p] = v
-      sum += v
-      if (v > 245) clipped++
-    }
-    const total = width * height
-    let grad = 0
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width - 1; x++) {
-        grad += Math.abs(luma[y * width + x + 1] - luma[y * width + x])
-      }
-    }
-    for (let y = 0; y < height - 1; y++) {
-      for (let x = 0; x < width; x++) {
-        grad += Math.abs(luma[(y + 1) * width + x] - luma[y * width + x])
-      }
-    }
-    const edges = total - width + (total - height)
-    return {
-      meanLuma: sum / total,
-      clippedRatio: clipped / total,
-      sharpness: edges > 0 ? grad / edges / 255 : 0,
-      width: img.width,
-      height: img.height,
-    }
-  } catch {
-    return null // 预检不可用 ≠ 图片有问题：跳过建议，主流程照走
-  }
-}
-
-function loadImage(dataUrl: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('图片解码失败'))
-    img.src = dataUrl
-  })
+export interface UploadableFile {
+  name: string
+  type: string
+  size: number
 }
 
 /** 客户端上传前置校验（服务端 bodyLimit 22mb / dataURL 正则的同源口径，提前可见失败）。 */
-export function validateFile(file: File): string | null {
+export function validateFile(file: UploadableFile): string | null {
   if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) return '请上传 JPG、PNG 或 WebP 图片'
   if (file.size > 15 * 1024 * 1024) return '图片超过 15MB，请压缩或重拍后再上传'
   return null

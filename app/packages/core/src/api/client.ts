@@ -1,18 +1,35 @@
 import { hc } from 'hono/client'
-import { toast } from 'sonner'
 import type { AppType } from '@anxin/api'
 import type { ConsultSkillId, DraftConfirm } from '@anxin/shared'
 
 /**
  * hc<AppType> 端到端类型客户端（技术方案 §1）。
- * AppType 为 type-only 导入，构建期擦除，不把 api 运行时代码（serve/db）带进 web（执行总纲 §3.1）。
+ * AppType 为 type-only 导入，构建期擦除，不把 api 运行时代码（serve/db）带进前端（执行总纲 §3.1）。
  * baseUrl '/'：dev 经 vite 代理 /api→8787，prod 由 Hono 同源托管，均用相对路径。
  */
 export const client = hc<AppType>('/')
 
+// ── 错误提示注入点（M5-T2 接缝 #1）──
+
 /**
- * 统一拆包 + 错误 toast：res.ok 或 body.ok 为假时，解析 { ok:false, code, message } → toast 报错并抛错。
- * 成功返回精确响应体（hc<AppType> 推导）。禁止静默吞错（执行总纲 §0.5）。
+ * API 层错误提示出口：core 不绑任何 toast 库（web=sonner、mobile=RN 侧实现），
+ * 由各端在装配阶段用 setApiNotifier 注入。默认 no-op —— 未装配时错误照样抛出，只是不提示，
+ * 绝不静默吞错（执行总纲 §0.5）。
+ */
+export interface ApiNotifier {
+  onError(message: string, code?: string): void
+}
+
+let apiNotifier: ApiNotifier = { onError: () => {} }
+
+/** 装配本端的错误提示实现（web 在启动处注入 sonner toast.error）。 */
+export function setApiNotifier(notifier: ApiNotifier): void {
+  apiNotifier = notifier
+}
+
+/**
+ * 统一拆包 + 错误提示：res.ok 或 body.ok 为假时，解析 { ok:false, code, message } → 交给注入的
+ * notifier 报错并抛错。成功返回精确响应体（hc<AppType> 推导）。禁止静默吞错（执行总纲 §0.5）。
  */
 export async function unwrap<T extends { ok: boolean }>(
   res: { ok: boolean; json(): Promise<T> },
@@ -21,7 +38,7 @@ export async function unwrap<T extends { ok: boolean }>(
   if (!res.ok || !body.ok) {
     const err = body as unknown as { message?: string; code?: string }
     const message = typeof err.message === 'string' ? err.message : '请求失败，请稍后重试'
-    toast.error(message)
+    apiNotifier.onError(message, typeof err.code === 'string' ? err.code : undefined)
     throw new Error(message)
   }
   return body
@@ -65,7 +82,7 @@ export type RecordItemDto = RecordsResponseDto['items'][number]
 
 // ── 录入草稿（M2-T7 确认页）──
 
-/** 草稿详情：payload 为 api 侧 DraftPayload，经 hc<AppType> 端到端推导（web 不复制类型，执行总纲 §3.1）。 */
+/** 草稿详情：payload 为 api 侧 DraftPayload，经 hc<AppType> 端到端推导（前端不复制类型，执行总纲 §3.1）。 */
 export async function fetchDraft(id: string) {
   const res = await client.api.drafts[':id'].$get({ param: { id } })
   const data = await unwrap(res)
@@ -93,7 +110,7 @@ export async function rejectDraft(id: string, reason?: string) {
 // ── 录入管线（M2-T8）──
 
 /**
- * 不 toast 的拆包（录入页要自己渲染失败分支，toast 会重复且丢结构化信息）。
+ * 不提示的拆包（录入页要自己渲染失败分支，toast 会重复且丢结构化信息）。
  * 失败时保留 status/code/details（409 的 detected/suggestion 等），禁止静默吞错：调用方必须把失败可见化。
  */
 export type Settled<T> =
@@ -145,7 +162,7 @@ export async function intakeDrug(image: string) {
  * 响应经 hc<AppType> 端到端推导（shared ConsultResponseSchema + 后端 consultLogId/sessionId）。
  * 守门与降级全部在后端 services/consult.service.ts 编排；本层不做业务判断。
  * L4/L3/manual-gate/no-source/ai-unavailable 均返回 200（守门正常路径，非错误），
- * 故用 unwrap（toast 仅在真错误时触发）；前端按 riskLevel/status/blocked 渲染各分支。
+ * 故用 unwrap（提示仅在真错误时触发）；前端按 riskLevel/status/blocked 渲染各分支。
  * M4-T5：opts.sessionId 续问（首问不传 = 服务端建会话并在响应回传 sessionId）。
  * M4-T7：opts.skillId 技能快路径（chips 显式指定，跳过正则）；自由文本不传（正则路径逐字不变）。
  * 无 opts 时保持两参调用形态（M3 行为与既有测试断言不变）。
@@ -168,7 +185,7 @@ export async function postConsult(
   return unwrap(res)
 }
 
-/** 咨询响应 DTO（去掉 ok 字段；hc<AppType> 推导，web 不复制类型）。 */
+/** 咨询响应 DTO（去掉 ok 字段；hc<AppType> 推导，前端不复制类型）。 */
 export type ConsultResponseDto = Omit<Awaited<ReturnType<typeof postConsult>>, 'ok'>
 
 // ── 咨询会话（M4-T5 · specs/04-T5）──

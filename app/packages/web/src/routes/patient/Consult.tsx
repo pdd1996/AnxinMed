@@ -9,7 +9,7 @@ import {
   postConsult,
   type ConsultResponseDto,
   type ConsultSessionDetailDto,
-} from '@/api/client'
+} from '@anxin/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {

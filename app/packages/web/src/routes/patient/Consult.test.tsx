@@ -1,7 +1,7 @@
 /**
  * M3-T2 · 咨询页端到端断言（spec §T2 完成标准：四风险等级 UI 状态全部可达）。
  *
- * 只 mock 传输层（@/api/client 的 fetchDrugs + postConsult），页面/组件全走真代码：
+ * 只 mock 传输层（core 的 fetchDrugs + postConsult），页面/组件全走真代码：
  * 断言的是「渲染出来的 DOM 到底有没有按 riskLevel 分派 EmergencyCard / AnswerCard」。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -10,7 +10,7 @@ import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { DrugDTOType } from '@anxin/shared'
 import Consult from './Consult'
-import type { ConsultResponseDto } from '@/api/client'
+import type { ConsultResponseDto } from '@anxin/core'
 
 const mocks = vi.hoisted(() => ({
   fetchDrugs: vi.fn(),
@@ -18,7 +18,10 @@ const mocks = vi.hoisted(() => ({
   fetchConsultSessions: vi.fn(),
   fetchConsultSession: vi.fn(),
 }))
-vi.mock('@/api/client', () => mocks)
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // M5-T2：只替换传输层函数，core 的其余导出走真代码
+})
 
 // jsdom 缺件：textarea 的 scrollIntoView
 Element.prototype.scrollIntoView = () => {}

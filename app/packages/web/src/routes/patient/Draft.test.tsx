@@ -1,16 +1,22 @@
 /**
  * M2-T7 · 确认页组件断言（任务书完成标准：needsManual 字段无法被预填值、冲突清单不自动选择）。
  *
- * 只 mock 传输层（@/api/client 的三个函数），页面/纯逻辑/组件全走真代码：
+ * 只 mock 传输层（@anxin/core 的三个函数），页面/纯逻辑/组件全走真代码：
  * 断言的是「渲染出来的 DOM 到底有没有预填值、有没有替用户选边、闸门是否真的挡住」。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useIntakeSession } from '@/stores/intakeSession'
-import { mkDraft, rxConflictPayload, rxNeedsManualPayload, rxUniquePayload, drugBoxPayload } from '@/lib/draft-fixtures'
-import type { DraftPayload } from '@/lib/draft'
+import {
+  drugBoxPayload,
+  mkDraft,
+  rxConflictPayload,
+  rxNeedsManualPayload,
+  rxUniquePayload,
+  useIntakeSession,
+  type DraftPayload,
+} from '@anxin/core'
 import Draft from './Draft'
 
 const mocks = vi.hoisted(() => ({
@@ -18,7 +24,10 @@ const mocks = vi.hoisted(() => ({
   confirmDraft: vi.fn(),
   rejectDraft: vi.fn(),
 }))
-vi.mock('@/api/client', () => mocks)
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // M5-T2：只替换传输层函数，core 的其余导出走真代码
+})
 
 // jsdom 缺件：Radix Dialog（信息不符 / 确认结果弹窗）依赖 ResizeObserver 与 scrollIntoView
 class ResizeObserverStub {

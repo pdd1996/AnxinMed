@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
   acceptSuggestion: vi.fn(),
   dismissSuggestion: vi.fn(),
 }))
-vi.mock('@/api/client', () => mocks)
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // M5-T2：只替换传输层函数，core 的其余导出走真代码
+})
 
 function renderCard(suggestion: ConsultSuggestion) {
   return render(

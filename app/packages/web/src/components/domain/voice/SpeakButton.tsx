@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { isSpeechSynthesisSupported, speak, stopSpeaking } from '@/lib/speech'
+import { isSpeechSupported, speak, stopSpeaking } from '@anxin/core'
 
 /**
  * 中文语音播报按钮（M3-T4 · spec §T4.2）——咨询回答可播放。
@@ -13,7 +13,7 @@ import { isSpeechSynthesisSupported, speak, stopSpeaking } from '@/lib/speech'
  *   看门狗（3s 未 onstart，WebView 静默吞 speak() 时兜底）；卸载时停止，避免离开页面仍在念；
  * - 降级（spec §T4.3）：speechSynthesis 不可用或无文本时置灰 + title 文案说明，不抛错。
  *
- * 复用 @/lib/speech 的 speak/stopSpeaking（与 ReminderModal 同源，一处真相）。
+ * 复用 @anxin/core 的 speak/stopSpeaking 门面（本端实现在 lib/speech.ts，与 ReminderModal 同源，一处真相）。
  */
 export interface SpeakButtonProps {
   /** 要播报的文本（中文）。 */
@@ -36,7 +36,7 @@ export function SpeakButton({
   variant = 'outline',
   className,
 }: SpeakButtonProps) {
-  const [supported] = useState<boolean>(() => isSpeechSynthesisSupported())
+  const [supported] = useState<boolean>(() => isSpeechSupported())
   const [playing, setPlaying] = useState(false)
   // 用 ref 跟踪播放态，供卸载清理读取（避免闭包读到过期 state）。
   const playingRef = useRef(false)

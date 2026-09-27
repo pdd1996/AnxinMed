@@ -1,5 +1,5 @@
 /**
- * M2-T8 · 录入页纯逻辑单测：失败分支映射（看得见地失败）/ 质量预检阈值 / 上传前置校验 / 阶段文案。
+ * M2-T8 · 录入页纯逻辑单测（M5-T2 随迁入 core）：失败分支映射 / 质量预检阈值 / 上传前置校验 / 阶段文案。
  */
 import { describe, it, expect } from 'vitest'
 import { ERR_CODES } from '@anxin/shared'
@@ -12,6 +12,7 @@ import {
   STAGE_TEXT,
   validateFile,
   type ImageStats,
+  type UploadableFile,
 } from './intake'
 
 const good: ImageStats = { meanLuma: 140, clippedRatio: 0.02, sharpness: 0.09, width: 1600, height: 1200 }
@@ -93,11 +94,9 @@ describe('mapIntakeFailure · 失败分支必须可见且可行动', () => {
 })
 
 describe('validateFile · 上传前置校验（与服务端口径同源）', () => {
-  /** size 用 defineProperty 伪造，避免真分配十几 MB 内存。 */
-  function file(type: string, size: number): File {
-    const f = new File([new Uint8Array(8)], 'a.png', { type })
-    Object.defineProperty(f, 'size', { value: size })
-    return f
+  /** 平台无关形状：web 的 File / RN 的 image-picker asset 都满足它。 */
+  function file(type: string, size: number): UploadableFile {
+    return { name: 'a.png', type, size }
   }
   it('类型与大小合法 → null', () => {
     expect(validateFile(file('image/png', 1024))).toBeNull()

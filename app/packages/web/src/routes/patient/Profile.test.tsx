@@ -18,7 +18,10 @@ const mocks = vi.hoisted(() => {
     client: { api: { profile: { $patch: patchProfile } } },
   }
 })
-vi.mock('@/api/client', () => mocks)
+vi.mock('@anxin/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@anxin/core')>()
+  return { ...actual, ...mocks } // M5-T2：只替换传输层函数，core 的其余导出走真代码
+})
 
 const ITEMS = [
   { id: 'h1', fieldKey: '过敏史', value: '青霉素', sourceMeta: { source: 'self_reported', confirmedAt: '2026-09-01T00:00:00.000Z' } },

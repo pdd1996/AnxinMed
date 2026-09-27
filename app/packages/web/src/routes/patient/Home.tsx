@@ -2,9 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Bell, Camera, Check, ChevronRight, Clock3, Info, PackageCheck, Pause, Pill, Sparkles } from 'lucide-react'
-import { client, fetchTodayTasks, unwrap } from '@/api/client'
-import { duePendingSlots, groupTasksByPlan, type PlanGroup, type TaskStatus } from '@/lib/tasks'
-import { useReminderQueue } from '@/stores/reminderQueue'
+import {
+  client,
+  duePendingSlots,
+  fetchTodayTasks,
+  groupTasksByPlan,
+  unwrap,
+  useReminderQueue,
+  type PlanGroup,
+  type TaskStatus,
+} from '@anxin/core'
 import { ReminderModal } from '@/components/domain/ReminderModal'
 import { ConfirmRecordDialog, type PendingRecord } from '@/components/domain/ConfirmRecordDialog'
 import { Button } from '@/components/ui/button'

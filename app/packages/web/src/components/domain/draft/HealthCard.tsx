@@ -1,7 +1,7 @@
 import { Info, ShieldQuestion, UserRound } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import type { ConfirmFormState, DraftPayload } from '@/lib/draft'
+import type { ConfirmFormState, DraftPayload } from '@anxin/core'
 
 /**
  * 健康信息「建议填入」勾选区（PRD §7.1.2 入口二 / §10.2）：勾选才写入 health_profiles。

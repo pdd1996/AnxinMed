@@ -4,7 +4,7 @@
  * 形态对齐 api 管线真实产物（见 packages/api/src/__tests__/pipeline-run.test.ts 的合成处方笺用例），
  * 用 `satisfies DraftPayload` 让夹具本身受 hc<AppType> 推导出的契约约束 —— 契约变了这里先红。
  */
-import type { DraftPayload } from '@/lib/draft'
+import type { DraftPayload } from './draft'
 
 const WHITELIST = {
   hospital: '萧山区第二人民医院（演示合成处方笺）',
