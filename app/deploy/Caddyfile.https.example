@@ -1,0 +1,20 @@
+# 安心用药 · Caddy 配置（备案后启用的 HTTPS 版本）
+#
+# 启用步骤（05 任务书 T1 第 5 条 + deploy/README.md §备案后切换）：
+#   1. 域名已备案、A 记录解析到本机公网 IP，安全组放行 80/443；
+#   2. `cp deploy/Caddyfile.https.example deploy/Caddyfile`，把下面两处 anxin.example.com 换成真实域名；
+#   3. `docker compose up -d caddy` —— Caddy 自动向 Let's Encrypt 申请并续期证书（HTTP-01/TLS-ALPN）；
+#   4. 客户端切 HTTPS：APK 改 `EXPO_PUBLIC_API_URL=https://域名` 重打包，
+#      `app/packages/mobile/app.json` 的 `usesCleartextTraffic` 改 false；
+#   5. 收口：安全组关闭 8787 公网入站（compose 里 api 的 8787 映射保留，只关云侧放行）。
+
+anxin.example.com {
+	encode gzip
+
+	# 医生端 Insight 与患者端 H5 由 api 进程托管静态 dist，同一上游即可
+	reverse_proxy api:8787
+}
+
+www.anxin.example.com {
+	redir https://anxin.example.com{uri} permanent
+}
