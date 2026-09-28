@@ -1,7 +1,8 @@
 # 安心用药 · 生产形态：api（多阶段镜像，托管 web/dist + /api，8787）+ db + caddy
 # 本地开发仅起 db：docker compose up -d db
 # 生产部署（火山 ECS）：见 deploy/README.md —— 先 `cp deploy/.env.example .env` 填真实值，再 docker compose up -d --build
-# 密钥口径：api 的运行期变量全部由 compose 插值自本目录 .env（compose 自动读取）；.env 不入 git、不进镜像（.dockerignore 已排除）
+# 密钥口径：api 的运行期凭据由 env_file 读本目录 .env 注入（缺文件不报错，缺键即保持未定义）；
+# .env 不入 git、不进镜像（.gitignore / .dockerignore 均已排除）。构建参数 NPM_REGISTRY 走 compose 插值，同样读这个文件。
 
 services:
   api:
@@ -17,29 +18,18 @@ services:
         condition: service_healthy
     ports:
       - "8787:8787"
+    # 凭据与可调项走 env_file：文件里没有的键就保持「未定义」，api 代码据此回落内置默认模型。
+    # 不用 ${VAR} 插值——compose 对缺失变量注入的是空字符串，而代码里 QWEN_MODEL/BAICHUAN_MODEL 等
+    # 用 ?? 取默认值，空串 ≠ 未定义，会把模型名变成空串导致调用失败。
+    env_file:
+      - path: .env
+        required: false
     environment:
       NODE_ENV: production
       PORT: "8787"
-      # 指向 compose 内的 db 服务；口令与 db 服务同源（deploy/.env.example 的 POSTGRES_PASSWORD）
+      # 指向 compose 内的 db 服务；口令与 db 服务同源（deploy/.env.example 的 POSTGRES_PASSWORD）。
+      # environment 优先级高于 env_file，故 .env 里那条指向宿主 localhost 的 DATABASE_URL 不会漏进来。
       DATABASE_URL: postgres://anxin:${POSTGRES_PASSWORD:-anxin_dev_2026}@db:5432/anxin_medication
-      # ── 模型凭据与开关：未设置的项在容器内保持「未定义」，api 代码据此回落到内置默认模型 ──
-      AI_MODE: ${AI_MODE}
-      QWEN_API_KEY: ${QWEN_API_KEY}
-      QWEN_BASE_URL: ${QWEN_BASE_URL}
-      QWEN_MODEL: ${QWEN_MODEL}
-      BAICHUAN_API_KEY: ${BAICHUAN_API_KEY}
-      BAICHUAN_BASE_URL: ${BAICHUAN_BASE_URL}
-      BAICHUAN_MODEL: ${BAICHUAN_MODEL}
-      OCR_API_KEY: ${OCR_API_KEY}
-      OCR_BASE_URL: ${OCR_BASE_URL}
-      OCR_MODEL: ${OCR_MODEL}
-      CONSULT_PROVIDER: ${CONSULT_PROVIDER}
-      CONSULT_MODEL: ${CONSULT_MODEL}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL}
-      ENABLE_INTENT_ROUTE: ${ENABLE_INTENT_ROUTE}
-      ENABLE_MEDICAL_SEARCH: ${ENABLE_MEDICAL_SEARCH}
 
   db:
     image: postgres:18-alpine
