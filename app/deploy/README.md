@@ -36,9 +36,17 @@ curl -sS -o /dev/null -w 'health=%{http_code}\n' http://<ECS_IP>:8787/api/health
 nc -zv -w3 <ECS_IP> 5432 && echo '⚠️ 5432 竟然可达，安全组或 compose 没收紧' || echo 'ok: 5432 公网不可达'
 ```
 
-## 2. 远端 build 的前置坑：Docker Hub 拉取加速
+## 2. 前置坑：大陆 ECS 的国际链路（**实测项，不要跳过**）
 
-本任务选择「服务器 git clone + 远端 build」，构建要拉 `node:22-slim`、运行要拉 `postgres:18-alpine` + `caddy:2-alpine`。大陆直连 docker.io 经常超时，先配加速器：
+远端 build 要拉 `node:22-slim`，运行要拉 `postgres:18-alpine` + `caddy:2-alpine`。
+**实测（2026-09-28，火山北京 4C8G）**：该机器 `git fetch` GitHub 直接 `GnuTLS recv error (-110)`，
+所以先假设 docker.io 也不通——按顺序验，别边跑边猜：
+
+```bash
+timeout 90 docker pull postgres:18-alpine && echo 'dockerhub 直连可用'
+```
+
+不通再配火山私有加速器（控制台「容器镜像服务 → 镜像加速器」，形如 `https://<加速ID>.mirror.volces.com`）：
 
 ```bash
 sudo mkdir -p /etc/docker
@@ -48,11 +56,15 @@ sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
 JSON
 sudo systemctl daemon-reload && sudo systemctl restart docker
 docker info | grep -A3 'Registry Mirrors'
+timeout 120 docker pull node:22-slim && timeout 120 docker pull postgres:18-alpine && timeout 60 docker pull caddy:2-alpine
 ```
 
 > 重启 docker 会中断在跑的容器——首次部署时还没有数据，无风险。
+> npm 侧不受此影响：`.env` 里 `NPM_REGISTRY=https://registry.npmmirror.com` 已是国内源。
 
-## 3. 拉代码
+## 3. 代码上云：两条路线，按链路可达性选
+
+**3a. git clone（GitHub 可达时首选，升级/回滚靠提交号最干净）**
 
 ```bash
 sudo mkdir -p /opt && cd /opt
@@ -60,7 +72,32 @@ git clone https://github.com/pdd1996/AnxinMed.git
 cd AnxinMed/app && git log --oneline -1   # 必须是含 M5-T1 部署物的提交
 ```
 
-仓库若为私有：控制台生成一次性 deploy key（只读）或用 `git clone https://<user>:<PAT>@github.com/...`；**PAT 不要写进任何仓库文件、shell history 里也留意**。
+仓库当前匿名可读（实测 `git ls-remote` 无凭据通过 + GitHub API 200），无需 token；仓库内没有任何密钥
+（`.env`、`app/backups/` 均在 `.gitignore`，`deploy/.env.example` 全占位）。
+
+**3b. scp 源码包（GitHub 不可达时用——实测走的这条）**
+
+本机从指定提交打精确快照（不含工作区脏改动、不含 `.env`/dump）：
+
+```bash
+cd <仓库根>
+git archive --format=tar.gz -o app/backups/anxin-src-<提交号>.tar.gz <提交号> app
+tar -tzf app/backups/anxin-src-<提交号>.tar.gz | wc -l        # 实测 449 个文件
+scp app/backups/anxin-src-<提交号>.tar.gz root@<ECS_IP>:/tmp/
+```
+
+服务器解到干净目录，**旧目录改名保留、不删**（服务器上的手工改动先另存 patch）：
+
+```bash
+cd ~ && git -C AnxinMed diff app/Dockerfile > ~/server-Dockerfile.patch   # 改名前先取差异
+mv AnxinMed AnxinMed.old-<旧提交短号>
+mkdir -p ~/anxin && tar -xzf /tmp/anxin-src-<提交号>.tar.gz -C ~/anxin
+cd ~/anxin/app && grep -c '^COPY packages' Dockerfile                     # 期望 6
+```
+
+> 3b 的代价：服务器上没有 git 元数据，回退靠重新 scp 对应提交的包；
+> 手工改过的文件先落 patch 再丢弃（实测那台机器上有一处 `node:20-slim→22-slim`，仓库版本已包含，无需合并）。
+> 本清单后续命令里的工作目录，3a 是 `/opt/AnxinMed/app`，3b 是 `~/anxin/app`。
 
 ## 4. 服务器 `.env`（真实凭据只在这台机器上）
 
