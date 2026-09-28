@@ -13,11 +13,15 @@ ENV npm_config_registry=${NPM_REGISTRY}
 ENV COREPACK_INTEGRITY_KEYS=0
 RUN corepack enable
 WORKDIR /app
-# 只拷清单文件以利用层缓存
+# 只拷清单文件以利用层缓存。七个 importer 一个不能少：lockfile 的 importers 段与 workspace 清单
+# 必须一一对应，少拷任一个（如 M5-T2 新增的 core）就会让 --frozen-lockfile 判定不同步而失败。
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/core/package.json packages/core/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
+COPY packages/mcp/package.json packages/mcp/
+COPY packages/mobile/package.json packages/mobile/
 COPY e2e/package.json e2e/
 RUN corepack prepare pnpm@11.23.0 --activate
 RUN pnpm install --frozen-lockfile
@@ -28,8 +32,11 @@ RUN corepack enable
 WORKDIR /app
 COPY --from=deps /app ./
 COPY . .
-# web: vite build → packages/web/dist ；api: esbuild bundle → packages/api/dist
-RUN corepack prepare pnpm@11.23.0 --activate && pnpm -r build
+# 只构建镜像真正伺服的两个包：web → packages/web/dist（vite）；api → packages/api/dist（esbuild）。
+# 不用 `pnpm -r build`：@anxin/core 无 build 脚本（exports 直指 src/*.ts，由 vite/esbuild 消费），
+# mobile/mcp 与镜像无关，构建它们只是白等。
+RUN corepack prepare pnpm@11.23.0 --activate \
+  && pnpm --filter @anxin/api --filter @anxin/web build
 
 # ── stage 3: runtime ──────────────────────────────────────────
 FROM node:22-slim AS runtime
