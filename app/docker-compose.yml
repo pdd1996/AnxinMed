@@ -1,6 +1,7 @@
-# 安心用药 · 生产形态：api（多阶段镜像，托管 web/dist + /api，8787）+ db
+# 安心用药 · 生产形态：api（多阶段镜像，托管 web/dist + /api，8787）+ db + caddy
 # 本地开发仅起 db：docker compose up -d db
-# 端到端/生产：docker compose up -d --build；随后在宿主机跑迁移与 seed（见 README「生产部署」）
+# 生产部署（火山 ECS）：见 deploy/README.md —— 先 `cp deploy/.env.example .env` 填真实值，再 docker compose up -d --build
+# 密钥口径：api 的运行期变量全部由 compose 插值自本目录 .env（compose 自动读取）；.env 不入 git、不进镜像（.dockerignore 已排除）
 
 services:
   api:
@@ -18,18 +19,38 @@ services:
       - "8787:8787"
     environment:
       NODE_ENV: production
-      # 指向 compose 内的 db 服务；生产（ECS）以环境变量/secret 覆盖，勿把真实密码提交进 git
-      DATABASE_URL: postgres://anxin:anxin_dev_2026@db:5432/anxin_medication
+      PORT: "8787"
+      # 指向 compose 内的 db 服务；口令与 db 服务同源（deploy/.env.example 的 POSTGRES_PASSWORD）
+      DATABASE_URL: postgres://anxin:${POSTGRES_PASSWORD:-anxin_dev_2026}@db:5432/anxin_medication
+      # ── 模型凭据与开关：未设置的项在容器内保持「未定义」，api 代码据此回落到内置默认模型 ──
+      AI_MODE: ${AI_MODE}
+      QWEN_API_KEY: ${QWEN_API_KEY}
+      QWEN_BASE_URL: ${QWEN_BASE_URL}
+      QWEN_MODEL: ${QWEN_MODEL}
+      BAICHUAN_API_KEY: ${BAICHUAN_API_KEY}
+      BAICHUAN_BASE_URL: ${BAICHUAN_BASE_URL}
+      BAICHUAN_MODEL: ${BAICHUAN_MODEL}
+      OCR_API_KEY: ${OCR_API_KEY}
+      OCR_BASE_URL: ${OCR_BASE_URL}
+      OCR_MODEL: ${OCR_MODEL}
+      CONSULT_PROVIDER: ${CONSULT_PROVIDER}
+      CONSULT_MODEL: ${CONSULT_MODEL}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL}
+      ENABLE_INTENT_ROUTE: ${ENABLE_INTENT_ROUTE}
+      ENABLE_MEDICAL_SEARCH: ${ENABLE_MEDICAL_SEARCH}
 
   db:
     image: postgres:18-alpine
     container_name: anxin-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      # 数据库不进公网：仅绑宿主机回环（供 SSH 隧道 / 本机 pg_dump 恢复用），安全组也不要放行 5432
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: anxin
-      POSTGRES_PASSWORD: anxin_dev_2026
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-anxin_dev_2026}
       POSTGRES_DB: anxin_medication
     volumes:
       # PG18 镜像 PGDATA 默认 /var/lib/postgresql/18/docker（挂载点须为父目录，否则数据不随卷持久化）
@@ -41,5 +62,23 @@ services:
       retries: 5
       start_period: 10s
 
+  # 过渡期（未备案）只占位、不承担流量：公网入口是裸 IP http://<IP>:8787 直连 api。
+  # 备案下来后换 deploy/Caddyfile 的 HTTPS 版本（见 Caddyfile.https.example），届时才真正接 80/443。
+  caddy:
+    image: caddy:2-alpine
+    container_name: anxin-caddy
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:
