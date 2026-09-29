@@ -1,0 +1,13 @@
+# 行尾纪律：容器与 Linux 侧读取的文件必须是 LF。
+# 必要性（实测）：Windows 上 core.autocrlf=true 时，`git archive` 会按 checkout 语义把文本转成 CRLF，
+# 导致 deploy/backup.sh 的 shebang 变成 `/usr/bin/env: 'bash\r'` 直接跑不起来；
+# 同理会往 .env.example 的值尾部塞一个不可见 \r（口令被污染，排查极难）。
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.example text eol=lf
+Caddyfile text eol=lf
