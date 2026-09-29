@@ -71,7 +71,8 @@ export default tseslint.config(
     // M5-T3 补修（随 M5-T2 验证发现）：mobile 的 CJS 配置文件（babel/metro/tailwind）不是 TS，
     // 上面那段只给 **/*.{ts,tsx} 配了语言环境 → 这些文件里的 module/require/__dirname 全报 no-undef。
     // 本段补 Node 全局并放行 require 写法（不改上游脚手架产物形态，Expo 生成的就是 CJS 配置）。
-    files: ['packages/mobile/**/*.js'],
+    // M5-T4 扩到 *.mjs：scripts/with-lan-url.mjs（dev 局域网地址探测）同为 Node 侧脚本。
+    files: ['packages/mobile/**/*.{js,mjs}'],
     languageOptions: {
       globals: { ...globals.node },
     },

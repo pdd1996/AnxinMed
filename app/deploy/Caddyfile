@@ -1,0 +1,17 @@
+# 安心用药 · Caddy 配置（M5-T1 过渡期版本）
+#
+# 现状：域名未备案，公网入口是裸 IP `http://<ECS_IP>:8787` 直连 api，Caddy 不承担流量。
+# 本文件的存在意义是让 caddy 服务先起来、配置常驻可用（空 Caddyfile 行为不确定，故给一个
+# 容器内回显站点：8080 端口未在 compose 里发布，公网不可达，也不会触发 ACME 申请）。
+#
+# 备案通过后：把下面的占位站点整段删掉，改用同目录 Caddyfile.https.example 的内容，
+# 并按其头部说明同步三件事（APK 的 EXPO_PUBLIC_API_URL、mobile app.json 的 cleartext、
+# 安全组 8787 收口）。
+
+{
+	admin localhost:2019
+}
+
+:8080 {
+	respond "anxin-caddy placeholder — 备案后改用 Caddyfile.https.example" 200
+}

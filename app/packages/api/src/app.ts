@@ -38,8 +38,18 @@ app.use(logger())
 app.use('/api/*', bodyLimit({ maxSize: 22 * 1024 * 1024 })) // 22mb：容纳拍照上传
 
 if (process.env.NODE_ENV === 'production') {
-  // prod：托管前端静态产物（web/dist）。具体 root 路径在 M1-T10 docker 落定。
-  app.use('/*', serveStatic({ root: './packages/web/dist' }))
+  // prod：托管前端静态产物（web/dist）。
+  // SPA 深链兜底：无扩展名且非 /api 的路径一律回 index.html，否则子页刷新/直链全 404（/box、/doctor/insight…）。
+  // 两条排除各有必要：/api 前缀放行——打错的接口要拿 404 JSON，不能被 index.html 的 200 吞掉（失败必须可见）；
+  // 带扩展名放行——/assets/*.js|css 等真实文件按原路径命中。
+  app.use(
+    '/*',
+    serveStatic({
+      root: './packages/web/dist',
+      rewriteRequestPath: (path) =>
+        path.startsWith('/api') || /\.[a-z0-9]+$/i.test(path) ? path : '/index.html',
+    }),
+  )
 } else {
   // dev：web(5173) 经 vite 代理 /api→8787；放开 CORS 便于直连调试。
   app.use('/api/*', cors())

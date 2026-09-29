@@ -1,91 +1,87 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { Stack } from "expo-router";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { apiBaseUrl, API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 
-type Status = "idle" | "loading" | "ok" | "fail";
+interface Entry {
+  href: string;
+  title: string;
+  desc: string;
+  /** 本里程碑内的可用性：T4 只打通药盒一条线，其余入口如实标注，不做点了没反应的按钮。 */
+  ready: boolean;
+  when?: string;
+}
 
-const STATUS_TEXT: Record<Status, string> = {
-  idle: "未探测",
-  loading: "探测中…",
-  ok: "连通",
-  fail: "不通",
-};
+const ENTRIES: Entry[] = [
+  {
+    href: "/intake",
+    title: "拍药盒入药箱",
+    desc: "拍一张药盒照片 → 识别 → 你核对 → 进药箱",
+    ready: true,
+  },
+  { href: "/box", title: "我的药箱", desc: "查看已建档的药品", ready: true },
+  {
+    href: "/probe",
+    title: "网络探测",
+    desc: "确认这台设备能连上服务器",
+    ready: true,
+  },
+];
 
-const STATUS_CLASS: Record<Status, string> = {
-  idle: "text-muted-foreground",
-  loading: "text-blue-600",
-  ok: "text-green-600",
-  fail: "text-red-600",
-};
+const SOON: { title: string; when: string }[] = [
+  { title: "拍处方笺（含用法用量）", when: "M5-T6" },
+  { title: "服药提醒与语音播报", when: "M5-T8" },
+  { title: "AI 用药咨询", when: "M5-T7" },
+];
 
+/** 首页（M5-T4 骨架）：三个已可用入口 + 未接入项如实列出 + API 地址可见。 */
 export default function Index() {
-  const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-  const [status, setStatus] = useState<Status>("idle");
-  const [detail, setDetail] = useState("");
-
-  async function probe() {
-    if (!apiUrl) {
-      setStatus("fail");
-      setDetail("EXPO_PUBLIC_API_URL 未配置（检查 .env.local）");
-      return;
-    }
-    setStatus("loading");
-    setDetail("");
-    const started = Date.now();
-    try {
-      const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/health`, {
-        cache: "no-store",
-      });
-      const ms = Date.now() - started;
-      if (res.ok) {
-        setStatus("ok");
-        setDetail(`HTTP ${res.status}，耗时 ${ms}ms`);
-      } else {
-        setStatus("fail");
-        setDetail(`HTTP ${res.status}，耗时 ${ms}ms`);
-      }
-    } catch (e) {
-      setStatus("fail");
-      setDetail(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  useEffect(() => {
-    probe();
-  }, []);
+  const router = useRouter();
+  const configured = isApiConfigured();
 
   return (
-    <View className="flex-1 bg-background px-5 pt-4">
-      <Text className="text-2xl font-semibold text-foreground">网络探测</Text>
-      <Text className="mt-2 text-base text-muted-foreground" numberOfLines={2}>
-        API 地址：{apiUrl ?? "未配置"}
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, paddingTop: 16 }}>
+      <Text className="text-2xl font-bold text-foreground">安心用药</Text>
+      <Text className="mt-1 text-base leading-6 text-muted-foreground">
+        把一个人的药放进同一个药箱：先能拍照建档，再管依从、冲突与效期。
       </Text>
 
-      <View className="mt-6 rounded-2xl border border-border bg-card p-5">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-lg text-card-foreground">/api/health</Text>
-          <View className="flex-row items-center gap-2">
-            {status === "loading" && <ActivityIndicator size="small" />}
-            <Text className={`text-lg font-semibold ${STATUS_CLASS[status]}`}>
-              {STATUS_TEXT[status]}
-            </Text>
-          </View>
-        </View>
-        {!!detail && (
-          <Text className="mt-3 text-base text-muted-foreground">{detail}</Text>
-        )}
+      <View
+        className={`mt-5 rounded-2xl border p-4 ${
+          configured ? "border-border bg-card" : "border-red-300 bg-red-50"
+        }`}
+      >
+        <Text className="text-sm text-muted-foreground">服务器地址</Text>
+        <Text className={`mt-1 text-base ${configured ? "text-card-foreground" : "text-red-700"}`}>
+          {configured ? apiBaseUrl() : API_URL_MISSING_HINT}
+        </Text>
       </View>
 
-      <Pressable
-        onPress={probe}
-        className="mt-6 min-h-[44px] items-center justify-center rounded-xl bg-primary active:opacity-80"
-      >
-        <Text className="text-lg font-medium text-primary-foreground">
-          重新探测
-        </Text>
-      </Pressable>
+      <View className="mt-6 gap-3">
+        {ENTRIES.map((entry) => (
+          <Pressable
+            key={entry.href}
+            accessibilityRole="button"
+            onPress={() => router.push(entry.href)}
+            className="min-h-[76px] justify-center rounded-2xl border border-border bg-card px-4 py-3 active:opacity-80"
+          >
+            <Text className="text-xl font-semibold text-card-foreground">{entry.title}</Text>
+            <Text className="mt-1 text-sm text-muted-foreground">{entry.desc}</Text>
+          </Pressable>
+        ))}
+      </View>
 
-      <Stack.Screen options={{ title: "安心用药" }} />
-    </View>
+      <Text className="mt-8 text-lg font-semibold text-foreground">还在路上</Text>
+      <View className="mt-2 gap-2">
+        {SOON.map((item) => (
+          <View
+            key={item.title}
+            className="flex-row items-center justify-between rounded-xl border border-dashed border-border px-4 py-3"
+          >
+            <Text className="text-base text-muted-foreground">{item.title}</Text>
+            <Text className="text-xs text-muted-foreground">{item.when}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 }

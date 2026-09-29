@@ -5,9 +5,45 @@ import type { ConsultSkillId, DraftConfirm } from '@anxin/shared'
 /**
  * hc<AppType> 端到端类型客户端（技术方案 §1）。
  * AppType 为 type-only 导入，构建期擦除，不把 api 运行时代码（serve/db）带进前端（执行总纲 §3.1）。
- * baseUrl '/'：dev 经 vite 代理 /api→8787，prod 由 Hono 同源托管，均用相对路径。
+ *
+ * 基址（M5-T4 接缝）：web 用默认 '/'——dev 经 vite 代理 /api→8787，prod 由 Hono 同源托管，均相对路径。
+ * RN 没有「同源」概念（App 与 api 不在同一台机器上），必须由平台层 `setApiBaseUrl(EXPO_PUBLIC_API_URL)`
+ * 注入绝对地址。默认值不变，故 web 侧零改动。
  */
-export const client = hc<AppType>('/')
+type ApiClient = ReturnType<typeof hc<AppType>>
+
+/** 基址可运行时改写，故客户端实例按当前基址惰性重建（改一次、建一次，不做每请求重建）。 */
+let apiBaseUrl = '/'
+let built: { base: string; client: ApiClient } | null = null
+
+function resolveClient(): ApiClient {
+  if (!built || built.base !== apiBaseUrl) built = { base: apiBaseUrl, client: hc<AppType>(apiBaseUrl) }
+  return built.client
+}
+
+/** 装配本端 API 基址（mobile 在平台装配阶段调用；传 '/' 即回到 web 的同源相对路径语义）。 */
+export function setApiBaseUrl(base: string): void {
+  const next = base.trim().replace(/\/+$/, '')
+  apiBaseUrl = next || '/'
+}
+
+/** 当前 API 基址（探测页 / 诊断界面展示用；禁在各处再拼一次字符串前缀）。 */
+export function getApiBaseUrl(): string {
+  return apiBaseUrl
+}
+
+/**
+ * 属性访问惰性转发到当前基址的 hc 实例（`client.api.drugs.$get` 等链式调用逐字不变）。
+ * 用 Proxy 而非直接导出实例，是为了让 setApiBaseUrl 在 import 之后调用依然生效。
+ */
+export const client = new Proxy({} as ApiClient, {
+  get(_target, prop) {
+    return Reflect.get(resolveClient() as object, prop)
+  },
+  has(_target, prop) {
+    return Reflect.has(resolveClient() as object, prop)
+  },
+})
 
 // ── 错误提示注入点（M5-T2 接缝 #1）──
 

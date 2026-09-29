@@ -3,6 +3,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@anxin/core": "workspace:*",
+    "@anxin/shared": "workspace:^",
     "@expo/ui": "~57.0.20",
     "@react-native-community/netinfo": "12.0.1",
     "@rn-primitives/dialog": "^1.5.2",
@@ -20,6 +22,7 @@
     "expo-font": "~57.0.4",
     "expo-glass-effect": "~57.0.4",
     "expo-image": "~57.0.5",
+    "expo-image-picker": "^57.0.20",
     "expo-linking": "~57.0.11",
     "expo-router": "~57.0.23",
     "expo-splash-screen": "~57.0.9",
@@ -51,9 +54,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android:dev": "expo run:android",
+    "start": "node scripts/with-lan-url.mjs start",
+    "android:dev": "node scripts/with-lan-url.mjs run:android",
     "android:release": "expo run:android --variant release",
+    "env:print": "node scripts/with-lan-url.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

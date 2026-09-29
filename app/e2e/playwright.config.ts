@@ -7,10 +7,14 @@
  *
  * 模式：默认 fixtures（回放）；`pnpm test:e2e:live`（E2E_AI_MODE=live）起真实 AI 客户端，
  *       需 QWEN/BAICHUAN/OCR key 与 qwen3.5-ocr 云端 OpenAI 兼容端点（ADR #16），仅发布前/验收手动跑，非回归手段。
+ *
+ * 远端目标（M5-T1）：设 `E2E_BASE_URL=http://<火山IP>:8787` 后**不再本地起 api/web**，整套打到该部署
+ *       （api 同源托管 /api 与前端 dist）；同时须给 `E2E_DB_URL` + `E2E_ALLOW_REMOTE_DB=1`
+ *       （经 SSH 隧道可达的部署库，见 app/deploy/README.md §8）。本地默认行为不变。
  */
 import { defineConfig, devices } from '@playwright/test'
 import { TEST_URL } from './lib/test-db.js'
-import { API_PORT, WEB_PORT, API_BASE, WEB_BASE } from './lib/ports.js'
+import { API_PORT, WEB_PORT, API_BASE, WEB_BASE, isRemoteTarget } from './lib/ports.js'
 
 const live = process.env.E2E_AI_MODE === 'live'
 
@@ -31,29 +35,32 @@ export default defineConfig({
     launchOptions: process.env.PW_EXECUTABLE_PATH ? { executablePath: process.env.PW_EXECUTABLE_PATH } : undefined,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: [
-    {
-      // api：fixtures 回放模式 + 独立测试库（dotenv 不覆盖已存在 env，故此处注入生效）
-      command: 'pnpm exec tsx src/index.ts',
-      cwd: '../packages/api',
-      port: API_PORT,
-      env: {
-        AI_MODE: live ? '' : 'fixtures',
-        DATABASE_URL: TEST_URL,
-        PORT: String(API_PORT),
-        NODE_ENV: 'test',
-      },
-      reuseExistingServer: false,
-      timeout: 60_000,
-    },
-    {
-      // web：vite dev（/api 代理→E2E api 独立端口，避免与本地 dev 8787 冲突）
-      command: `pnpm exec vite --port ${WEB_PORT} --strictPort`,
-      cwd: '../packages/web',
-      port: WEB_PORT,
-      env: { API_PROXY_TARGET: API_BASE },
-      reuseExistingServer: false,
-      timeout: 60_000,
-    },
-  ],
+  // 远端目标下不本地起服务（打了远端就不该再有本地进程）
+  webServer: isRemoteTarget
+    ? []
+    : [
+        {
+          // api：fixtures 回放模式 + 独立测试库（dotenv 不覆盖已存在 env，故此处注入生效）
+          command: 'pnpm exec tsx src/index.ts',
+          cwd: '../packages/api',
+          port: API_PORT,
+          env: {
+            AI_MODE: live ? '' : 'fixtures',
+            DATABASE_URL: TEST_URL,
+            PORT: String(API_PORT),
+            NODE_ENV: 'test',
+          },
+          reuseExistingServer: false,
+          timeout: 60_000,
+        },
+        {
+          // web：vite dev（/api 代理→E2E api 独立端口，避免与本地 dev 8787 冲突）
+          command: `pnpm exec vite --port ${WEB_PORT} --strictPort`,
+          cwd: '../packages/web',
+          port: WEB_PORT,
+          env: { API_PROXY_TARGET: API_BASE },
+          reuseExistingServer: false,
+          timeout: 60_000,
+        },
+      ],
 })

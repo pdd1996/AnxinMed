@@ -2,6 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // M5-T4：mobile 引用 @anxin/core → 其 type-only 依赖 @anxin/api 的 AppType 会把 api 源码拉进类型图，
+    // 那些文件 `import 'node:fs'`。隐式 @types 扫描在本机祖先链上有损坏残留（同 web 包注释），
+    // 故与 web/api 同款改为显式 types；node 类型只服务于这条类型链，运行期仍是 RN。
+    "types": ["node"],
     "paths": {
       "@/*": [
         "./src/*"

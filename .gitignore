@@ -11,6 +11,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# ── 数据库备份 dump（M5-T1：真实数据落盘处，永不入库）──
+app/backups/
+*.dump
+
 # ── 包管理器：本仓库用 pnpm，忽略 npm / yarn 锁文件（保留 pnpm-lock.yaml）──
 package-lock.json
 yarn.lock
