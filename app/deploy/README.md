@@ -61,6 +61,15 @@ timeout 120 docker pull node:22-slim && timeout 120 docker pull postgres:18-alpi
 
 > 重启 docker 会中断在跑的容器——首次部署时还没有数据，无风险。
 > npm 侧不受此影响：`.env` 里 `NPM_REGISTRY=https://registry.npmmirror.com` 已是国内源。
+>
+> **npm 源要落进 `/root/.npmrc` 才有效**（实测）：只设 `npm_config_registry` 环境变量时，pnpm 11 仍按
+> `registry.npmjs.org` 拉 tarball；Dockerfile 已改为写 npmrc。
+>
+> **`--trust-lockfile` 是大陆链路的必需品**（实测）：pnpm 11 安装时会对 lockfile 的 1158 个条目逐个查信任证据
+> （每条目一次 packument 请求），在该机器上耗时 2m13s～5m07s，三轮构建全部死在这一步的超时上。
+> Dockerfile 已加 `--trust-lockfile` 跳过它——完整性仍由 `--frozen-lockfile` 的 integrity 哈希保证，
+> 只是不再额外核每包的信任等级。本机/CI 网络快，仍走完整校验（该旗标只在镜像构建里用）。
+> 另：pnpm store 已挂 BuildKit 缓存，重跑构建时实测 `reused 1024`，不重下全部。
 
 ## 3. 代码上云：两条路线，按链路可达性选
 

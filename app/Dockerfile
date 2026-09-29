@@ -32,8 +32,12 @@ COPY e2e/package.json e2e/
 RUN corepack prepare pnpm@11.23.0 --activate
 # 把实际生效的 registry 打进构建日志——下次再慢，先看这一行对不对
 RUN echo "[deps] pnpm registry = $(pnpm config get registry)"
-# store 走 BuildKit 缓存挂载：单包超时重试不再重下全部
-RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
+# store 走 BuildKit 缓存挂载：单包超时重试不再重下全部。
+# --trust-lockfile：跳过「逐条 lockfile 项查信任证据」的 supply-chain 校验——实测大陆 ECS 上这一步要打 1158 条
+# packument 请求，耗时 2m13s～5m07s，是三轮构建超时的唯一主因。跳过它不影响完整性校验：
+# --frozen-lockfile 仍按 lockfile 里的 integrity 哈希逐包校验，只是不再额外查每个版本的信任等级。
+# 本机与 CI 链路快，仍然跑完整校验（这一面只在 Dockerfile 里）。
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile --trust-lockfile
 
 # ── stage 2: build ────────────────────────────────────────────
 FROM node:22-slim AS build
