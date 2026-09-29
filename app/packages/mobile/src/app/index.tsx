@@ -1,9 +1,9 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { apiBaseUrl, API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 
 interface Entry {
-  href: string;
+  href: Href;
   title: string;
   desc: string;
   /** 本里程碑内的可用性：T4 只打通药盒一条线，其余入口如实标注，不做点了没反应的按钮。 */
@@ -59,7 +59,7 @@ export default function Index() {
       <View className="mt-6 gap-3">
         {ENTRIES.map((entry) => (
           <Pressable
-            key={entry.href}
+            key={entry.title}
             accessibilityRole="button"
             onPress={() => router.push(entry.href)}
             className="min-h-[76px] justify-center rounded-2xl border border-border bg-card px-4 py-3 active:opacity-80"

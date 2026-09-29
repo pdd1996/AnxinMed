@@ -56,7 +56,7 @@
   "scripts": {
     "start": "node scripts/with-lan-url.mjs start",
     "android:dev": "node scripts/with-lan-url.mjs run:android",
-    "android:release": "expo run:android --variant release",
+    "android:release": "node scripts/release-apk.mjs",
     "env:print": "node scripts/with-lan-url.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"

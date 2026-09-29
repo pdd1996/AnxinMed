@@ -37,9 +37,29 @@ taskkill //PID <PID> //F                          # Git Bash 下双斜杠；cmd 
 3. `.env.local` 里的显式值（手工固定，默认已注释掉——**换 Wi-Fi 不再需要改文件**）；
 4. 本机探测的局域网 IPv4 + `ANXIN_API_PORT`（默认 8787），Wi-Fi 网卡优先。
 
-release 走另一条：`.env.production.local` 指向火山（`EXPO_PUBLIC_API_URL=http://<IP>:8787`），
-`android:release` **不做** LAN 探测，以免把开发机地址打进发布包。
+release 走另一条：`pnpm --filter @anxin/mobile android:release` = `scripts/release-apk.mjs`，
+地址只认 shell 里的 `EXPO_PUBLIC_API_URL` 或 `.env.production.local`（指向火山），**不做** LAN 探测——
+以免把开发机地址打进发布包。两条硬拦：没有地址就拒绝出包；值是 `10.0.2.2`/`localhost`/`127.0.0.1` 也拒绝出包。
 未配置时首页会红字显示「还没配好服务器地址」——禁静默失败。
+
+### release 包的两条收紧（写在 prebuild 插件里，不是手改 android/）
+
+`android/` 整目录被 `.gitignore` 忽略、由 `expo prebuild` 生成——手改既进不了版本库，也会在下次 prebuild 被抹掉。
+所以下两条落在 `plugins/with-release-hardening.js`（已在 `app.json` 的 `plugins` 注册），换机 prebuild 后自动就位。
+
+1. **不带开发者菜单**：`expo-dev-*` 一族的 `expo-module.config.json` 只在 iOS 侧标了 `debugOnly`，Android 侧
+   autolinking 不分变体——直接 `expo run:android --variant release` 打出来的包里就有 `DevLauncherPackage`
+   与 `exp+<slug>://` 深链（外部 intent 可拉起它去连任意 metro 地址）。插件往 `settings.gradle` 注入一段
+   「读 `ANXIN_RELEASE_BUILD` 环境变量 → 给 `expoAutolinking.exclude` 填这四个包名」；出包脚本置位，
+   dev 出包不置位 → 调试链路不变。
+   自检：`aapt dump xmltree app-release.apk AndroidManifest.xml | grep exp+` 应无输出。
+2. **双 ABI**：`expo run:android` 只在 **debug** 变体按已连设备的 ABI 传 `-PreactNativeArchitectures`，
+   release 变体用 `android/gradle.properties` 里的值。模板值若只有 `x86_64`，release 包装进 ARM64 真机会报
+   `INSTALL_FAILED_NO_MATCHING_ABIS`（现象是「装不上」，与代码无关）。插件把它写成 `arm64-v8a,x86_64`。
+   自检：`unzip -l app-release.apk | grep -oE "lib/[A-Za-z0-9_-]+/" | sort -u` 两行都要在（**注意**用 `[A-Za-z0-9_-]`——`arm64-v8a` 带连字符，`[a-z0-9_]` 会漏掉它，看着像「只有 x86_64」）。
+
+prebuild 之后先验这两条再出包（插件确实跑到了）：`grep -c ANXIN_RELEASE_BUILD android/settings.gradle` 应为 `1`；
+`grep ^reactNativeArchitectures android/gradle.properties` 应为 `arm64-v8a,x86_64`。
 
 ## 页面与里程碑边界（M5-T4 现状）
 
@@ -73,7 +93,7 @@ release 走另一条：`.env.production.local` 指向火山（`EXPO_PUBLIC_API_U
   真要点 prebuild 时注意：`expo prebuild --platform android` **默认就会先删 `android/`**（不加 `--clean` 也一样），
   目录被 Gradle/编辑器占住时报 `EBUSY: resource busy or locked` 并中止——先关掉占用的进程再动，
   且 `android/` 不入 git，删了只能靠 prebuild + 下面三个补丁重建。
-- `prebuild --clean` 会重生成 android/，届时需重打三个补丁：
+- `prebuild --clean` 会重生成 android/，届时需重打三个**网络镜像类**补丁（插件不管这些）：
   1. `android/build.gradle` 两个 repositories 块在 `mavenCentral()` 前插一行 `maven { url 'https://maven.aliyun.com/repository/public' }`
   2. `android/gradle/wrapper/gradle-wrapper.properties` 的 `distributionUrl` 换腾讯镜像 `https://mirrors.cloud.tencent.com/gradle/gradle-9.3.1-bin.zip`（官方源本机仅 ~40KB/s）
   3. `android/gradle.properties` 追加 `systemProp.socksProxyHost=127.0.0.1` / `systemProp.socksProxyPort=10808`（v2rayN；境外源走梯子，国内源按路由直连。**代理没开时 Gradle 一切外连都会挂**，本机 09-29 实测：v2rayN 未运行时靠 `~/.gradle` 缓存照旧能出包）

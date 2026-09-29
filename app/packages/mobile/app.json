@@ -34,7 +34,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/with-release-hardening"
     ],
     "experiments": {
       "typedRoutes": true,
