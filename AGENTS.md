@@ -66,7 +66,7 @@ pnpm --filter @anxin/api db:migrate    # 执行迁移
 pnpm --filter @anxin/api db:seed       # 从 demo/server/mock-data.json 导入资产域三库
 pnpm --filter @anxin/api db:studio     # Drizzle Studio
 
-# mobile（RN 安卓患者端，M5-T3 起落地；本机工具链已配 ANDROID_HOME=D:\Android\SDK）
+# mobile（RN 安卓患者端，M5-T3 起落地；需本机 Android SDK + JDK 17，SDK 路径以本机实际配置为准）
 pnpm --filter @anxin/mobile android:dev      # metro 真机调试
 pnpm --filter @anxin/mobile android:release  # release APK 出包
 
