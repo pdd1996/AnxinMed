@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { ERR_CODES } from '@anxin/shared'
 import {
   assessQuality,
+  CLIENT_ERR_CODES,
   mapIntakeFailure,
   QUALITY_HINTS,
   RETAKE_CHECKLIST,
@@ -90,6 +91,28 @@ describe('mapIntakeFailure · 失败分支必须可见且可行动', () => {
     const fb = mapIntakeFailure({ status: 409, code: ERR_CODES.LAYER_MISMATCH, message: 'x', details: { detected: '处方层', suggestion: 42 } })
     expect(fb.detected).toEqual([])
     expect(fb.body).toBe('x')
+  })
+
+  // M5-T4：RN 真机最常见的一类失败——请求根本没到服务器。归到「无法可靠识别」会把用户支去重拍好照片。
+  it('传输层失败（status 0 / NETWORK_ERROR / TIMEOUT）→ 「连不上服务器」卡：不催重拍、不给换入口', () => {
+    for (const input of [
+      { status: 0, code: CLIENT_ERR_CODES.NETWORK_ERROR, message: '网络不可达' },
+      { status: 0, code: CLIENT_ERR_CODES.TIMEOUT, message: '请求超时' },
+      { status: -1, code: CLIENT_ERR_CODES.NETWORK_ERROR, message: '' },
+    ]) {
+      const fb = mapIntakeFailure(input)
+      expect(fb.kind).toBe('unavailable')
+      expect(fb.title).toBe('连不上服务器')
+      expect(fb.allowSwitch).toBe(false)
+      expect(fb.allowManual).toBe(false)
+      expect(fb.hints.join('')).toContain('不需要重拍')
+      expect(fb.body).not.toBe('') // 空 message 也要有兜底文案，禁空白卡
+    }
+  })
+
+  it('传输失败文案不得与「识别失败」的重拍清单混用', () => {
+    const fb = mapIntakeFailure({ status: 0, code: CLIENT_ERR_CODES.NETWORK_ERROR, message: '网络不可达' })
+    expect(fb.hints).not.toEqual(RETAKE_CHECKLIST)
   })
 })
 
