@@ -281,6 +281,18 @@ docker compose exec -T db pg_restore -U anxin -d anxin_medication --no-owner --c
 
 ## 13. 已知偏离与风险（交付说明要抄这一节）
 
+0. **PG18 数据卷布局冲突（实测踩过）**：若 `pgdata` 卷里残留老布局数据（挂载点根目录直接有 `PG_VERSION`/`base/`），
+   `postgres:18-alpine` 会拒绝启动并反复重启，错误签名：
+   `Error: in 18+, these Docker images are configured to store database data in a format which is compatible with "pg_ctl/api" ... there appears to be PostgreSQL data in: /var/lib/postgresql`。
+   症状是 `docker compose up -d` 报 `dependency failed to start: container anxin-db is unhealthy`，api/caddy 一起不来。
+   处置：先把旧卷整份备份出来，确认备份非空后再删卷重建——
+   ```bash
+   mkdir -p ~/pgbackup
+   docker run --rm -v app_pgdata:/d:ro -v ~/pgbackup:/backup alpine tar czf /backup/pgdata-old.tar.gz -C /d .
+   ls -lh ~/pgbackup/            # 确认存在且非空，再往下
+   cd ~/anxin/app && docker compose down && docker volume rm app_pgdata && docker compose up -d
+   ```
+   （删卷会丢云端库内数据，只在「云端数据可从本地 dump 重建」时做；恢复见 §6。）
 1. **数据初始化路线偏离**：原定 `db:migrate` + `db:seed` 重建不可执行——`demo/server/mock-data.json` 已不在工作区，且 runtime 镜像无 TS 源码/drizzle-kit。改用整库 `pg_dump` 恢复（任务书允许的兜底路径，18→18 同版本）。**后续影响**：服务器上同样跑不了 `db:seed*` / `db:import-crawled` / 任何 `tsx src/db/*` 运维脚本；将来需要在云端跑这些时，要么在服务器装 node 工具链 + 源码 checkout（偏离「零代码改动」），要么加一个 `--profile ops` 的运维服务（属 T1 之后的决定）。
 2. **远端 e2e 有结构性限制**：见 §8 的警示块——写正式库、需隧道、跑完建议回滚。独立 staging 实例不在 T1 边界内。
 3. **改 `POSTGRES_PASSWORD` 不会自动同步到已有库**（compose 口令只在卷首次初始化时生效），跨环境复制时按 `deploy/.env.example` 里的注释用 `alter role` 改。
