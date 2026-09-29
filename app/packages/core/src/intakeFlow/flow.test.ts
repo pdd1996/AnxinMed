@@ -238,13 +238,16 @@ describe('六步流转 · drafts 步（单草稿直达 / 多草稿列表）', ()
     expect(actions).toEqual([{ type: 'intake', entry: 'B', dataUrl: DATA_URL }])
   })
 
-  it('单草稿 → 原图进会话 + 清交接 + 直达 /drafts/:id，不落 drafts 步', () => {
+  it('单草稿 → 原图进会话 + 清交接 + 直达 /drafts/:id，并落 drafts 步（不留 processing）', () => {
     const { state, actions } = run(
       { type: 'intake_ok', dataUrl: DATA_URL, result: runResult(['d-1']) },
       { step: 'processing', image: DATA_URL },
     )
-    expect(state.step).toBe('processing')
-    expect(state.result).toBeNull()
+    // 落 drafts 是安卓端的硬要求：expo-router 把本屏留在栈里，停在 processing 会让用户
+    // 从草稿页返回后看到永不终结的转圈（web 靠路由卸载掩盖了同一问题）。
+    expect(state.step).toBe('drafts')
+    expect(state.stageIdx).toBe(0)
+    expect(state.result?.drafts.map((d) => d.id)).toEqual(['d-1'])
     expect(actions).toEqual([
       { type: 'session_set_images', draftIds: ['d-1'], dataUrl: DATA_URL },
       { type: 'session_clear_pending_image' },

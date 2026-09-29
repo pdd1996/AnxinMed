@@ -225,9 +225,10 @@ export function transitionIntakeFlow(
         { type: 'session_clear_pending_image' },
       ]
       if (draftIds.length === 1) {
-        // 单草稿直达确认页：状态不动（原组件即如此，只跳转不落 drafts 步）
+        // 单草稿直达确认页。状态**照样落 drafts**：留在 processing 的话，安卓端 expo-router
+        // 会把这张屏压在草稿页下面继续空转阶段定时器，用户一按返回就是永远转圈
+        // ——请求已成功，再不会有任何事件来终结它（05 任务书 T4 禁「转圈不结束」）。
         actions.push({ type: 'navigate', path: `/drafts/${draftIds[0]}` })
-        return { state: normalize(state), actions }
       }
       return {
         state: normalize({ ...state, result: event.result, step: 'drafts' }),
