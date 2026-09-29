@@ -86,14 +86,23 @@ cd AnxinMed/app && git log --oneline -1   # 必须是含 M5-T1 部署物的提�
 
 **3b. scp 源码包（GitHub 不可达时用——实测走的这条）**
 
-本机从指定提交打精确快照（不含工作区脏改动、不含 `.env`/dump）：
+本机从指定提交打精确快照（不含工作区脏改动、不含 `.env`/dump）。
+**必须带 `-c core.autocrlf=false`**：实测 Windows `core.autocrlf=true` 下 `git archive` 会把文本转成 CRLF，
+`.gitattributes` 也挡不住这条路径，结果是 Linux 上 `backup.sh` 的 shebang 变成 `bash\r` 跑不起来、
+`.env` 值尾部混入不可见 `\r`。打完先验行尾再上传：
 
 ```bash
 cd <仓库根>
-git archive --format=tar.gz -o app/backups/anxin-src-<提交号>.tar.gz <提交号> app
-tar -tzf app/backups/anxin-src-<提交号>.tar.gz | wc -l        # 实测 449 个文件
+git -c core.autocrlf=false archive --format=tar.gz -o app/backups/anxin-src-<提交号>.tar.gz <提交号> app
+tar -tzf app/backups/anxin-src-<提交号>.tar.gz | wc -l                    # 实测 449 个文件
+tar -xzOf app/backups/anxin-src-<提交号>.tar.gz app/deploy/backup.sh | tr -dc '\r' | wc -c   # 必须是 0
 scp app/backups/anxin-src-<提交号>.tar.gz root@<ECS_IP>:/tmp/
 ```
+
+> 自检用 `tr -dc '\r' | wc -c` 数 CR 字节，**不要用 `grep -c $'\r'`**：实测同一个干净文件它先给 0 后给 43
+> （43 恰为行数），会把好包判成坏包、也会让假阴性蒙混过关。
+
+（已在 `app/backups/` 里留了旧包的话，重打一份覆盖它；旧包是 CRLF 的，别再用。）
 
 服务器解到干净目录，**旧目录改名保留、不删**（服务器上的手工改动先另存 patch）：
 
