@@ -66,7 +66,7 @@ prebuild 之后先验这两条再出包（插件确实跑到了）：`grep -c AN
 
 `src/app/` 根 stack：`(patient)`（五 tab：今日/药箱/记录/我的/设置；分组内不走系统头部，页内自出标题）·
 `intake`（拍药盒 → 层检测 → 识别 → 草稿）· `drafts/[id]`（唯一闸门：确认建档）· `probe`（T3 的网络探测页）。
-今日/记录/我的 目前是**按分片占位**（真机可见「路由 /xxx · 真实实现见 M5-T5x」，不是假按钮），设置页的字号两档已真实生效。
+今日页自 M5-T5b 起是**真实任务页**（任务卡 + 30s 轮询 + 页内提醒弹窗 + 打勾写记录）；记录/我的 仍是**按分片占位**（真机可见「骨架占位 · 真实实现见 M5-T5x」，不是假按钮）；药箱是 T4 的最简列表（计划弹窗与删药二次确认在 T5-c），设置页的字号两档已真实生效。
 分组不改变 URL：`/box`、`/intake`、`/probe` 等路径与 T4 一致，旧链接与 `router.push("/box")` 全部照用。
 
 - 六步流转的**决策**全在 `@anxin/core` 的 `transitionIntakeFlow`（纯函数、已单测），本包只做动作解释与渲染；
@@ -94,6 +94,24 @@ grep -c '"rem"' /tmp/anxin-rem-check/_expo/static/js/android/*.js               
 
 只剩烤死的数字、`rem` 计数归零，就是内联被改回来了。
 
+## 令牌色带透明度修饰符会整条静默丢失（M5-T5b 实测）
+
+`tailwind.config.js` 的颜色令牌写成 `var(--primary)` **纯字符串**（没有 `<alpha-value>` 占位，因为
+`global.css` 里的变量存的是完整的 `hsl(240 5.9% 10%)` 而非裸通道），所以 Tailwind 无法注入 alpha：
+**`bg-primary/10`、`border-primary/40`、`text-primary-foreground/80` 这一族类整条不落进产物**——不报错、不降级，就是没有。
+
+```bash
+cd app/packages/mobile && printf '<div class="bg-primary bg-primary\\/10"></div>' > /tmp/t.html \
+  && npx tailwindcss -i src/global.css --content /tmp/t.html | grep -E "^\.bg-primary"   # 只出 .bg-primary 一条
+```
+
+写法上的替代：实色令牌（`bg-secondary` / `bg-muted` / `border-2 border-primary`）、元素级 `opacity-*`，
+或往 `global.css` 再加一条整色令牌。**静态色不受影响**（`bg-black/50` 正常，见 `ui/dialog.tsx`）。
+图标更是一条独立通道：`Icon` 拿不到 `TextClassContext`，颜色只能 `color={useUnstableNativeVariable("--primary")}`
+显式给（同 `(patient)/_layout.tsx`）。
+已知的既有漏网（T4 遗留，均无功能影响、只是没底色）：`app/drafts/[id].tsx:275` 的 `bg-primary/10`、
+`app/intake.tsx:183` 的 `bg-muted/40`。T5-c/T5-e 落地 RiskBadge 的四档语义色时**必然**撞上这条（web 侧全是 `bg-*/10` 形态）。
+
 ## workspace 源码引用与 Metro（改坏了会在 bundling 期才炸）
 
 `@anxin/core` / `@anxin/shared` 的 `exports` 直接指向 `src/*.ts`（前端不产 dist），故 Metro 需要：
@@ -108,7 +126,7 @@ grep -c '"rem"' /tmp/anxin-rem-check/_expo/static/js/android/*.js               
 
 ## 本机工具链与构建环境（换机/prebuild --clean 后必读）
 
-- **本仓库在两台 Windows 机器上跑，构建/装机/网络探测的结论全是分机器的**：一条「盘上有几个 ABI」「代理通不通」如果不标机器就无法复盘。**约定：任何验收状态表记实测事实时，同时记 `pnpm --filter @anxin/mobile machine:id` 输出的 `Host` 值**（该脚本只读，打印主机名 / Windows 版本（靠 build 号分 10 与 11）/ 内存 / 有无 AVD / ANDROID_HOME）。已知两台：`Robot`（Win 11，带模拟器 `Medium_Phone_API_36`），另一台 Win 10 / 8GB **不带模拟器**（只能真机联调，其 Host 待该机自报后补进此处与状态表）。
+- **本仓库在两台 Windows 机器上跑，构建/装机/网络探测的结论全是分机器的**：一条「盘上有几个 ABI」「代理通不通」如果不标机器就无法复盘。**约定：任何验收状态表记实测事实时，同时记 `pnpm --filter @anxin/mobile machine:id` 输出的 `Host` 值**（该脚本只读，打印主机名 / Windows 版本（靠 build 号分 10 与 11）/ 内存 / 有无 AVD / ANDROID_HOME）。已知两台：`Robot`（Win 11 / 31.7GB，带模拟器 `Medium_Phone_API_36`，`ANDROID_HOME=D:\03Environments\Android\SDK`）与 `DESKTOP-0GOAAGP`（Win 10 / build 19045 / 7.9GB / i5-8250U，**无 AVD**、`ANDROID_HOME=D:\Android\SDK`，只能真机联调；09-30 自报，其 `android/app/build/outputs/apk/release/` 至今是 09-29 11:58 的单 ABI 旧包，**在这台上装机前必须先重出包**）。
 
 - `ANDROID_HOME` 指向本机 Android SDK（路径因机而异，勿照抄）；查法：PowerShell `[Environment]::GetEnvironmentVariable('ANDROID_HOME','Machine')`
 - 版本号（platform-tools / build-tools / platforms）由 Expo SDK 决定，不必与文档对齐：构建时 gradle 会打印实际采用的 `compileSdk / targetSdk / buildTools / ndk / kotlin`，以它为准；本机 SDK 装的是哪些版本用 `sdkmanager --list` 查
