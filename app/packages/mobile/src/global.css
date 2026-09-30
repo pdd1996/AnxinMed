@@ -31,12 +31,12 @@
   }
 
   /* 深色令牌必须走 @media 通道，不能照搬 web 的 `.dark:root`。
-     09-30 实测：`.dark:root{…}` 整段在编译期就进不了 bundle（`expo export` 产物里搜不到
-     深色的 #0a0a0a / #26262a，而浅色的 #ffffff / #f4f4f5 在），于是系统深色下 app 全白底。
-     react-native-css-interop 的 normalize-selectors.js 里，`:root` + `prefers-color-scheme: dark`
-     这一支（isRootVariableSelector + isDarkModeMediaQuery）不依赖 tailwind 的 darkMode 选项，
-     编译成 rootVariables/dark，运行时由 runtime/native/appearance-observables.js 的
-     colorScheme.get() 选档。RN 侧也没有 documentElement 可挂 `dark` 类。 */
+     09-30 实测：值本身**在包里**（#09090b/#27272a 各 1 处），但 `.dark:root` 那一支编译出的是
+     「要求祖先节点挂 dark 类」的选择器，而 RN 没有 documentElement 可挂 → 运行时永不生效，
+     系统深色下整页仍白底。`:root` + `@media (prefers-color-scheme: dark)` 这一支
+     （isRootVariableSelector + isDarkModeMediaQuery）不依赖 tailwind 的 darkMode 选项，
+     编译成 rootVariables/dark，运行时由 appearance-observables.js 的 colorScheme.get() 选档。
+     取证方法与两次判错见 T5-真机验收.md §2.5（别拿「某个色值在不在包里」当判据）。 */
   @media (prefers-color-scheme: dark) {
     :root {
       --background: hsl(240 10% 3.9%);
