@@ -4,6 +4,10 @@
 
 @layer base {
   :root {
+    /* 老年向根字号 normal 档（M1-T8 令牌：normal 17px / large 20px）。
+       metro 侧 inlineRem:false 后 rem 是运行时可观察量，本行只是首帧初值；
+       切档见 components/FontScaleSync.tsx，两处数值必须同步。 */
+    font-size: 17px;
     --background: hsl(0 0% 100%);
     --foreground: hsl(240 10% 3.9%);
     --card: hsl(0 0% 100%);

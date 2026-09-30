@@ -54,4 +54,14 @@ function resolveRequest(context, moduleName, platform) {
 
 config.resolver.resolveRequest = resolveRequest;
 
-module.exports = withNativeWind(config, { input: "./src/global.css" });
+/**
+ * 字号全局缩放（M5-T5a spike 结论，docs/specs/05d §2-T5-a 第 3 条）：
+ * NativeWind 的 `inlineRem` 默认 14 —— rem 在**编译期**烤成常数，运行时改不动，字号两档就做不了。
+ * 置 false 后 rem 走运行时可观察量（react-native-css-interop/src/runtime/native/unit-observables.ts），
+ * 与 src/global.css 的 `:root{font-size}` 一起等价于 web 的 `html{font-size}` 驱动 rem：
+ * 一次 rem.set(17|20) 让所有 rem 基准的文字与间距同步缩放，无需逐组件改造。
+ */
+module.exports = withNativeWind(config, {
+  input: "./src/global.css",
+  inlineRem: false,
+});
