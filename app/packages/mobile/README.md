@@ -61,14 +61,37 @@ release 走另一条：`pnpm --filter @anxin/mobile android:release` = `scripts/
 prebuild 之后先验这两条再出包（插件确实跑到了）：`grep -c ANXIN_RELEASE_BUILD android/settings.gradle` 应为 `1`；
 `grep ^reactNativeArchitectures android/gradle.properties` 应为 `arm64-v8a,x86_64`。
 
-## 页面与里程碑边界（M5-T4 现状）
+## 页面与里程碑边界（M5-T5a 现状）
 
-`src/app/` 下：`index`（首页三入口）· `intake`（拍药盒 → 层检测 → 识别 → 草稿）·
-`drafts/[id]`（唯一闸门：确认建档）· `box`（药箱最简列表）· `probe`（T3 的网络探测页）。
+`src/app/` 根 stack：`(patient)`（五 tab：今日/药箱/记录/我的/设置；分组内不走系统头部，页内自出标题）·
+`intake`（拍药盒 → 层检测 → 识别 → 草稿）· `drafts/[id]`（唯一闸门：确认建档）· `probe`（T3 的网络探测页）。
+今日/记录/我的 目前是**按分片占位**（真机可见「路由 /xxx · 真实实现见 M5-T5x」，不是假按钮），设置页的字号两档已真实生效。
+分组不改变 URL：`/box`、`/intake`、`/probe` 等路径与 T4 一致，旧链接与 `router.push("/box")` 全部照用。
 
 - 六步流转的**决策**全在 `@anxin/core` 的 `transitionIntakeFlow`（纯函数、已单测），本包只做动作解释与渲染；
 - **一期不做本地质量预检**（05 任务书 T2/T4 允许降级：预检只是建议不拦用户），二期用 expo 侧像素统计补 `compute_stats` 分支；
-- 处方笺入口 T6、五页全量与 fontScale T5、提醒 T8、图表与 Maestro T9 —— 见 `T4-真机验收.md` 与任务书 05。
+- 处方笺入口 T6、Home/Box/Records/Profile 全量移植 T5b~T5e、提醒 T8、图表与 Maestro T9 —— 见 `T4-真机验收.md` 与任务书 05。
+
+## 字号全局缩放（M5-T5a 接线，改这三处前两读）
+
+NativeWind v4 的 rem 有两条路：**编译期内联**（`inlineRem` 是数字 → `1rem` 直接烤成常数，运行时改不动）与
+**运行时可观察量**（`inlineRem: false` → 每个 rem 值留成 `["rem", n]` 描述符，`rem.set()` 一改全 app 重解析）。
+本项目走后者，与 web 的 `html{font-size}` 驱动 rem 同语义，三处必须同时成立：
+
+1. `metro.config.js`：`withNativeWind(config, { input, inlineRem: false })`——**去掉这个参数就静默退回内联 14**，字号档切换立刻失效（不报错、不改样式表现，只是没反应）；
+2. `src/global.css`：`:root { font-size: 17px }` 是 normal 档首帧初值（persist 水合前也走它）；
+3. `src/components/FontScaleSync.tsx`：`FONT_ROOT_DP = { normal: 17, large: 20 }`，订阅 core 的字号 store 执行 `rem.set()`；store 在 `src/stores/fontScale.ts`（AsyncStorage 持久化，键 `anxin-font-scale`）。
+
+副作用要知道：rem 从烤死的 14 变成活的 17，**所有 rem 基准的文字与间距整体放大约 21%**（写死 px 的 `min-h-[44px]` 一族不受影响）。
+自检（**不需要真机**，看产物里 rem 是否还是活的）：
+
+```bash
+cd app/packages/mobile && npx expo export --platform android --dev --no-bytecode --output-dir /tmp/anxin-rem-check
+grep -o 'rem:[0-9.]*' /tmp/anxin-rem-check/_expo/static/js/android/*.js | head -1   # 预期 rem:17
+grep -c '"rem"' /tmp/anxin-rem-check/_expo/static/js/android/*.js                    # 预期 >0（描述符仍在）
+```
+
+只剩烤死的数字、`rem` 计数归零，就是内联被改回来了。
 
 ## workspace 源码引用与 Metro（改坏了会在 bundling 期才炸）
 
