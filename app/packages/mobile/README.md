@@ -123,5 +123,6 @@ grep -c '"rem"' /tmp/anxin-rem-check/_expo/static/js/android/*.js               
   1. `android/build.gradle` 两个 repositories 块在 `mavenCentral()` 前插一行 `maven { url 'https://maven.aliyun.com/repository/public' }`
   2. `android/gradle/wrapper/gradle-wrapper.properties` 的 `distributionUrl` 换腾讯镜像 `https://mirrors.cloud.tencent.com/gradle/gradle-9.3.1-bin.zip`（官方源本机仅 ~40KB/s）
   3. `android/gradle.properties` 追加 `systemProp.socksProxyHost=127.0.0.1` / `systemProp.socksProxyPort=10808`（v2rayN；境外源走梯子，国内源按路由直连。**代理没开时 Gradle 一切外连都会挂**，本机 09-29 实测：v2rayN 未运行时靠 `~/.gradle` 缓存照旧能出包）
+- **核「APK 里到底有没有本次改动」时，别用 `grep -a "中文文案"`**：release 包 `assets/index.android.bundle` 是 Hermes 字节码，串表里的中文按 **UTF-16LE** 存，UTF-8 模式搜恒为 0（09-30 就据此把一个含 T5-a 的好包误判成没打进去）。正解是 `unzip -p … assets/index.android.bundle` 后用 node 搜 `Buffer.from(s,'utf16le')`，ASCII 串（AsyncStorage 键名、API 地址）才可以用 UTF-8 搜。可复用的命令与预期值见 [T5-真机验收.md §1](./T5-真机验收.md)。
 - 过渡期 `usesCleartextTraffic: true`（app.json expo-build-properties），切 HTTPS 后关闭
 - 已知版本漂移（实测不影响构建与运行，暂不动）：`react-native-svg` 装 15.15.5，Expo 57 期望 15.15.4，而 `package.json` 写的 `^15.15.5` 永远解析不到它。**下次重建原生层时顺路归位**：`npx expo install react-native-svg --fix`（改的是原生模块，须与重建同批做，单独改会留下 manifest 与 node_modules 不一致）
