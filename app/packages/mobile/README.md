@@ -10,6 +10,7 @@ pnpm --filter @anxin/mobile android:dev      # metro 真机调试（自动探测
 pnpm --filter @anxin/mobile android:release  # release 构建；APK 产物在 android/app/build/outputs/apk/release/
 pnpm --filter @anxin/mobile start            # 仅起 metro（配合已装的 dev client）
 pnpm --filter @anxin/mobile env:print        # 只打印探测到的 API 地址，不起服务
+pnpm --filter @anxin/mobile machine:id       # 打印本机指纹（主机名/系统/内存/有无模拟器），状态表标机器用
 ```
 
 ### metro 调试白屏：先查 8081 是否被上次会话遗留的 metro 占着
@@ -106,6 +107,8 @@ grep -c '"rem"' /tmp/anxin-rem-check/_expo/static/js/android/*.js               
 那些文件 `import 'node:fs'`（与 web/api 包同款处理，本机祖先链有损坏的隐式 @types 残留）。
 
 ## 本机工具链与构建环境（换机/prebuild --clean 后必读）
+
+- **本仓库在两台 Windows 机器上跑，构建/装机/网络探测的结论全是分机器的**：一条「盘上有几个 ABI」「代理通不通」如果不标机器就无法复盘。**约定：任何验收状态表记实测事实时，同时记 `pnpm --filter @anxin/mobile machine:id` 输出的 `Host` 值**（该脚本只读，打印主机名 / Windows 版本（靠 build 号分 10 与 11）/ 内存 / 有无 AVD / ANDROID_HOME）。已知两台：`Robot`（Win 11，带模拟器 `Medium_Phone_API_36`），另一台 Win 10 / 8GB **不带模拟器**（只能真机联调，其 Host 待该机自报后补进此处与状态表）。
 
 - `ANDROID_HOME` 指向本机 Android SDK（路径因机而异，勿照抄）；查法：PowerShell `[Environment]::GetEnvironmentVariable('ANDROID_HOME','Machine')`
 - 版本号（platform-tools / build-tools / platforms）由 Expo SDK 决定，不必与文档对齐：构建时 gradle 会打印实际采用的 `compileSdk / targetSdk / buildTools / ndk / kotlin`，以它为准；本机 SDK 装的是哪些版本用 `sdkmanager --list` 查

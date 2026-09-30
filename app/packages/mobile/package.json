@@ -61,6 +61,7 @@
     "android:dev": "node scripts/with-lan-url.mjs run:android",
     "android:release": "node scripts/release-apk.mjs",
     "env:print": "node scripts/with-lan-url.mjs",
+    "machine:id": "node scripts/machine-id.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },
