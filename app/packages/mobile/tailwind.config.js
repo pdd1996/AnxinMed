@@ -1,7 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: ["class"],
-  safelist: ["dark"],
+  // 深色走系统通道（Tailwind 默认 darkMode:'media'），**不要**写 darkMode:['class'] + safelist:['dark']：
+  // 那是 web（html 挂 .dark 类）的形态，RN 没有 documentElement 可挂，`dark:` 变体会全部失效。
+  // 深色令牌本身见 src/global.css 的 @media (prefers-color-scheme: dark) 段。
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {

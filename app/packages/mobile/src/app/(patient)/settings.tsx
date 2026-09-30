@@ -1,7 +1,8 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { Type } from "lucide-react-native";
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
+import { Text } from "@/components/ui/text";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFontScale, type FontScale } from "@/stores/fontScale";
 

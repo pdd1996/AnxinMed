@@ -30,25 +30,34 @@
     --radius: 0.625rem;
   }
 
-  .dark:root {
-    --background: hsl(240 10% 3.9%);
-    --foreground: hsl(0 0% 98%);
-    --card: hsl(240 10% 3.9%);
-    --card-foreground: hsl(0 0% 98%);
-    --popover: hsl(240 10% 3.9%);
-    --popover-foreground: hsl(0 0% 98%);
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(240 5.9% 10%);
-    --secondary: hsl(240 3.7% 15.9%);
-    --secondary-foreground: hsl(0 0% 98%);
-    --muted: hsl(240 3.7% 15.9%);
-    --muted-foreground: hsl(240 5% 64.9%);
-    --accent: hsl(240 3.7% 15.9%);
-    --accent-foreground: hsl(0 0% 98%);
-    --destructive: hsl(0 62.8% 30.6%);
-    --destructive-foreground: hsl(0 0% 98%);
-    --border: hsl(240 3.7% 15.9%);
-    --input: hsl(240 3.7% 15.9%);
-    --ring: hsl(240 4.9% 83.9%);
+  /* 深色令牌必须走 @media 通道，不能照搬 web 的 `.dark:root`。
+     09-30 实测：`.dark:root{…}` 整段在编译期就进不了 bundle（`expo export` 产物里搜不到
+     深色的 #0a0a0a / #26262a，而浅色的 #ffffff / #f4f4f5 在），于是系统深色下 app 全白底。
+     react-native-css-interop 的 normalize-selectors.js 里，`:root` + `prefers-color-scheme: dark`
+     这一支（isRootVariableSelector + isDarkModeMediaQuery）不依赖 tailwind 的 darkMode 选项，
+     编译成 rootVariables/dark，运行时由 runtime/native/appearance-observables.js 的
+     colorScheme.get() 选档。RN 侧也没有 documentElement 可挂 `dark` 类。 */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: hsl(240 10% 3.9%);
+      --foreground: hsl(0 0% 98%);
+      --card: hsl(240 10% 3.9%);
+      --card-foreground: hsl(0 0% 98%);
+      --popover: hsl(240 10% 3.9%);
+      --popover-foreground: hsl(0 0% 98%);
+      --primary: hsl(0 0% 98%);
+      --primary-foreground: hsl(240 5.9% 10%);
+      --secondary: hsl(240 3.7% 15.9%);
+      --secondary-foreground: hsl(0 0% 98%);
+      --muted: hsl(240 3.7% 15.9%);
+      --muted-foreground: hsl(240 5% 64.9%);
+      --accent: hsl(240 3.7% 15.9%);
+      --accent-foreground: hsl(0 0% 98%);
+      --destructive: hsl(0 62.8% 30.6%);
+      --destructive-foreground: hsl(0 0% 98%);
+      --border: hsl(240 3.7% 15.9%);
+      --input: hsl(240 3.7% 15.9%);
+      --ring: hsl(240 4.9% 83.9%);
+    }
   }
 }
