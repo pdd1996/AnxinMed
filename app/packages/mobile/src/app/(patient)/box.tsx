@@ -3,10 +3,11 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
 import { useRouter } from "expo-router";
 import { CONFIRM_STATUS_META } from "@anxin/shared";
 import { fetchDrugs } from "@anxin/core";
+import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 
 /**
  * 药箱最简列表（M5-T4 完成标准第 1 条的后半段：入箱后要看得见）。
- * 完整五页移植（含计划弹窗、手动建档表单、fontScale、导出）在 M5-T5。
+ * 现挂在 (patient) 分组的「药箱」tab 下；计划弹窗、手动建档表单、删药二次确认在 M5-T5c 接入。
  */
 type BoxState =
   | { kind: "loading" }
@@ -44,7 +45,11 @@ export default function Box() {
   return (
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, paddingTop: 16 }}
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingBottom: TAB_BAR_BOTTOM_PAD,
+        paddingTop: 16,
+      }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
