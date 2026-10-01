@@ -1,8 +1,13 @@
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { Type } from "lucide-react-native";
 import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Text 必须走 ui/text：09-30 深夜修过一条「settings.tsx 直引 react-native 的 Text，接不到
+// TextClassContext 下发的颜色」（commit 7b35934），T5-e 重写本页时又退回去了——深色下选中档
+// 文字实测黑压黑。见 T5-真机验收.md §2.10。
+import { Text } from "@/components/ui/text";
+import { cn } from "@/lib/utils";
 import { useFontScale, type FontScale } from "@/stores/fontScale";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 
@@ -107,7 +112,15 @@ function TabOption({
       accessibilityState={{ selected: active }}
       className="min-h-[44px] flex-1 px-6"
     >
-      <Text className="text-base font-semibold">{label}</Text>
+      <Text
+        className={cn(
+          "text-base font-semibold",
+          // 一元素只挂一条颜色类：两条同类颜色类在 RN 侧谁赢由 CSS 产出顺序定，不按 class 书写顺序（§2.10 实测）
+          active ? "text-primary-foreground" : "text-secondary-foreground"
+        )}
+      >
+        {label}
+      </Text>
     </TabsTrigger>
   );
 }
