@@ -35,7 +35,8 @@
           }
         }
       ],
-      "./plugins/with-release-hardening"
+      "./plugins/with-release-hardening",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
