@@ -28,6 +28,22 @@
     --input: hsl(240 5.9% 90%);
     --ring: hsl(240 5.9% 10%);
     --radius: 0.625rem;
+
+    /* 风险语义色四档（05d §7-5 前置）。四组值逐字照搬 web/src/styles/index.css:36-39 与 :66-69，
+       别在组件里写死色号（§6 第 4 条要求色 + 图标 + 文字三件套，且深浅两套都要有）。 */
+    --risk-l1: #2f7d5b;
+    --risk-l2: #2b6ca3;
+    --risk-l3: #c2662f;
+    --risk-l4: #b23b3b;
+    /* 浅底令牌：web 侧是 `bg-risk-lN/10|/15`，而 RN 的令牌是纯 var 字符串，带 alpha 的类**整条不落进产物**
+       （README「令牌色带透明度修饰符会整条静默丢失」）。所以把混色结果算成实色存进来：
+       L1/L2 用 α=0.10、L3/L4 用 α=0.15（与 web 各档一致），底色取本档卡片面
+       （light #ffffff、dark #09090b = hsl(240 10% 3.9%)），逐通道 `round(α·前景 + (1−α)·底色)`。
+       描边不另设令牌：web 的 `/30` 同理落不了地，改用实色 + 2px 宽（§6 第 4 条不单靠颜色，这样更稳）。 */
+    --risk-l1-tint: #eaf2ef;
+    --risk-l2-tint: #eaf0f6;
+    --risk-l3-tint: #f6e8e0;
+    --risk-l4-tint: #f3e2e2;
   }
 
   /* 深色令牌必须走 @media 通道，不能照搬 web 的 `.dark:root`。
@@ -58,6 +74,16 @@
       --border: hsl(240 3.7% 15.9%);
       --input: hsl(240 3.7% 15.9%);
       --ring: hsl(240 4.9% 83.9%);
+
+      /* 深色档风险色（照 web/index.css:66-69），浅底同 §上方说明的公式：α=0.10/0.15 叠在 #09090b 上 */
+      --risk-l1: #4f9c88;
+      --risk-l2: #5b9bd5;
+      --risk-l3: #e08a4e;
+      --risk-l4: #e0685f;
+      --risk-l1-tint: #101818;
+      --risk-l2-tint: #11181f;
+      --risk-l3-tint: #291c15;
+      --risk-l4-tint: #291718;
     }
   }
 }

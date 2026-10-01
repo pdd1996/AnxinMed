@@ -41,6 +41,12 @@ module.exports = {
           DEFAULT: "var(--card)",
           foreground: "var(--card-foreground)",
         },
+        // 风险语义色四档（05d §7-5）：`text-risk-l1` / `border-risk-l1` 走实色，浅底走 `bg-risk-l1-tint`。
+        // 不要写 `bg-risk-l1/10`——本文件的令牌全是 var 纯串，带 alpha 的类整条不落进产物（README 同名坑）。
+        "risk-l1": { DEFAULT: "var(--risk-l1)", tint: "var(--risk-l1-tint)" },
+        "risk-l2": { DEFAULT: "var(--risk-l2)", tint: "var(--risk-l2-tint)" },
+        "risk-l3": { DEFAULT: "var(--risk-l3)", tint: "var(--risk-l3-tint)" },
+        "risk-l4": { DEFAULT: "var(--risk-l4)", tint: "var(--risk-l4-tint)" },
       },
       borderRadius: {
         "4xl": "2rem",
