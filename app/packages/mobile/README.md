@@ -121,6 +121,8 @@ grep -c '"rem"' /tmp/anxin-rem-check/_expo/static/js/android/*.js               
 `global.css` 里的变量存的是完整的 `hsl(240 5.9% 10%)` 而非裸通道），所以 Tailwind 无法注入 alpha：
 **`bg-primary/10`、`border-primary/40`、`text-primary-foreground/80` 这一族类整条不落进产物**——不报错、不降级，就是没有。
 
+**这条坑的深色版本（M5-T5e 预检实测，缺陷全程见 `T5-真机验收.md` §2.10）**：`dark:bg-input/30`、`dark:border-foreground/10` 这种「`dark:` 变体 + `/alpha`」**同样整条丢**，探针产物里连选择器都不出现；而不带 alpha 的 `dark:text-*` 会正常编成 `@media (prefers-color-scheme: dark){.dark\:text-x{color:var(--x)}}`。更要紧的是：**同一元素挂两条同属性颜色类时，RN 侧谁生效由生成 CSS 的先后决定，不按 class 书写顺序**（实测 `.dark\:text-foreground` 就排在 `.dark\:text-muted-foreground` 之前）——所以「选中态再补一条颜色类去覆盖」这种 web 直觉在这里不成立。写法只有两条：① 一个元素**只挂一条**颜色类，用 JS 三元选（`active ? 'text-primary-foreground' : 'text-secondary-foreground'`）；② 底色与字色都用**实色令牌对**（`bg-primary` + `text-primary-foreground`，两档自动反色）。`ui/tabs.tsx` 的选中态已按 ② 改过，别改回 `/alpha` 那一族。
+
 ```bash
 cd app/packages/mobile && printf '<div class="bg-primary bg-primary\\/10"></div>' > /tmp/t.html \
   && npx tailwindcss -i src/global.css --content /tmp/t.html | grep -E "^\.bg-primary"   # 只出 .bg-primary 一条
