@@ -1,15 +1,21 @@
-import { View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { Type } from "lucide-react-native";
-import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
-import { Text } from "@/components/ui/text";
+import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFontScale, type FontScale } from "@/stores/fontScale";
+import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
+
+/** 未接项照「如实写明落在哪一片」的形态列出，不放点了没反应的假开关（05d §2-T5-e）。 */
+const NOT_YET = [
+  { title: "系统通知与到点提醒", when: "M5-T8" },
+  { title: "语音播报", when: "M5-T7" },
+  { title: "AI 用药咨询相关设置", when: "M5-T7" },
+];
 
 /**
- * 设置页（M5-T5a 起可用）：字号两档切换 = 全局缩放的验证入口（05d §2-T5-a 完成标准）。
+ * 设置页（M5-T5e 起为真实页）：字号两档 = 全局缩放的验证入口，风险语义色预览 = §6 第 4 条的色板自检。
  * 档位经 core 的 store + AsyncStorage 持久化，切换即时写入 NativeWind 的 rem 根（见 FontScaleSync）。
- * 风险语义色预览、提醒设置等其余项随 M5-T5e / M5-T8 接入。
  */
 export default function Settings() {
   const scale = useFontScale((s) => s.scale);
@@ -18,8 +24,18 @@ export default function Settings() {
   const primary = useUnstableNativeVariable("--primary");
 
   return (
-    <PlaceholderPage title="设置" route="/settings" milestone="M5-T5e">
-      <View className="gap-3">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingBottom: TAB_BAR_BOTTOM_PAD,
+        paddingTop: 16,
+      }}
+    >
+      <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">设置</Text>
+      <Text className="mt-1 text-2xl font-bold text-foreground">看得清，才用得住</Text>
+
+      <View className="mt-6 gap-3">
         <View className="flex-row items-center gap-2">
           <Type size={20} color={primary} importantForAccessibility="no" />
           <Text className="text-base font-bold text-foreground">字号大小</Text>
@@ -38,7 +54,40 @@ export default function Settings() {
           改变的是整页文字与间距一起缩放，从标题到按钮、卡片内边距都会跟着变。
         </Text>
       </View>
-    </PlaceholderPage>
+
+      <View className="mt-8 gap-3">
+        <Text className="text-base font-bold text-foreground">风险语义色预览</Text>
+        <Text className="text-sm leading-6 text-muted-foreground">
+          图标 + 文字并用，不单靠颜色（守门 L1–L4，L4 最高）。
+        </Text>
+        <View className="flex-row flex-wrap gap-2">
+          <RiskBadge level="L1" />
+          <RiskBadge level="L2" />
+          <RiskBadge level="L3" />
+          <RiskBadge level="L4" />
+        </View>
+      </View>
+
+      <View className="mt-8 gap-2">
+        <Text className="text-base font-bold text-foreground">界面深浅色</Text>
+        <Text className="text-sm leading-6 text-muted-foreground">
+          跟随手机的系统深浅色设置，切换后立即生效，不需要重启应用。
+        </Text>
+      </View>
+
+      <View className="mt-8 gap-2">
+        <Text className="text-lg font-semibold text-foreground">还在路上</Text>
+        {NOT_YET.map((item) => (
+          <View
+            key={item.title}
+            className="flex-row items-center justify-between rounded-xl border border-dashed border-border px-4 py-3"
+          >
+            <Text className="flex-1 text-base text-muted-foreground">{item.title}</Text>
+            <Text className="ml-3 text-xs text-muted-foreground">{item.when}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 

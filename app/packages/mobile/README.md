@@ -66,7 +66,10 @@ prebuild 之后先验这两条再出包（插件确实跑到了）：`grep -c AN
 
 `src/app/` 根 stack：`(patient)`（五 tab：今日/药箱/记录/我的/设置；分组内不走系统头部，页内自出标题）·
 `intake`（拍药盒 → 层检测 → 识别 → 草稿）· `drafts/[id]`（唯一闸门：确认建档）· `probe`（T3 的网络探测页）。
-今日页自 M5-T5b 起是**真实任务页**（任务卡 + 30s 轮询 + 页内提醒弹窗 + 打勾写记录）；记录/我的 仍是**按分片占位**（真机可见「骨架占位 · 真实实现见 M5-T5x」，不是假按钮）；药箱自 M5-T5c 起接两份查询并带 建/改计划、手动建档、暂停/恢复/结束、删药二次确认；设置页的字号两档已真实生效。
+五 tab 自 M5-T5e 起**全是真实页**（`PlaceholderPage` 零引用，已删）：今日=任务卡 + 30s 轮询 + 页内提醒弹窗 + 打勾写记录（T5b）·
+药箱=两份查询 + 建/改计划 + 手动建档 + 暂停/恢复/结束 + 删药二次确认（T5c）· 记录=日/周/月区间 + CSV 导出（T5d）·
+我的=健康信息七字段常驻 + 补录/编辑/删除二次确认（T5e）· 设置=字号两档 + 风险语义色预览 + 深浅色说明 + 未接项如实标注（T5e）。
+未接入的能力一律以「还在路上 · M5-Tx」的虚线行列出，不放点了没反应的假按钮；不存在的路由由 `app/+not-found.tsx` 兜底。
 分组不改变 URL：`/box`、`/intake`、`/probe` 等路径与 T4 一致，旧链接与 `router.push("/box")` 全部照用。
 
 - 六步流转的**决策**全在 `@anxin/core` 的 `transitionIntakeFlow`（纯函数、已单测），本包只做动作解释与渲染；
@@ -111,6 +114,13 @@ cd app/packages/mobile && printf '<div class="bg-primary bg-primary\\/10"></div>
 显式给（同 `(patient)/_layout.tsx`）。
 已知的既有漏网（T4 遗留，均无功能影响、只是没底色）：`app/drafts/[id].tsx:275` 的 `bg-primary/10`、
 `app/intake.tsx:183` 的 `bg-muted/40`。T5-c/T5-e 落地 RiskBadge 的四档语义色时**必然**撞上这条（web 侧全是 `bg-*/10` 形态）。
+
+**已按替代写法②落地的形状**（M5-T5e，加新语义色照抄它）：`global.css` 的 `:root` 与深色 `@media` 两段各存一对——
+主色 `--risk-l1: #2f7d5b` + 浅底 `--risk-l1-tint: #eaf2ef`（tint = 主色按 web 的 α 叠在本档卡片面上的算得值，公式见 global.css 内注释）；
+`tailwind.config.js` 写成 `"risk-l1": { DEFAULT: "var(--risk-l1)", tint: "var(--risk-l1-tint)" }`，
+于是有 `text-risk-l1` / `border-risk-l1` / `bg-risk-l1-tint` 三条实色类（自检：`npx tailwindcss -i src/global.css --content <探针文件>` 要出这三条规则）。
+**组件里必须写完整字面量类名**——NativeWind 靠扫源码收类名，拼 `text-risk-${level}` 收不到；图标颜色另用
+`useUnstableNativeVariable("--risk-l1")` 显式给。
 
 ## workspace 源码引用与 Metro（改坏了会在 bundling 期才炸）
 
