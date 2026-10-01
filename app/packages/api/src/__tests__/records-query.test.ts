@@ -108,6 +108,32 @@ describe('GET /api/records?from&to · 按日/周/月查询', () => {
     expect(res.body.items).toEqual([])
     expect(res.body.summary).toEqual({ total: 0, taken: 0, skipped: 0, later: 0 })
   })
+
+  it('planId 悬空的孤儿记录：items 与 summary 同源，药名留痕不静默少一条（M5-T5d · 05d §7-6）', async () => {
+    // DB 无外键（删药靠 services 显式级联），悬空行是真实可能出现的形态；
+    // 修复前 listRecordsByRange 用 innerJoin 把它整行吞掉，而 summary 单表照计 → 页顶条数与列表差 1。
+    const orphanPlan = 'plan-t6-orphan'
+    const orphan = `${orphanPlan}__2026-09-12__08:00`
+    await db.insert(records).values({
+      id: orphan,
+      userId: USER,
+      planId: orphanPlan,
+      scheduledDate: '2026-09-12',
+      scheduledTime: '08:00',
+      status: 'skipped',
+    })
+    try {
+      const res = await get('/api/records?from=2026-09-01&to=2026-09-30')
+      expect(res.status).toBe(200)
+      expect(res.body.items.length).toBe(res.body.summary.total) // 断言型：两侧必须同源
+      const row = res.body.items.find((r: { id: string }) => r.id === orphan)
+      expect(row).toBeDefined()
+      expect(row.drugName).toBe('（计划已删除）')
+      expect(row.planId).toBe(orphanPlan)
+    } finally {
+      await db.delete(records).where(eq(records.id, orphan))
+    }
+  })
 })
 
 describe('GET /api/records · 入参校验', () => {

@@ -29,21 +29,27 @@ export interface RecordWithDrug {
 /**
  * 按日期范围查记录（M3-T6 · GET /api/records?from&to）：联 plans→drugs 取药名，
  * 按 scheduledDate 倒序 + 时间点正序（近日在前，同日按时间）。范围闭区间 [from, to]。
+ *
+ * **两处都是 leftJoin**（M5-T5d 修 05d §7-6）：原先 innerJoin 会让 planId 悬空的记录整行消失，
+ * 而 `summarizeRecordsByRange` 只查 records 单表照计 → 页顶「共 N 次」与列表条数对不上，
+ * CSV 导出（吃的就是 items）静默少一条，违反「禁止静默吞错」。改左连后两侧同源，
+ * 悬空行的药名回落「（计划已删除）」留痕（DB 无外键，删药靠 services 显式级联，
+ * 级联失败/外部改库都会留下这种行）。
  */
 export function listRecordsByRange(userId: string, from: string, to: string): Promise<RecordWithDrug[]> {
   return db
     .select({
       id: records.id,
       planId: records.planId,
-      drugName: drugs.genericName,
+      drugName: sql<string>`coalesce(${drugs.genericName}, ${'（计划已删除）'})`,
       scheduledDate: records.scheduledDate,
       scheduledTime: records.scheduledTime,
       status: records.status,
       actedAt: records.actedAt,
     })
     .from(records)
-    .innerJoin(plans, eq(records.planId, plans.id))
-    .innerJoin(drugs, eq(plans.drugId, drugs.id))
+    .leftJoin(plans, eq(records.planId, plans.id))
+    .leftJoin(drugs, eq(plans.drugId, drugs.id))
     .where(and(eq(records.userId, userId), gte(records.scheduledDate, from), lte(records.scheduledDate, to)))
     .orderBy(desc(records.scheduledDate), records.scheduledTime)
 }
