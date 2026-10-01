@@ -28,6 +28,24 @@ taskkill //PID <PID> //F                          # Git Bash 下双斜杠；cmd 
 
 模拟器卡在 `offline` 是另一回事：跑过 `adb kill-server` 之后，正在运行的模拟器会一直显示 offline——guest 其实早就开好了（`getprop sys.boot_completed` 为 1、AVD 目录落了 `bootcompleted.ini`），是 adb 与模拟器的注册断了且不会自动重连，`adb reconnect offline` 无效。解法是重启模拟器（别再动 adb server）。
 
+### 跨机 pull 后 mobile typecheck 红：`.expo/types/router.d.ts` 是**每台机器各自生成**的
+
+`experiments.typedRoutes: true`（`app.json`）让 `router.push("/xxx")` 的路径受 TS 检查，依据是生成物 `.expo/types/router.d.ts`——而 `.expo/` 在 `.gitignore` 里（第 7 行），**不随 commit 走**。后果（10-01 实测）：另一台机器上 T5-a 之后一直正常，本机那份却还停在 09-29 的**扁平路由集**（只有 `/box`、`/intake`、`/probe`、`/drafts/[id]`），pull 到 `(patient)` 分组后的代码就报：
+
+```
+src/app/(patient)/profile.tsx(57,40): error TS2345: Argument of type '"/records"' is not assignable to parameter of type '"/" | … '
+```
+
+**这不是代码错，是本机生成物过期**。重生成只有一条实测可行的路——起 metro 并**真打一次 bundle 请求**（`expo export` 与 `expo start` 光起服务都不会重写这个文件，实测两步都没动 mtime）：
+
+```bash
+npx expo start --port 8099 &                       # 后台起，等到 /status 可响应
+curl -o /dev/null "http://localhost:8099/node_modules/expo-router/entry.bundle?platform=android&dev=true&hot=false&transform.engine=hermes&transform.routerRoot=src%2Fapp"
+# 约 34s 返回 200；随后 .expo/types/router.d.ts 应变成 4002B 量级、含 /records /settings /profile
+```
+
+判据：`grep -c "/records\|/settings\|/profile" .expo/types/router.d.ts` 从 0 变 ≥3。别用「删掉 `.expo/types` 让它退回宽松 `string`」这招——那会把这条 TS 闸门静默关掉。
+
 ## API 地址（禁止硬编码）
 
 `EXPO_PUBLIC_API_URL` 由构建期注入，core 侧经 `setApiBaseUrl` 装配（M5-T4 接缝：RN 没有「同源」概念）。
