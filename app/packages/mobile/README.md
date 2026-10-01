@@ -134,6 +134,7 @@ cd app/packages/mobile && printf '<div class="bg-primary bg-primary\\/10"></div>
 - pnpm 布局：workspace 根 `pnpm-workspace.yaml` 已设 `nodeLinker: hoisted`（npm 同款扁平布局）——隔离布局下 babel 转译器解析不到传递依赖、C++ 编译超 Windows 260 字符路径，勿改回
 - **新增带原生模块的依赖时不必 prebuild**：`android/` 走 expo-modules 自动链接（库自带的 AndroidManifest 会合并权限，
   例：expo-image-picker 声明 `CAMERA`）。直接重跑 `android:release` 即可。
+  **但新增原生模块 = 下次出包要吃 Gradle 依赖解析**：目前累计两批——T5-a 的 `@react-native-async-storage/async-storage`（首拉 KSP 插件）、T5-d 的 `expo-file-system` + `expo-sharing`（`expo install` 顺带把 `expo-sharing` 写进了 `app.json` 的 plugins）。这两批都要求 v2rayN 在线（`gradle.properties` 钉了 SOCKS），没代理就是 `Can't connect to SOCKS proxy` → BUILD FAILED。
   真要点 prebuild 时注意：`expo prebuild --platform android` **默认就会先删 `android/`**（不加 `--clean` 也一样），
   目录被 Gradle/编辑器占住时报 `EBUSY: resource busy or locked` 并中止——先关掉占用的进程再动，
   且 `android/` 不入 git，删了只能靠 prebuild + 下面三个补丁重建。
