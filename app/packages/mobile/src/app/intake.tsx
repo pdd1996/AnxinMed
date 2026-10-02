@@ -172,9 +172,9 @@ export default function Intake() {
       <Text className="mt-1 text-2xl font-bold text-foreground">拍药盒 · 建档案</Text>
 
       {!configured && (
-        <View className="mt-4 rounded-2xl border border-red-300 bg-red-50 p-4">
-          <Text className="text-base font-semibold text-red-700">还没配好服务器地址</Text>
-          <Text className="mt-1 text-sm leading-5 text-red-700">{API_URL_MISSING_HINT}</Text>
+        <View className="mt-4 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-4">
+          <Text className="text-base font-semibold text-risk-l4">还没配好服务器地址</Text>
+          <Text className="mt-1 text-sm leading-5 text-risk-l4">{API_URL_MISSING_HINT}</Text>
         </View>
       )}
 
@@ -217,7 +217,7 @@ export default function Intake() {
       {state.step === "quality" && (
         <StepCard title="照片质量可能影响识别">
           {state.issues.map((issue) => (
-            <Text key={issue} className="mt-1 text-sm leading-5 text-amber-800">
+            <Text key={issue} className="mt-1 text-sm leading-5 text-foreground">
               · {issue}
             </Text>
           ))}
@@ -242,7 +242,7 @@ export default function Intake() {
             {STAGES.map((stage, i) => (
               <View key={stage} className="flex-row items-center gap-2">
                 {i < state.stageIdx ? (
-                  <Text className="text-base text-green-700">✓</Text>
+                  <Text className="text-base text-risk-l1">✓</Text>
                 ) : i === state.stageIdx ? (
                   <ActivityIndicator size="small" />
                 ) : (
@@ -295,8 +295,10 @@ export default function Intake() {
               </Text>
             ))}
           </View>
-          <View className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3">
-            <Text className="text-sm leading-5 text-amber-900">{SAFETY_NOTE}</Text>
+          {/* 告警卡：底色/描边走 L3 令牌（深浅两档都有值），正文用 --foreground——
+              text-risk-l3 压在 risk-l3-tint 上只有约 3.3:1，够不上老年向的正读对比。 */}
+          <View className="mt-3 rounded-xl border border-risk-l3 bg-risk-l3-tint p-3">
+            <Text className="text-sm leading-5 text-foreground">{SAFETY_NOTE}</Text>
           </View>
           <ActionRow>
             <SecondaryButton label="重新上传" onPress={() => dispatch({ type: "retake" })} />
@@ -363,14 +365,14 @@ function StepCard({
   return (
     <View
       className={`mt-5 rounded-2xl border p-5 ${
-        tone === "danger" ? "border-red-300 bg-red-50/60" : "border-border bg-card"
+        tone === "danger" ? "border-risk-l4 bg-risk-l4-tint" : "border-border bg-card"
       }`}
     >
       <View className="flex-row items-center gap-2">
         {spinning && <ActivityIndicator />}
         <Text
           className={`flex-1 text-xl font-bold ${
-            tone === "danger" ? "text-red-800" : "text-card-foreground"
+            tone === "danger" ? "text-risk-l4" : "text-card-foreground"
           }`}
         >
           {title}

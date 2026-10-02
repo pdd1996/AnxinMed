@@ -49,7 +49,8 @@ export function HealthInfoCard() {
   const primary = useUnstableNativeVariable("--primary");
   const primaryForeground = useUnstableNativeVariable("--primary-foreground");
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
-  const destructive = useUnstableNativeVariable("--destructive");
+  // 红字走 --risk-l4 而不是 --destructive：后者的深色档是 #7f1d1d，压在深色卡面上约 2:1，读不出（05d §6 第 16 条）。
+  const riskL4 = useUnstableNativeVariable("--risk-l4");
   const { data, isPending, error, refetch } = useQuery({
     queryKey: ["profile"],
     queryFn: fetchProfile,
@@ -137,8 +138,8 @@ export function HealthInfoCard() {
           <Text className="px-4 py-6 text-base text-muted-foreground">正在读取健康信息…</Text>
         ) : error ? (
           <View className="gap-3 px-4 py-5">
-            <Text className="text-base font-semibold text-red-800">健康信息读取失败</Text>
-            <Text className="text-sm leading-5 text-red-700">
+            <Text className="text-base font-semibold text-risk-l4">健康信息读取失败</Text>
+            <Text className="text-sm leading-5 text-risk-l4">
               {error instanceof Error ? error.message : "请求没能完成"}
             </Text>
             <Pressable
@@ -311,7 +312,7 @@ export function HealthInfoCard() {
               )}
 
               {isBirth && (birthYear.length > 0 || birthMonth.length > 0) && !birthValid ? (
-                <Text className="text-xs text-red-700">填 4 位年份与 1–12 的月份，例如 1958 年 5 月。</Text>
+                <Text className="text-xs text-risk-l4">填 4 位年份与 1–12 的月份，例如 1958 年 5 月。</Text>
               ) : null}
               {failure ? <FailureLine message={failure} /> : null}
 
@@ -325,8 +326,8 @@ export function HealthInfoCard() {
                       setConfirmingDelete(true);
                     }}
                   >
-                    <Icon as={Trash2} size={18} color={destructive} />
-                    <Text className="text-destructive">删除</Text>
+                    <Icon as={Trash2} size={18} color={riskL4} />
+                    <Text className="text-risk-l4">删除</Text>
                   </Button>
                 ) : null}
                 <View className="flex-1 flex-row justify-end gap-2">
@@ -357,8 +358,8 @@ export function HealthInfoCard() {
 
 function FailureLine({ message }: { message: string }) {
   return (
-    <View className="rounded-xl border border-red-300 bg-red-50 p-3">
-      <Text className="text-sm leading-5 text-red-700">{message}</Text>
+    <View className="rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+      <Text className="text-sm leading-5 text-risk-l4">{message}</Text>
     </View>
   );
 }

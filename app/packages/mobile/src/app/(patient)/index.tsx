@@ -176,11 +176,11 @@ export default function Today() {
 
       <View
         className={`mt-5 rounded-2xl border p-4 ${
-          configured ? "border-border bg-card" : "border-red-300 bg-red-50"
+          configured ? "border-border bg-card" : "border-risk-l4 bg-risk-l4-tint"
         }`}
       >
         <Text className="text-sm text-muted-foreground">服务器地址</Text>
-        <Text className={`mt-1 text-base ${configured ? "text-card-foreground" : "text-red-700"}`}>
+        <Text className={`mt-1 text-base ${configured ? "text-card-foreground" : "text-risk-l4"}`}>
           {configured ? apiBaseUrl() : API_URL_MISSING_HINT}
         </Text>
       </View>
@@ -188,9 +188,9 @@ export default function Today() {
       {!configured ? null : isPending ? (
         <Text className="mt-6 text-base text-muted-foreground">正在读取今日任务…</Text>
       ) : error ? (
-        <View className="mt-6 rounded-2xl border border-red-300 bg-red-50 p-5">
-          <Text className="text-lg font-semibold text-red-800">今日任务读取失败</Text>
-          <Text className="mt-1 text-sm leading-5 text-red-700">
+        <View className="mt-6 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-5">
+          <Text className="text-lg font-semibold text-risk-l4">今日任务读取失败</Text>
+          <Text className="mt-1 text-sm leading-5 text-risk-l4">
             {error instanceof Error ? error.message : "请求没能完成"}
           </Text>
           <Pressable
@@ -225,15 +225,15 @@ export default function Today() {
           </View>
 
           {recordError ? (
-            <View className="mt-4 rounded-2xl border border-red-300 bg-red-50 p-4">
-              <Text className="text-base font-semibold text-red-800">记录未写入</Text>
-              <Text className="mt-1 text-sm leading-5 text-red-700">{recordError}</Text>
+            <View className="mt-4 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-4">
+              <Text className="text-base font-semibold text-risk-l4">记录未写入</Text>
+              <Text className="mt-1 text-sm leading-5 text-risk-l4">{recordError}</Text>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setRecordError(null)}
-                className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-red-300 active:opacity-80"
+                className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-risk-l4 active:opacity-80"
               >
-                <Text className="text-base font-medium text-red-800">知道了</Text>
+                <Text className="text-base font-medium text-risk-l4">知道了</Text>
               </Pressable>
             </View>
           ) : null}

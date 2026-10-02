@@ -58,6 +58,7 @@ export default function Box() {
   const queryClient = useQueryClient();
   const primary = useUnstableNativeVariable("--primary");
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
+  const riskL4 = useUnstableNativeVariable("--risk-l4");
   const [showManual, setShowManual] = useState(false);
   const [planTarget, setPlanTarget] = useState<{ drug: DrugItem; plan?: PlanItem } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DrugItem | null>(null);
@@ -213,9 +214,9 @@ export default function Box() {
       {loading ? (
         <Text className="mt-6 text-base text-muted-foreground">正在读取药箱…</Text>
       ) : loadError ? (
-        <View className="mt-6 rounded-2xl border border-red-300 bg-red-50 p-5">
-          <Text className="text-lg font-semibold text-red-800">药箱读取失败</Text>
-          <Text className="mt-1 text-sm leading-5 text-red-700">
+        <View className="mt-6 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-5">
+          <Text className="text-lg font-semibold text-risk-l4">药箱读取失败</Text>
+          <Text className="mt-1 text-sm leading-5 text-risk-l4">
             {loadError instanceof Error ? loadError.message : "请求没能完成"}
           </Text>
           <Pressable
@@ -229,15 +230,15 @@ export default function Box() {
       ) : (
         <View className="mt-5 gap-3">
           {actionError ? (
-            <View className="rounded-2xl border border-red-300 bg-red-50 p-4">
-              <Text className="text-base font-semibold text-red-800">操作没有完成</Text>
-              <Text className="mt-1 text-sm leading-5 text-red-700">{actionError}</Text>
+            <View className="rounded-2xl border border-risk-l4 bg-risk-l4-tint p-4">
+              <Text className="text-base font-semibold text-risk-l4">操作没有完成</Text>
+              <Text className="mt-1 text-sm leading-5 text-risk-l4">{actionError}</Text>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setActionError(null)}
-                className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-red-300 active:opacity-80"
+                className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-risk-l4 active:opacity-80"
               >
-                <Text className="text-base font-medium text-red-800">知道了</Text>
+                <Text className="text-base font-medium text-risk-l4">知道了</Text>
               </Pressable>
             </View>
           ) : null}
@@ -299,9 +300,9 @@ export default function Box() {
                   </View>
 
                   {openedOverdue(drug) ? (
-                    <View className="mt-3 flex-row items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-3">
-                      <Icon as={AlertTriangle} size={18} color="#b91c1c" />
-                      <Text className="flex-1 text-xs leading-5 text-red-700">
+                    <View className="mt-3 flex-row items-start gap-2 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+                      <Icon as={AlertTriangle} size={18} color={riskL4} />
+                      <Text className="flex-1 text-xs leading-5 text-risk-l4">
                         开封已超说明书效期，建议弃药（以说明书为准）。
                       </Text>
                     </View>
@@ -372,7 +373,7 @@ export default function Box() {
                     <CardAction
                       label="删除"
                       icon={Trash2}
-                      tint="#b91c1c"
+                      tint={riskL4}
                       busy={busy}
                       onPress={() => setDeleteTarget(drug)}
                     />

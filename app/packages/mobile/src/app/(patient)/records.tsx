@@ -154,9 +154,9 @@ export default function Records() {
         ) : null}
 
         {mismatch ? (
-          <View className="mt-3 rounded-xl border border-red-300 bg-red-50 p-3">
-            <Text className="text-sm font-semibold text-red-800">条数对不上</Text>
-            <Text className="mt-1 text-xs leading-5 text-red-700">
+          <View className="mt-3 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+            <Text className="text-sm font-semibold text-risk-l4">条数对不上</Text>
+            <Text className="mt-1 text-xs leading-5 text-risk-l4">
               页顶统计 {summary?.total} 条，列表只有 {items.length} 条——导出的 CSV 按列表生成，
               可能少 {Math.max(0, (summary?.total ?? 0) - items.length)} 条。请把这条提示与区间
               （{from} ~ {to}）告知开发者。
@@ -165,8 +165,8 @@ export default function Records() {
         ) : null}
 
         {failure ? (
-          <View className="mt-3 rounded-xl border border-red-300 bg-red-50 p-3">
-            <Text className="text-sm leading-5 text-red-700">{failure}</Text>
+          <View className="mt-3 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+            <Text className="text-sm leading-5 text-risk-l4">{failure}</Text>
           </View>
         ) : null}
         {notice ? (
@@ -177,9 +177,9 @@ export default function Records() {
       {isPending ? (
         <Text className="mt-6 text-base text-muted-foreground">正在载入记录…</Text>
       ) : error ? (
-        <View className="mt-4 rounded-2xl border border-red-300 bg-red-50 p-5">
-          <Text className="text-lg font-semibold text-red-800">记录读取失败</Text>
-          <Text className="mt-1 text-sm leading-5 text-red-700">
+        <View className="mt-4 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-5">
+          <Text className="text-lg font-semibold text-risk-l4">记录读取失败</Text>
+          <Text className="mt-1 text-sm leading-5 text-risk-l4">
             {error instanceof Error ? error.message : "请求没能完成"}
           </Text>
           <Pressable

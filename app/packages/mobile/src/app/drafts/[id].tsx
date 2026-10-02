@@ -82,7 +82,7 @@ export default function DraftRoute() {
   if (page.kind === "error") {
     return (
       <View className="flex-1 justify-center gap-3 bg-background px-6">
-        <Text className="text-xl font-bold text-red-800">草稿读取失败</Text>
+        <Text className="text-xl font-bold text-risk-l4">草稿读取失败</Text>
         <Text className="text-sm leading-5 text-muted-foreground">{page.message}</Text>
         <Pressable
           accessibilityRole="button"
@@ -191,8 +191,8 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         </View>
 
         {payload.degraded && (
-          <View className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3">
-            <Text className="text-sm leading-5 text-red-800">
+          <View className="mt-4 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+            <Text className="text-sm leading-5 text-risk-l4">
               识别降级（{payload.degraded.code}）：{payload.degraded.message}
             </Text>
           </View>
@@ -303,7 +303,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
             {payload.interactions.hits.map((hit, i) => (
               <Text
                 key={`${hit.level}-${i}`}
-                className="mt-1 text-sm leading-5 text-amber-900"
+                className="mt-1 text-sm leading-5 text-foreground"
               >
                 · {hit.level}：{hit.drugNames.join(" + ")} —— {hit.note}（来源：{hit.source}）
               </Text>
@@ -315,7 +315,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           {reasons.length > 0 && (
             <View className="mb-3 gap-1">
               {reasons.map((reason) => (
-                <Text key={reason} className="text-sm leading-5 text-amber-900">
+                <Text key={reason} className="text-sm leading-5 text-foreground">
                   · {reason}
                 </Text>
               ))}
@@ -343,6 +343,11 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           </Pressable>
           <Text className="mt-3 text-xs leading-5 text-muted-foreground">
             确认即留痕：药品、确认时间与关键字段快照写入来源记录。
+          </Text>
+          {/* §6 第 15 条：物理返回的语义要在界面上说一句，别让人猜。
+              返回只是退回录入屏（草稿仍在那份识别结果里），本页未提交的填写随屏幕出栈丢掉。 */}
+          <Text className="mt-1 text-xs leading-5 text-muted-foreground">
+            按返回键不会丢掉这份草稿，回到上一步还能继续核对其它草稿；但这页上还没提交的修改不会保留。
           </Text>
         </View>
 
@@ -388,7 +393,7 @@ function Field({
   }
   return (
     <View className="mt-3">
-      <Text className="text-sm text-amber-900">{label} · 需你填写（系统不预填猜测）</Text>
+      <Text className="text-sm text-foreground">{label} · 需你填写（系统不预填猜测）</Text>
       <TextInput
         className={FIELD_CLASS}
         value={value}

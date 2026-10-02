@@ -14,9 +14,9 @@ const STATUS_TEXT: Record<Status, string> = {
 
 const STATUS_CLASS: Record<Status, string> = {
   idle: "text-muted-foreground",
-  loading: "text-blue-600",
-  ok: "text-green-600",
-  fail: "text-red-600",
+  loading: "text-risk-l2",
+  ok: "text-risk-l1",
+  fail: "text-risk-l4",
 };
 
 /**

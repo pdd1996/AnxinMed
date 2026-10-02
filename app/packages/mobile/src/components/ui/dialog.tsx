@@ -5,6 +5,7 @@ import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
 import * as React from 'react';
 import { Platform, Text, View, type GestureResponderEvent, type ViewProps } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
@@ -52,11 +53,20 @@ function DialogOverlay({
           entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)}
           exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}
           as="Pressable">
+          {/* 键盘避让：edge-to-edge 下（android/gradle.properties 的 edgeToEdgeEnabled=true）
+              manifest 的 adjustResize 不再缩窗口，实测键盘会整块盖住弹窗底部的保存钮，
+              RN 自带 KeyboardAvoidingView 在安卓上依赖窗口 resize，故用 keyboard-controller 的。
+              它撑满遮罩并在键盘弹起时让出底部高度，弹窗随之上移（05d §6 第 14 条）。 */}
+          <KeyboardAvoidingView
+            behavior="padding"
+            style={{ flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
           <NativeOnlyAnimatedView
+            style={{ flexShrink: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}
             entering={FadeIn.delay(50).reduceMotion(ReduceMotion.System)}
             exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}>
             <>{children}</>
           </NativeOnlyAnimatedView>
+          </KeyboardAvoidingView>
         </NativeOnlyAnimatedView>
       </DialogPrimitive.Overlay>
     </FullWindowOverlay>
@@ -75,7 +85,7 @@ function DialogContent({
       <DialogOverlay>
         <DialogPrimitive.Content
           className={cn(
-            'bg-background border-border z-50 mx-auto flex w-full max-w-[calc(100%-2rem)] flex-col gap-4 rounded-lg border p-6 shadow-lg shadow-black/5 sm:max-w-lg',
+            'bg-background border-border z-50 mx-auto flex w-full shrink max-w-[calc(100%-2rem)] flex-col gap-4 rounded-lg border p-6 shadow-lg shadow-black/5 sm:max-w-lg',
             Platform.select({
               web: 'animate-in fade-in-0 zoom-in-95 duration-200',
             }),

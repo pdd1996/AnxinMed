@@ -223,7 +223,7 @@ export function PlanModal({
                       accessibilityLabel={`时间点 ${index + 1} 分钟`}
                     />
                     {bad ? (
-                      <Text className="flex-1 text-xs text-red-700">按 24 小时制填 0–23 时 / 0–59 分</Text>
+                      <Text className="flex-1 text-xs text-risk-l4">按 24 小时制填 0–23 时 / 0–59 分</Text>
                     ) : (
                       <View className="flex-1" />
                     )}
