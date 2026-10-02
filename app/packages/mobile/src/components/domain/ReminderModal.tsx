@@ -71,16 +71,18 @@ export function ReminderModal({
           >
             <Text>{`确认已服${nextPending ? `（${nextPending.time}）` : ""}`}</Text>
           </Button>
+          {/* 播报单独占一行：它带「待接入」四个字，塞进三钮等宽的那一行会被裁掉一行文字
+              （10-02 模拟器实测）。语音接入属 M5-T7，接上后文案可缩回「播报」。 */}
+          <Button
+            variant="outline"
+            className="min-h-[48px] w-full"
+            disabled={!speechReady}
+            accessibilityLabel={speechReady ? "语音播报" : "语音播报将在后续版本接入"}
+            onPress={() => speak(speakText)}
+          >
+            <Text>{speechReady ? "播报" : "播报·待接入"}</Text>
+          </Button>
           <View className="flex-row gap-2">
-            <Button
-              variant="outline"
-              className="min-h-[48px] flex-1"
-              disabled={!speechReady}
-              accessibilityLabel={speechReady ? "语音播报" : "语音播报将在后续版本接入"}
-              onPress={() => speak(speakText)}
-            >
-              <Text>{speechReady ? "播报" : "播报·待接入"}</Text>
-            </Button>
             <Button
               variant="outline"
               className="min-h-[48px] flex-1"
