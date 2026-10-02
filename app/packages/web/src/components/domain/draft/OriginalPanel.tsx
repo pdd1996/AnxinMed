@@ -51,7 +51,7 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
 
           {payload.item && (
             <dl className="space-y-1 rounded-lg border bg-background p-3 text-sm">
-              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">本条目原文（白名单抄录）</p>
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">本条目原文（只留用药相关几类）</p>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">药名</dt>
                 <dd className="text-right font-semibold">{payload.item.drugName || '—'}</dd>
@@ -75,7 +75,7 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
 
           {w && (
             <dl className="space-y-1 text-sm">
-              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">处方头部（闭合白名单）</p>
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">处方头部（只留固定几类）</p>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">医院</dt>
                 <dd className="text-right font-semibold">{w.hospital || '—'}</dd>
@@ -127,19 +127,19 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Lock className="size-4 text-primary" aria-hidden />
-            脱敏执行
-            <span className="text-xs font-normal text-muted-foreground">四层程序 · 失败方向统一为「宁可误杀」</span>
+            隐私处理
+            <span className="text-xs font-normal text-muted-foreground">四步程序 · 拿不准时一律按更安全的一侧处理</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <ul className="space-y-1.5 text-sm">
             <li className="flex items-start gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>L0 版面裁剪 —— 前记（患者信息）/ 后记（签名）整块丢弃，只留正文行</span>
+              <span>第一步 裁版面 —— 处方前记（患者信息）/ 后记（签名）整块丢弃，只留正文行</span>
             </li>
             <li className="flex items-start gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>L1 闭合白名单 —— schema 之外无字段可装身份信息：医院 / 处方号 / 日期 / 科室 / 诊断 / 条目</span>
+              <span>第二步 只留固定几类 —— 医院 / 处方号 / 日期 / 科室 / 诊断 / 条目，装不下别的身份信息</span>
             </li>
             <li className="flex items-start gap-2">
               {auditHits.length > 0 ? (
@@ -148,7 +148,7 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
                 <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
               )}
               <span>
-                L2 兜底扫描 ——{' '}
+                第三步 兜底扫描 ——{' '}
                 {auditHits.length > 0
                   ? `命中 ${auditHits.reduce((sum, [, n]) => sum + n, 0)} 项（${auditHits.map(([t, n]) => `${t}×${n}`).join('、')}），已替换为 [已脱敏]`
                   : '未命中敏感模式'}
@@ -156,27 +156,27 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
             </li>
             <li className="flex items-start gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>L3 出口约束 —— OCR 原文即用即弃，仅白名单正文发第三方模型；审计只记类型与次数，不记原文</span>
+              <span>第四步 出口约束 —— 识别原文用完即弃，只把上面那几类正文发给第三方模型；日志只记类型与次数，不记原文</span>
             </li>
           </ul>
           {(payload.backlinkIntercepted ?? 0) > 0 && (
             <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-2 text-xs text-risk-l3">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-              回链校验拦截 {payload.backlinkIntercepted} 项模型兜底值（原文中寻不到该串）—— 已丢弃并转人工补，绝不采用幻觉值。
+              与原文比对后拦下 {payload.backlinkIntercepted} 项模型补的值（照片里找不到这个串）—— 已丢弃并转人工补，不采用模型编的。
             </p>
           )}
           {payload.fallbackStatus === 'unavailable' && (
             <p className="text-xs text-muted-foreground">兜底解析服务本次不可用：缺项保留人工补（不影响已抄录字段）。</p>
           )}
           <p className="text-xs text-muted-foreground">
-            原图仅在本次会话的浏览器内存中显示，不上传保存；服务端只保留脱敏后的白名单字段。
+            原图仅在本次会话的浏览器内存中显示，不上传保存；服务端只保留上面列出的那几类字段。
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="space-y-2 py-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">层检测结果</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">照片类型</p>
           <p className="flex flex-wrap gap-2">
             {(payload.layers ?? []).map((layer) => (
               <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">

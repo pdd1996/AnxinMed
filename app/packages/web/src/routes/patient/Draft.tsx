@@ -175,7 +175,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
     <div className="space-y-5">
       <header className="space-y-2">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-          Draft confirmation · 唯一闸门 · {payload.entry === 'A' ? '入口A 处方笺' : '入口B 药品'}
+          逐项核对 · {payload.entry === 'A' ? '处方笺' : '药盒'}
         </p>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>

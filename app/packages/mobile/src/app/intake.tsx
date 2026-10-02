@@ -209,7 +209,7 @@ export default function Intake() {
             <Text className="text-lg font-medium text-card-foreground">从相册选一张</Text>
           </Pressable>
           <Text className="mt-1 text-xs leading-5 text-muted-foreground">
-            上传即表示你了解图片可能包含个人健康信息。原图只存在本机会话内存里；服务端只做白名单解析与四层脱敏，原文即用即弃、不存图片字节。
+            上传即表示你了解图片可能包含个人健康信息。原图只存在本机会话内存里；服务端只取与用药有关的字段，姓名、门诊号这类信息在发送前就被去掉，原文用完即弃、不存图片字节。
           </Text>
         </View>
       )}
@@ -270,7 +270,7 @@ export default function Intake() {
           </Text>
           <LayerBadges layers={state.mismatch.detected} />
           <Text className="mt-2 text-xs leading-5 text-muted-foreground">
-            层检测是校验而不是分流——系统不会静默改道。安卓端「拍处方笺」入口在 M5-T6 接入，本次可重拍药盒或按当前入口重试。
+            系统只核对照片与所选入口是否一致，不会自己换路径。服务端也会拦，按当前入口继续通常仍会被拒绝。安卓端「拍处方笺」入口在 M5-T6 接入，本次可重拍药盒或按当前入口重试。
           </Text>
           <ActionRow>
             <SecondaryButton label="重新上传" onPress={() => dispatch({ type: "retake" })} />
@@ -323,7 +323,7 @@ export default function Intake() {
       {state.step === "drafts" && state.result && (
         <StepCard title={`识别完成：${state.result.drafts.length} 份草稿待确认`}>
           <Text className="text-sm leading-5 text-muted-foreground">
-            确认页是唯一闸门，请逐个核对。
+            一张处方笺含多个药品时会拆成多份「档案 + 计划」草稿；确认页要一份一份人工核对。
           </Text>
           {state.result.drafts.map((draft, i) => (
             <Pressable

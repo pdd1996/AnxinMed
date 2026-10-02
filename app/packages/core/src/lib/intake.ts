@@ -114,7 +114,7 @@ export function mapIntakeFailure(input: {
       kind: 'mismatch',
       title: '检测结果与所选入口不符',
       body: suggestion || input.message,
-      hints: ['层检测是校验而不是分流 —— 系统不会静默改道，由你决定', '确认照片拿对了（处方笺 / 药盒）后再继续'],
+      hints: ['系统只核对照片与所选入口是否一致，不会自己换路径，由你决定', '确认照片拿对了（处方笺 / 药盒）后再继续'],
       detected,
       allowManual: false,
       allowSwitch: true,

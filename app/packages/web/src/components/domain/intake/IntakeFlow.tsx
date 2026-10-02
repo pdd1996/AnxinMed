@@ -225,7 +225,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               />
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
-                上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只做白名单解析与四层脱敏，原文即用即弃、不存图片字节。
+                上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只取与用药有关的字段，姓名、门诊号这类信息在发送前就被去掉，原文用完即弃、不存图片字节。
               </p>
             </CardContent>
           </Card>
@@ -326,7 +326,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
               ))}
             </p>
             <p className="text-xs text-muted-foreground">
-              层检测是<strong>校验</strong>而不是分流 —— 系统不会静默改道。服务端对入口有硬校验，按当前入口继续通常仍会被拒绝。
+              系统只核对照片与所选入口是否一致，不会自己换路径。服务端也会拦，按当前入口继续通常仍会被拒绝。
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button className="min-h-11 flex-1" onClick={() => dispatch({ type: 'switch_entry' })}>
@@ -407,7 +407,7 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              一张处方笺含多个药品时拆成多份「档案 + 计划」草稿；确认页是唯一闸门，请<strong>逐个</strong>核对确认。
+              一张处方笺含多个药品时拆成多份「档案 + 计划」草稿；确认页要<strong>一份一份</strong>人工核对。
             </p>
             <ul className="space-y-2">
               {state.result.drafts.map((draft, i) => (

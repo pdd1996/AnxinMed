@@ -173,7 +173,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
     >
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48, paddingTop: 16 }}>
         <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">
-          唯一闸门 · {payload.entry === "A" ? "入口A 处方笺" : "入口B 药品"}
+          逐项核对 · {payload.entry === "A" ? "处方笺" : "药盒"}
         </Text>
         <Text className="mt-1 text-2xl font-bold text-foreground">
           草稿确认{payload.item ? `：${payload.item.drugName}` : ""}
