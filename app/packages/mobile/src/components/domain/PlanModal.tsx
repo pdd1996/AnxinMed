@@ -52,6 +52,30 @@ function joinPart(head: string, tail: string): string {
 }
 
 /**
+ * 「时 / 分」两框的可编辑原文。
+ * ⚠️ 框的 `value` 必须是**用户敲出来的原文**，不能是补零后的规范串：受控值一补零回写，
+ * 框里恒为两位，`maxLength={2}` 就把后续按键整条吃掉（"08"+"2"="082" 超长 → 连
+ * onChangeText 都不触发），而退格删成一位又立刻被补回两位 —— 结果是四框全敲不进数字
+ * （10-03 用户真机反馈「编辑时间没法输入数字」）。规范 `HH:MM` 只在保存/校验时拼。
+ */
+interface TimeParts {
+  hour: string;
+  minute: string;
+}
+
+function splitTime(time: string): TimeParts {
+  const [hour = "", minute = ""] = time.split(":");
+  return { hour, minute };
+}
+
+/** 单框是否填全且落在取值域内（空框、超 23 时 / 59 分都算非法）。 */
+function isTimePartsValid({ hour, minute }: TimeParts): boolean {
+  return (
+    /^\d{1,2}$/.test(hour) && /^\d{1,2}$/.test(minute) && isHHMM(joinPart(hour, minute))
+  );
+}
+
+/**
  * 手动建 / 编辑服药计划（M5-T5c，照 web `domain/PlanModal.tsx` 的字段与判定，渲染层换 RN）。
  * 医嘱只抄录不生成：用量/频次/时间点全部由用户填写，`suggestTimes` 给的初值标「辅助」。
  * 归算口径不在这里：`closed` 的结束日期用 shared 的 `addDaysStr`（与服务端同源公式），
@@ -90,7 +114,9 @@ export function PlanModal({
   const [doseValue, setDoseValue] = useState(String(initial?.dose.value ?? 1));
   const [doseUnit, setDoseUnit] = useState(initial?.dose.unit ?? defaultUnit ?? "片");
   const [frequency, setFrequency] = useState(String(initial?.frequency ?? 3));
-  const [times, setTimes] = useState<string[]>(initial?.times ?? suggestTimes(3));
+  const [times, setTimes] = useState<TimeParts[]>(() =>
+    (initial?.times ?? suggestTimes(3)).map(splitTime),
+  );
   const [meal, setMeal] = useState(initial?.meal ?? MEALS[0]);
   const [cycle, setCycle] = useState<CycleType>(initial?.cycleType ?? "open");
   const [customDays, setCustomDays] = useState("7");
@@ -98,10 +124,10 @@ export function PlanModal({
 
   // 频次变化重算建议时间点（标「辅助」，可改）；编辑已有计划时不覆盖用户已定的时点。
   useEffect(() => {
-    if (!initial) setTimes(suggestTimes(Number(frequency) || 1));
+    if (!initial) setTimes(suggestTimes(Number(frequency) || 1).map(splitTime));
   }, [frequency, initial]);
 
-  const timesValid = times.length > 0 && times.every(isHHMM);
+  const timesValid = times.length > 0 && times.every(isTimePartsValid);
   const valid =
     Number(doseValue) > 0 &&
     Number(frequency) > 0 &&
@@ -117,11 +143,7 @@ export function PlanModal({
 
   function setTimePart(index: number, part: "hour" | "minute", value: string) {
     setTimes((current) =>
-      current.map((time, i) => {
-        if (i !== index) return time;
-        const [hour, minute] = time.split(":");
-        return part === "hour" ? joinPart(value, minute ?? "00") : joinPart(hour ?? "08", value);
-      }),
+      current.map((time, i) => (i === index ? { ...time, [part]: value } : time)),
     );
   }
 
@@ -201,13 +223,12 @@ export function PlanModal({
                 </View>
               </View>
               {times.map((time, index) => {
-                const [hour, minute] = time.split(":");
-                const bad = !isHHMM(time);
+                const bad = !isTimePartsValid(time);
                 return (
                   <View key={index} className="flex-row items-center gap-2">
                     <Input
                       className="min-h-[48px] w-16 text-center"
-                      value={hour ?? ""}
+                      value={time.hour}
                       keyboardType="number-pad"
                       maxLength={2}
                       onChangeText={(value) => setTimePart(index, "hour", value)}
@@ -216,7 +237,7 @@ export function PlanModal({
                     <Text className="text-xl font-bold text-foreground">:</Text>
                     <Input
                       className="min-h-[48px] w-16 text-center"
-                      value={minute ?? ""}
+                      value={time.minute}
                       keyboardType="number-pad"
                       maxLength={2}
                       onChangeText={(value) => setTimePart(index, "minute", value)}
@@ -241,7 +262,7 @@ export function PlanModal({
               <Button
                 variant="outline"
                 className="min-h-[48px] flex-row items-center justify-center gap-2"
-                onPress={() => setTimes((current) => [...current, "08:00"])}
+                onPress={() => setTimes((current) => [...current, splitTime("08:00")])}
               >
                 <Icon as={Plus} size={18} color={primary} />
                 <Text>添加时间点</Text>
@@ -318,7 +339,8 @@ export function PlanModal({
             onSave({
               dose: { value: Number(doseValue), unit: doseUnit },
               frequency: Number(frequency),
-              times,
+              // 交给服务端的仍是规范 `HH:MM`，与 web `type="time"` 的提交值同形。
+              times: times.map((t) => joinPart(t.hour, t.minute)),
               meal,
               cycleType: cycle,
               endDate: cycle === "closed" ? addDaysStr(todayStr(), Number(customDays)) : undefined,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Camera, PackageCheck, Pill, Wifi } from "lucide-react-native";
+import { Bell, Camera, Check, PackageCheck, Pill, Wifi } from "lucide-react-native";
 import {
   client,
   duePendingSlots,
@@ -37,6 +37,11 @@ function cycleLabel(group: PlanGroup): string {
   if (group.cycleType === "open") return "长期";
   if (group.cycleType === "stock") return "用完为止";
   return `疗程至 ${group.endDate ?? "—"}`;
+}
+
+/** 今日还有没有可操作的时点：全记录/全跳过时，提醒弹窗里没有一件事能做，不该开。 */
+function hasPendingSlot(group: PlanGroup): boolean {
+  return group.slots.some((slot) => slot.status === "pending");
 }
 
 /** 今日页上仍可用的入口（T5-a 裁定：tab 里没有录入位，「核心动作 ≤2 屏」靠这里兜住，常驻不可移）。 */
@@ -124,17 +129,31 @@ export default function Today() {
   });
 
   // 轮询比对：到点仍 pending 的计划入队（同计划不重复入队）。
+  // 依赖**不能**带 queue：关掉一个会 dequeue → queue 变 → effect 重跑 → 该计划仍到点 pending
+  // 且已不在队列 → 立刻被重新入队，弹窗永远关不完（10-02 真机实测连点 6 次 ✕ 仍在弹）。
+  // 与 web `routes/patient/Home.tsx:93-99` 同语义：只跟 groups。队列读当前值走 getState()，不吃闭包旧值。
   useEffect(() => {
+    const queued = useReminderQueue.getState().queue;
     for (const group of groups) {
       const due = duePendingSlots(group);
-      if (due.length > 0 && !queue.some((item) => item.planId === group.planId)) {
+      if (due.length > 0 && !queued.some((item) => item.planId === group.planId)) {
         enqueue({ planId: group.planId, time: due[0].time });
       }
     }
-  }, [groups, queue, enqueue]);
+  }, [groups, enqueue]);
+  // 队首自动弹出。队首计划若已无可操作时点（今日全部记录/跳过），丢掉这一项再看下一个——
+  // 死弹窗（三个钮全灰、只能按 ✕）不该出现，用户口径 10-03：「完成了就不该弹出来」。
   useEffect(() => {
-    if (!reminderPlanId && queue.length > 0) setReminderPlanId(queue[0].planId);
-  }, [queue, reminderPlanId]);
+    if (reminderPlanId || queue.length === 0) return;
+    const head = queue[0];
+    const group = groups.find((item) => item.planId === head.planId);
+    if (!group) return;
+    if (!hasPendingSlot(group)) {
+      dequeue();
+      return;
+    }
+    setReminderPlanId(head.planId);
+  }, [groups, queue, reminderPlanId, dequeue]);
 
   const reminderGroup = groups.find((group) => group.planId === reminderPlanId) ?? null;
   const summary = data?.summary;
@@ -292,14 +311,23 @@ export default function Today() {
                     ))}
                   </View>
 
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setReminderPlanId(group.planId)}
-                    className="mt-3 min-h-[48px] flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card active:opacity-80"
-                  >
-                    <Icon as={Bell} size={18} color={mutedForeground} />
-                    <Text className="text-base font-medium text-card-foreground">处理提醒</Text>
-                  </Pressable>
+                  {hasPendingSlot(group) ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setReminderPlanId(group.planId)}
+                      className="mt-3 min-h-[48px] flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card active:opacity-80"
+                    >
+                      <Icon as={Bell} size={18} color={mutedForeground} />
+                      <Text className="text-base font-medium text-card-foreground">处理提醒</Text>
+                    </Pressable>
+                  ) : (
+                    // 全部记录后这里不再是按钮：点开一个全灰的弹窗等于给用户一个坏掉的入口
+                    // （web 现状如此，H5 已冻结兜底不再演进，此差异登记在 §2.7 差异清单）。
+                    <View className="mt-3 min-h-[48px] flex-row items-center justify-center gap-2 rounded-xl border border-dashed border-border">
+                      <Icon as={Check} size={18} color={mutedForeground} />
+                      <Text className="text-base text-muted-foreground">今日已全部记录</Text>
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
