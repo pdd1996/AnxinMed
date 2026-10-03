@@ -124,8 +124,11 @@ export default function Records() {
       </View>
 
       <View className="mt-4 rounded-2xl border border-border bg-card p-4">
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="flex-row items-center gap-2">
+        {/* flex-wrap 是必需：大字档下日期串变宽，不换行会把「导出 CSV」整条挤出屏幕右边缘
+            （10-03 模拟器大字档实测，按钮节点 bounds 右沿 =1080 即屏宽，「CSV」三字看不见）。
+            标准档两者本来同宽一行，加 wrap 无变化。 */}
+        <View className="flex-row flex-wrap items-center justify-between gap-3">
+          <View className="min-w-0 flex-row items-center gap-2">
             <Icon as={CalendarDays} size={20} color={mutedForeground} />
             <Text className="text-base font-semibold text-card-foreground">
               {from} ~ {to}
