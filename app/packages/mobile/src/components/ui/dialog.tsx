@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
 import * as React from 'react';
-import { Platform, Text, View, type GestureResponderEvent, type ViewProps } from 'react-native';
+import { Platform, StatusBar, Text, View, type GestureResponderEvent, type ViewProps } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
@@ -56,10 +56,20 @@ function DialogOverlay({
           {/* 键盘避让：edge-to-edge 下（android/gradle.properties 的 edgeToEdgeEnabled=true）
               manifest 的 adjustResize 不再缩窗口，实测键盘会整块盖住弹窗底部的保存钮，
               RN 自带 KeyboardAvoidingView 在安卓上依赖窗口 resize，故用 keyboard-controller 的。
-              它撑满遮罩并在键盘弹起时让出底部高度，弹窗随之上移（05d §6 第 14 条）。 */}
+              它撑满遮罩并在键盘弹起时让出底部高度，弹窗随之上移（05d §6 第 14 条）。
+              paddingTop 是状态栏高度：KAV 只让底部，居中就只按「屏高-键盘」算，键盘一弹起
+              整块弹窗会被顶到贴屏幕顶——10-04 真机(PJZ110/Android 15)实测「编辑服药计划」的 ✕
+              跑到 y80–131（状态栏/挖孔区），点它完全没反应，得先收键盘才关得掉。
+              让出这段后 ✕ 回到状态栏下方，底部仍有富余不被键盘盖住。 */}
           <KeyboardAvoidingView
             behavior="padding"
-            style={{ flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
+            style={{
+              flex: 1,
+              alignSelf: 'stretch',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0,
+            }}>
           <NativeOnlyAnimatedView
             style={{ flexShrink: 1, width: '100%', alignItems: 'center', justifyContent: 'center' }}
             entering={FadeIn.delay(50).reduceMotion(ReduceMotion.System)}
