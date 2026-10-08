@@ -137,7 +137,8 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
       await rejectDraft(draft.id, "用户点信息不符 → 重新拍摄");
       useIntakeSession.getState().clear([draft.id]);
       toast.info("已标记信息不符，请重新拍摄");
-      router.replace("/intake");
+      // 重新拍摄要回到「这个草稿所属的入口」，而不是固定药盒入口（对齐 web Draft.tsx:129-143 的跳转分叉）
+      router.replace(payload.type === "prescription" ? "/intake/rx" : "/intake/drug");
     } catch {
       setBusy("");
     }
@@ -272,7 +273,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
                   accessibilityState={{ selected: active }}
                   onPress={() => patch({ selectedCandidateId: cand.id })}
                   className={`mt-2 min-h-[56px] justify-center rounded-xl border p-3 ${
-                    active ? "border-primary bg-primary/10" : "border-border bg-background"
+                    active ? "border-primary bg-secondary" : "border-border bg-background"
                   }`}
                 >
                   <Text className="text-base font-semibold text-foreground">

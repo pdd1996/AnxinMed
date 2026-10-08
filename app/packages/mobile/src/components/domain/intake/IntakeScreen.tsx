@@ -8,11 +8,14 @@ import {
   View,
 } from "react-native";
 import { Stack, useRouter, type Href } from "expo-router";
+import { FileText, Package } from "lucide-react-native";
+import { useUnstableNativeVariable } from "nativewind";
 import { toast } from "sonner-native";
 import {
   detectImage,
   initialIntakeFlowState,
   intakeDrug,
+  intakePrescription,
   SAFETY_NOTE,
   STAGE_TEXT,
   transitionIntakeFlow,
@@ -28,34 +31,66 @@ import { pickFromLibrary, takePhoto } from "@/lib/photo";
 import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 
 /**
- * 录入骨架（M5-T4 · 05c 执行书）——**最细一条线**：拍照 → 层检测 → 识别 → 草稿确认 → 药箱。
- *
- * 分工与 web 端 `IntakeFlow.tsx` 完全一致（这是 M5-T2 抽包的意义）：
- *   - 决策全在 core 的 `transitionIntakeFlow`（纯函数、已单测），本文件只是**动作解释器 + 渲染**；
- *   - 平台差异收在四处：取图（expo-image-picker 直出 base64，替代 web 的 FileReader）、
- *     像素预检（一期降级为「不预检」，见下方 compute_stats 分支）、提示（sonner-native）、
- *     跳转（expo-router）。
- *
- * 范围纪律（05c「明确不做」）：入口 A（拍处方笺）留 T6、五页全量移植留 T5、提醒留 T8。
+ * 录入屏（M5-T6a · 双入口平级 tab）：处方笺（A）/ 药盒（B）两个路由各挂一份本组件。
+ * 对齐 web `IntakeFlow.tsx` 的 09-25 改造口径——tab 只在 upload 步渲染（照片进流程后收起）、
+ * 点另一颗即切（无确认弹窗，RN 用 replace 实现对方页重挂的「上传态归零」语义）、眉题「拍照录入」常驻。
+ * 分工不变：决策全在 core 的 `transitionIntakeFlow`（纯函数、已单测），本组件只是动作解释器 + 渲染。
+ * 平台差异四处：取图（expo-image-picker）、像素预检（一期降级不预检，T6-b 补）、提示（sonner-native）、
+ * 跳转（expo-router，跨入口 replace）。
  */
 
-const ENTRY: IntakeEntry = "B";
-const STAGES = STAGE_TEXT[ENTRY];
+interface IntakeCopy {
+  entry: IntakeEntry;
+  pageTitle: string;
+  uploadTitle: string;
+  uploadHint: string;
+  otherEntryLabel: string;
+  otherEntryPath: string;
+}
+
+/** 逐字照搬 web 的入口文案（IntakeRx.tsx / IntakeDrug.tsx），禁新写话术（05e §2-T6-a-2）。 */
+const COPY: Record<IntakeEntry, IntakeCopy> = {
+  A: {
+    entry: "A",
+    pageTitle: "拍处方笺录入",
+    uploadTitle: "上传平铺完整的处方笺照片",
+    uploadHint: "单子摊平拍全，光线足、别反光",
+    otherEntryLabel: "拍药品",
+    otherEntryPath: "/intake/drug",
+  },
+  B: {
+    entry: "B",
+    pageTitle: "拍药品建档",
+    uploadTitle: "上传正面清晰的药盒照片",
+    uploadHint: "药盒正面拍清楚；散装药片拍不了",
+    otherEntryLabel: "拍处方笺",
+    otherEntryPath: "/intake/rx",
+  },
+};
+
+const ENTRY_TABS: { entry: IntakeEntry; label: string; icon: typeof FileText }[] = [
+  { entry: "A", label: "拍处方笺", icon: FileText },
+  { entry: "B", label: "拍药品", icon: Package },
+];
 
 const PRESSABLE_CLASS =
   "min-h-[52px] items-center justify-center rounded-xl px-4 py-3";
 
-export default function Intake() {
+export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
   const router = useRouter();
+  const copy = COPY[entry];
   const [state, setState] = useState<IntakeFlowState>(initialIntakeFlowState);
   // 异步回调要读到最新状态（而非发起时的闭包值）；状态只经 dispatch 写入，故 ref 与 state 同源。
   const stateRef = useRef(state);
   const configured = isApiConfigured();
+  // 图标不吃 TextClassContext，颜色显式给（05d §7-7）。
+  const iconFg = useUnstableNativeVariable("--primary-foreground");
+  const iconMuted = useUnstableNativeVariable("--muted-foreground");
 
   const ctx: IntakeFlowCtx = {
-    entry: ENTRY,
-    otherEntryPath: "/intake",
-    stageCount: STAGES.length,
+    entry,
+    otherEntryPath: copy.otherEntryPath,
+    stageCount: STAGE_TEXT[entry].length,
   };
 
   /** 执行 core 决策产出的动作（本端副作用；结果再以事件回灌状态机）。 */
@@ -67,9 +102,8 @@ export default function Intake() {
           break;
 
         /**
-         * 质量预检：05 任务书 T2/T4 明确允许移动端一期降级——
-         * 预检本身只是「建议不拦用户」，core 收到 `stats: null` 即视为无问题、主流程照走。
-         * 二期用 expo-image-manipulator / 像素统计补实现时，只需在这里换成真实统计值。
+         * 质量预检：mobile 一期降级不预检（05 任务书 T2/T4 允许——「建议不拦用户」），
+         * core 收到 `stats: null` 即视为主流程照走。T6-b 用原生 resize + JS 解码补实现时换这里。
          */
         case "compute_stats":
           void Promise.resolve(null).then((stats) =>
@@ -98,7 +132,10 @@ export default function Intake() {
 
         case "intake":
           void callTransport(
-            () => intakeDrug(action.dataUrl),
+            () =>
+              action.entry === "A"
+                ? intakePrescription(action.dataUrl)
+                : intakeDrug(action.dataUrl),
             TIMEOUT_MS.intake,
           ).then((res) => {
             if (!res.ok) {
@@ -123,11 +160,10 @@ export default function Intake() {
 
         case "navigate": {
           const [path] = action.path.split("?");
-          if (path === "/box") {
-            // 手动建档表单属 T5 范围：不藏按钮语义，也不假装完成——明示去处与缺口。
-            toast.info("手动建档表单将在 M5-T5 接入安卓端，本次先到药箱");
-            router.push("/box" as Href);
-            return;
+          // 跨入口切换 = 点按即切（05e §0-4）：replace 不留栈，对方屏重挂即干净的上传态（与 web 换页同语义）。
+          if (path.startsWith("/intake/")) {
+            router.replace(action.path as Href);
+            break;
           }
           router.push(action.path as Href);
           break;
@@ -143,6 +179,12 @@ export default function Intake() {
     setState(next.state);
     runActions(next.actions);
   }
+
+  // 层检测纠偏的跨入口交接：对方入口页留下原图时，本页直接重跑（web IntakeFlow.tsx:151-154 同语义）。
+  // 仅挂载时跑一次；dispatch 闭包读到的是 ref 里的最新状态，故意不进依赖。
+  useEffect(() => {
+    dispatch({ type: "handoff", pending: useIntakeSession.getState().pendingImage });
+  }, []);
 
   // 处理中阶段文案推进（PRD §10.1「处理中状态明确」）；下标归零由状态机负责。
   useEffect(() => {
@@ -169,7 +211,7 @@ export default function Intake() {
       <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">
         拍照录入
       </Text>
-      <Text className="mt-1 text-2xl font-bold text-foreground">拍药盒 · 建档案</Text>
+      <Text className="mt-1 text-2xl font-bold text-foreground">{copy.pageTitle}</Text>
 
       {!configured && (
         <View className="mt-4 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-4">
@@ -180,12 +222,37 @@ export default function Intake() {
 
       {state.step === "upload" && (
         <View className="mt-5 gap-3">
-          <View className="items-center rounded-2xl border-2 border-dashed border-border bg-muted/40 p-6">
-            <Text className="text-lg font-semibold text-foreground">
-              把药盒正面拍清楚
-            </Text>
+          {/* 平级 tab：只在 upload 步出现（照片进流程后收起）；选中态 = 描边 + 实底 + 图标，不单靠颜色 */}
+          <View className="flex-row gap-2">
+            {ENTRY_TABS.map((tab) => {
+              const active = tab.entry === entry;
+              return (
+                <Pressable
+                  key={tab.entry}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  disabled={active}
+                  onPress={() => dispatch({ type: "goto_other_entry" })}
+                  className={`h-14 flex-1 flex-row items-center justify-center gap-2 rounded-xl border active:opacity-80 ${
+                    active ? "border-primary bg-primary" : "border-border bg-card"
+                  }`}
+                >
+                  <tab.icon size={20} color={active ? iconFg : iconMuted} importantForAccessibility="no" />
+                  <Text
+                    className={`text-base font-semibold ${
+                      active ? "text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View className="items-center rounded-2xl border-2 border-dashed border-border bg-muted p-6">
+            <Text className="text-lg font-semibold text-foreground">{copy.uploadTitle}</Text>
             <Text className="mt-2 text-center text-sm leading-5 text-muted-foreground">
-              对准药盒上的药名与规格，让文字占满画面；关闭闪光灯，避开反光。
+              {copy.uploadHint}
             </Text>
           </View>
           <Pressable
@@ -229,7 +296,7 @@ export default function Intake() {
       )}
 
       {state.step === "processing" && (
-        <StepCard title={`正在识别（${ENTRY === "A" ? "处方笺" : "药盒"}）`} spinning>
+        <StepCard title={`正在识别（${entry === "A" ? "处方笺" : "药品"}）`} spinning>
           {state.image ? (
             <Image
               source={{ uri: state.image }}
@@ -239,7 +306,7 @@ export default function Intake() {
             />
           ) : null}
           <View className="mt-4 gap-2">
-            {STAGES.map((stage, i) => (
+            {STAGE_TEXT[entry].map((stage, i) => (
               <View key={stage} className="flex-row items-center gap-2">
                 {i < state.stageIdx ? (
                   <Text className="text-base text-risk-l1">✓</Text>
@@ -265,19 +332,26 @@ export default function Intake() {
 
       {state.step === "mismatch" && state.mismatch && (
         <StepCard title="检测结果与所选入口不符">
+          {state.handoffNote ? (
+            <Text className="text-sm leading-5 text-muted-foreground">{state.handoffNote}</Text>
+          ) : null}
           <Text className="text-base leading-6 text-foreground">
             {state.mismatch.suggestion}
           </Text>
           <LayerBadges layers={state.mismatch.detected} />
           <Text className="mt-2 text-xs leading-5 text-muted-foreground">
-            系统只核对照片与所选入口是否一致，不会自己换路径。服务端也会拦，按当前入口继续通常仍会被拒绝。安卓端「拍处方笺」入口在 M5-T6 接入，本次可重拍药盒或按当前入口重试。
+            系统只核对照片与所选入口是否一致，不会自己换路径。服务端也会拦，按当前入口继续通常仍会被拒绝。
           </Text>
           <ActionRow>
-            <SecondaryButton label="重新上传" onPress={() => dispatch({ type: "retake" })} />
             <PrimaryButton
+              label={`切换到「${copy.otherEntryLabel}」重跑`}
+              onPress={() => dispatch({ type: "switch_entry" })}
+            />
+            <SecondaryButton
               label="检测错了 · 按当前入口重试"
               onPress={() => dispatch({ type: "retry" })}
             />
+            <SecondaryButton label="重新上传" onPress={() => dispatch({ type: "retake" })} />
           </ActionRow>
         </StepCard>
       )}
@@ -311,12 +385,13 @@ export default function Intake() {
                 onPress={() => dispatch({ type: "goto_manual" })}
               />
             )}
+            {state.feedback.allowSwitch && (
+              <SecondaryButton
+                label={`换到「${copy.otherEntryLabel}」`}
+                onPress={() => dispatch({ type: "goto_other_entry" })}
+              />
+            )}
           </ActionRow>
-          {state.feedback.allowSwitch && (
-            <Text className="mt-2 text-xs text-muted-foreground">
-              换到「拍处方笺」重跑：安卓端在 M5-T6 接入。
-            </Text>
-          )}
         </StepCard>
       )}
 

@@ -1,6 +1,7 @@
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
-import { Type } from "lucide-react-native";
+import { Type, Wifi } from "lucide-react-native";
 import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Text 必须走 ui/text：09-30 深夜修过一条「settings.tsx 直引 react-native 的 Text，接不到
@@ -23,6 +24,7 @@ const NOT_YET = [
  * 档位经 core 的 store + AsyncStorage 持久化，切换即时写入 NativeWind 的 rem 根（见 FontScaleSync）。
  */
 export default function Settings() {
+  const router = useRouter();
   const scale = useFontScale((s) => s.scale);
   const setScale = useFontScale((s) => s.setScale);
   // 图标是 SVG，取 --primary 令牌而不是写死色值（深浅色都要对，05d §6 第 16 条）。
@@ -71,6 +73,22 @@ export default function Settings() {
           <RiskBadge level="L3" />
           <RiskBadge level="L4" />
         </View>
+      </View>
+
+      <View className="mt-8 gap-2">
+        <Text className="text-lg font-semibold text-foreground">服务器连接</Text>
+        <Text className="text-sm leading-6 text-muted-foreground">
+          连不上时，先在这里检查这台设备的网络与服务器地址。
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/probe")}
+          className="mt-1 min-h-[52px] flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 active:opacity-80"
+        >
+          <Wifi size={20} color={primary} importantForAccessibility="no" />
+          <Text className="flex-1 text-base font-medium text-card-foreground">网络探测</Text>
+          <Text className="text-sm text-muted-foreground">去检查 →</Text>
+        </Pressable>
       </View>
 
       <View className="mt-8 gap-2">

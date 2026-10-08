@@ -201,7 +201,7 @@ export default function Box() {
         <Pressable
           accessibilityRole="button"
           disabled={busy}
-          onPress={() => router.push("/intake")}
+          onPress={() => router.push("/intake/drug")}
           className={`min-h-[52px] flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-primary active:opacity-80 ${
             busy ? "opacity-50" : ""
           }`}
@@ -251,7 +251,7 @@ export default function Box() {
               </Text>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push("/intake")}
+                onPress={() => router.push("/intake/drug")}
                 className="mt-5 min-h-[48px] items-center justify-center rounded-xl bg-primary px-6 active:opacity-80"
               >
                 <Text className="text-lg font-medium text-primary-foreground">去拍照</Text>

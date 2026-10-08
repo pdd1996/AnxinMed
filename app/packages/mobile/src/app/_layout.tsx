@@ -32,7 +32,8 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(patient)" options={{ headerShown: false }} />
-            <Stack.Screen name="intake" options={{ title: "拍照录入" }} />
+            <Stack.Screen name="intake/rx" options={{ title: "拍照录入" }} />
+            <Stack.Screen name="intake/drug" options={{ title: "拍照录入" }} />
             <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
             <Stack.Screen name="probe" options={{ title: "网络探测" }} />
           </Stack>

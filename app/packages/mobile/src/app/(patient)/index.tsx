@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Camera, Check, PackageCheck, Pill, Wifi } from "lucide-react-native";
+import { Bell, Camera, Check, FileText, PackageCheck, Pill } from "lucide-react-native";
 import {
   client,
   duePendingSlots,
@@ -47,21 +47,20 @@ function hasPendingSlot(group: PlanGroup): boolean {
 /** 今日页上仍可用的入口（T5-a 裁定：tab 里没有录入位，「核心动作 ≤2 屏」靠这里兜住，常驻不可移）。 */
 const ENTRIES = [
   {
-    href: "/intake" as const,
+    href: "/intake/rx" as const,
+    title: "拍处方笺入药箱",
+    desc: "一张处方笺 → 建档 + 服药计划一次完成",
+    icon: FileText,
+  },
+  {
+    href: "/intake/drug" as const,
     title: "拍药盒入药箱",
     desc: "拍一张药盒正面 → 识别 → 你核对 → 进药箱",
     icon: Camera,
   },
-  {
-    href: "/probe" as const,
-    title: "网络探测",
-    desc: "确认这台设备能连上服务器",
-    icon: Wifi,
-  },
 ];
 
 const SOON = [
-  { title: "拍处方笺（含用法用量）", when: "M5-T6" },
   { title: "AI 用药咨询", when: "M5-T7" },
   { title: "退到后台的系统级到点提醒", when: "M5-T8" },
 ];
@@ -268,7 +267,7 @@ export default function Today() {
               </Text>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push("/intake")}
+                onPress={() => router.push("/intake/rx")}
                 className="mt-5 min-h-[48px] items-center justify-center rounded-xl bg-primary px-6 active:opacity-80"
               >
                 <Text className="text-lg font-medium text-primary-foreground">开始录入</Text>
