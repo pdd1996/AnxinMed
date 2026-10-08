@@ -61,6 +61,14 @@ release 走另一条：`pnpm --filter @anxin/mobile android:release` = `scripts/
 以免把开发机地址打进发布包。两条硬拦：没有地址就拒绝出包；值是 `10.0.2.2`/`localhost`/`127.0.0.1` 也拒绝出包。
 未配置时首页会红字显示「还没配好服务器地址」——禁静默失败。
 
+## dev 构建的 fixtures 回放场景头（M5-T6a，05e §1-8）
+
+`AI_MODE=fixtures` 的 api 按 `x-test-scenario` 请求头选场景回放（e2e 侧靠 Playwright 注入、vite 代理透传）。
+RN 没有 vite 代理，dev 构建经 `EXPO_PUBLIC_TEST_SCENARIO` 注入同一个头（`lib/wiring.ts` → core 的
+`setExtraHeaders`）：`EXPO_PUBLIC_TEST_SCENARIO=rx-normal pnpm --filter @anxin/mobile android:dev` 即可
+让本端录入链路吃 `app/e2e/fixtures/<场景>.json` 的录制包（回放不看图片内容，`quality:0.8` 重编码图无碍）。
+release 构建不定义该变量即通道不存在（`__DEV__` 双保险）；web 侧零改动。
+
 ### release 包的两条收紧（写在 prebuild 插件里，不是手改 android/）
 
 `android/` 整目录被 `.gitignore` 忽略、由 `expo prebuild` 生成——手改既进不了版本库，也会在下次 prebuild 被抹掉。

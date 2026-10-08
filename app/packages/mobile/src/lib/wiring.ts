@@ -1,4 +1,4 @@
-import { getApiBaseUrl, setApiBaseUrl, setApiNotifier } from "@anxin/core";
+import { getApiBaseUrl, setApiBaseUrl, setApiNotifier, setExtraHeaders } from "@anxin/core";
 import { toast } from "sonner-native";
 
 /**
@@ -9,6 +9,9 @@ import { toast } from "sonner-native";
 
 /** EXPO_PUBLIC_API_URL 在构建期被内联进包体（Expo 约定），运行时不可改；缺配置必须可见。 */
 const RAW_API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+
+/** dev 构建可指名 fixtures 回放场景（05e §1-8）：release 不定义即通道不存在。 */
+const TEST_SCENARIO = process.env.EXPO_PUBLIC_TEST_SCENARIO ?? "";
 
 export const API_URL_MISSING_HINT =
   "未配置 API 地址：dev 用 `pnpm --filter @anxin/mobile android:dev`（自动探测电脑局域网 IP），" +
@@ -24,9 +27,12 @@ export function apiBaseUrl(): string {
   return getApiBaseUrl();
 }
 
-/** 装配本端接缝：API 基址 + 错误提示出口。 */
+/** 装配本端接缝：API 基址 + 错误提示出口 + dev-only 场景头。 */
 export function wireMobilePlatform(): void {
   setApiBaseUrl(RAW_API_URL);
+  if (__DEV__ && TEST_SCENARIO) {
+    setExtraHeaders({ "x-test-scenario": TEST_SCENARIO });
+  }
   setApiNotifier({
     onError: (message, code) => {
       toast.error(code ? `${message}（${code}）` : message);

@@ -14,10 +14,16 @@ type ApiClient = ReturnType<typeof hc<AppType>>
 
 /** 基址可运行时改写，故客户端实例按当前基址惰性重建（改一次、建一次，不做每请求重建）。 */
 let apiBaseUrl = '/'
-let built: { base: string; client: ApiClient } | null = null
+/** 附加请求头（dev-only 测试通道，见 setExtraHeaders）。 */
+let extraHeaders: Record<string, string> = {}
+let built: { base: string; headersKey: string; client: ApiClient } | null = null
 
 function resolveClient(): ApiClient {
-  if (!built || built.base !== apiBaseUrl) built = { base: apiBaseUrl, client: hc<AppType>(apiBaseUrl) }
+  const headersKey = JSON.stringify(extraHeaders)
+  if (!built || built.base !== apiBaseUrl || built.headersKey !== headersKey) {
+    const init = Object.keys(extraHeaders).length ? { headers: extraHeaders } : undefined
+    built = { base: apiBaseUrl, headersKey, client: hc<AppType>(apiBaseUrl, init) }
+  }
   return built.client
 }
 
@@ -25,6 +31,16 @@ function resolveClient(): ApiClient {
 export function setApiBaseUrl(base: string): void {
   const next = base.trim().replace(/\/+$/, '')
   apiBaseUrl = next || '/'
+}
+
+/**
+ * 附加请求头（M5-T6a · dev-only fixtures 回放通道）：mobile 读 `EXPO_PUBLIC_TEST_SCENARIO`
+ * 注入 `x-test-scenario`，让 `AI_MODE=fixtures` 的 api 按场景回放录制包（e2e 侧靠 Playwright
+ * setExtraHTTPHeaders 注入同一个头，RN 没有 vite 代理故走此通道）。web 不调用，零影响；
+ * release 构建不定义该变量即不存在。头表变了实例会重建，与基址同一条惰性重建路径。
+ */
+export function setExtraHeaders(headers: Record<string, string>): void {
+  extraHeaders = { ...headers }
 }
 
 /** 当前 API 基址（探测页 / 诊断界面展示用；禁在各处再拼一次字符串前缀）。 */
