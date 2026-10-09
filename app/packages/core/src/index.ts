@@ -7,7 +7,7 @@
  *   · ApiNotifier —— 各端的错误提示（web=sonner）
  *   · SpeechAdapter —— 各端的 TTS（web=speechSynthesis，mobile=expo-speech）
  *   · createFontScaleStore(storage) —— 各端的持久化后端（web=localStorage，mobile=AsyncStorage）
- *   · ImageStatsProvider —— 各端的图片像素统计（web=canvas，mobile 一期可降级不预检）
+ *   · ImageStatsProvider —— 各端的图片像素统计（web=canvas，mobile=原生缩放 + jpeg-js 解码，M5-T6b）
  * 类型与 zod 契约继续走 @anxin/shared；本包不复制契约。
  * 平台触点一览（M5-T4 增补 #0）：
  *   · setApiBaseUrl —— API 基址（web=同源相对 '/'，mobile=EXPO_PUBLIC_API_URL 绝对地址）

@@ -1,5 +1,7 @@
 /**
  * M2-T8 · 录入页纯逻辑单测（M5-T2 随迁入 core）：失败分支映射 / 质量预检阈值 / 上传前置校验 / 阶段文案。
+ * M5-T6b 增：`statsFromRgba` 的手算像素 fixture——web 那份 canvas 数学按 05e §3 不动，
+ * 两份拷贝的一致性没有运行时护栏，只能靠这里把三个统计值钉死（05e §7-1）。
  */
 import { describe, it, expect } from 'vitest'
 import { ERR_CODES } from '@anxin/shared'
@@ -11,6 +13,7 @@ import {
   RETAKE_CHECKLIST,
   SAFETY_NOTE,
   STAGE_TEXT,
+  statsFromRgba,
   validateFile,
   type ImageStats,
   type UploadableFile,
@@ -140,5 +143,87 @@ describe('STAGE_TEXT · 处理中状态文案', () => {
     expect(STAGE_TEXT.A[0]).toContain('层检测')
     expect(STAGE_TEXT.B.join('')).not.toContain('OCR') // 入口B 不走医嘱线
     expect(STAGE_TEXT.B.join('')).toContain('不提取用法用量')
+  })
+})
+
+describe('statsFromRgba · 手算像素 fixture（RN 解码后的数学与 web canvas 同源）', () => {
+  /** 灰度像素阵 → RGBA 字节（行优先、每像素 4 字节、alpha=255）——canvas 与 jpeg-js 的输出同形。 */
+  function rgba(rows: number[][]): { data: Uint8ClampedArray; width: number; height: number } {
+    const height = rows.length
+    const width = rows[0].length
+    const data = new Uint8ClampedArray(width * height * 4)
+    rows.forEach((row, y) =>
+      row.forEach((gray, x) => {
+        const i = (y * width + x) * 4
+        data[i] = gray
+        data[i + 1] = gray
+        data[i + 2] = gray
+        data[i + 3] = 255
+      }),
+    )
+    return { data, width, height }
+  }
+
+  /** 采样网格 → 统计值；原图边长默认 1000×1000（只有 too-small 一条判原图，其余三条判网格）。 */
+  function measure(rows: number[][], orig?: { width: number; height: number }) {
+    const grid = rgba(rows)
+    return statsFromRgba(grid.data, grid.width, grid.height, orig?.width ?? 1000, orig?.height ?? 1000)
+  }
+
+  /** 5×5 斜坡：每列比前一列亮 step，行间相同 ⇒ 梯度只来自水平方向（grad=20·step，edges=40）。 */
+  const ramp = (step: number) =>
+    Array.from({ length: 5 }, () => [100, 100 + step, 100 + 2 * step, 100 + 3 * step, 100 + 4 * step])
+
+  /** 50 像素（5×10）里前 n 个取 246（luma>245 记截断），其余 120。 */
+  function highlight(n: number): number[][] {
+    const rows: number[][] = []
+    let k = 0
+    for (let y = 0; y < 5; y++) {
+      const row: number[] = []
+      for (let x = 0; x < 10; x++) row.push(k++ < n ? 246 : 120)
+      rows.push(row)
+    }
+    return rows
+  }
+
+  const flat = (gray: number) => Array.from({ length: 2 }, () => [gray, gray])
+
+  it('三个统计值钉死在数学本身：luma 权重、>245 记截断、梯度均值 /255', () => {
+    // 手算 2×2=[[100,246],[100,100]]：luma 即灰度（权重和为 1）⇒ meanLuma=546/4=136.5；
+    // 截断像素 1 个 ⇒ clippedRatio=1/4；梯度=|246-100|(首行水平) + |100-246|(垂直)=292，
+    // edges=(4-2)+(4-2)=4 ⇒ sharpness=292/4/255
+    const stats = measure([[100, 246], [100, 100]])
+    expect(stats.meanLuma).toBe(546 / 4)
+    expect(stats.clippedRatio).toBe(1 / 4)
+    expect(stats.sharpness).toBe(292 / 4 / 255)
+    expect(stats.width).toBe(1000)
+    expect(stats.height).toBe(1000)
+  })
+
+  it('过暗：均匀亮度 60 不命中、59 命中 too-dark（阈值落在下界不误伤）', () => {
+    const ok = measure(flat(60))
+    const dark = measure(flat(59))
+    expect(ok.meanLuma).toBe(60)
+    expect(dark.meanLuma).toBeLessThan(60)
+    expect(assessQuality(ok)).not.toContain('too-dark')
+    expect(assessQuality(dark)).toContain('too-dark')
+  })
+
+  it('反光：50 像素里 9 个截断（占比恰 0.18）不命中、10 个命中 glare；恰 245 不记截断', () => {
+    expect(measure(flat(245)).clippedRatio).toBe(0)
+    expect(assessQuality(measure(highlight(9)))).toEqual([])
+    expect(assessQuality(measure(highlight(10)))).toEqual(['glare'])
+  })
+
+  it('模糊：每列 +10 的斜坡判模糊、+11 不判（sharpness 阈值 0.02 两侧各一档）', () => {
+    expect(measure(ramp(10)).sharpness).toBeCloseTo(200 / 40 / 255, 10)
+    expect(assessQuality(measure(ramp(10)))).toEqual(['blurry'])
+    expect(assessQuality(measure(ramp(11)))).toEqual([])
+  })
+
+  it('分辨率过低：判的是原图边长，不是缩放后的采样网格（480 不命中 / 479 命中）', () => {
+    expect(assessQuality(measure(ramp(11), { width: 480, height: 640 }))).toEqual([])
+    expect(assessQuality(measure(ramp(11), { width: 479, height: 640 }))).toEqual(['too-small'])
+    expect(assessQuality(measure(ramp(11), { width: 4032, height: 479 }))).toEqual(['too-small'])
   })
 })

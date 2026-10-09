@@ -4,9 +4,9 @@
  * 原则（PRD §7.2.6：全部「看得见地失败」）：任何失败都必须渲染成用户可理解的卡片 + 可行动的下一步
  * （重拍 / 换入口 / 人工补 / 手动建档），禁止静默吞错；质量预检只是**建议**，不拦用户（仍要上传可选）。
  *
- * 平台边界（M5-T2 接缝 #5）：像素统计（图片解码 + 逐像素采样）是平台能力，留在各端实现
- * （web=canvas，mobile 一期可降级不预检）；本模块只做「统计值 → 质量问题」的纯判读，
- * 由 ImageStatsProvider 类型把这条接缝固化下来。
+ * 平台边界（M5-T2 接缝 #5，M5-T6b 按源注入）：像素统计（图片解码 + 逐像素采样）是平台能力，
+ * 留在各端实现（web=canvas，mobile=原生缩放 + JS 解码）；本模块只做「统计值 → 质量问题」的纯判读，
+ * 外加两端共用的「RGBA → 统计值」数学（`statsFromRgba`），由 ImageStatsProvider 类型把这条接缝固化下来。
  */
 import { ERR_CODES } from '@anxin/shared'
 
@@ -166,11 +166,79 @@ export interface ImageStats {
 }
 
 /**
- * 像素统计 provider 接缝（M5-T2）：平台层注入（web=canvas 实现）。
- * 返回 null = 本端不做/不能做预检（环境无 canvas、RN 一期降级）→ 调用方跳过建议、主流程照走
+ * RGBA 像素 → 统计值（M5-T6b：RN 走「原生 resize ≤512 → 小图交 JS 解码」，解码完的像素与 web
+ * canvas 的 `getImageData` 同形，于是判读之前的数学可以收成一份）。
+ *
+ * **与 `web/src/lib/imageStats.ts` 的循环是同一套数学的两份拷贝**（H5 冻结，那份按 05e §3 不动）：
+ * luma 权重、`>245` 记截断、梯度均值 `/255`、`edges` 的算法逐字对齐。改任一侧必须同步另一侧，
+ * 否则就是 05e §7-1 说的「RN 判模糊、web 不判」；一致性由 `intake.test.ts` 的手算像素 fixture 守。
+ *
+ * @param data RGBA、每像素 4 字节、行优先
+ * @param width 参与统计的采样网格宽（缩放后的图，**不是**原图）
+ * @param height 参与统计的采样网格高
+ * @param origWidth 原图宽——`too-small` 判的是原图，缩放后的图永远 ≤512 会把好照片误判成小图
+ * @param origHeight 原图高
+ */
+export function statsFromRgba(
+  data: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  origWidth: number,
+  origHeight: number,
+): ImageStats {
+  const total = width * height
+  const luma = new Float64Array(total)
+  let sum = 0
+  let clipped = 0
+  for (let i = 0, p = 0; p < total; i += 4, p++) {
+    const v = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]
+    luma[p] = v
+    sum += v
+    if (v > 245) clipped++
+  }
+  let grad = 0
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width - 1; x++) {
+      grad += Math.abs(luma[y * width + x + 1] - luma[y * width + x])
+    }
+  }
+  for (let y = 0; y < height - 1; y++) {
+    for (let x = 0; x < width; x++) {
+      grad += Math.abs(luma[(y + 1) * width + x] - luma[y * width + x])
+    }
+  }
+  const edges = total - width + (total - height)
+  return {
+    meanLuma: sum / total,
+    clippedRatio: clipped / total,
+    sharpness: edges > 0 ? grad / edges / 255 : 0,
+    width: origWidth,
+    height: origHeight,
+  }
+}
+
+/**
+ * 预检的输入源（M5-T6b · 05e §1-3 取①）。
+ * RN 侧不能把大 dataURL 喂给原生层——那等于把全尺寸原图再编一遍（05e §7-2 禁的就是这个），
+ * 所以本机文件 URI 与原图边长（picker 已回，省掉一次探边解码）一起进来。
+ */
+export interface ImageStatsSource {
+  /** 本机文件 URI（`file://…`）——RN 侧的唯一可用输入。 */
+  uri?: string
+  /** 原图宽（像素）。 */
+  width?: number
+  /** 原图高（像素）。 */
+  height?: number
+}
+
+/**
+ * 像素统计 provider 接缝（M5-T2 定义，M5-T6b 放宽为按源注入）：平台层注入实现
+ * （web=canvas，直接用第一个参数；mobile=expo-image-manipulator 原生缩放 + jpeg-js 解码，用 source）。
+ * 第二个参数可选 ⇒ web 的实现与调用点零改动（H5 冻结，05e §3「对 web 一行都不改」）。
+ * 返回 null = 本端不做/不能做预检（缺 uri、解码失败、环境无 canvas）→ 调用方跳过建议、主流程照走
  * （预检只是建议，不拦用户）。
  */
-export type ImageStatsProvider = (dataUrl: string) => Promise<ImageStats | null>
+export type ImageStatsProvider = (dataUrl: string, source?: ImageStatsSource) => Promise<ImageStats | null>
 
 export type QualityIssue = 'too-dark' | 'glare' | 'blurry' | 'too-small'
 

@@ -69,6 +69,13 @@ describe('六步流转 · upload 步（起点与前置校验）', () => {
     expect(state.step).toBe('upload')
     expect(actions).toEqual([{ type: 'compute_stats', dataUrl: DATA_URL }])
   })
+
+  it('平台侧的预检输入（本机文件 URI + 原图边长）原样转交，状态机不解释它', () => {
+    const source = { uri: 'file:///cache/photo-1.jpg', width: 4032, height: 3024 }
+    const { state, actions } = run({ type: 'file_read', dataUrl: DATA_URL, source })
+    expect(state.image).toBe(DATA_URL)
+    expect(actions).toEqual([{ type: 'compute_stats', dataUrl: DATA_URL, source }])
+  })
 })
 
 describe('六步流转 · quality 步（预检是建议，不拦用户）', () => {

@@ -1,4 +1,4 @@
-import type { Entry, ImageStats, IntakeFeedback, QualityIssue } from '../lib/intake'
+import type { Entry, ImageStats, ImageStatsSource, IntakeFeedback, QualityIssue } from '../lib/intake'
 import { assessQuality, mapIntakeFailure } from '../lib/intake'
 import type { intakePrescription } from '../api/client'
 
@@ -7,8 +7,9 @@ import type { intakePrescription } from '../api/client'
  *
  * 分工（本任务的核心纪律）：
  *   - core（本文件）＝**决策**：给定「当前状态 + 事件（含 IO 结果）」算出「新状态 + 动作描述列表」；
- *   - 平台层（web 的 IntakeFlow.tsx / mobile 后续同构）＝**执行**：网络请求、FileReader、
- *     canvas 像素统计、navigate 跳转、toast、900ms 阶段文案定时器、内存会话读写。
+ *   - 平台层（web 的 IntakeFlow.tsx / mobile 的 IntakeScreen.tsx）＝**执行**：网络请求、FileReader、
+ *     图片像素统计（web=canvas，mobile=原生缩放 + JS 解码）、navigate 跳转、toast、
+ *     900ms 阶段文案定时器、内存会话读写。
  * 因此本模块零副作用、零 DOM、可脱离 React 单测（见 flow.test.ts）。
  *
  * run() 的异步编排被拆成两半：「发起 IO」（动作）与「拿到 IO 结果后怎么迁移」（事件分支），
@@ -63,7 +64,8 @@ export interface IntakeFlowCtx {
 /** 平台层要执行的动作描述（不含任何执行逻辑）。 */
 export type IntakeFlowAction =
   | { type: 'toast'; message: string }
-  | { type: 'compute_stats'; dataUrl: string }
+  /** 本地像素统计的输入：dataUrl 供 web（canvas），source 供 RN（本机文件 + 原图边长，M5-T6b）。 */
+  | { type: 'compute_stats'; dataUrl: string; source?: ImageStatsSource }
   | { type: 'detect'; entry: Entry; dataUrl: string }
   | { type: 'intake'; entry: Entry; dataUrl: string }
   | { type: 'session_set_images'; draftIds: string[]; dataUrl: string }
@@ -74,7 +76,8 @@ export type IntakeFlowAction =
 /** 事件：平台层的 IO 结果与用户动作。 */
 export type IntakeFlowEvent =
   | { type: 'file_rejected'; message: string }
-  | { type: 'file_read'; dataUrl: string }
+  /** 选图/读图成功；`source` 是平台侧还能拿到的原始输入（本机文件 URI + 原图边长），只转交给预检。 */
+  | { type: 'file_read'; dataUrl: string; source?: ImageStatsSource }
   /** 像素统计结果（null=本端不预检/不能预检 → 视为无问题，主流程照走）。 */
   | { type: 'stats_checked'; stats: ImageStats | null }
   /** 「仍要上传」/「检测错了 · 按当前入口重试」。 */
@@ -166,7 +169,7 @@ export function transitionIntakeFlow(
       // 原组件：setImage 后立刻做本地像素统计，此间仍停在上传步（不提前进 processing）
       return {
         state: normalize({ ...state, image: event.dataUrl }),
-        actions: [{ type: 'compute_stats', dataUrl: event.dataUrl }],
+        actions: [{ type: 'compute_stats', dataUrl: event.dataUrl, source: event.source }],
       }
 
     case 'stats_checked': {
