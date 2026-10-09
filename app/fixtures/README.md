@@ -33,6 +33,13 @@ python app/fixtures/make-fixtures.py
 
 渲染用微软雅黑（`C:/Windows/Fonts/msyh.ttc`）；字体缺失时打印 `[warn]` 回退默认字体（不静默）。
 
+## quality/ · 质量预检退化样张（M5-T6b，不进 golden case）
+
+`make-quality-fixtures.py` → `quality/` 五张：暗 / 反光 / 模糊 / 分辨率过低 各命中一条判据，加一张
+`quality-ok.png` 对照（应当不出质量卡）。服务对象是录入屏的本地质量预检（`core` 的 `assessQuality`
+阈值：meanLuma<60、clippedRatio>0.18、sharpness<0.02、原图任一边<480），**与 `golden-cases.json` 无关**，
+e2e 与 zero-leak 都不读它们；设备上怎么用见 `docs/specs/05e-M5-T6-录入双入口完整化执行书.md` §2-T6-b 口令包。
+
 ## 合成 PII 声明
 
 `golden-cases.json` 的 `pii` 块（张三 / 13800001234 / MZ20260001 / 广东省深圳市南山区科技路1号 / 李四）
