@@ -28,6 +28,11 @@ const MAX_BYTES = 15 * 1024 * 1024;
 export interface Photo {
   /** `data:image/jpeg;base64,...` —— core 的 detectImage / intakeDrug 入参形态。 */
   dataUrl: string;
+  /**
+   * 本机文件 URI —— 质量预检的唯一可用输入（05e §1-2：T6-a 之前这里把它丢掉了，于是预检只能
+   * 全尺寸重编一遍原图，那条路 05e §7-2 明令禁止）。
+   */
+  uri: string;
   name: string;
   /** 解码后的字节数（UI 展示 + validateFile 复核）。 */
   bytes: number;
@@ -67,6 +72,7 @@ function toPhoto(asset: ImagePicker.ImagePickerAsset): PickResult {
     ok: true,
     photo: {
       dataUrl: `data:${mime};base64,${base64}`,
+      uri: asset.uri,
       name,
       bytes,
       width: asset.width ?? 0,

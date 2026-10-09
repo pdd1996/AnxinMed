@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { Stack, useRouter, type Href } from "expo-router";
-import { FileText, Package } from "lucide-react-native";
+import { FileText, Package, TriangleAlert } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { toast } from "sonner-native";
 import {
@@ -16,6 +16,8 @@ import {
   initialIntakeFlowState,
   intakeDrug,
   intakePrescription,
+  QUALITY_HINTS,
+  QUALITY_ISSUE_LABEL,
   SAFETY_NOTE,
   STAGE_TEXT,
   transitionIntakeFlow,
@@ -27,16 +29,17 @@ import {
   type IntakeFlowState,
 } from "@anxin/core";
 import { callTransport, TIMEOUT_MS } from "@/lib/net";
+import { computeImageStats } from "@/lib/imageStats";
 import { pickFromLibrary, takePhoto } from "@/lib/photo";
 import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 
 /**
- * 录入屏（M5-T6a · 双入口平级 tab）：处方笺（A）/ 药盒（B）两个路由各挂一份本组件。
+ * 录入屏（M5-T6a · 双入口平级 tab；M5-T6b · 本地质量预检）：处方笺（A）/ 药盒（B）两个路由各挂一份本组件。
  * 对齐 web `IntakeFlow.tsx` 的 09-25 改造口径——tab 只在 upload 步渲染（照片进流程后收起）、
  * 点另一颗即切（无确认弹窗，RN 用 replace 实现对方页重挂的「上传态归零」语义）、眉题「拍照录入」常驻。
  * 分工不变：决策全在 core 的 `transitionIntakeFlow`（纯函数、已单测），本组件只是动作解释器 + 渲染。
- * 平台差异四处：取图（expo-image-picker）、像素预检（一期降级不预检，T6-b 补）、提示（sonner-native）、
- * 跳转（expo-router，跨入口 replace）。
+ * 平台差异四处：取图（expo-image-picker）、像素预检（`@/lib/imageStats`：原生缩放 + JS 解码）、
+ * 提示（sonner-native）、跳转（expo-router，跨入口 replace）。
  */
 
 interface IntakeCopy {
@@ -102,11 +105,12 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
           break;
 
         /**
-         * 质量预检：mobile 一期降级不预检（05 任务书 T2/T4 允许——「建议不拦用户」），
-         * core 收到 `stats: null` 即视为主流程照走。T6-b 用原生 resize + JS 解码补实现时换这里。
+         * 本地质量预检（M5-T6b）：原生缩放 + JS 解码出统计值，判读仍由 core 做。
+         * `stats: null` = 这台机器上这次拿不到统计值 → core 视为「无问题」，主流程照走。
+         * 预检只是建议，任何时候都不拦用户（05e §0-1）。
          */
         case "compute_stats":
-          void Promise.resolve(null).then((stats) =>
+          void computeImageStats(action.dataUrl, action.source).then((stats) =>
             dispatch({ type: "stats_checked", stats }),
           );
           break;
@@ -193,10 +197,12 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
     return () => clearInterval(timer);
   }, [state.step]);
 
-  async function start(source: "camera" | "library") {
-    const picked = source === "camera" ? await takePhoto() : await pickFromLibrary();
+  async function start(from: "camera" | "library") {
+    const picked = from === "camera" ? await takePhoto() : await pickFromLibrary();
     if (picked.ok) {
-      dispatch({ type: "file_read", dataUrl: picked.photo.dataUrl });
+      const { dataUrl, uri, width, height } = picked.photo;
+      // uri 与原图边长只服务本机预检（05e §1-3）：下传的仍是 dataUrl，预检不改变上传内容
+      dispatch({ type: "file_read", dataUrl, source: { uri, width, height } });
       return;
     }
     if (picked.kind === "cancelled") return;
@@ -282,12 +288,23 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
       )}
 
       {state.step === "quality" && (
-        <StepCard title="照片质量可能影响识别">
-          {state.issues.map((issue) => (
-            <Text key={issue} className="mt-1 text-sm leading-5 text-foreground">
-              · {issue}
-            </Text>
-          ))}
+        <StepCard title="照片质量可能影响识别" warn>
+          {/* 逐字走 core 的标签与话术（05e §2-T6-b-3：阈值与文案零新增）；底色/描边用 L3 实色令牌，
+              正文用 --foreground——与下方 SAFETY_NOTE 同一档对比度口径（README 的 /alpha 禁写条） */}
+          <View className="gap-2">
+            {state.issues.map((issue) => (
+              <View key={issue} className="rounded-xl border border-risk-l3 bg-risk-l3-tint p-3">
+                <Text className="text-sm leading-5 text-foreground">
+                  <Text className="font-semibold">{QUALITY_ISSUE_LABEL[issue]}：</Text>
+                  {QUALITY_HINTS[issue]}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {/* 两端分叉的唯一一处措辞：web 说「浏览器本地」，RN 说「本机」（05e §2-T6-b-4） */}
+          <Text className="mt-1 text-xs leading-5 text-muted-foreground">
+            这是本机上的拍照建议（不上传、不做识别判断）。质量差时识别会降级为人工补，不会编造。
+          </Text>
           <ActionRow>
             <SecondaryButton label="重拍 / 换一张" onPress={() => dispatch({ type: "retake" })} />
             <PrimaryButton label="仍要上传" onPress={() => dispatch({ type: "retry" })} />
@@ -431,12 +448,16 @@ function StepCard({
   children,
   tone,
   spinning,
+  warn,
 }: {
   title: string;
   children: ReactNode;
   tone?: "danger";
   spinning?: boolean;
+  /** 标题前挂告警三角（web 的质量卡形态）；卡本身保持中性底色，只有失败卡才是红底。 */
+  warn?: boolean;
 }) {
+  const warnColor = useUnstableNativeVariable("--risk-l3");
   return (
     <View
       className={`mt-5 rounded-2xl border p-5 ${
@@ -445,6 +466,9 @@ function StepCard({
     >
       <View className="flex-row items-center gap-2">
         {spinning && <ActivityIndicator />}
+        {warn && (
+          <TriangleAlert size={20} color={warnColor} importantForAccessibility="no" />
+        )}
         <Text
           className={`flex-1 text-xl font-bold ${
             tone === "danger" ? "text-risk-l4" : "text-card-foreground"
