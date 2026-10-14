@@ -1,12 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
@@ -16,32 +13,45 @@ import {
   buildConfirm,
   confirmDraft,
   fetchDraft,
-  identityNeedsManual,
   initialConfirmState,
-  isManualMode,
   rejectDraft,
-  selectableCandidates,
   unmetReasons,
   useIntakeSession,
   type ConfirmFormState,
   type DraftDto,
 } from "@anxin/core";
+import { queryClient } from "@/lib/query";
+import { HealthCard } from "@/components/domain/draft/HealthCard";
+import { IdentityCard } from "@/components/domain/draft/IdentityCard";
+import { NoPlanCard } from "@/components/domain/draft/NoPlanCard";
+import { OriginalPanel } from "@/components/domain/draft/OriginalPanel";
+import {
+  ConfirmResultDialog,
+  InteractionCard,
+  type ConfirmResult,
+} from "@/components/domain/draft/RiskCards";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Text } from "@/components/ui/text";
 
 /**
- * 草稿确认页（M5-T4 最简版）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
- * 表单初值、缺项判定、闸门清单与 confirm 入参一律走 core（`initialConfirmState` / `unmetReasons` /
- * `buildConfirm`），本文件只做渲染与 IO。凡进档案，最后一道门是用户——识别置信度再高也不跳过。
+ * 草稿确认页（05e §2-T6-c）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
+ * 表单初值、缺项判定、闸门清单与 confirm 入参一律走 core，本文件只做渲染与 IO。
+ * 区块组成与渲染顺序逐块对齐 web：原文对照 → 药品身份 → （有计划：医嘱/时间点｜无计划：仅建档）
+ * → 健康建议 → 相互作用 →（处方笺另有范围校验与使用人，归 T6-d）→ 闸门。
  *
- * T4 只覆盖入口 B（药盒：无医嘱线、无计划），故医嘱/时间点/使用人三块留 T5/T6；
- * 入口 B 的 `planDraft` 恒为 null，`unmetReasons` 也就只剩「冲突未选定」与「手动建档缺项」两类。
+ * 入口 B 的 `planDraft` 恒为 null，故本片实到的是「仅建档」那条分支；确认后端上不带计划时
+ * 跳 `/box?plan=<drugId>` 由药箱页直接弹建计划弹窗（两步式录入，同时闭合 05d §2.7 的尾巴）。
  */
 type Page =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "ready"; draft: DraftDto };
-
-const FIELD_CLASS =
-  "mt-1 min-h-[48px] rounded-xl border border-border bg-background px-3 py-2 text-base text-foreground";
 
 export default function DraftRoute() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -63,7 +73,7 @@ export default function DraftRoute() {
         if (!alive) return;
         setPage({
           kind: "error",
-          message: error instanceof Error ? error.message : "草稿读取失败",
+          message: error instanceof Error ? error.message : "草稿不存在或已被处理。",
         });
       });
     return () => {
@@ -103,48 +113,79 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
   const payload = draft.payload;
   const [state, setState] = useState<ConfirmFormState>(() => initialConfirmState(payload));
   const [busy, setBusy] = useState<"" | "confirm" | "reject">("");
-  // 原图只在本机会话内存（core 的 intakeSession，绝不持久化）；取不到 → 纯文字核对
+  const [mismatchOpen, setMismatchOpen] = useState(false);
+  const [result, setResult] = useState<ConfirmResult | null>(null);
+  // 原图只在本机会话内存（core 的 intakeSession，绝不持久化）；取不到 → 文字对照降级
   const imageUrl = useIntakeSession((s) => s.imageByDraftId[draft.id]);
 
   const patch = (partial: Partial<ConfirmFormState>) =>
     setState((prev) => ({ ...prev, ...partial }));
 
   const reasons = useMemo(() => unmetReasons(payload, state), [payload, state]);
-  const candidates = selectableCandidates(payload);
-  const manualMode = isManualMode(payload, state);
   const statusMeta = CONFIRM_STATUS_META[payload.drugDraft.confirmStatus ?? "manual"];
+  const drugName =
+    state.manual.genericName || payload.drugDraft.genericName || payload.item?.drugName || "本药";
+
+  /** 确认/拒绝都会改动药箱、计划、今日任务与健康档 —— 五个键一起失效（web Draft.tsx:98-102 同口径）。 */
+  const invalidate = () => {
+    for (const key of [["drugs"], ["plans"], ["tasks", "today"], ["profile"], ["draft", draft.id]]) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
+
+  /** 确认后跳转：带计划 → 药箱；无计划（入口 B / 降级）→ 药箱并直接打开该药的计划弹窗。 */
+  function goBox(res: ConfirmResult) {
+    if (res.planId) {
+      toast.success("已确认：药品已入药箱，计划已生效");
+      router.replace("/box");
+      return;
+    }
+    toast.success("已确认：药品已入药箱。请为该药手动创建计划（药盒/标签用法不会被自动抄录）");
+    router.replace(`/box?plan=${res.drugId}`);
+  }
 
   async function onConfirm() {
     setBusy("confirm");
     try {
       const res = await confirmDraft(draft.id, buildConfirm(payload, state));
       useIntakeSession.getState().clear([draft.id]);
+      invalidate();
       const risky = (res.interactions?.hits.length ?? 0) > 0 || res.dosageRange?.status === "exceed";
       if (risky) {
-        toast.warning("已建档：本次核对发现风险项，请在药箱内复核计划");
-      } else {
-        toast.success(res.planId ? "已确认：药品已入药箱" : "已确认：药品已入药箱，请手动创建计划");
+        // 有风险发现 → 跳转前让用户真的看到（只标注不阻止）；此时不切只读态，见下面的 `&& !result`
+        setBusy("");
+        setResult(res);
+        return;
       }
-      router.replace("/box");
+      goBox(res);
     } catch {
       setBusy(""); // 文案已由 ApiNotifier 提示（core 统一出口），此处只解除按钮忙碌态
     }
   }
 
-  async function onReject() {
+  async function onReject(reason: string) {
     setBusy("reject");
     try {
-      await rejectDraft(draft.id, "用户点信息不符 → 重新拍摄");
+      await rejectDraft(draft.id, reason);
       useIntakeSession.getState().clear([draft.id]);
+      invalidate();
+      setMismatchOpen(false);
+      if (reason.includes("手动建档")) {
+        toast.info("已标记信息不符，请在药箱页手动建档");
+        router.replace("/box?manual=1");
+        return;
+      }
       toast.info("已标记信息不符，请重新拍摄");
-      // 重新拍摄要回到「这个草稿所属的入口」，而不是固定药盒入口（对齐 web Draft.tsx:129-143 的跳转分叉）
+      // 重新拍摄要回到「这个草稿所属的入口」，而不是固定药盒入口（对齐 web 的跳转分叉）
       router.replace(payload.type === "prescription" ? "/intake/rx" : "/intake/drug");
     } catch {
       setBusy("");
     }
   }
 
-  if (draft.status !== "pending") {
+  // 已确认/已拒绝 → 只读态（防重复操作）。例外：刚确认完、正展示重跑规则检查结果时不切只读，
+  // 否则 invalidate 回读到 status=confirmed 会把本页提前换成只读卡、结果弹窗还没被看到就被卸载。
+  if (draft.status !== "pending" && !result) {
     const confirmed = draft.status === "confirmed";
     return (
       <View className="flex-1 justify-center gap-3 bg-background px-6">
@@ -172,7 +213,9 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
       className="flex-1 bg-background"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48, paddingTop: 16 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48, paddingTop: 16 }}
+      >
         <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">
           逐项核对 · {payload.entry === "A" ? "处方笺" : "药盒"}
         </Text>
@@ -180,140 +223,38 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           草稿确认{payload.item ? `：${payload.item.drugName}` : ""}
         </Text>
         <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-          凡进档案，最后一道门是你。请对照照片逐项核对药名、规格与剂型。
+          凡进档案，最后一道门是你 —— 用量、频次、疗程三项无差别逐项核对，不因识别置信度高而跳过。
         </Text>
 
         <View className="mt-3 flex-row items-center gap-2">
           <View className="rounded-full bg-secondary px-3 py-1">
-            <Text className="text-xs font-semibold text-secondary-foreground" accessibilityLabel={statusMeta.hint}>
+            <Text
+              className="text-xs font-semibold text-secondary-foreground"
+              accessibilityLabel={statusMeta.hint}
+            >
               {statusMeta.label}
             </Text>
           </View>
         </View>
 
-        {payload.degraded && (
-          <View className="mt-4 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
-            <Text className="text-sm leading-5 text-risk-l4">
+        {payload.degraded ? (
+          <View className="mt-4 rounded-xl border-2 border-risk-l4 bg-risk-l4-tint p-3">
+            <Text className="text-sm leading-5 text-foreground">
               识别降级（{payload.degraded.code}）：{payload.degraded.message}
             </Text>
           </View>
-        )}
+        ) : null}
 
-        {imageUrl && (
-          <Image
-            source={{ uri: imageUrl }}
-            resizeMode="contain"
-            style={{ width: "100%", height: 240, borderRadius: 12, marginTop: 16 }}
-            accessibilityLabel="本次上传的原图，用于逐项核对"
-          />
-        )}
-
-        <Section title="药品身份">
-          <Field
-            label="通用名（药名）"
-            value={state.manual.genericName}
-            manual={identityNeedsManual(payload, "genericName")}
-            transcribed={payload.drugDraft.genericName}
-            onChangeText={(v) => patch({ manual: { ...state.manual, genericName: v } })}
-          />
-          <Field
-            label="规格"
-            value={state.manual.specification}
-            manual={identityNeedsManual(payload, "specification")}
-            transcribed={payload.drugDraft.specification ?? ""}
-            onChangeText={(v) => patch({ manual: { ...state.manual, specification: v } })}
-          />
-          <Field
-            label="剂型"
-            value={state.manual.form}
-            manual={identityNeedsManual(payload, "form")}
-            transcribed={payload.drugDraft.form ?? ""}
-            onChangeText={(v) => patch({ manual: { ...state.manual, form: v } })}
-          />
-          {!manualMode && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => patch({ useManual: true })}
-              className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-border active:opacity-80"
-            >
-              <Text className="text-base text-card-foreground">以上都不对 · 改手动建档</Text>
-            </Pressable>
-          )}
-          {manualMode && (
-            <View className="mt-3 flex-row gap-3">
-              <View className="flex-1">
-                <Text className="text-sm text-muted-foreground">库存数量</Text>
-                <TextInput
-                  className={FIELD_CLASS}
-                  keyboardType="number-pad"
-                  value={state.manual.stockValue}
-                  onChangeText={(v) => patch({ manual: { ...state.manual, stockValue: v } })}
-                />
-              </View>
-              <View className="w-24">
-                <Text className="text-sm text-muted-foreground">单位</Text>
-                <TextInput
-                  className={FIELD_CLASS}
-                  value={state.manual.stockUnit}
-                  onChangeText={(v) => patch({ manual: { ...state.manual, stockUnit: v } })}
-                />
-              </View>
-            </View>
-          )}
-        </Section>
-
-        {candidates.length > 0 && !manualMode && (
-          <Section title="库内有多条候选（系统不选边）">
-            {candidates.map((cand) => {
-              const active = state.selectedCandidateId === cand.id;
-              return (
-                <Pressable
-                  key={cand.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
-                  onPress={() => patch({ selectedCandidateId: cand.id })}
-                  className={`mt-2 min-h-[56px] justify-center rounded-xl border p-3 ${
-                    active ? "border-primary bg-secondary" : "border-border bg-background"
-                  }`}
-                >
-                  <Text className="text-base font-semibold text-foreground">
-                    {cand.genericName} {cand.specification ?? ""}
-                  </Text>
-                  <Text className="mt-1 text-xs text-muted-foreground">
-                    {[cand.brandName, cand.form, cand.manufacturer].filter(Boolean).join(" · ")}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </Section>
-        )}
-
-        {!payload.planDraft && (
-          <Section title="用法用量（本照片不含）">
-            <Text className="text-sm leading-5 text-muted-foreground">
-              {payload.labelNotice
-                ? "照片里是医院标签：标签上的用法不会被自动抄录（PRD 边界）。"
-                : "药盒照片只提供药品身份，用法用量不会被自动抄录。"}
-              建档后请在药箱里手动创建服药计划。
-            </Text>
-          </Section>
-        )}
-
-        {(payload.interactions?.hits.length ?? 0) > 0 && (
-          <Section title="相互作用提示（只标注，不阻止）">
-            {payload.interactions.hits.map((hit, i) => (
-              <Text
-                key={`${hit.level}-${i}`}
-                className="mt-1 text-sm leading-5 text-foreground"
-              >
-                · {hit.level}：{hit.drugNames.join(" + ")} —— {hit.note}（来源：{hit.source}）
-              </Text>
-            ))}
-          </Section>
-        )}
+        <View className="mt-4 gap-4">
+          <OriginalPanel payload={payload} imageUrl={imageUrl} />
+          <IdentityCard payload={payload} state={state} patch={patch} />
+          {payload.planDraft ? null : <NoPlanCard payload={payload} />}
+          <HealthCard payload={payload} state={state} patch={patch} />
+          <InteractionCard result={payload.interactions ?? null} />
+        </View>
 
         <View className="mt-6 rounded-2xl border border-border bg-card p-4">
-          {reasons.length > 0 && (
+          {reasons.length > 0 ? (
             <View className="mb-3 gap-1">
               {reasons.map((reason) => (
                 <Text key={reason} className="text-sm leading-5 text-foreground">
@@ -321,32 +262,38 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
                 </Text>
               ))}
             </View>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            disabled={reasons.length > 0 || busy !== ""}
-            onPress={onConfirm}
-            className={`min-h-[56px] items-center justify-center rounded-xl bg-primary active:opacity-80 ${
-              reasons.length > 0 || busy !== "" ? "opacity-50" : ""
-            }`}
-          >
-            <Text className="text-lg font-semibold text-primary-foreground">
-              {busy === "confirm" ? "正在写入…" : "确认建档（计划稍后手动创建）"}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy !== ""}
-            onPress={onReject}
-            className="mt-2 min-h-[52px] items-center justify-center rounded-xl border border-border active:opacity-80"
-          >
-            <Text className="text-lg font-medium text-card-foreground">信息不符 · 重新拍摄</Text>
-          </Pressable>
+          ) : null}
+          <View className="flex-row gap-3">
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy !== ""}
+              onPress={() => setMismatchOpen(true)}
+              className="min-h-[56px] flex-1 items-center justify-center rounded-xl border border-border bg-background active:opacity-80"
+            >
+              <Text className="text-lg font-medium text-foreground">信息不符</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={reasons.length > 0 || busy !== ""}
+              onPress={onConfirm}
+              className={`min-h-[56px] flex-[2] items-center justify-center rounded-xl bg-primary active:opacity-80 ${
+                reasons.length > 0 || busy !== "" ? "opacity-50" : ""
+              }`}
+            >
+              <Text className="text-lg font-semibold text-primary-foreground">
+                {busy === "confirm"
+                  ? "正在写入…"
+                  : payload.planDraft
+                    ? "确认建档并生效计划"
+                    : "确认建档（计划稍后手动创建）"}
+              </Text>
+            </Pressable>
+          </View>
           <Text className="mt-3 text-xs leading-5 text-muted-foreground">
-            确认即留痕：药品、确认时间与关键字段快照写入来源记录。
+            确认即留痕：药品 ID、确认时间、确认方式与关键字段快照写入来源记录；
+            医嘱字段若被你修正，标注会从「抄录」降为「自填」。
           </Text>
-          {/* §6 第 15 条：物理返回的语义要在界面上说一句，别让人猜。
-              返回只是退回录入屏（草稿仍在那份识别结果里），本页未提交的填写随屏幕出栈丢掉。 */}
+          {/* §6 第 15 条：物理返回的语义要在界面上说一句，别让人猜。 */}
           <Text className="mt-1 text-xs leading-5 text-muted-foreground">
             按返回键不会丢掉这份草稿，回到上一步还能继续核对其它草稿；但这页上还没提交的修改不会保留。
           </Text>
@@ -354,55 +301,46 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
 
         <Stack.Screen options={{ title: "草稿确认" }} />
       </ScrollView>
+
+      <Dialog open={mismatchOpen} onOpenChange={(o) => !o && setMismatchOpen(false)}>
+        <DialogContent className="max-h-[88vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-card-foreground">信息不符</DialogTitle>
+            <DialogDescription className="text-sm leading-5 text-muted-foreground">
+              识别结果与实物不一致时，回到重拍或手动建档 —— 系统不猜测。本草稿会被标记为已拒绝并留痕。
+            </DialogDescription>
+          </DialogHeader>
+          <View className="gap-2">
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy !== ""}
+              onPress={() => onReject("用户点信息不符 → 重新拍摄")}
+              className="min-h-[56px] items-center justify-center rounded-xl border border-border bg-background active:opacity-80"
+            >
+              <Text className="text-lg font-medium text-foreground">重新拍摄</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy !== ""}
+              onPress={() => onReject("用户点信息不符 → 手动建档")}
+              className="min-h-[56px] items-center justify-center rounded-xl bg-primary active:opacity-80"
+            >
+              <Text className="text-lg font-semibold text-primary-foreground">手动建档</Text>
+            </Pressable>
+          </View>
+        </DialogContent>
+      </Dialog>
+
+      {result ? (
+        <ConfirmResultDialog
+          result={result}
+          drugName={drugName}
+          onDone={() => {
+            setResult(null);
+            goBox(result);
+          }}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View className="mt-5 rounded-2xl border border-border bg-card p-4">
-      <Text className="text-lg font-semibold text-card-foreground">{title}</Text>
-      <View className="mt-2">{children}</View>
-    </View>
-  );
-}
-
-/**
- * 单个身份字段：needsManual 覆盖的项**留空待填**（core 的初值规则，绝不预填猜测），
- * 其余显示抄录值供核对（T4 最简版不允许改写已识别值，改写在 T5 与 web 对齐）。
- */
-function Field({
-  label,
-  value,
-  manual,
-  transcribed,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  manual: boolean;
-  transcribed: string;
-  onChangeText: (text: string) => void;
-}) {
-  if (!manual) {
-    return (
-      <View className="mt-3">
-        <Text className="text-sm text-muted-foreground">{label}</Text>
-        <Text className="mt-1 text-lg text-foreground">{transcribed || "（空）"}</Text>
-      </View>
-    );
-  }
-  return (
-    <View className="mt-3">
-      <Text className="text-sm text-foreground">{label} · 需你填写（系统不预填猜测）</Text>
-      <TextInput
-        className={FIELD_CLASS}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="对照药盒填写"
-        placeholderTextColor="#9ca3af"
-      />
-    </View>
-  );
-}
-

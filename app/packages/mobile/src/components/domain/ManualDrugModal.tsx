@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { DOSE_UNITS } from "@anxin/shared";
 import { Button } from "@/components/ui/button";
@@ -31,11 +31,14 @@ export interface ManualDrugForm {
 export function ManualDrugModal({
   open,
   busy,
+  prefillName,
   onClose,
   onSave,
 }: {
   open: boolean;
   busy: boolean;
+  /** 咨询建议卡路径带过来的药名（`?prefillDrug=`）：只预填药名，其余字段仍须自己填并确认。 */
+  prefillName?: string;
   onClose: () => void;
   onSave: (data: ManualDrugForm) => void;
 }) {
@@ -44,6 +47,10 @@ export function ManualDrugModal({
   const [formValue, setFormValue] = useState("");
   const [stock, setStock] = useState("1");
   const [stockUnit, setStockUnit] = useState<string>("片");
+
+  useEffect(() => {
+    if (open && prefillName) setGenericName(prefillName);
+  }, [open, prefillName]);
 
   const valid =
     genericName.trim().length > 0 && specification.trim().length > 0 && formValue.trim().length > 0;

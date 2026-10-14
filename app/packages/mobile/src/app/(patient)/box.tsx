@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View, type ColorValue } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import {
@@ -70,6 +70,42 @@ export default function Box() {
   const plans = plansQuery.data ?? [];
   const loading = drugsQuery.isPending || plansQuery.isPending;
   const loadError = drugsQuery.error ?? plansQuery.error;
+
+  /**
+   * 跨页交接参数（05e §2-T6-c，闭合 05d §2.7 里「未接 `?plan=` / `?manual=1&prefillDrug=`」那条尾巴）：
+   *   `?manual=1` → 信息不符后手动建档；`?plan=<drugId>` → 入口 B 建档后直接弹该药建计划弹窗（两步式录入）；
+   *   `?prefillDrug=名` → 手动建档预填药名，其余字段仍需自己填并确认（manual 门禁不豁免）。
+   * 处理完立即清参数，防返回或重挂重复弹窗；找不到药品走页内红条可见报错，不静默吞。
+   */
+  const params = useLocalSearchParams<{ plan?: string; manual?: string; prefillDrug?: string }>();
+  const [manualPrefillName, setManualPrefillName] = useState<string | undefined>(undefined);
+  // 确认页刚 invalidate 就跳过来时，缓存里还是失效前的旧列表；只补拉一次，拉完仍找不到才算真没有
+  const planRefetchTried = useRef(false);
+  useEffect(() => {
+    if (!params.manual && !params.plan) return;
+    if (loading) return; // plan 分支要拿 drug 对象，等药箱数据到位再开
+    if (params.manual) {
+      setManualPrefillName(typeof params.prefillDrug === "string" ? params.prefillDrug : undefined);
+      setShowManual(true);
+      router.setParams({ manual: undefined, prefillDrug: undefined });
+    }
+    if (params.plan) {
+      const drug = drugs.find((d) => d.id === params.plan);
+      if (drug) {
+        setPlanTarget({ drug, plan: plans.find((p) => p.drugId === drug.id) });
+        planRefetchTried.current = false;
+        router.setParams({ plan: undefined });
+        return;
+      }
+      if (!planRefetchTried.current) {
+        planRefetchTried.current = true;
+        void drugsQuery.refetch(); // refetch 改变 drugs → 本 effect 重跑
+        return;
+      }
+      setActionError("未找到要建计划的药品，请下拉刷新后重试");
+      router.setParams({ plan: undefined });
+    }
+  }, [params.manual, params.plan, params.prefillDrug, loading, drugs, plans, router, drugsQuery]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["drugs"] });
@@ -392,6 +428,7 @@ export default function Box() {
       <ManualDrugModal
         open={showManual}
         busy={createDrug.isPending}
+        prefillName={manualPrefillName}
         onClose={() => setShowManual(false)}
         onSave={(form) => createDrug.mutate(form)}
       />
