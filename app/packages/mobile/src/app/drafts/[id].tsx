@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,6 +9,8 @@ import {
   View,
 } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
+import { useUnstableNativeVariable } from "nativewind";
+import { AlertTriangle } from "lucide-react-native";
 import { toast } from "sonner-native";
 import { CONFIRM_STATUS_META } from "@anxin/shared";
 import {
@@ -26,14 +27,16 @@ import {
   type ConfirmFormState,
   type DraftDto,
 } from "@anxin/core";
+import { NoPlanCard } from "@/components/domain/draft/NoPlanCard";
+import { OriginalPanel } from "@/components/domain/draft/OriginalPanel";
 
 /**
- * 草稿确认页（M5-T4 最简版）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
+ * 草稿确认页（M5-T4 最简版 → M5-T6c 逐块对齐 web）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
  * 表单初值、缺项判定、闸门清单与 confirm 入参一律走 core（`initialConfirmState` / `unmetReasons` /
  * `buildConfirm`），本文件只做渲染与 IO。凡进档案，最后一道门是用户——识别置信度再高也不跳过。
  *
- * T4 只覆盖入口 B（药盒：无医嘱线、无计划），故医嘱/时间点/使用人三块留 T5/T6；
- * 入口 B 的 `planDraft` 恒为 null，`unmetReasons` 也就只剩「冲突未选定」与「手动建档缺项」两类。
+ * T6-c1 已补：OriginalPanel（原图 viewer / 本条目原文 / 处方头部 / 人工补清单 / 隐私四步 / 照片类型）、
+ * NoPlanCard（原自造段换掉）、页头与降级卡逐字对齐 web。身份三态/相互作用/健康/拒绝 Dialog/刷新与跳转归 T6-c2。
  */
 type Page =
   | { kind: "loading" }
@@ -103,8 +106,10 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
   const payload = draft.payload;
   const [state, setState] = useState<ConfirmFormState>(() => initialConfirmState(payload));
   const [busy, setBusy] = useState<"" | "confirm" | "reject">("");
-  // 原图只在本机会话内存（core 的 intakeSession，绝不持久化）；取不到 → 纯文字核对
+  // 原图只在本机会话内存（core 的 intakeSession，绝不持久化）；取不到 → OriginalPanel 走文字对照降级
   const imageUrl = useIntakeSession((s) => s.imageByDraftId[draft.id]);
+  // 图标不吃 TextClassContext，颜色显式给（05d §7-7）
+  const iconDanger = useUnstableNativeVariable("--risk-l4");
 
   const patch = (partial: Partial<ConfirmFormState>) =>
     setState((prev) => ({ ...prev, ...partial }));
@@ -180,7 +185,9 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           草稿确认{payload.item ? `：${payload.item.drugName}` : ""}
         </Text>
         <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-          凡进档案，最后一道门是你。请对照照片逐项核对药名、规格与剂型。
+          凡进档案，最后一道门是你 —— 用量、频次、疗程三项
+          <Text className="font-semibold text-foreground">无差别逐项核对</Text>
+          ，不因识别置信度高而跳过。
         </Text>
 
         <View className="mt-3 flex-row items-center gap-2">
@@ -192,21 +199,23 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         </View>
 
         {payload.degraded && (
-          <View className="mt-4 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
-            <Text className="text-sm leading-5 text-risk-l4">
-              识别降级（{payload.degraded.code}）：{payload.degraded.message}
+          <View className="mt-4 flex-row items-start gap-2 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+            <AlertTriangle
+              size={18}
+              color={iconDanger}
+              importantForAccessibility="no"
+              style={{ marginTop: 1 }}
+            />
+            <Text className="flex-1 text-sm leading-5 text-risk-l4">
+              <Text className="font-semibold">识别降级（{payload.degraded.code}）：</Text>
+              {payload.degraded.message}
             </Text>
           </View>
         )}
 
-        {imageUrl && (
-          <Image
-            source={{ uri: imageUrl }}
-            resizeMode="contain"
-            style={{ width: "100%", height: 240, borderRadius: 12, marginTop: 16 }}
-            accessibilityLabel="本次上传的原图，用于逐项核对"
-          />
-        )}
+        <View className="mt-4">
+          <OriginalPanel payload={payload} imageUrl={imageUrl} />
+        </View>
 
         <Section title="药品身份">
           <Field
@@ -288,15 +297,11 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           </Section>
         )}
 
+        {/* 原自造段换成 web 的 NoPlanCard 逐字（顺带收掉「PRD 边界」工程词，05d §6-11 的回写项） */}
         {!payload.planDraft && (
-          <Section title="用法用量（本照片不含）">
-            <Text className="text-sm leading-5 text-muted-foreground">
-              {payload.labelNotice
-                ? "照片里是医院标签：标签上的用法不会被自动抄录（PRD 边界）。"
-                : "药盒照片只提供药品身份，用法用量不会被自动抄录。"}
-              建档后请在药箱里手动创建服药计划。
-            </Text>
-          </Section>
+          <View className="mt-5">
+            <NoPlanCard payload={payload} />
+          </View>
         )}
 
         {(payload.interactions?.hits.length ?? 0) > 0 && (
