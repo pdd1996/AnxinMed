@@ -137,6 +137,8 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
   const statusMeta = CONFIRM_STATUS_META[payload.drugDraft.confirmStatus ?? "manual"];
   const drugName =
     state.manual.genericName || payload.drugDraft.genericName || payload.item?.drugName || "本药";
+  // 深链/冷启动直达本页时栈里没有录入屏，「回到上一步还能核对其它草稿」不成立（05e §2-T6-e）。
+  const canGoBack = router.canGoBack();
 
   /** 确认/拒绝都会改动药箱、计划、今日任务与健康档 —— 五个键一起失效（web Draft.tsx:98-102 同口径）。 */
   const invalidate = () => {
@@ -316,7 +318,9 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           </Text>
           {/* §6 第 15 条：物理返回的语义要在界面上说一句，别让人猜。 */}
           <Text className="mt-1 text-xs leading-5 text-muted-foreground">
-            按返回键不会丢掉这份草稿，回到上一步还能继续核对其它草稿；但这页上还没提交的修改不会保留。
+            {canGoBack
+              ? "按返回键不会丢掉这份草稿，回到上一步还能继续核对其它草稿；但这页上还没提交的修改不会保留。"
+              : "按返回键不会丢掉这份草稿，草稿仍在服务端等待确认；但这页上还没提交的修改不会保留。"}
           </Text>
         </View>
 
