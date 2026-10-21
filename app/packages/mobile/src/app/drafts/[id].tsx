@@ -21,15 +21,18 @@ import {
   type DraftDto,
 } from "@anxin/core";
 import { queryClient } from "@/lib/query";
-import { HealthCard } from "@/components/domain/draft/HealthCard";
+import { isHHMM } from "@/lib/time";
+import { HealthCard, WhoCard } from "@/components/domain/draft/HealthCard";
 import { IdentityCard } from "@/components/domain/draft/IdentityCard";
 import { NoPlanCard } from "@/components/domain/draft/NoPlanCard";
 import { OriginalPanel } from "@/components/domain/draft/OriginalPanel";
 import {
   ConfirmResultDialog,
+  DosageRangeCard,
   InteractionCard,
   type ConfirmResult,
 } from "@/components/domain/draft/RiskCards";
+import { SigCard, TimesCard } from "@/components/domain/draft/SigCard";
 import {
   Dialog,
   DialogContent,
@@ -40,13 +43,14 @@ import {
 import { Text } from "@/components/ui/text";
 
 /**
- * 草稿确认页（05e §2-T6-c）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
+ * 草稿确认页（05e §2-T6-c / §2-T6-d）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
  * 表单初值、缺项判定、闸门清单与 confirm 入参一律走 core，本文件只做渲染与 IO。
- * 区块组成与渲染顺序逐块对齐 web：原文对照 → 药品身份 → （有计划：医嘱/时间点｜无计划：仅建档）
- * → 健康建议 → 相互作用 →（处方笺另有范围校验与使用人，归 T6-d）→ 闸门。
+ * 区块组成与渲染顺序逐块对齐 web：原文对照 → 药品身份 →（有计划：医嘱/时间点｜无计划：仅建档）
+ * → 健康建议 → 相互作用 →（有计划：说明书范围校验）→（处方笺：使用人）→ 闸门。
  *
- * 入口 B 的 `planDraft` 恒为 null，故本片实到的是「仅建档」那条分支；确认后端上不带计划时
- * 跳 `/box?plan=<drugId>` 由药箱页直接弹建计划弹窗（两步式录入，同时闭合 05d §2.7 的尾巴）。
+ * 入口 B 的 `planDraft` 恒为 null，走「仅建档」分支；入口 A 走医嘱 + 时间点 + 范围校验 + 使用人。
+ * 确认后端上不带计划时跳 `/box?plan=<drugId>` 由药箱页直接弹建计划弹窗（两步式录入，
+ * 同时闭合 05d §2.7 的尾巴）。
  */
 type Page =
   | { kind: "loading" }
@@ -121,7 +125,15 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
   const patch = (partial: Partial<ConfirmFormState>) =>
     setState((prev) => ({ ...prev, ...partial }));
 
-  const reasons = useMemo(() => unmetReasons(payload, state), [payload, state]);
+  // core 的闸门只保证「至少一个时间点」；RN 用可编辑的时/分框，还需拦住编辑中的非法串
+  // （web 的 `type="time"` 由控件本身保证 HH:MM，这条是平台适配后补的等价约束）。
+  const reasons = useMemo(() => {
+    const list = unmetReasons(payload, state);
+    if (payload.planDraft && state.times.some((time) => !isHHMM(time))) {
+      list.push("请把服药时间点填成 24 小时制（时 0–23 / 分 0–59，如 08:30）");
+    }
+    return list;
+  }, [payload, state]);
   const statusMeta = CONFIRM_STATUS_META[payload.drugDraft.confirmStatus ?? "manual"];
   const drugName =
     state.manual.genericName || payload.drugDraft.genericName || payload.item?.drugName || "本药";
@@ -248,9 +260,18 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         <View className="mt-4 gap-4">
           <OriginalPanel payload={payload} imageUrl={imageUrl} />
           <IdentityCard payload={payload} state={state} patch={patch} />
-          {payload.planDraft ? null : <NoPlanCard payload={payload} />}
+          {payload.planDraft ? (
+            <>
+              <SigCard payload={payload} state={state} patch={patch} />
+              <TimesCard payload={payload} state={state} patch={patch} />
+            </>
+          ) : (
+            <NoPlanCard payload={payload} />
+          )}
           <HealthCard payload={payload} state={state} patch={patch} />
           <InteractionCard result={payload.interactions ?? null} />
+          {payload.planDraft ? <DosageRangeCard result={payload.dosageRange ?? null} /> : null}
+          {payload.type === "prescription" ? <WhoCard state={state} patch={patch} /> : null}
         </View>
 
         <View className="mt-6 rounded-2xl border border-border bg-card p-4">

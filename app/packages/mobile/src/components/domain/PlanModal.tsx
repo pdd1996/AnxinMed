@@ -15,6 +15,7 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Text } from "@/components/ui/text";
+import { isTimePartsValid, joinPart, splitTime, type TimeParts } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 export interface PlanFormResult {
@@ -41,39 +42,6 @@ const CYCLES: { value: CycleType; title: string; desc: string }[] = [
   { value: "stock", title: "用完为止", desc: "按库存推算可用天数" },
   { value: "closed", title: "自定义天数", desc: "封闭式 · 推算结束日期" },
 ];
-
-/** 时间点合法性：HH:MM，24 小时制，与 web `type="time"` 的取值域一致。 */
-function isHHMM(value: string): boolean {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
-}
-
-function joinPart(head: string, tail: string): string {
-  return `${head.padStart(2, "0")}:${tail.padStart(2, "0")}`;
-}
-
-/**
- * 「时 / 分」两框的可编辑原文。
- * ⚠️ 框的 `value` 必须是**用户敲出来的原文**，不能是补零后的规范串：受控值一补零回写，
- * 框里恒为两位，`maxLength={2}` 就把后续按键整条吃掉（"08"+"2"="082" 超长 → 连
- * onChangeText 都不触发），而退格删成一位又立刻被补回两位 —— 结果是四框全敲不进数字
- * （10-03 用户真机反馈「编辑时间没法输入数字」）。规范 `HH:MM` 只在保存/校验时拼。
- */
-interface TimeParts {
-  hour: string;
-  minute: string;
-}
-
-function splitTime(time: string): TimeParts {
-  const [hour = "", minute = ""] = time.split(":");
-  return { hour, minute };
-}
-
-/** 单框是否填全且落在取值域内（空框、超 23 时 / 59 分都算非法）。 */
-function isTimePartsValid({ hour, minute }: TimeParts): boolean {
-  return (
-    /^\d{1,2}$/.test(hour) && /^\d{1,2}$/.test(minute) && isHHMM(joinPart(hour, minute))
-  );
-}
 
 /**
  * 手动建 / 编辑服药计划（M5-T5c，照 web `domain/PlanModal.tsx` 的字段与判定，渲染层换 RN）。

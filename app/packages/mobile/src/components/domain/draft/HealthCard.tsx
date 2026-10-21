@@ -1,5 +1,5 @@
 import { TextInput, Pressable, View } from "react-native";
-import { Info, UserRound } from "lucide-react-native";
+import { Info, ShieldQuestion, UserRound } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import type { ConfirmFormState, DraftPayload } from "@anxin/core";
 import {
@@ -90,6 +90,58 @@ export function HealthCard({
             不勾选即不写入，随时可在「我的 · 健康信息」手动补。
           </Text>
         </View>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * 「这是给谁用的药」（T6-d，对齐 web `HealthCard.tsx` 的 WhoCard，PRD §7.2.5 / §10.2）。
+ * 新管线结构性丢弃处方前记（姓名/性别/年龄/门诊号），前端拿不到患者信息、无法比对 —— 隐私红线优先。
+ * 故对处方草稿恒定提示并作为闸门之一（core 的 unmetReasons 兜底），由用户自己核对使用人。
+ */
+export function WhoCard({
+  state,
+  patch,
+}: {
+  state: ConfirmFormState;
+  patch: (partial: Partial<ConfirmFormState>) => void;
+}) {
+  const l3 = useUnstableNativeVariable("--risk-l3");
+  const checked = state.whoConfirmed;
+  return (
+    <Card>
+      <CardHeader>
+        <View className="flex-row items-center gap-2">
+          <Icon as={ShieldQuestion} size={20} color={l3} />
+          <CardTitle className="text-lg text-card-foreground">这是给谁用的药？</CardTitle>
+        </View>
+      </CardHeader>
+      <CardContent className="gap-3">
+        <View className="flex-row items-start gap-2 rounded-xl border-2 border-risk-l3 bg-risk-l3-tint p-3">
+          <Icon as={UserRound} size={20} color={l3} style={{ marginTop: 2 }} />
+          <Text className="flex-1 text-sm leading-5 text-foreground">
+            处方笺上的患者信息（姓名 / 性别 / 年龄 / 门诊号）已按隐私红线整块丢弃，系统无法替你核对使用人。
+            家里多人用药时，请自己确认这盒药是给谁用的 —— 药箱与提醒都记在当前账号下。
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked }}
+          accessibilityLabel="我已确认本药的使用人"
+          onPress={() => patch({ whoConfirmed: !checked })}
+          className="min-h-[48px] flex-row items-center gap-3"
+        >
+          <View
+            className={cn(
+              "size-6 items-center justify-center rounded border-2",
+              checked ? "border-primary bg-primary" : "border-border bg-background",
+            )}
+          >
+            {checked ? <Text className="text-sm font-bold text-primary-foreground">✓</Text> : null}
+          </View>
+          <Text className="flex-1 text-base font-semibold text-foreground">我已确认本药的使用人</Text>
+        </Pressable>
       </CardContent>
     </Card>
   );

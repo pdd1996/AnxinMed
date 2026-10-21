@@ -1,5 +1,6 @@
 import { Pressable, View } from "react-native";
 import {
+  Check,
   HeartPulse,
   Info,
   OctagonX,
@@ -38,6 +39,8 @@ import { cn } from "@/lib/utils";
 export type ConfirmResult = Awaited<ReturnType<typeof confirmDraft>>;
 type Interaction = NonNullable<DraftPayload["interactions"]>;
 type Hit = Interaction["hits"][number];
+type DosageRange = NonNullable<DraftPayload["dosageRange"]>;
+type Issue = DosageRange["issues"][number];
 
 const LEVEL_META: Record<InteractionLevel, { icon: LucideIcon; shell: string }> = {
   禁忌: { icon: OctagonX, shell: "border-risk-l4 bg-risk-l4-tint" },
@@ -120,6 +123,73 @@ export function InteractionCard({ result }: { result: Interaction | null }) {
             </Text>
           </View>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * 说明书范围校验结果区（T6-d，对齐 web `RiskCards.tsx` 的 DosageRangeCard，PRD §8.3）。
+ * pass / exceed / none 三态，仅标注留痕、绝不阻止创建。
+ */
+export function DosageRangeCard({ result }: { result: DosageRange | null }) {
+  const primary = useUnstableNativeVariable("--primary");
+  const muted = useUnstableNativeVariable("--muted-foreground");
+  const ok = useUnstableNativeVariable("--risk-l1");
+  const warn = useUnstableNativeVariable("--risk-l3");
+  const status = result?.status ?? "none";
+  const issues: Issue[] = result?.issues ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <View className="flex-row flex-wrap items-center gap-2">
+          <Icon as={Info} size={20} color={primary} />
+          <CardTitle className="text-lg text-card-foreground">说明书范围校验</CardTitle>
+          <Text className="text-xs text-muted-foreground">对照说明书库上限 · 仅标注不阻止</Text>
+        </View>
+      </CardHeader>
+      <CardContent>
+        {status === "pass" ? (
+          <View className="flex-row items-start gap-2 rounded-xl border-2 border-risk-l1 bg-risk-l1-tint p-3">
+            <Icon as={Check} size={20} color={ok} style={{ marginTop: 2 }} />
+            <Text className="flex-1 text-sm leading-5 text-foreground">
+              医嘱在说明书范围内{result?.basis ? `（依据：${result.basis}）` : ""}。
+            </Text>
+          </View>
+        ) : null}
+        {status === "exceed" ? (
+          <View className="gap-2">
+            {issues.map((issue, i) => (
+              <View
+                key={i}
+                className="flex-row items-start gap-2 rounded-xl border-2 border-risk-l3 bg-risk-l3-tint p-3"
+              >
+                <Icon as={TriangleAlert} size={20} color={warn} style={{ marginTop: 2 }} />
+                <Text className="flex-1 text-sm leading-5 text-foreground">
+                  <Text className="font-bold">
+                    {issue.field === "frequency" ? "频次" : "单次用量"}
+                  </Text>
+                  {` 处方/填写值 ${issue.planValue} · 说明书上限 ${issue.insertMax}`}
+                  {"\n"}
+                  <Text className="text-xs text-muted-foreground">{issue.insertNote}</Text>
+                </Text>
+              </View>
+            ))}
+            <Text className="text-xs leading-5 text-muted-foreground">
+              仅标注留痕、不阻止确认（处方可能有意超说明书用量）。请向开方医生或药师确认后再服用。
+              {result?.basis ? ` 依据：${result.basis}` : ""}
+            </Text>
+          </View>
+        ) : null}
+        {status === "none" ? (
+          <View className="flex-row items-start gap-2 rounded-xl border border-border bg-muted p-3">
+            <Icon as={Info} size={20} color={muted} style={{ marginTop: 2 }} />
+            <Text className="flex-1 text-sm leading-5 text-foreground">
+              {result?.note ?? "说明书库未收录该药的结构化用法用量，本次跳过范围校验（跳过 ≠ 无风险）。"}
+            </Text>
+          </View>
+        ) : null}
       </CardContent>
     </Card>
   );
