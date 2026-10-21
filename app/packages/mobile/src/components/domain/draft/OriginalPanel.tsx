@@ -227,7 +227,7 @@ export function OriginalPanel({
           </Text>
           {payload.labelNotice ? (
             <TintNote icon={AlertTriangle}>
-              检测到医院标签层：标签上的用法不会被自动抄录（V2.1 已删除该能力）。本次仅建档，请到药箱手动创建计划。
+              检测到医院标签层：标签上的用法不会被自动抄录。本次仅建档，请到药箱手动创建计划。
             </TintNote>
           ) : null}
         </CardContent>

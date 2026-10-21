@@ -226,7 +226,10 @@ export default function Box() {
         <Pressable
           accessibilityRole="button"
           disabled={busy}
-          onPress={() => setShowManual(true)}
+          onPress={() => {
+            setManualPrefillName(undefined);
+            setShowManual(true);
+          }}
           className={`min-h-[52px] flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card active:opacity-80 ${
             busy ? "opacity-50" : ""
           }`}

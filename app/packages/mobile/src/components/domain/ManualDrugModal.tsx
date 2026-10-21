@@ -48,8 +48,14 @@ export function ManualDrugModal({
   const [stock, setStock] = useState("1");
   const [stockUnit, setStockUnit] = useState<string>("片");
 
+  // 每次打开按 prefillName 重置（web ManualDrugModal 同语义）：只预填药名，其余字段保持空
   useEffect(() => {
-    if (open && prefillName) setGenericName(prefillName);
+    if (!open) return;
+    setGenericName(prefillName ?? "");
+    setSpecification("");
+    setFormValue("");
+    setStock("1");
+    setStockUnit("片");
   }, [open, prefillName]);
 
   const valid =
