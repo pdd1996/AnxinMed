@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View, type ColorValue } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
+import { toast } from "sonner-native";
 import {
   AlertTriangle,
   Camera,
@@ -60,6 +61,7 @@ export default function Box() {
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const riskL4 = useUnstableNativeVariable("--risk-l4");
   const [showManual, setShowManual] = useState(false);
+  const [manualPrefillName, setManualPrefillName] = useState<string | null>(null);
   const [planTarget, setPlanTarget] = useState<{ drug: DrugItem; plan?: PlanItem } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DrugItem | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -70,6 +72,35 @@ export default function Box() {
   const plans = plansQuery.data ?? [];
   const loading = drugsQuery.isPending || plansQuery.isPending;
   const loadError = drugsQuery.error ?? plansQuery.error;
+
+  /**
+   * 确认页（M5-T6c）跳转来的一次性意图（对齐 web `Box.tsx:45-68`）：
+   *   ?plan=<drugId>   → 入口B 药盒建档不产生计划，直接打开该药的计划弹窗（两步式录入）
+   *   ?manual=1        → 信息不符后手动建档（PRD §7.2.6）
+   *   ?prefillDrug=名  → 咨询建议卡「手动建档」路径（M4-T6）：打开弹窗并预填药名，其余字段仍需手填
+   * 处理完清参数（防回退/重挂重复弹窗）；药不在库里就可见报错，不静默吞。
+   */
+  const params = useLocalSearchParams<{ manual?: string; plan?: string; prefillDrug?: string }>();
+  const intentHandled = useRef(false);
+  useEffect(() => {
+    if (intentHandled.current) return;
+    if ((!params.manual && !params.plan) || loading) return;
+    intentHandled.current = true;
+    if (params.manual) {
+      setManualPrefillName(params.prefillDrug ?? null);
+      setShowManual(true);
+    }
+    if (params.plan) {
+      const drug = drugs.find((d) => d.id === params.plan);
+      if (drug) {
+        setPlanTarget({ drug, plan: plans.find((p) => p.drugId === drug.id) });
+      } else {
+        toast.error("未找到要建计划的药品，请下拉刷新后重试");
+      }
+    }
+    router.setParams({ manual: undefined, plan: undefined, prefillDrug: undefined });
+    // drugs/plans 每次 refetch 会换引用，重跑由上面的 intentHandled 守住（语义与 web 的清参数等效）
+  }, [params.manual, params.plan, params.prefillDrug, loading, drugs, plans, router]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["drugs"] });
@@ -190,7 +221,11 @@ export default function Box() {
         <Pressable
           accessibilityRole="button"
           disabled={busy}
-          onPress={() => setShowManual(true)}
+          onPress={() => {
+            // 手动点开走干净的空表单：不让上一次 ?prefillDrug= 的预填名留在框里（web 侧没清，属遗留）
+            setManualPrefillName(null);
+            setShowManual(true);
+          }}
           className={`min-h-[52px] flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card active:opacity-80 ${
             busy ? "opacity-50" : ""
           }`}
@@ -392,6 +427,7 @@ export default function Box() {
       <ManualDrugModal
         open={showManual}
         busy={createDrug.isPending}
+        initialGenericName={manualPrefillName}
         onClose={() => setShowManual(false)}
         onSave={(form) => createDrug.mutate(form)}
       />

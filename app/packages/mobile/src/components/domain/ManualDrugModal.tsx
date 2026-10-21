@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { DOSE_UNITS } from "@anxin/shared";
 import { Button } from "@/components/ui/button";
@@ -33,17 +33,30 @@ export function ManualDrugModal({
   busy,
   onClose,
   onSave,
+  initialGenericName,
 }: {
   open: boolean;
   busy: boolean;
   onClose: () => void;
   onSave: (data: ManualDrugForm) => void;
+  /** 打开时预填的药名（咨询建议卡「手动建档」路径传入）；每次打开以该值重置药名框，其余字段清空。 */
+  initialGenericName?: string | null;
 }) {
   const [genericName, setGenericName] = useState("");
   const [specification, setSpecification] = useState("");
   const [formValue, setFormValue] = useState("");
   const [stock, setStock] = useState("1");
   const [stockUnit, setStockUnit] = useState<string>("片");
+
+  // 每次打开按 initialGenericName 重置（web ManualDrugModal 同语义）：只预填名，其余字段保持空
+  useEffect(() => {
+    if (!open) return;
+    setGenericName(initialGenericName ?? "");
+    setSpecification("");
+    setFormValue("");
+    setStock("1");
+    setStockUnit("片");
+  }, [open, initialGenericName]);
 
   const valid =
     genericName.trim().length > 0 && specification.trim().length > 0 && formValue.trim().length > 0;
