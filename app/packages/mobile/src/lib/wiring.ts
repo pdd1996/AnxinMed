@@ -1,5 +1,6 @@
-import { getApiBaseUrl, setApiBaseUrl, setApiNotifier, setExtraHeaders } from "@anxin/core";
+import { getApiBaseUrl, setApiBaseUrl, setApiNotifier, setExtraHeaders, setSpeechAdapter } from "@anxin/core";
 import { toast } from "sonner-native";
+import { mobileSpeechAdapter } from "./speech";
 
 /**
  * RN 平台装配（M5-T2 接缝的移动端实现，M5-T4 首次接线）。
@@ -27,9 +28,10 @@ export function apiBaseUrl(): string {
   return getApiBaseUrl();
 }
 
-/** 装配本端接缝：API 基址 + 错误提示出口 + dev-only 场景头。 */
+/** 装配本端接缝：API 基址 + 错误提示出口 + TTS + dev-only 场景头。 */
 export function wireMobilePlatform(): void {
   setApiBaseUrl(RAW_API_URL);
+  setSpeechAdapter(mobileSpeechAdapter);
   if (__DEV__ && TEST_SCENARIO) {
     setExtraHeaders({ "x-test-scenario": TEST_SCENARIO });
   }

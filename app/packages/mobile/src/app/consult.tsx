@@ -7,11 +7,11 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AlertTriangle, Send } from "lucide-react-native";
+import { AlertTriangle, History, MessageSquarePlus, Send } from "lucide-react-native";
 import {
   CONFIRM_STATUS_META,
   CONSULT_DATA_QUICK_QUESTIONS,
@@ -19,11 +19,19 @@ import {
   type ConsultSkillId,
   type ConsultSuggestion,
 } from "@anxin/shared";
-import { fetchDrugs, postConsult, type ConsultResponseDto } from "@anxin/core";
+import {
+  fetchConsultSession,
+  fetchConsultSessions,
+  fetchDrugs,
+  postConsult,
+  type ConsultResponseDto,
+  type ConsultSessionDetailDto,
+} from "@anxin/core";
 import { guardRequest, TIMEOUT_MS } from "@/lib/net";
-import { AnswerCard } from "@/components/domain/consult/AnswerCard";
+import { AnswerCard, buildSpeakText } from "@/components/domain/consult/AnswerCard";
 import { EmergencyCard } from "@/components/domain/consult/EmergencyCard";
 import { SuggestionCard } from "@/components/domain/consult/SuggestionCard";
+import { SpeakButton } from "@/components/domain/voice/SpeakButton";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
@@ -39,6 +47,39 @@ interface ChatMessage {
 let msgSeq = 0;
 const nextMsgId = () => `msg-${Date.now()}-${++msgSeq}`;
 
+/** 会话时间展示（老年向：月日 + 时分，不用 ISO 串；照 web `formatTime`）。 */
+function formatTime(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+/** 会话回放行 → 聊天消息对（照 web `logToChatMessages`；卡片只在其产生的一轮有效，回放不重弹）。 */
+function logToChatMessages(
+  log: ConsultSessionDetailDto["messages"][number],
+): ChatMessage[] {
+  const snapshot = (log.sectionsSnapshot ?? null) as ConsultResponseDto["sections"];
+  const response: ConsultResponseDto = {
+    riskLevel: log.riskLevel,
+    status: log.status,
+    answer: snapshot?.summary ?? log.question,
+    sections: snapshot,
+    citations: (log.citations ?? null) as ConsultResponseDto["citations"],
+    notice: log.notice,
+    l0Notice: null,
+    blocked: log.blockedAt != null,
+    toolUsed: log.status === "data-answered" ? log.intent : null,
+    consultLogId: log.consultLogId,
+    sessionId: "",
+    suggestion: null,
+  };
+  return [
+    { id: `${log.consultLogId}-q`, role: "user", question: log.question },
+    { id: log.consultLogId, role: "assistant", response },
+  ];
+}
+
 /**
  * AI 咨询页（M5-T7，照 web `routes/patient/Consult.tsx` 的行为重写渲染层）。
  *
@@ -51,6 +92,7 @@ const nextMsgId = () => `msg-${Date.now()}-${++msgSeq}`;
 export default function Consult() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { drugId } = useLocalSearchParams<{ drugId?: string }>();
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const riskL3 = useUnstableNativeVariable("--risk-l3");
@@ -67,11 +109,31 @@ export default function Consult() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<ConsultSuggestion | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ text: string; skillId?: ConsultSkillId } | null>(
     null,
   );
   const scrollRef = useRef<ScrollView>(null);
+  // 最新一条回答（头部播报对象；卡内不重复放播放按钮，照 web 2026-09-21 改版）
+  const lastResponse = [...messages]
+    .reverse()
+    .find((m) => m.role === "assistant" && m.response)?.response;
+
+  const sessionsQuery = useQuery({
+    queryKey: ["consult-sessions"],
+    queryFn: async () => {
+      const result = await guardRequest(
+        () => fetchConsultSessions(),
+        TIMEOUT_MS.consult,
+      );
+      if (!result.ok) throw new Error(result.message);
+      return result.data;
+    },
+    enabled: historyOpen,
+  });
 
   const consultMutation = useMutation({
     mutationFn: (input: { text: string; skillId?: ConsultSkillId }) =>
@@ -121,6 +183,39 @@ export default function Consult() {
     consultMutation.mutate(failed);
   };
 
+  /** 回放历史会话：拉详情 → 映射消息 → 会话续接到当前窗口（照 web `handleRestoreSession`）。 */
+  const restoreSession = async (id: string) => {
+    if (historyBusyId) return;
+    setHistoryBusyId(id);
+    setHistoryError(null);
+    const result = await guardRequest(
+      () => fetchConsultSession(id),
+      TIMEOUT_MS.consult,
+    );
+    setHistoryBusyId(null);
+    if (!result.ok) {
+      setHistoryError(result.message);
+      return;
+    }
+    setSessionId(result.data.session.id);
+    setMessages(result.data.messages.flatMap(logToChatMessages));
+    setSuggestion(null);
+    setError(null);
+    setFailed(null);
+    setHistoryOpen(false);
+  };
+
+  /** 开新会话：清空本地会话态（服务端历史保留，可从「历史会话」再进入）。 */
+  const handleNewSession = () => {
+    setSessionId(null);
+    setMessages([]);
+    setSuggestion(null);
+    setError(null);
+    setFailed(null);
+    setHistoryOpen(false);
+    void queryClient.invalidateQueries({ queryKey: ["consult-sessions"] });
+  };
+
   return (
     <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
       <ScrollView
@@ -129,6 +224,92 @@ export default function Consult() {
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
       >
+        <View className="mb-4 flex-row items-center gap-2">
+          <SpeakButton
+            text={
+              lastResponse
+                ? buildSpeakText(
+                    lastResponse.sections ?? null,
+                    lastResponse.answer,
+                    lastResponse.notice,
+                  )
+                : ""
+            }
+            label="播放最新回答"
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: historyOpen }}
+            onPress={() => {
+              setHistoryError(null);
+              setHistoryOpen((v) => !v);
+            }}
+            className={cn(
+              "min-h-[44px] flex-row items-center gap-1.5 rounded-xl border border-border px-3 active:opacity-80",
+              historyOpen && "bg-secondary",
+            )}
+          >
+            <Icon as={History} size={18} color={mutedForeground} />
+            <Text
+              className={cn(
+                "text-sm font-medium",
+                historyOpen ? "text-secondary-foreground" : "text-foreground",
+              )}
+            >
+              历史会话
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleNewSession}
+            className="min-h-[44px] flex-row items-center gap-1.5 rounded-xl border border-border px-3 active:opacity-80"
+          >
+            <Icon as={MessageSquarePlus} size={18} color={mutedForeground} />
+            <Text className="text-sm font-medium text-foreground">开新会话</Text>
+          </Pressable>
+        </View>
+
+        {historyOpen ? (
+          <View className="mb-4 rounded-xl border border-border bg-muted p-2">
+            {sessionsQuery.isPending ? (
+              <Text className="p-2 text-sm text-muted-foreground">加载中…</Text>
+            ) : sessionsQuery.error ? (
+              <Text className="p-2 text-sm leading-5 text-risk-l4">
+                {sessionsQuery.error instanceof Error
+                  ? sessionsQuery.error.message
+                  : "历史会话读取失败，请重试。"}
+              </Text>
+            ) : (sessionsQuery.data?.items.length ?? 0) === 0 ? (
+              <Text className="p-2 text-sm text-muted-foreground">还没有历史会话。</Text>
+            ) : (
+              <View className="gap-1">
+                {(sessionsQuery.data?.items ?? []).map((s) => (
+                  <Pressable
+                    key={s.id}
+                    accessibilityRole="button"
+                    disabled={!!historyBusyId}
+                    onPress={() => void restoreSession(s.id)}
+                    className="min-h-[44px] flex-row items-center gap-2 rounded-lg px-2 py-2 active:opacity-80"
+                  >
+                    <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
+                      {s.title}
+                    </Text>
+                    <Text className="shrink-0 text-xs text-muted-foreground">
+                      {formatTime(s.lastActiveAt)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            {historyBusyId ? (
+              <Text className="p-2 text-sm text-muted-foreground">正在打开会话…</Text>
+            ) : null}
+            {historyError ? (
+              <Text className="p-2 text-sm leading-5 text-risk-l4">{historyError}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {selectedDrug?.confirmStatus === "manual" ? (
           <View className="mb-4 flex-row items-start gap-2 rounded-xl border-2 border-risk-l3 bg-risk-l3-tint p-3">
             <Icon as={AlertTriangle} size={18} color={riskL3} />

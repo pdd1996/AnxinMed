@@ -3,6 +3,7 @@ import { Linking, Pressable, View } from "react-native";
 import { MapPin, OctagonX, Phone } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import type { ConsultSections } from "@anxin/shared";
+import { SpeakButton } from "@/components/domain/voice/SpeakButton";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 
@@ -16,6 +17,12 @@ export function EmergencyCard({ sections }: { sections: ConsultSections }) {
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const primaryForeground = useUnstableNativeVariable("--primary-foreground");
   const [linkError, setLinkError] = useState<string | null>(null);
+  // 急救指引播报文本（照 web：结论→风险→下一步→提醒，去尾句号避免叠字）
+  const speakText = [sections.summary, ...sections.risks, sections.nextAction, sections.warning]
+    .filter(Boolean)
+    .map((s) => s.replace(/[。.]+$/, "").trim())
+    .filter(Boolean)
+    .join("。");
 
   const openLink = async (url: string, hint: string) => {
     try {
@@ -35,6 +42,7 @@ export function EmergencyCard({ sections }: { sections: ConsultSections }) {
             {sections.summary}
           </Text>
         </View>
+        <SpeakButton text={speakText} label="播报急救指引" className="shrink-0" />
       </View>
 
       {sections.risks.length > 0 ? (
