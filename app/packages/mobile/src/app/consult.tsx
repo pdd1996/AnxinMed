@@ -17,10 +17,13 @@ import {
   CONSULT_DATA_QUICK_QUESTIONS,
   CONSULT_INSERT_QUICK_QUESTIONS,
   type ConsultSkillId,
+  type ConsultSuggestion,
 } from "@anxin/shared";
 import { fetchDrugs, postConsult, type ConsultResponseDto } from "@anxin/core";
 import { guardRequest, TIMEOUT_MS } from "@/lib/net";
-import { RiskBadge } from "@/components/domain/RiskBadge";
+import { AnswerCard } from "@/components/domain/consult/AnswerCard";
+import { EmergencyCard } from "@/components/domain/consult/EmergencyCard";
+import { SuggestionCard } from "@/components/domain/consult/SuggestionCard";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
@@ -63,6 +66,7 @@ export default function Consult() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<ConsultSuggestion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ text: string; skillId?: ConsultSkillId } | null>(
     null,
@@ -91,6 +95,7 @@ export default function Consult() {
       setError(null);
       setFailed(null);
       setSessionId(response.sessionId);
+      setSuggestion(response.suggestion ?? null);
       setMessages((prev) => [
         ...prev,
         { id: nextMsgId(), role: "user", question: input.text },
@@ -172,32 +177,25 @@ export default function Consult() {
                   </Text>
                 </View>
               </View>
-            ) : (
-              <View
+            ) : msg.response?.riskLevel === "L4" && msg.response.sections ? (
+              <EmergencyCard key={msg.id} sections={msg.response.sections} />
+            ) : msg.response ? (
+              <AnswerCard
                 key={msg.id}
-                className="rounded-2xl border border-border bg-card p-4"
-              >
-                {msg.response ? (
-                  <>
-                    <RiskBadge level={msg.response.riskLevel} showHint />
-                    <Text className="mt-2 text-base leading-6 text-card-foreground">
-                      {msg.response.answer}
-                    </Text>
-                    {msg.response.notice ? (
-                      <Text className="mt-2 text-sm leading-5 text-risk-l2">
-                        {msg.response.notice}
-                      </Text>
-                    ) : null}
-                    {msg.response.l0Notice ? (
-                      <Text className="mt-2 text-sm leading-5 text-muted-foreground">
-                        {msg.response.l0Notice}
-                      </Text>
-                    ) : null}
-                  </>
-                ) : null}
-              </View>
-            ),
+                riskLevel={msg.response.riskLevel}
+                status={msg.response.status}
+                answer={msg.response.answer}
+                sections={msg.response.sections ?? null}
+                citations={msg.response.citations ?? []}
+                notice={msg.response.notice}
+                l0Notice={msg.response.l0Notice}
+                blocked={msg.response.blocked}
+                toolUsed={msg.response.toolUsed}
+              />
+            ) : null,
           )}
+
+          {suggestion ? <SuggestionCard suggestion={suggestion} /> : null}
 
           {consultMutation.isPending ? (
             <View className="flex-row items-center gap-2">
