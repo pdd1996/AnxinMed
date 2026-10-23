@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Camera, Check, FileText, PackageCheck, Pill } from "lucide-react-native";
+import { Bell, Bot, Camera, Check, FileText, PackageCheck, Pill } from "lucide-react-native";
 import {
   client,
   duePendingSlots,
@@ -58,10 +58,15 @@ const ENTRIES = [
     desc: "拍一张药盒正面 → 识别 → 你核对 → 进药箱",
     icon: Camera,
   },
+  {
+    href: "/consult" as const,
+    title: "AI 药师咨询",
+    desc: "问说明书、查药箱数据；不诊断、不开方",
+    icon: Bot,
+  },
 ];
 
 const SOON = [
-  { title: "AI 用药咨询", when: "M5-T7" },
   { title: "退到后台的系统级到点提醒", when: "M5-T8" },
 ];
 

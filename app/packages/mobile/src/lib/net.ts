@@ -8,7 +8,7 @@ import { CLIENT_ERR_CODES, type Settled } from "@anxin/core";
  */
 
 /** 层检测是轻请求；识别管线含两次模型调用，超时给到 3 分钟（火山公网 + 手机 4G 实测口径待补）。 */
-export const TIMEOUT_MS = { detect: 30_000, intake: 180_000 } as const;
+export const TIMEOUT_MS = { detect: 30_000, intake: 180_000, consult: 60_000 } as const;
 
 const TIMEOUT = Symbol("timeout");
 
@@ -63,4 +63,31 @@ export async function callTransport<T>(
     };
   }
   return settled as Settled<T>;
+}
+
+/** 会抛错的 core 请求（consult / 会话读取走 unwrap）→ 中文失败分支，供页面常驻错误卡消费。 */
+export type Guarded<T> = { ok: true; data: T } | { ok: false; message: string };
+
+/**
+ * 与 callTransport 的分工：intake 系 core 函数回 `Settled`；consult 系 `unwrap` 成功回 body、失败**抛错**。
+ * 本函数把「抛错」统一收敛成可渲染的中文分支：服务端业务错（unwrap 抛出的中文 message）原样透传，
+ * 网络层异常/超时换成人话（与 callTransport 同一套文案）。不吞错——失败一定返回 ok:false。
+ */
+export async function guardRequest<T>(
+  run: () => Promise<T>,
+  ms: number,
+): Promise<Guarded<T>> {
+  let result: unknown;
+  try {
+    result = await waitFor(run, ms);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    const technical =
+      !detail || /network request failed|failed to fetch|aborted|timeout|socket/i.test(detail);
+    return { ok: false, message: technical ? failureMessage("error", ms, detail) : detail };
+  }
+  if (result === TIMEOUT) {
+    return { ok: false, message: failureMessage("timeout", ms, "") };
+  }
+  return { ok: true, data: result as T };
 }

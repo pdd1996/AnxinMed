@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import {
   AlertTriangle,
+  Bot,
   Camera,
   FileText,
   Hand,
@@ -51,7 +52,7 @@ function openedOverdue(drug: DrugItem): boolean {
  * 数据 = ['drugs'] + ['plans'] 两份查询；写操作四个 mutation 统一 invalidate
  * drugs/plans/tasks,today 三键（建计划会立刻改变今日任务）。
  * `md:` 断点的两列布局按 05 任务书 T5 第 3 条直接删成单列；
- * web 卡上的「问这个药」不放（咨询 UI 属 M5-T7，不做假按钮）。
+ * web 卡上的「问这个药」在 T7 起接入（深链 /consult?drugId=…，不做页内选药器）。
  */
 export default function Box() {
   const router = useRouter();
@@ -375,6 +376,15 @@ export default function Box() {
                   ) : null}
 
                   <View className="mt-4 flex-row flex-wrap gap-2">
+                    <CardAction
+                      label="问这个药"
+                      icon={Bot}
+                      tint={mutedForeground}
+                      busy={busy}
+                      onPress={() =>
+                        router.push({ pathname: "/consult", params: { drugId: drug.id } })
+                      }
+                    />
                     <CardAction
                       label={plan ? "编辑计划" : "创建计划"}
                       icon={Pencil}

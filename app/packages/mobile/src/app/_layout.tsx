@@ -40,6 +40,7 @@ export default function RootLayout() {
               <Stack.Screen name="intake/rx" options={{ title: "拍照录入" }} />
               <Stack.Screen name="intake/drug" options={{ title: "拍照录入" }} />
               <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
+              <Stack.Screen name="consult" options={{ title: "AI 药师咨询" }} />
               <Stack.Screen name="probe" options={{ title: "网络探测" }} />
             </Stack>
           </OnboardingGate>
