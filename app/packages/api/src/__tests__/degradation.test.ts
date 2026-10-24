@@ -58,6 +58,7 @@ beforeAll(async () => {
   await db.insert(drugMaster).values({ id: DM, genericName: '玻璃酸钠滴眼液', brandName: '海露', specification: '0.1%（10mL:10mg）', form: '滴眼液' })
   await db.insert(packageInserts).values({
     id: PI,
+    curationStatus: 'reviewed',
     drugId: DM,
     genericName: '玻璃酸钠滴眼液',
     brandName: '海露',

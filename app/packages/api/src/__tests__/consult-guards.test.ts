@@ -17,6 +17,7 @@ import {
   detectManualGate,
   detectNoSource,
   detectProhibited,
+  detectUnverified,
   guardConsult,
 } from '../services/consult/guards.js'
 import type { ConsultDrug, InsertSlice } from '../services/consult/types.js'
@@ -43,6 +44,8 @@ const mkInsert = (overrides: Partial<InsertSlice> = {}): InsertSlice => ({
   storage: null,
   source: '测试来源',
   version: 'v1',
+  sourceSections: null,
+  curationStatus: 'reviewed',
   ...overrides,
 })
 
@@ -135,6 +138,35 @@ describe('detectManualGate · manual 档门禁（PRD §7.5.4）', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 说明书核验门禁
+// ---------------------------------------------------------------------------
+
+describe('detectUnverified · 说明书核验门禁', () => {
+  it('crawled insert → 返回药名', () => {
+    const drugs = [
+      mkDrug({ id: 'd1', insert: mkInsert({ genericName: '测试药A', curationStatus: 'crawled' }) }),
+    ]
+    expect(detectUnverified(drugs)).toEqual(['测试药A'])
+  })
+
+  it('reviewed insert → 空数组', () => {
+    expect(detectUnverified([mkDrug()])).toEqual([])
+  })
+
+  it('insert=null → 空数组（交给 no-source）', () => {
+    expect(detectUnverified([mkDrug({ insert: null })])).toEqual([])
+  })
+
+  it('多药命中 → 药名去重', () => {
+    const drugs = [
+      mkDrug({ id: 'd1', insert: mkInsert({ genericName: '测试药A', curationStatus: 'mock' }) }),
+      mkDrug({ id: 'd2', insert: mkInsert({ genericName: '测试药A', curationStatus: 'crawled' }) }),
+    ]
+    expect(detectUnverified(drugs)).toEqual(['测试药A'])
+  })
+})
+
+// ---------------------------------------------------------------------------
 // no-source（本地未命中）
 // ---------------------------------------------------------------------------
 
@@ -177,6 +209,15 @@ describe('guardConsult · 守门编排优先级', () => {
     const drugs = [mkDrug({ confirmStatus: 'manual', drugMasterId: null, insert: null })]
     const d = guardConsult('这个药通常用于什么', drugs)
     expect(d).toEqual({ kind: 'manual-gate' })
+  })
+
+  it('unverified 优先于 no-source：crawled insert + 另一药无 insert → unverified', () => {
+    const drugs = [
+      mkDrug({ id: 'd1', insert: mkInsert({ genericName: '测试药A', curationStatus: 'crawled' }) }),
+      mkDrug({ id: 'd2', insert: null }),
+    ]
+    const d = guardConsult('这个药通常用于什么', drugs)
+    expect(d).toEqual({ kind: 'unverified', drugNames: ['测试药A'] })
   })
 
   it('无药上下文 + L4 问题 → emergency（drugIds 空也能触发）', () => {

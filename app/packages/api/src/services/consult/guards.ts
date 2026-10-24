@@ -43,6 +43,20 @@ export function detectManualGate(drugs: ConsultDrug[]): boolean {
   return drugs.every((d) => d.confirmStatus === 'manual')
 }
 
+/**
+ * 说明书核验门禁：只要有任一命中说明书的药不是 reviewed，就降级为 L0 原文查询。
+ * 与 manual-gate 的区别：manual-gate 看用户侧录入方式，这道门看资产侧说明书状态。
+ */
+export function detectUnverified(drugs: ConsultDrug[]): string[] {
+  return [
+    ...new Set(
+      drugs
+        .filter((d) => d.insert !== null && d.insert.curationStatus !== 'reviewed')
+        .map((d) => d.insert!.genericName),
+    ),
+  ]
+}
+
 /** 本地说明书库未命中：所有咨询对象都查不到 insert（且医疗搜索默认关时触发 no-source）。 */
 export function detectNoSource(drugs: ConsultDrug[]): boolean {
   if (drugs.length === 0) return false
@@ -61,9 +75,11 @@ export function guardConsult(question: string, drugs: ConsultDrug[]): GuardDecis
   const prohibited = detectProhibited(question)
   if (prohibited) return { kind: 'refused', matched: prohibited }
 
-  // 有药上下文才走 manual-gate / no-source（无药时 L4/L3 已覆盖紧急与拒答路径）
+  // 有药上下文才走 manual-gate / unverified / no-source（无药时 L4/L3 已覆盖紧急与拒答路径）
   if (drugs.length > 0) {
     if (detectManualGate(drugs)) return { kind: 'manual-gate' }
+    const unverified = detectUnverified(drugs)
+    if (unverified.length > 0) return { kind: 'unverified', drugNames: unverified }
     if (detectNoSource(drugs)) return { kind: 'no-source' }
   }
 

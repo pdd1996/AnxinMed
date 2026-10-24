@@ -112,6 +112,7 @@ beforeAll(async () => {
   })
   await db.insert(packageInserts).values({
     id: PI,
+    curationStatus: 'reviewed',
     drugId: DM,
     genericName: '玻璃酸钠滴眼液',
     specification: '0.1%（10mL:10mg）',

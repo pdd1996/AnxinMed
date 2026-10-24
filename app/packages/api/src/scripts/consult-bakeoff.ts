@@ -84,7 +84,9 @@ async function main(): Promise<void> {
       select id, drug_id as "drugId", generic_name as "genericName", brand_name as "brandName",
              specification, form, indication, components, dosage, contraindications,
              adverse_reactions as "adverseReactions", precautions, interactions, pharmacology,
-             pharmacokinetics, storage, source, version
+             pharmacokinetics, storage, source, version,
+             source_sections as "sourceSections",
+             curation_status as "curationStatus"
       from package_inserts where drug_id = ${c.drugId} limit 1`
     const r = rows[0]
     if (!r) throw new Error(`题集药品不在库中：${c.drugId}（先补说明书入库）`)
@@ -106,6 +108,8 @@ async function main(): Promise<void> {
       storage: (r.storage as string) ?? null,
       source: String(r.source ?? ''),
       version: (r.version as string) ?? null,
+      sourceSections: (r.sourceSections as Record<string, string> | null) ?? null,
+      curationStatus: (r.curationStatus as InsertSlice['curationStatus']) ?? 'crawled',
     })
   }
   await sql.end()

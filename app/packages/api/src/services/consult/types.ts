@@ -41,6 +41,10 @@ export interface InsertSlice {
   storage: string | null
   source: string | null
   version: string | null
+  /** 说明书全文分段（PDF 来源才有；用于孕妇/儿童/老年/过量等未 typed 段落）。 */
+  sourceSections: Record<string, string> | null
+  /** 说明书核验状态：只有 reviewed 才允许进入个体化解释。 */
+  curationStatus: 'mock' | 'crawled' | 'reviewed'
 }
 
 /**
@@ -68,6 +72,7 @@ export interface ConsultDrug {
  * - `emergency`：L4 紧急信号（附命中关键词，供 risk_events.detail 留痕）
  * - `refused`：L3 拒答（附命中关键词）
  * - `manual-gate`：manual 档药品拒绝个体化解释（仅可 L0 资料查询，接口层拒绝）
+ * - `unverified`：说明书未经人工核验（curationStatus !== reviewed），仅可 L0
  * - `no-source`：本地说明书库未命中（且医疗搜索默认关）
  * - `proceed`：进入生成路径（Baichuan 或降级规则拼装）
  */
@@ -75,6 +80,7 @@ export type GuardDecision =
   | { kind: 'emergency'; matched: string }
   | { kind: 'refused'; matched: string }
   | { kind: 'manual-gate' }
+  | { kind: 'unverified'; drugNames: string[] }
   | { kind: 'no-source' }
   | { kind: 'proceed' }
 

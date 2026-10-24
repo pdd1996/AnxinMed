@@ -98,6 +98,7 @@ beforeAll(async () => {
   // 说明书 fixture：上限 10 次/日 → 确认路径重跑范围校验的锚点（频次 4 → pass；99 → exceed）
   await db.insert(packageInserts).values({
     id: PI_HYCOSAN,
+    curationStatus: 'reviewed',
     drugId: DM_HYCOSAN,
     genericName: '玻璃酸钠滴眼液',
     dosage: { adult: { dosePerUse: { value: 1, unit: '滴' }, maxFrequencyPerDay: { value: 10, unit: '次', note: '超出需眼科医生指导' } } },
