@@ -21,6 +21,7 @@
     "db:seed-demo": "tsx src/db/seed-demo.ts",
     "db:seed-drafts": "tsx src/db/seed-drafts-demo.ts",
     "db:import-crawled": "tsx src/db/import-crawled.ts",
+    "db:import-manuals": "tsx src/db/import-manuals.ts",
     "db:audit": "tsx src/db/data-audit.ts",
     "perf:intake": "tsx src/scripts/perf-intake.ts",
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",

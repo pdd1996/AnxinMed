@@ -1,11 +1,13 @@
 /**
- * 安心用药 · 数据库 Schema（10 张表 = 资产域三库 + 用户域七表）
+ * 安心用药 · 数据库 Schema（17 张表 = 资产域五库 + 用户域/咨询留痕）
  *
  * PRD V2 §12.3/§13 · 技术方案 §4 · 执行总纲 §3.2。
  *
- * 资产域（Mock，与代码分离，write-once）：
- *   drug_master       药品身份库 —— 识药匹配对象，schema 对齐 NMPA
+ * 资产域（与代码分离，write-once）：
+ *   drug_generics     通用名层 —— 通用名+剂型，挂成分/类别规则
+ *   drug_master       产品身份库 —— 识药匹配对象，schema 对齐 NMPA
  *   package_inserts   说明书库   —— 身份组 + 内容组 + 来源三件套
+ *   source_documents  来源文档层 —— PDF/网页来源与内容指纹
  *   interaction_rules 相互作用库 —— {drugIds[], level 四级枚举, note, source}
  *
  * 用户域（全部带 userId，多用户边界从第一天贯通）：
@@ -14,13 +16,58 @@
  *
  * 核心不变式：药品主数据库 ≠ 用户药箱；医嘱只抄录不生成；条目禁止模型生成。
  */
-import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date, uniqueIndex } from 'drizzle-orm/pg-core'
+
+/** 产品类型（通用名层与产品层共用）。 */
+export const PRODUCT_TYPES = ['化学药', '生物制品', '中成药', '中药材', '医疗器械', '其他'] as const
+
+// ---------------------------------------------------------------------------
+// drug_generics · 通用名层（2026-10-24）
+// 一个通用名+剂型 = 一条；产品（drug_master）挂在它下面。
+// 主要给成分/过敏/类别级相互作用用，避免同名多厂家把通用名拆碎。
+// ---------------------------------------------------------------------------
+export const drugGenerics = pgTable('drug_generics', {
+  id: text('id').primaryKey(),
+  genericName: text('generic_name').notNull(),
+  form: text('form'),
+  productType: varchar('product_type', { enum: PRODUCT_TYPES }),
+  activeIngredients: jsonb('active_ingredients').$type<string[]>(),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('drug_generics_name_form_uq').on(table.genericName, table.form),
+])
+
+// ---------------------------------------------------------------------------
+// source_documents · 来源文档层（2026-10-24）
+// 一份 PDF/网页/官方文件 = 一条；package_inserts 通过 source_document_id 回链。
+// file_hash 用于去重（同一 PDF 多次导入）；content_hash 用于内容变化检测。
+// ---------------------------------------------------------------------------
+export const sourceDocuments = pgTable('source_documents', {
+  id: text('id').primaryKey(),
+  sourceType: varchar('source_type', { enum: ['dxy', 'manual-pdf', 'nmpa', 'other'] }).notNull(),
+  sourceName: text('source_name'),
+  fileName: text('file_name'),
+  fileHash: text('file_hash'),
+  contentHash: text('content_hash'),
+  sourceRecordIds: jsonb('source_record_ids').$type<string[]>(),
+  publishedAt: date('published_at'),                       // 说明书修订/发布日（PDF 常缺失）
+  retrievedAt: timestamp('retrieved_at'),                  // 获取/导出日
+  metadata: jsonb('metadata'),                             // { extractorVersion, pageCount, ... }
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('source_documents_file_hash_uq').on(table.fileHash),
+])
 
 // ---------------------------------------------------------------------------
 // drug_master · 药品身份库
 // ---------------------------------------------------------------------------
 export const drugMaster = pgTable('drug_master', {
   id: text('id').primaryKey(),                        // 条目 ID，如 drug-hycosan-01
+  genericDrugId: text('generic_drug_id'),             // → drug_generics.id（通用名层）
 
   // ── 身份快照（NMPA 对齐）──
   genericName: text('generic_name').notNull(),           // 通用名
@@ -28,10 +75,14 @@ export const drugMaster = pgTable('drug_master', {
   specification: text('specification').notNull(),        // 规格，如 0.1%（10mL：10mg）
   form: text('form').notNull(),                          // 剂型，如 滴眼液、片剂
   manufacturer: text('manufacturer'),                    // 生产企业
-  approvalNumber: text('approval_number'),               // 批准文号 / 进口注册证号（平局裁判）
+  repackager: text('repackager'),                        // 分包装企业
+  approvalNumber: text('approval_number'),               // 主批准文号（平局裁判）
+  approvalNumbers: jsonb('approval_numbers').$type<string[]>(), // 全部批准文号（主批号+分包装）
+  productType: varchar('product_type', { enum: PRODUCT_TYPES }),
   otcClass: text('otc_class'),                           // OTC 分类：OTC甲 / OTC乙 / null=处方药
   insuranceClass: text('insurance_class'),               // 医保分类：医保甲类 / 医保乙类 / 自费
   isOriginal: boolean('is_original').default(false),     // 原研药标识
+  identityKey: text('identity_key'),                     // 产品身份指纹（幂等/去重）
 
   // ── 数据治理 ──
   curationStatus: varchar('curation_status', { enum: ['mock', 'crawled', 'reviewed'] })
@@ -42,7 +93,9 @@ export const drugMaster = pgTable('drug_master', {
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (table) => [
+  uniqueIndex('drug_master_identity_key_uq').on(table.identityKey),
+])
 
 // ---------------------------------------------------------------------------
 // package_inserts · 说明书库
@@ -73,8 +126,14 @@ export const packageInserts = pgTable('package_inserts', {
 
   // ── 来源组（"生产日期"三件套）──
   source: text('source'),                                // 来源描述
-  version: text('version'),                              // 版本号
+  version: text('version'),                              // 版本标签（展示用）
   sourceUrl: text('source_url'),                         // 来源 URL
+  sourceDocumentId: text('source_document_id'),          // → source_documents.id（来源文档层）
+  contentHash: text('content_hash'),                     // 规范化正文指纹（内容变化检测）
+  sourceSections: jsonb('source_sections').$type<Record<string, string>>(), // 说明书全文分段（逐字抄录，键=原段名）
+  sourceFile: text('source_file'),                       // 来源文件名（本地 PDF 库）
+  sourceRecordIds: jsonb('source_record_ids').$type<string[]>(), // 来源库记录 ID（文件名方括号内）
+  approvalNumbers: jsonb('approval_numbers').$type<string[]>(),  // 本行覆盖的批准文号（可多条）
 
   // ── 数据治理 ──
   curationStatus: varchar('curation_status', { enum: ['mock', 'crawled', 'reviewed'] })
@@ -84,7 +143,9 @@ export const packageInserts = pgTable('package_inserts', {
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (table) => [
+  uniqueIndex('package_inserts_drug_source_uq').on(table.drugId, table.sourceDocumentId),
+])
 
 // ---------------------------------------------------------------------------
 // interaction_rules · 相互作用规则库
