@@ -13,11 +13,7 @@ import { useFontScale, type FontScale } from "@/stores/fontScale";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 
 /** 未接项照「如实写明落在哪一片」的形态列出，不放点了没反应的假开关（05d §2-T5-e）。 */
-const NOT_YET = [
-  { title: "系统通知与到点提醒", when: "M5-T8" },
-  { title: "语音播报", when: "M5-T7" },
-  { title: "AI 用药咨询相关设置", when: "M5-T7" },
-];
+const NOT_YET = [{ title: "系统通知与到点提醒", when: "M5-T8" }];
 
 /**
  * 设置页（M5-T5e 起为真实页）：字号两档 = 全局缩放的验证入口，风险语义色预览 = §6 第 4 条的色板自检。
