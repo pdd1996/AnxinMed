@@ -9,7 +9,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertTriangle, History, MessageSquarePlus, Send } from "lucide-react-native";
 import {
@@ -217,7 +217,7 @@ export default function Consult() {
   };
 
   return (
-    <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
+    <View className="flex-1 bg-background">
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}
@@ -416,10 +416,11 @@ export default function Consult() {
         </View>
       </ScrollView>
 
-      <View
-        className="border-t border-border bg-background px-5 pt-3"
-        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-      >
+      <KeyboardStickyView>
+        <View
+          className="border-t border-border bg-background px-5 pt-3"
+          style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+        >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -486,7 +487,8 @@ export default function Consult() {
             <Icon as={Send} size={20} color={primaryForeground} />
           </Pressable>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+        </View>
+      </KeyboardStickyView>
+    </View>
   );
 }
