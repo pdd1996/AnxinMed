@@ -3,6 +3,7 @@ import "../global.css";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PortalHost } from "@rn-primitives/portal";
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { FontScaleSync } from "@/components/FontScaleSync";
@@ -17,7 +18,8 @@ wireMobilePlatform();
 /**
  * 应用外壳（M5-T5a，对齐 web/src/App.tsx:18-28 的装配次序）：
  * Query → 字号档同步 → 首次使用声明卡 → 路由。
- * 五 tab 在 (patient) 分组内（无系统头部，页内自出标题）；录入 / 草稿确认 / 网络探测走根 stack 全屏 push。
+ * 五 tab 在 (patient) 分组内（无系统头部，页内自出标题）；录入流程 / 草稿确认 / 记录 / 设置 / 网络探测
+ * 走根 stack 全屏（2026-10-25 导航改造：录入与咨询进 tab，记录/设置收回「我的」）。
  */
 export default function RootLayout() {
   return (
@@ -28,6 +30,8 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         {/* 键盘避让的提供方：edge-to-edge 下窗口不再随输入法缩放，弹窗要靠它让出键盘高度（§6 第 14 条）。 */}
         <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
+          {/* 系统状态栏图标跟深浅色翻转：浅色下深色图标（否则白压白，时钟/电量看不见）。 */}
+          <StatusBar style="auto" />
           <FontScaleSync />
           <OnboardingGate>
             <Stack
@@ -37,10 +41,12 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="(patient)" options={{ headerShown: false }} />
+              <Stack.Screen name="intake/flow" options={{ title: "拍照录入" }} />
               <Stack.Screen name="intake/rx" options={{ title: "拍照录入" }} />
               <Stack.Screen name="intake/drug" options={{ title: "拍照录入" }} />
               <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
-              <Stack.Screen name="consult" options={{ title: "AI 药师咨询" }} />
+              <Stack.Screen name="records" options={{ title: "服药记录" }} />
+              <Stack.Screen name="settings" options={{ title: "设置" }} />
               <Stack.Screen name="probe" options={{ title: "网络探测" }} />
             </Stack>
           </OnboardingGate>

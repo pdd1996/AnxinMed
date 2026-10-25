@@ -30,7 +30,7 @@ import {
 } from "@anxin/core";
 import { callTransport, TIMEOUT_MS } from "@/lib/net";
 import { computeImageStats } from "@/lib/imageStats";
-import { pickFromLibrary, takePhoto } from "@/lib/photo";
+import { pickFromLibrary, takePhoto, type Photo } from "@/lib/photo";
 import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 
 /**
@@ -79,12 +79,34 @@ const ENTRY_TABS: { entry: IntakeEntry; label: string; icon: typeof FileText }[]
 const PRESSABLE_CLASS =
   "min-h-[52px] items-center justify-center rounded-xl px-4 py-3";
 
-export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
+interface IntakeScreenProps {
+  entry: IntakeEntry;
+  /**
+   * upload = 底部「录入」tab 里只渲染上传步，选图后交给 onPicked（再 push 全屏流程）；
+   * full = 根 stack 全屏，走完整的上传/预检/识别/失败/草稿流程（默认）。
+   */
+  mode?: "full" | "upload";
+  /** full 模式下从录入 tab 交接过来的起始照片（挂载即开跑）。 */
+  initialPhoto?: Pick<Photo, "dataUrl" | "uri" | "width" | "height"> | null;
+  /** upload 模式选好照片后的去向；不传则在本屏直接进识别（旧行为）。 */
+  onPicked?: (photo: Photo) => void;
+  /** upload 模式切另一颗入口（tab 原地切换，不换路由）。 */
+  onSwitchEntry?: () => void;
+}
+
+export default function IntakeScreen({
+  entry,
+  mode = "full",
+  initialPhoto = null,
+  onPicked,
+  onSwitchEntry,
+}: IntakeScreenProps) {
   const router = useRouter();
   const copy = COPY[entry];
   const [state, setState] = useState<IntakeFlowState>(initialIntakeFlowState);
   // 异步回调要读到最新状态（而非发起时的闭包值）；状态只经 dispatch 写入，故 ref 与 state 同源。
   const stateRef = useRef(state);
+  const startedRef = useRef(false);
   const configured = isApiConfigured();
   // 图标不吃 TextClassContext，颜色显式给（05d §7-7）。
   const iconFg = useUnstableNativeVariable("--primary-foreground");
@@ -166,6 +188,11 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
           const [path] = action.path.split("?");
           // 跨入口切换 = 点按即切（05e §0-4）：replace 不留栈，对方屏重挂即干净的上传态（与 web 换页同语义）。
           if (path.startsWith("/intake/")) {
+            // tab 内没有对方路由：原地换 entry 即等价于「对方屏重挂」。
+            if (onSwitchEntry) {
+              onSwitchEntry();
+              break;
+            }
             router.replace(action.path as Href);
             break;
           }
@@ -186,7 +213,22 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
 
   // 层检测纠偏的跨入口交接：对方入口页留下原图时，本页直接重跑（web IntakeFlow.tsx:151-154 同语义）。
   // 仅挂载时跑一次；dispatch 闭包读到的是 ref 里的最新状态，故意不进依赖。
+  // upload 模式只做上传步，手上没有可跑的流程；带 initialPhoto 的 full 屏（录入 tab 交接）直接开跑。
   useEffect(() => {
+    if (mode === "upload" || startedRef.current) return;
+    startedRef.current = true;
+    if (initialPhoto) {
+      dispatch({
+        type: "file_read",
+        dataUrl: initialPhoto.dataUrl,
+        source: {
+          uri: initialPhoto.uri,
+          width: initialPhoto.width,
+          height: initialPhoto.height,
+        },
+      });
+      return;
+    }
     dispatch({ type: "handoff", pending: useIntakeSession.getState().pendingImage });
   }, []);
 
@@ -201,6 +243,12 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
     const picked = from === "camera" ? await takePhoto() : await pickFromLibrary();
     if (picked.ok) {
       const { dataUrl, uri, width, height } = picked.photo;
+      if (onPicked) {
+        // 新照片接管：上一次跨入口留下的交接图作废，避免全屏流程挂载时被 handoff 抢跑。
+        useIntakeSession.getState().setPendingImage(null);
+        onPicked(picked.photo);
+        return;
+      }
       // uri 与原图边长只服务本机预检（05e §1-3）：下传的仍是 dataUrl，预检不改变上传内容
       dispatch({ type: "file_read", dataUrl, source: { uri, width, height } });
       return;
@@ -436,7 +484,8 @@ export default function IntakeScreen({ entry }: { entry: IntakeEntry }) {
         </StepCard>
       )}
 
-      <Stack.Screen options={{ title: "拍照录入" }} />
+      {/* tab 里没有栈头；全屏流程由根 stack 给标题（这里与 05e 的眉题并存，保持原样）。 */}
+      {mode === "upload" ? null : <Stack.Screen options={{ title: "拍照录入" }} />}
     </ScrollView>
   );
 }

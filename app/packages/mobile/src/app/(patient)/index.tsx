@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Bot, Camera, Check, FileText, PackageCheck, Pill } from "lucide-react-native";
+import { Bell, Check, PackageCheck, Pill } from "lucide-react-native";
 import {
   client,
   duePendingSlots,
@@ -44,28 +44,7 @@ function hasPendingSlot(group: PlanGroup): boolean {
   return group.slots.some((slot) => slot.status === "pending");
 }
 
-/** 今日页上仍可用的入口（T5-a 裁定：tab 里没有录入位，「核心动作 ≤2 屏」靠这里兜住，常驻不可移）。 */
-const ENTRIES = [
-  {
-    href: "/intake/rx" as const,
-    title: "拍处方笺入药箱",
-    desc: "一张处方笺 → 建档 + 服药计划一次完成",
-    icon: FileText,
-  },
-  {
-    href: "/intake/drug" as const,
-    title: "拍药盒入药箱",
-    desc: "拍一张药盒正面 → 识别 → 你核对 → 进药箱",
-    icon: Camera,
-  },
-  {
-    href: "/consult" as const,
-    title: "AI 药师咨询",
-    desc: "问说明书、查药箱数据；不诊断、不开方",
-    icon: Bot,
-  },
-];
-
+/** 未接项照「如实写明落在哪一片」的形态列出，不放点了没反应的假开关（05d §2-T5-e）。 */
 const SOON = [
   { title: "退到后台的系统级到点提醒", when: "M5-T8" },
 ];
@@ -272,7 +251,7 @@ export default function Today() {
               </Text>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push("/intake/rx")}
+                onPress={() => router.push("/intake")}
                 className="mt-5 min-h-[48px] items-center justify-center rounded-xl bg-primary px-6 active:opacity-80"
               >
                 <Text className="text-lg font-medium text-primary-foreground">开始录入</Text>
@@ -338,23 +317,6 @@ export default function Today() {
           )}
         </>
       )}
-
-      <View className="mt-8 gap-3">
-        {ENTRIES.map((entry) => (
-          <Pressable
-            key={entry.title}
-            accessibilityRole="button"
-            onPress={() => router.push(entry.href)}
-            className="min-h-[76px] flex-row items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 active:opacity-80"
-          >
-            <Icon as={entry.icon} size={26} color={mutedForeground} />
-            <View className="flex-1">
-              <Text className="text-xl font-semibold text-card-foreground">{entry.title}</Text>
-              <Text className="text-sm text-muted-foreground">{entry.desc}</Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
 
       <Text className="mt-8 text-lg font-semibold text-foreground">还在路上</Text>
       <View className="mt-2 gap-2">

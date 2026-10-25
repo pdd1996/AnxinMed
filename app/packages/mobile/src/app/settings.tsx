@@ -10,7 +10,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useFontScale, type FontScale } from "@/stores/fontScale";
-import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 
 /** 未接项照「如实写明落在哪一片」的形态列出，不放点了没反应的假开关（05d §2-T5-e）。 */
 const NOT_YET = [{ title: "系统通知与到点提醒", when: "M5-T8" }];
@@ -31,12 +30,12 @@ export default function Settings() {
       className="flex-1 bg-background"
       contentContainerStyle={{
         paddingHorizontal: 20,
-        paddingBottom: TAB_BAR_BOTTOM_PAD,
+        paddingBottom: 40,
         paddingTop: 16,
       }}
     >
-      <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">设置</Text>
-      <Text className="mt-1 text-2xl font-bold text-foreground">看得清，才用得住</Text>
+      {/* 页面标题由根 stack 头部给（「设置」），页内小标题只负责本页的主张。 */}
+      <Text className="text-2xl font-bold text-foreground">看得清，才用得住</Text>
 
       <View className="mt-6 gap-3">
         <View className="flex-row items-center gap-2">

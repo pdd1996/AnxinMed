@@ -10,7 +10,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlertTriangle, History, MessageSquarePlus, Send } from "lucide-react-native";
 import {
   CONFIRM_STATUS_META,
@@ -91,7 +90,6 @@ function logToChatMessages(
  */
 export default function Consult() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { drugId } = useLocalSearchParams<{ drugId?: string }>();
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
@@ -224,7 +222,10 @@ export default function Consult() {
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="mb-4 flex-row items-center gap-2">
+        <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">咨询</Text>
+        <Text className="mt-1 text-2xl font-bold text-foreground">AI 药师咨询</Text>
+
+        <View className="mb-4 mt-4 flex-row items-center gap-2">
           <SpeakButton
             text={
               lastResponse
@@ -326,7 +327,7 @@ export default function Consult() {
                 药箱为空：去
                 <Text
                   className="font-semibold text-primary underline"
-                  onPress={() => router.push("/intake/rx")}
+                  onPress={() => router.push("/intake")}
                 >
                   录入
                 </Text>
@@ -419,7 +420,7 @@ export default function Consult() {
       <KeyboardStickyView>
         <View
           className="border-t border-border bg-background px-5 pt-3"
-          style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+          style={{ paddingBottom: 12 }}
         >
         <ScrollView
           horizontal

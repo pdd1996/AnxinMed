@@ -12,7 +12,6 @@ import {
   recordsToCsv,
   type RangeMode,
 } from "@anxin/core";
-import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 import { Icon } from "@/components/ui/icon";
 
 const MODES: { key: RangeMode; label: string }[] = [
@@ -79,7 +78,7 @@ export default function Records() {
       className="flex-1 bg-background"
       contentContainerStyle={{
         paddingHorizontal: 20,
-        paddingBottom: TAB_BAR_BOTTOM_PAD,
+        paddingBottom: 40,
         paddingTop: 16,
       }}
       refreshControl={
@@ -90,8 +89,8 @@ export default function Records() {
         />
       }
     >
-      <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">服药记录</Text>
-      <Text className="mt-1 text-2xl font-bold text-foreground">查询与导出</Text>
+      {/* 页面标题由根 stack 头部给（「服药记录」），页内只留动作导向的小标题。 */}
+      <Text className="text-2xl font-bold text-foreground">查询与导出</Text>
       <Text className="mt-1 text-base leading-6 text-muted-foreground">
         按日 / 周 / 月查看你亲自确认的服药留痕，可导出 CSV。
       </Text>
