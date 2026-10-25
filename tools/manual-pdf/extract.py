@@ -20,7 +20,7 @@ from pathlib import Path
 
 import fitz
 
-EXTRACTOR_VERSION = 'manual-pdf-2026-10-24'
+EXTRACTOR_VERSION = 'manual-pdf-2026-10-25'
 
 SECTION_RE = re.compile(r'【([^】]{1,20})】')
 FILENAME_RE = re.compile(r'^(?P<name>.*?)\[(?P<ids>[^\]]+)\](?:-\d+)?$')
@@ -30,12 +30,45 @@ APPROVAL_RE = re.compile(
     r'(国药准字[A-Za-z0-9]+(?:[（(][^）)]*[）)])?|进口药品注册证号[^\s，,；;]+|H\d{8,}|[A-Z]\d{8,})'
 )
 
+MANUFACTURER_LABELS = {
+    '企业名称', '企业各称', '公司名称', '生产名称', '生产企业', '生产企业名称',
+    '药品生产企业', '生产厂', '生产厂名称', '生产厂商', '厂商名称', '制造商名称',
+    '上市许可持有人/企业名称', '受托方', '受托生产企业',
+}
+MAH_LABELS = {
+    '上市许可持有人', '药品上市许可持有人', '委托方', '委托企业',
+}
+DOMESTIC_CONTACT_RE = re.compile(r'^[\[【]?(?:境内|国内)[^：:]{0,6}(?:联系|代理|机构)')
+ADDRESS_LABEL_RE = re.compile(r'地址|邮编|电话|传真|网址|邮箱|联系方式')
+COMPANY_SUFFIX_RE = re.compile(
+    r'(?:公司|集团|总厂|药厂|制药厂|工厂|厂)$'
+    r'|(?:GmbH|Ltd|Limited|Inc|LLC|L\.L\.C|S\.A|S\.p\.A|S\.R\.L|SRL|B\.V|N\.V|Co|KG|AG|SAS|PLC|Pty|LP|Corp|Corporation|A/S)$',
+    re.I,
+)
+MANUFACTURER_VALUE_CUT_RE = re.compile(
+    r'\s*(?:生产|注册|公司|企业|经营)?地址\s*[：:]'
+    r'|\s*(?:邮政)?邮编\s*[：:]'
+    r'|\s*电话\s*[：:]|\s*传真\s*[：:]|\s*网址\s*[：:]'
+)
+ADDRESS_VALUE_RE = re.compile(r'[路街]|号(?:楼|院|层)?$|Road|Street|Avenue', re.I)
+
 FORM_SUFFIXES = [
-    '注射液', '注射用', '滴眼液', '滴鼻液', '滴耳液', '口服溶液', '口服混悬液', '混悬液',
-    '喷雾剂', '气雾剂', '吸入剂', '缓释胶囊', '控释胶囊', '肠溶胶囊', '缓释片', '控释片',
-    '肠溶片', '分散片', '咀嚼片', '泡腾片', '含片', '舌下片', '贴膏', '乳膏', '软膏',
-    '凝胶', '胶囊', '颗粒', '滴丸', '丸', '片', '栓', '糖浆', '散', '酊', '洗剂',
-    '搽剂', '贴剂', '膜剂', '胶浆',
+    # 长词优先：干混悬剂 / 口服混悬液 / 口服溶液 / 注射用水 必须先于短词命中
+    '干混悬剂', '口服混悬液', '混悬液', '混悬剂',
+    '口服溶液', '浓溶液', '溶液',
+    '粉雾剂', '喷雾剂', '气雾剂', '吸入剂',
+    '缓释胶囊', '控释胶囊', '肠溶胶囊', '缓释片', '控释片', '肠溶片',
+    '分散片', '咀嚼片', '泡腾片', '含片', '舌下片',
+    '注射用水', '注射液',
+    '滴眼液', '滴眼剂', '滴鼻液', '滴耳液', '眼膏',
+    '贴膏', '乳膏', '软膏',
+    '凝胶剂', '凝胶',
+    '口服液', '合剂', '洗液', '洗剂',
+    '乳胶剂', '滴剂', '口溶膜', '灌肠剂', '含漱液', '植入剂',
+    '乳剂', '搽剂', '贴剂', '膜剂', '胶浆',
+    '胶囊', '颗粒', '滴丸', '丸', '片', '栓', '糖浆', '散', '酊',
+    # 传统剂型放在最后，避免抢在更具体的后缀之前
+    '微球', '露', '膏药', '膏', '水', '丹', '液', '饮', '贴', '皂',
 ]
 
 
@@ -74,12 +107,27 @@ def labeled_values(block: str) -> dict[str, str]:
 
 
 def strip_paren_suffix(name: str) -> str:
-    return re.sub(r'[（(][^）)]*[）)]\s*$', '', name).strip()
+    while True:
+        stripped = re.sub(r'[（(][^）)]*[）)]\s*$', '', name).strip()
+        stripped = re.sub(r'\[[^\]]*\]\s*$', '', stripped).strip()
+        if stripped == name:
+            return stripped
+        name = stripped
 
 
 def form_of(generic_name: str) -> str | None:
     base = strip_paren_suffix(generic_name)
-    return next((s for s in FORM_SUFFIXES if base.endswith(s)), None)
+    base = re.sub(r'\s*(?:复合包装|组合包装|合包装)$', '', base).strip()
+    if base == '石膏':
+        return None
+    suffix = next((s for s in FORM_SUFFIXES if base.endswith(s)), None)
+    if suffix:
+        return suffix
+    if '注射用' in base:
+        return '注射用'
+    if base.startswith('吸入用'):
+        return '吸入用'
+    return None
 
 
 def has_strength(text: str) -> bool:
@@ -178,20 +226,93 @@ def parse_approvals(raw: str, specs: list[str]) -> tuple[dict[str, list[str]], l
     return result, unmapped
 
 
+def company_like(value: str) -> bool:
+    cleaned = re.sub(r'[\s.,;；。]+$', '', value.strip())
+    return bool(COMPANY_SUFFIX_RE.search(cleaned))
+
+
+def split_label(line: str) -> tuple[str | None, str]:
+    m = LABEL_RE.match(line)
+    if not m:
+        return None, line
+    return m.group(1).strip(), m.group(2).strip()
+
+
 def parse_manufacturer(block: str) -> tuple[str | None, str | None]:
     main = repack = None
+    main_priority = repack_priority = 99
     in_repack = False
+    in_domestic = False
+    pending_label: str | None = None
+
     for line in block.splitlines():
         s = clean_line(line)
+        if not s:
+            continue
+        if re.match(r'^[\[【]?\s*分包装\s*[\]】]?\s*$', s):
+            in_repack = True
+            in_domestic = False
+            continue
         if re.match(r'^[\[【]?分包装', s):
             in_repack = True
-        m = re.match(r'^企业名称\s*[：:]\s*(.+)$', s)
-        if m:
-            name = m.group(1).strip()
-            if in_repack and repack is None:
-                repack = name
-            elif main is None:
-                main = name
+            in_domestic = False
+            s = re.sub(r'^[\[【]?分包装[\]】]?\s*', '', s)
+            if not s:
+                continue
+        if re.match(r'^[\[【]?(?:进口)?分装', s) or (
+            s.startswith(('[', '【')) and '分包装' in s
+        ):
+            in_repack = True
+            in_domestic = False
+            continue
+        if DOMESTIC_CONTACT_RE.match(s):
+            in_domestic = True
+            continue
+        if in_domestic:
+            continue
+
+        label, value = split_label(s)
+        if label is None and re.fullmatch(r'[^：:]{1,16}\s*[：:]', s):
+            pending_label = re.sub(r'\s*[：:]$', '', s).strip()
+            continue
+        if label is None and pending_label:
+            label, value = pending_label, s
+        pending_label = None
+        value = MANUFACTURER_VALUE_CUT_RE.split(value, maxsplit=1)[0].strip(' ；;，,')
+        if not value:
+            continue
+        if ADDRESS_VALUE_RE.search(value) and not company_like(value):
+            continue
+
+        if label:
+            normalized = label.replace(' ', '').replace('\u3000', '')
+            if ADDRESS_LABEL_RE.search(normalized):
+                # 个别 PDF 把公司名称误标成「公司地址」；真地址不会以公司/厂后缀结尾
+                if normalized != '公司地址' or not company_like(value):
+                    continue
+                priority = 3
+            elif normalized in MANUFACTURER_LABELS:
+                priority = 0
+            elif normalized == '名称':
+                priority = 1
+            elif normalized in MAH_LABELS:
+                priority = 2
+            elif company_like(value):
+                priority = 3
+            else:
+                continue
+        else:
+            if not company_like(value):
+                continue
+            priority = 1
+
+        if in_repack:
+            if priority < repack_priority:
+                repack = value
+                repack_priority = priority
+        elif priority < main_priority:
+            main = value
+            main_priority = priority
     return main, repack
 
 
