@@ -42,6 +42,7 @@ gui-test-screenshots/
 tools/drug-crawler/
 data/crawled/
 data/manuals/
+data/manuals-manifest*.json*
 data/category-manifests/
 data/import-log.jsonl
 data/crawled-总账.md
