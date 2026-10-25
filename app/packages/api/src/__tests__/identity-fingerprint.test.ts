@@ -8,6 +8,7 @@ import {
   makeGenericId,
   makeIdentityKey,
   makeSourceDocumentId,
+  normalizeSpecification,
 } from '../db/identity.js'
 
 const base = {
@@ -44,6 +45,37 @@ describe('makeIdentityKey · 产品身份指纹', () => {
     const a = makeIdentityKey(base)
     const b = makeIdentityKey({ ...base, genericName: ' 测试 片 ' })
     expect(a).toBe(b)
+  })
+})
+
+describe('makeIdentityKey · 规格单位归一化', () => {
+  const withSpec = (specification: string) => makeIdentityKey({ ...base, specification })
+
+  it('克 / g、空白、全角标点归一化', () => {
+    expect(withSpec('0.65克')).toBe(withSpec('0.65 g'))
+    expect(withSpec('每粒装 0.35 g')).toBe(withSpec('每粒装0.35克'))
+    expect(withSpec('100ml：10g（精制鱼油）')).toBe(withSpec('100ml:10g(精制鱼油)'))
+  })
+
+  it('毫克 / mg、微克 / μg / mcg 归一化', () => {
+    expect(withSpec('30 毫克')).toBe(withSpec('30mg'))
+    expect(withSpec('5μg')).toBe(withSpec('5微克'))
+    expect(withSpec('5mcg')).toBe(withSpec('5ug'))
+  })
+
+  it('毫升 / ml、小数尾零归一化', () => {
+    expect(withSpec('100 毫升')).toBe(withSpec('100ml'))
+    expect(withSpec('0.50g')).toBe(withSpec('0.5g'))
+  })
+
+  it('不同数值或不同单位仍然不同', () => {
+    expect(withSpec('5mg')).not.toBe(withSpec('5g'))
+    expect(withSpec('10mg')).not.toBe(withSpec('10ml'))
+    expect(withSpec('0.3克')).not.toBe(withSpec('0.65克'))
+  })
+
+  it('normalizeSpecification 不误伤药名中的「克」', () => {
+    expect(normalizeSpecification('克霉唑10毫克')).toBe('克霉唑10mg')
   })
 })
 
