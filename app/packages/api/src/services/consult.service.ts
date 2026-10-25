@@ -74,6 +74,8 @@ function toInsertSlice(row: assetsRepo.PackageInsertRow): InsertSlice {
     storage: row.storage,
     source: row.source,
     version: row.version,
+    sourceSections: row.sourceSections ?? null,
+    curationStatus: row.curationStatus,
   }
 }
 

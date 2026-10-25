@@ -86,7 +86,9 @@ async function loadInsert(sqlClient: ReturnType<typeof postgres>, id: string): P
     select id, drug_id as "drugId", generic_name as "genericName", brand_name as "brandName",
            specification, form, indication, components, dosage, contraindications,
            adverse_reactions as "adverseReactions", precautions, interactions, pharmacology,
-           pharmacokinetics, storage, source, version
+           pharmacokinetics, storage, source, version,
+           source_sections as "sourceSections",
+           curation_status as "curationStatus"
     from package_inserts where id = ${id}`
   const r = rows[0]
   if (!r) throw new Error(`insert 行不存在：${id}`)
@@ -108,6 +110,8 @@ async function loadInsert(sqlClient: ReturnType<typeof postgres>, id: string): P
     storage: (r.storage as string) ?? null,
     source: String(r.source ?? ''),
     version: (r.version as string) ?? null,
+    sourceSections: (r.sourceSections as Record<string, string> | null) ?? null,
+    curationStatus: (r.curationStatus as InsertSlice['curationStatus']) ?? 'crawled',
   }
 }
 

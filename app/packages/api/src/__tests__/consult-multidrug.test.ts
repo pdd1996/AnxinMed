@@ -133,6 +133,7 @@ beforeAll(async () => {
   await db.insert(packageInserts).values([
     {
       id: PI_A,
+      curationStatus: 'reviewed',
       drugId: DM_A,
       genericName: '玻璃酸钠滴眼液',
       brandName: '海露',
@@ -146,6 +147,7 @@ beforeAll(async () => {
     },
     {
       id: PI_B,
+      curationStatus: 'reviewed',
       drugId: DM_B,
       genericName: '阿司匹林片',
       brandName: '拜阿司匹灵',

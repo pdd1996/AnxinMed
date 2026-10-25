@@ -54,6 +54,7 @@ beforeAll(async () => {
   })
   await db.insert(packageInserts).values({
     id: PI,
+    curationStatus: 'reviewed',
     drugId: DM,
     genericName: '玻璃酸钠滴眼液',
     brandName: '海露',

@@ -63,6 +63,7 @@ beforeAll(async () => {
   })
   await db.insert(packageInserts).values({
     id: PI_HYCOSAN,
+    curationStatus: 'reviewed',
     drugId: DM_HYCOSAN,
     genericName: '玻璃酸钠滴眼液',
     brandName: '海露',
@@ -139,6 +140,13 @@ beforeEach(async () => {
   // 每个测试前清空留痕表，保证断言确定性
   await db.delete(riskEvents).where(eq(riskEvents.userId, USER))
   await db.delete(consultLogs).where(eq(consultLogs.userId, USER))
+})
+
+afterEach(async () => {
+  // 未核验门禁用例会临时改状态，逐例复位
+  await db.update(packageInserts)
+    .set({ curationStatus: 'reviewed' })
+    .where(eq(packageInserts.id, PI_HYCOSAN))
 })
 
 // ---------------------------------------------------------------------------
@@ -279,6 +287,36 @@ describe('POST /api/consult · manual 档门禁（PRD §7.5.4）', () => {
     expect(res.body.blocked).toBe(true)
     expect(res.body.l0Notice).toContain('手动建档')
     expect(res.body.l0Notice).toContain('L0')
+
+    const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
+    expect(events).toHaveLength(1)
+    expect(events[0].level).toBe('manual-gate')
+    expect(events[0].type).toBe('manual-blocked')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 说明书未核验门禁
+// ---------------------------------------------------------------------------
+
+describe('POST /api/consult · 说明书未核验门禁', () => {
+  it('crawled insert → manual-gate（L0）+ 明示未核验 + risk_events 留痕', async () => {
+    await db.update(packageInserts)
+      .set({ curationStatus: 'crawled' })
+      .where(eq(packageInserts.id, PI_HYCOSAN))
+    prevClients = setAiClients(mockClients({}))
+
+    const res = await req('POST', '/api/consult', {
+      question: '这个药通常用于什么？',
+      drugIds: [DRUG_HYCOSAN],
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('manual-gate')
+    expect(res.body.blocked).toBe(true)
+    expect(res.body.l0Notice).toContain('尚未人工核验')
+    expect(res.body.l0Notice).toContain('玻璃酸钠滴眼液')
+    expect(res.body.citations).toHaveLength(1)
 
     const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
     expect(events).toHaveLength(1)

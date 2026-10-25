@@ -45,8 +45,8 @@ beforeAll(async () => {
     source: '海露说明书注意事项（演示抄录）',
   })
   await db.insert(packageInserts).values([
-    { id: PI_A, drugId: DM_A, genericName: '玻璃酸钠滴眼液', dosage: { adult: { dosePerUse: { value: 1, unit: '滴' }, maxFrequencyPerDay: { value: 10, unit: '次', note: '超出需眼科医生指导' } } }, source: '海露说明书', version: 'v1' },
-    { id: PI_B, drugId: DM_B, genericName: '左氧氟沙星滴眼液', dosage: { adult: { dosePerUse: { value: 1, unit: '滴' }, maxFrequencyPerDay: { value: 6, unit: '次', note: '超出需医生指导' } } }, source: '演示说明书', version: 'v1' },
+    { id: PI_A, curationStatus: 'reviewed', drugId: DM_A, genericName: '玻璃酸钠滴眼液', dosage: { adult: { dosePerUse: { value: 1, unit: '滴' }, maxFrequencyPerDay: { value: 10, unit: '次', note: '超出需眼科医生指导' } } }, source: '海露说明书', version: 'v1' },
+    { id: PI_B, curationStatus: 'reviewed', drugId: DM_B, genericName: '左氧氟沙星滴眼液', dosage: { adult: { dosePerUse: { value: 1, unit: '滴' }, maxFrequencyPerDay: { value: 6, unit: '次', note: '超出需医生指导' } } }, source: '演示说明书', version: 'v1' },
   ])
   await db.insert(drugs).values([
     { id: DRUG_A, userId: USER, genericName: '玻璃酸钠滴眼液', specification: '0.1%', form: '滴眼剂', drugMasterId: DM_A, confirmStatus: 'ocr_matched' },

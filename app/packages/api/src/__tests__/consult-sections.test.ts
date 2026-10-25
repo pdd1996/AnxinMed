@@ -2,7 +2,7 @@
  * M3-T1 · 按键取数 + L2 剂量过滤 + 归一化单测（PRD §7.5.3–§7.5.4）。
  *
  * 覆盖：
- * - pickInsertSections × 8（各段落路由：药理/相互作用/不良反应/禁忌/成份/注意事项/储存/医嘱提示/适应症兜底）
+ * - pickInsertSections × 12（各段落路由：药理/相互作用/不良反应/禁忌/成份/孕妇/儿童/老年/过量/注意事项/储存/医嘱提示/适应症兜底）
  * - normalizeSections × 3（limited 标记 / 兜底文案 / risks 不过滤剂量）
  * - fallbackSectionsFromInsert × 1（Baichuan 不可用降级）
  * - stripDosageAdvice × 3（切除/不误伤/边界）
@@ -47,6 +47,8 @@ const mkInsert = (overrides: Partial<InsertSlice> = {}): InsertSlice => ({
   storage: '密封，避光，不超过25℃保存',
   source: '丁香园用药助手',
   version: '2024-01',
+  sourceSections: null,
+  curationStatus: 'reviewed',
   ...overrides,
 })
 
@@ -119,6 +121,57 @@ describe('pickInsertSections · 按键取数（结构化取数优先于语义检
     const s = pickInsertSections('这个药的药理机制是什么', sparse)
     expect(s.text).toContain('药理作用：（未收录）')
     expect(s.text).toContain('药代动力学：（未收录）')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 孕妇/儿童/老年/过量（sourceSections 路由）
+// ---------------------------------------------------------------------------
+
+describe('pickInsertSections · 孕妇/儿童/老年/过量（sourceSections 路由）', () => {
+  const insert = mkInsert({
+    sourceSections: {
+      '孕妇和哺乳期妇女用药': '孕妇及哺乳期妇女禁用。',
+      '儿童用药': '儿童慎用。',
+      '老年用药': '老年患者应减量。',
+      '药物过量': '立即停药并就医。',
+    },
+  })
+
+  it('"孕妇能不能用" → 孕妇及哺乳期用药', () => {
+    const s = pickInsertSections('孕妇能不能用', insert)
+    expect(s.key).toBe('pregnancy')
+    expect(s.text).toContain('孕妇及哺乳期妇女禁用')
+  })
+
+  it('"哺乳期能吃吗" → 孕妇及哺乳期用药', () => {
+    const s = pickInsertSections('哺乳期能吃吗', insert)
+    expect(s.key).toBe('pregnancy')
+    expect(s.text).toContain('哺乳期妇女禁用')
+  })
+
+  it('"儿童能吃吗" → 儿童用药', () => {
+    const s = pickInsertSections('儿童能吃吗', insert)
+    expect(s.key).toBe('pediatric')
+    expect(s.text).toContain('儿童慎用')
+  })
+
+  it('"老人能吃吗" → 老年用药', () => {
+    const s = pickInsertSections('老人能吃吗', insert)
+    expect(s.key).toBe('geriatric')
+    expect(s.text).toContain('老年患者应减量')
+  })
+
+  it('"药物过量怎么办" → 药物过量', () => {
+    const s = pickInsertSections('药物过量怎么办', insert)
+    expect(s.key).toBe('overdose')
+    expect(s.text).toContain('立即停药并就医')
+  })
+
+  it('sourceSections 缺失 → 明确标注"（未收录）"', () => {
+    const s = pickInsertSections('孕妇能不能用', mkInsert({ sourceSections: null }))
+    expect(s.key).toBe('pregnancy')
+    expect(s.text).toContain('（未收录）')
   })
 })
 

@@ -7,8 +7,9 @@
  *
  * 判定依据是行内自带的来源信息（source / dataSource 列），不靠猜：
  * - package_inserts.source 含「丁香园」→ 真实（DXY 抄录：爬虫草稿或人工首单）
+ * - package_inserts.source 含「说明书 PDF」→ 真实（本地 PDF 说明书提取）
  * - package_inserts.source 含「本地演示 / 本地 Mock」→ 演示（demo 虚构内容，未经整理流程）
- * - drug_master.dataSource 含「丁香园」→ 真实（爬虫建档）；含 demo 路径 → 演示档案（demo seed 带入）
+ * - drug_master.dataSource 含「丁香园」→ 真实（爬虫建档）；含「说明书 PDF」→ 真实（PDF 建档）；含 demo 路径 → 演示档案（demo seed 带入）
  * - interaction_rules.source 含「演示」→ 演示抄录（正式条目待人工抄录，PRD §7.8.1 禁止模型生成）
  *
  * 清理语义：只删「演示内容 且 同药已有真实说明书行」的 package_inserts 行；
@@ -36,6 +37,7 @@ interface Prov {
 function insertProv(r: { source: string | null }): Prov {
   const s = r.source ?? ''
   if (s.includes('丁香园')) return { label: '真实·DXY抄录   ', real: true }
+  if (s.includes('说明书 PDF')) return { label: '真实·PDF说明书 ', real: true }
   if (s.includes('本地演示') || s.includes('本地 Mock')) return { label: '演示·虚构内容', real: false }
   return { label: '⚠️未知来源    ', real: false }
 }
@@ -43,6 +45,7 @@ function insertProv(r: { source: string | null }): Prov {
 function masterProv(r: { dataSource: string | null }): Prov {
   const s = r.dataSource ?? ''
   if (s.includes('丁香园')) return { label: '真实·爬虫建档', real: true }
+  if (s.includes('说明书 PDF')) return { label: '真实·PDF建档 ', real: true }
   if (s.includes('demo/')) return { label: '演示·demo档案', real: false }
   return { label: '⚠️未知来源   ', real: false }
 }

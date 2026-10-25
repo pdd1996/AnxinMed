@@ -4,7 +4,7 @@
  * 资产域是 Mock 三库（write-once，与用户域分离，无 userId）；规则引擎（services/rules）为纯函数，
  * 由此仓储取数后经 plans.service 编排传入。字段裁剪到匹配/校验所需，避免把整库拖进内存。
  */
-import { eq, ilike, inArray } from 'drizzle-orm'
+import { desc, eq, ilike, inArray, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { drugMaster, packageInserts, interactionRules } from '../db/schema.js'
 
@@ -42,7 +42,7 @@ export function listInteractionRules(): Promise<InteractionRuleRow[]> {
   return db.select().from(interactionRules)
 }
 
-/** 按 drug_master.id 取说明书（package_inserts.drugId → drug_master.id）。 */
+/** 按 drug_master.id 取说明书（优先 reviewed，再取最新；避免多版本时来源不确定）。 */
 export async function findPackageInsertByDrugMasterId(
   drugMasterId: string,
 ): Promise<PackageInsertRow | undefined> {
@@ -50,6 +50,10 @@ export async function findPackageInsertByDrugMasterId(
     .select()
     .from(packageInserts)
     .where(eq(packageInserts.drugId, drugMasterId))
+    .orderBy(
+      sql`case when ${packageInserts.curationStatus} = 'reviewed' then 0 else 1 end`,
+      desc(packageInserts.updatedAt),
+    )
     .limit(1)
   return rows[0]
 }

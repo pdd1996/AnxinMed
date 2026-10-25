@@ -173,6 +173,7 @@ beforeAll(async () => {
   })
   await db.insert(packageInserts).values({
     id: PI,
+    curationStatus: 'reviewed',
     drugId: DM,
     genericName: '青霉素V钾片',
     specification: '0.236g（40万单位）',

@@ -58,6 +58,32 @@ const REFUSED_SECTIONS: NormalizedSections = {
 const MANUAL_GATE_NOTICE =
   '该药品为用户手动建档（未经 OCR 确认），AI 个性化咨询不可用，仅可查询药品资料（L0）。'
 
+/** 说明书未核验提示（资产侧门禁：curationStatus !== reviewed）。 */
+const UNVERIFIED_NOTICE =
+  '该药品说明书尚未人工核验，AI 个性化咨询不可用，仅可查询药品原文资料（L0）。'
+
+/**
+ * L0 资料查询结果（manual-gate 与 unverified 共用）。
+ * 暂复用 manual-gate 状态，避免扩展 consult_logs.status 枚举；l0Notice 负责区分原因。
+ */
+function buildL0FromInsert(primary: ConsultDrug, question: string, notice: string): ConsultRunResult {
+  const sections = fallbackSectionsFromInsert(question, primary.insert!)
+  const picked = pickInsertSections(question, primary.insert!)
+  return {
+    riskLevel: 'L1',
+    status: 'manual-gate',
+    answer: sections.summary,
+    sections,
+    citations: [{ ...insertCitation(primary.insert!), sectionKey: picked.key }],
+    evidence: { sections: [{ drugName: primary.insert!.genericName, sectionKey: picked.key }] },
+    notice: null,
+    l0Notice: notice,
+    blocked: true,
+    matchedKeyword: null,
+    triggerDrugId: primary.id,
+  }
+}
+
 /** no-source 固定文案（搜索兜底已移除 · 2026-09 决议；drugName=null = 无对象药，不虚构药名）。 */
 function buildNoSourceResult(drugName: string | null): ConsultRunResult {
   const summary = drugName
@@ -160,21 +186,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     const primary = pickPrimaryDrug(drugs)
     // manual 档也可能命中说明书（demo findInsertByDrug 的 nameMatches 兜底路径）
     if (primary?.insert) {
-      const sections = fallbackSectionsFromInsert(question, primary.insert)
-      const picked = pickInsertSections(question, primary.insert)
-      return {
-        riskLevel: 'L1',
-        status: 'manual-gate',
-        answer: sections.summary,
-        sections,
-        citations: [{ ...insertCitation(primary.insert), sectionKey: picked.key }],
-        evidence: { sections: [{ drugName: primary.insert.genericName, sectionKey: picked.key }] },
-        notice: null,
-        l0Notice: MANUAL_GATE_NOTICE,
-        blocked: true, // 个体化解释被拒绝（但 L0 资料查询仍返回）
-        matchedKeyword: null,
-        triggerDrugId: primary.id,
-      }
+      return buildL0FromInsert(primary, question, MANUAL_GATE_NOTICE)
     }
     // manual 档 + 说明书也未命中 → 仍返回 manual-gate（门禁基于 confirmStatus，不基于 insert）
     // 附固定文案说明"未经 OCR 确认且本地未收录"，避免前端拿到空 sections
@@ -199,6 +211,21 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
       matchedKeyword: null,
       triggerDrugId: primary?.id ?? null,
     }
+  }
+
+  // ── 4b. unverified：说明书未人工核验 → 仅 L0 原文资料（不调 LLM）──
+  if (decision.kind === 'unverified') {
+    const primary =
+      drugs.find((d) => d.insert !== null && d.insert.curationStatus !== 'reviewed') ??
+      pickPrimaryDrug(drugs)
+    if (primary?.insert) {
+      return buildL0FromInsert(
+        primary,
+        question,
+        `${UNVERIFIED_NOTICE}涉及：${decision.drugNames.join('、')}。`,
+      )
+    }
+    return buildNoSourceResult(primary?.genericName ?? null)
   }
 
   // ── 5. no-source：本地未命中 ──

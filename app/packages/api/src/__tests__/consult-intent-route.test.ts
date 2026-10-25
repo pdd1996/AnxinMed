@@ -90,6 +90,7 @@ beforeAll(async () => {
   })
   await db.insert(packageInserts).values({
     id: PI_HYCOSAN,
+    curationStatus: 'reviewed',
     drugId: DM_HYCOSAN,
     genericName: '玻璃酸钠滴眼液',
     brandName: '海露',

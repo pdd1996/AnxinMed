@@ -39,6 +39,16 @@ export function pickInsertSections(question: string, insert: InsertSlice): Picke
   return { key: route.key, label: route.label, text }
 }
 
+/** source_sections 取原文（支持 PDF/DXY 段名变体）；未收录返回空串。 */
+function sourceText(insert: InsertSlice, keys: string[]): string {
+  const sections = insert.sourceSections ?? {}
+  for (const key of keys) {
+    const text = sections[key]
+    if (text) return sanitizeText(text)
+  }
+  return ''
+}
+
 /** 按段落 key 从说明书切片拼正文（未收录字段明确标注，避免 LLM 幻觉填空）。 */
 function buildSectionText(key: string, insert: InsertSlice): string {
   const contra = joinJsonArray(insert.contraindications)
@@ -55,6 +65,14 @@ function buildSectionText(key: string, insert: InsertSlice): string {
       return `禁忌：${contra || '（未收录）'}`
     case 'components':
       return `成份：${insert.components || '（未收录）'}`
+    case 'pregnancy':
+      return `孕妇及哺乳期用药：${sourceText(insert, ['孕妇和哺乳期妇女用药', '孕妇用药', '哺乳期妇女用药']) || '（未收录）'}`
+    case 'pediatric':
+      return `儿童用药：${sourceText(insert, ['儿童用药']) || '（未收录）'}`
+    case 'geriatric':
+      return `老年用药：${sourceText(insert, ['老年用药']) || '（未收录）'}`
+    case 'overdose':
+      return `药物过量：${sourceText(insert, ['药物过量']) || '（未收录）'}`
     case 'precautions':
       return `注意事项：${preca || '（未收录）'}`
     case 'storage':
