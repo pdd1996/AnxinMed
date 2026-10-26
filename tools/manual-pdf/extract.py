@@ -2,8 +2,8 @@
 """NMPA 版式说明书 PDF → AnxinMed data/manuals 草稿。
 
 用法（在仓库根目录执行）：
-  python tools/manual-pdf/extract.py "../../manuals/ω-3鱼油脂肪乳注射液[187040,186994,187403,187458].pdf" \
-      --drug-id-prefix drug-omega-3-fish-oil
+  python tools/manual-pdf/extract.py "../../manuals/<药品名>[<源记录ID>].pdf" \
+      --drug-id-prefix drug-<英文通用名 slug>
 
 规则：按【段名】逐字切分，仅做空白归一化；一个 PDF 覆盖多个规格时，每个规格产出一份草稿。
 依赖：PyMuPDF（import fitz）。
