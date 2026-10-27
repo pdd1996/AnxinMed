@@ -132,6 +132,16 @@ export async function fetchRecords(from: string, to: string) {
 export type RecordsResponseDto = Omit<Awaited<ReturnType<typeof fetchRecords>>, 'ok'>
 export type RecordItemDto = RecordsResponseDto['items'][number]
 
+/**
+ * GET /api/records/adherence-series：患者自查打卡时序（M5-T9 · RN 依从图表 · 0 次 LLM）。
+ * 与医生端 fetchPatientAdherenceSeries 同一响应契约，但 patientId 由服务端从会话用户派生，前端不传 id。
+ */
+export async function fetchMyAdherenceSeries(days: number) {
+  const res = await client.api.records['adherence-series'].$get({ query: { days: String(days) } })
+  return unwrap(res)
+}
+export type MyAdherenceSeriesDto = Omit<Awaited<ReturnType<typeof fetchMyAdherenceSeries>>, 'ok'>
+
 // ── 录入草稿（M2-T7 确认页）──
 
 /** 草稿详情：payload 为 api 侧 DraftPayload，经 hc<AppType> 端到端推导（前端不复制类型，执行总纲 §3.1）。 */
