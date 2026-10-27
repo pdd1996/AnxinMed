@@ -115,6 +115,8 @@ export default function Consult() {
     null,
   );
   const scrollRef = useRef<ScrollView>(null);
+  /** 只在消息条数真的变了才滚到底——历史面板开合与 citations 展开同样改内容高度，无条件滚动会把刚点开的面板甩出屏幕。 */
+  const lastScrolledCount = useRef(-1);
   // 最新一条回答（头部播报对象；卡内不重复放播放按钮，照 web 2026-09-21 改版）
   const lastResponse = [...messages]
     .reverse()
@@ -219,7 +221,11 @@ export default function Consult() {
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => {
+          if (lastScrolledCount.current === messages.length) return;
+          lastScrolledCount.current = messages.length;
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">咨询</Text>
