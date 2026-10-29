@@ -13,6 +13,7 @@ import {
   type RangeMode,
 } from "@anxin/core";
 import { Icon } from "@/components/ui/icon";
+import { AdherenceCharts } from "@/components/domain/records/AdherenceCharts";
 
 const MODES: { key: RangeMode; label: string }[] = [
   { key: "day", label: "按日" },
@@ -94,6 +95,8 @@ export default function Records() {
       <Text className="mt-1 text-base leading-6 text-muted-foreground">
         按日 / 周 / 月查看你亲自确认的服药留痕，可导出 CSV。
       </Text>
+
+      <AdherenceCharts />
 
       <View className="mt-5 flex-row gap-2">
         {MODES.map((item) => {
