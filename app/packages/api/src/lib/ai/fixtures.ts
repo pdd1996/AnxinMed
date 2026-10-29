@@ -44,7 +44,8 @@ export interface FixturePack {
 }
 
 /** app/e2e/fixtures（从本文件 app/packages/api/src/lib/ai/ 上溯 5 级到 app/）。 */
-const FIXTURE_DIR = fileURLToPath(new URL('../../../../../e2e/fixtures', import.meta.url))
+// 传 .href 而非 URL 对象：mobile 包 tsc 带 DOM lib，其 URL 类型与 node:url 的 fileURLToPath 不兼容。
+const FIXTURE_DIR = fileURLToPath(new URL('../../../../../e2e/fixtures', import.meta.url).href)
 
 const packCache = new Map<string, FixturePack>()
 
