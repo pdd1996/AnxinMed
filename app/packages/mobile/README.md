@@ -79,7 +79,7 @@ release 构建不定义该变量即通道不存在（`__DEV__` 双保险）；we
    与 `exp+<slug>://` 深链（外部 intent 可拉起它去连任意 metro 地址）。插件往 `settings.gradle` 注入一段
    「读 `ANXIN_RELEASE_BUILD` 环境变量 → 给 `expoAutolinking.exclude` 填这四个包名」；出包脚本置位，
    dev 出包不置位 → 调试链路不变。
-   自检：`aapt dump xmltree app-release.apk AndroidManifest.xml | grep exp+` 应无输出。
+   自检：dex 内不得出现开发者包路径 `expo/modules/devlauncher`、`expo/modules/devmenu`、`expo/modules/devclient`（可解包 `classes*.dex` 后用 `strings` 搜）。**不要**用 `aapt dump xmltree | grep exp+` 判——`exp+anxin-medication` 是 prebuild 写进主 manifest 的静态深链，排除后仍在；`DevLauncher`/`DevMenu` 子串也会命中 RN 自带的 `DevMenuModule` 与 `expo-updates-interface`。
 2. **双 ABI**：`expo run:android` 只在 **debug** 变体按已连设备的 ABI 传 `-PreactNativeArchitectures`，
    release 变体用 `android/gradle.properties` 里的值。模板值若只有 `x86_64`，release 包装进 ARM64 真机会报
    `INSTALL_FAILED_NO_MATCHING_ABIS`（现象是「装不上」，与代码无关）。插件把它写成 `arm64-v8a,x86_64`。
@@ -88,13 +88,13 @@ release 构建不定义该变量即通道不存在（`__DEV__` 双保险）；we
 prebuild 之后先验这两条再出包（插件确实跑到了）：`grep -c ANXIN_RELEASE_BUILD android/settings.gradle` 应为 `1`；
 `grep ^reactNativeArchitectures android/gradle.properties` 应为 `arm64-v8a,x86_64`。
 
-## 页面与里程碑边界（M5-T7 现状）
+## 页面与里程碑边界（M5-T8 现状）
 
 `src/app/` 根 stack：`(patient)`（五 tab：今日/药箱/记录/我的/设置；分组内不走系统头部，页内自出标题）·
-`intake`（拍药盒 → 层检测 → 识别 → 草稿）· `drafts/[id]`（唯一闸门：确认建档）· `consult`（AI 咨询）· `probe`（T3 的网络探测页）。
+`intake`（拍药盒 → 层检测 → 识别 → 草稿）· `drafts/[id]`（唯一闸门：确认建档）· `consult`（AI 咨询）· `probe`（T3 的网络探测页）· `notification-settings`（T8 的通知与后台设置引导）。
 五 tab 自 M5-T5e 起**全是真实页**（`PlaceholderPage` 零引用，已删）：今日=任务卡 + 30s 轮询 + 页内提醒弹窗 + 打勾写记录（T5b）·
 药箱=两份查询 + 建/改计划 + 手动建档 + 暂停/恢复/结束 + 删药二次确认（T5c）· 记录=日/周/月区间 + CSV 导出（T5d）·
-我的=健康信息七字段常驻 + 补录/编辑/删除二次确认（T5e）· 设置=字号两档 + 风险语义色预览 + 深浅色说明 + 未接项如实标注（T5e）。
+我的=健康信息七字段常驻 + 补录/编辑/删除二次确认（T5e）· 设置=字号两档 + 风险语义色预览 + 深浅色说明 + 到点提醒入口（T5e/T8）。
 未接入的能力一律以「还在路上 · M5-Tx」的虚线行列出，不放点了没反应的假按钮；不存在的路由由 `app/+not-found.tsx` 兜底。
 分组不改变 URL：`/box`、`/intake`、`/probe` 等路径与 T4 一致，旧链接与 `router.push("/box")` 全部照用。
 
@@ -103,7 +103,7 @@ prebuild 之后先验这两条再出包（插件确实跑到了）：`grep -c AN
   快捷问题与 TTS（expo-speech，rate 0.92）都在本包；逻辑真相仍走 `@anxin/core`。
 - 六步流转的**决策**全在 `@anxin/core` 的 `transitionIntakeFlow`（纯函数、已单测），本包只做动作解释与渲染；
 - 本地质量预检已在 T6-b 落地（原生 resize ≤512 → `jpeg-js` 解码 → core `statsFromRgba`）；预检只是建议，不拦用户；
-- 处方笺入口与质量预检 T6 已交付、咨询 T7 已接；提醒 T8、图表与 Maestro T9 —— 见 `T6-真机验收.md`、`T7-真机验收.md` 与任务书 05。
+- 处方笺入口与质量预检 T6 已交付、咨询 T7 已接；**本地到点提醒 T8 已接**（`expo-notifications` 定时通知 + 设置引导页，验收见 `T8-真机验收.md`）；图表与 Maestro 归 T9 —— 见任务书 05。
 
 ## 字号全局缩放（M5-T5a 接线，改这三处前两读）
 

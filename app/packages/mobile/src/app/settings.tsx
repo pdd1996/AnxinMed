@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
-import { Type, Wifi } from "lucide-react-native";
+import { Type, Bell, Wifi } from "lucide-react-native";
 import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Text 必须走 ui/text：09-30 深夜修过一条「settings.tsx 直引 react-native 的 Text，接不到
@@ -10,9 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { useFontScale, type FontScale } from "@/stores/fontScale";
-
-/** 未接项照「如实写明落在哪一片」的形态列出，不放点了没反应的假开关（05d §2-T5-e）。 */
-const NOT_YET = [{ title: "系统通知与到点提醒", when: "M5-T8" }];
+import { useReminderSync } from "@/stores/reminderSync";
 
 /**
  * 设置页（M5-T5e 起为真实页）：字号两档 = 全局缩放的验证入口，风险语义色预览 = §6 第 4 条的色板自检。
@@ -22,6 +20,7 @@ export default function Settings() {
   const router = useRouter();
   const scale = useFontScale((s) => s.scale);
   const setScale = useFontScale((s) => s.setScale);
+  const reminderPermission = useReminderSync((s) => s.permission);
   // 图标是 SVG，取 --primary 令牌而不是写死色值（深浅色都要对，05d §6 第 16 条）。
   const primary = useUnstableNativeVariable("--primary");
 
@@ -87,23 +86,31 @@ export default function Settings() {
       </View>
 
       <View className="mt-8 gap-2">
+        <Text className="text-lg font-semibold text-foreground">到点提醒</Text>
+        <Text className="text-sm leading-6 text-muted-foreground">
+          退到后台或关闭应用后，到点由系统通知提醒。
+          {reminderPermission === "granted"
+            ? "通知权限已开启。"
+            : "通知权限还没开启，到点提醒不会响。"}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/notification-settings")}
+          className="mt-1 min-h-[52px] flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 active:opacity-80"
+        >
+          <Bell size={20} color={primary} importantForAccessibility="no" />
+          <Text className="flex-1 text-base font-medium text-card-foreground">通知与提醒设置</Text>
+          <Text className="text-sm text-muted-foreground">
+            {reminderPermission === "granted" ? "去检查 →" : "去开启 →"}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View className="mt-8 gap-2">
         <Text className="text-base font-bold text-foreground">界面深浅色</Text>
         <Text className="text-sm leading-6 text-muted-foreground">
           跟随手机的系统深浅色设置，切换后立即生效，不需要重启应用。
         </Text>
-      </View>
-
-      <View className="mt-8 gap-2">
-        <Text className="text-lg font-semibold text-foreground">还在路上</Text>
-        {NOT_YET.map((item) => (
-          <View
-            key={item.title}
-            className="flex-row items-center justify-between rounded-xl border border-dashed border-border px-4 py-3"
-          >
-            <Text className="flex-1 text-base text-muted-foreground">{item.title}</Text>
-            <Text className="ml-3 text-xs text-muted-foreground">{item.when}</Text>
-          </View>
-        ))}
       </View>
     </ScrollView>
   );

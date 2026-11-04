@@ -19,6 +19,7 @@ import { ConfirmRecordDialog, type PendingRecord } from "@/components/domain/Con
 import { ReminderModal } from "@/components/domain/ReminderModal";
 import { TaskSlotChip } from "@/components/domain/task-slot";
 import { Icon } from "@/components/ui/icon";
+import { useReminderSync } from "@/stores/reminderSync";
 import { useUnstableNativeVariable } from "nativewind";
 
 type TodayData = Awaited<ReturnType<typeof fetchTodayTasks>>;
@@ -44,16 +45,12 @@ function hasPendingSlot(group: PlanGroup): boolean {
   return group.slots.some((slot) => slot.status === "pending");
 }
 
-/** 未接项照「如实写明落在哪一片」的形态列出，不放点了没反应的假开关（05d §2-T5-e）。 */
-const SOON = [
-  { title: "退到后台的系统级到点提醒", when: "M5-T8" },
-];
-
 /**
  * 今日页（M5-T5b：照 web `routes/patient/Home.tsx` 的逻辑真相，渲染层重写）。
  * 任务数据 = GET /api/tasks/today，30s 轮询；到点未处理项进 core 的提醒队列，队首自动弹窗；
  * 打勾写 POST /api/records 走乐观更新（失败回滚 + 页内可见错误）。
- * 提醒只在**本页打开期间**发生——队列在客户端内存里，系统通知属 M5-T8（05d §7 第 4 条）。
+ * 系统级到点提醒自 M5-T8 起由根布局的 NotificationSync 排定（退到后台/关闭后仍生效）；
+ * 本页打开期间仍用页内弹窗，两条路不重复提醒。
  */
 export default function Today() {
   const router = useRouter();
@@ -62,6 +59,7 @@ export default function Today() {
   const configured = isApiConfigured();
   const primary = useUnstableNativeVariable("--primary");
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
+  const reminderPermission = useReminderSync((state) => state.permission);
   const [pending, setPending] = useState<PendingRecord | null>(null);
   const [reminderPlanId, setReminderPlanId] = useState<string | null>(null);
   const [recordError, setRecordError] = useState<string | null>(null);
@@ -226,6 +224,27 @@ export default function Today() {
             </View>
           </View>
 
+          {reminderPermission === "denied" || reminderPermission === "undetermined" ? (
+            <View className="mt-4 rounded-2xl border border-risk-l3 bg-risk-l3-tint p-4">
+              <View className="flex-row items-center gap-2">
+                <Icon as={Bell} size={18} color={primary} />
+                <Text className="flex-1 text-base font-semibold text-risk-l3">
+                  到点提醒还没打开
+                </Text>
+              </View>
+              <Text className="mt-1 text-sm leading-5 text-risk-l3">
+                退到后台或关闭应用后，收不到服药通知。打开通知权限与后台设置后才会到点提醒。
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push("/notification-settings")}
+                className="mt-3 min-h-[44px] items-center justify-center rounded-xl border border-risk-l3 active:opacity-80"
+              >
+                <Text className="text-base font-medium text-risk-l3">去开启</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {recordError ? (
             <View className="mt-4 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-4">
               <Text className="text-base font-semibold text-risk-l4">记录未写入</Text>
@@ -318,23 +337,10 @@ export default function Today() {
         </>
       )}
 
-      <Text className="mt-8 text-lg font-semibold text-foreground">还在路上</Text>
-      <View className="mt-2 gap-2">
-        {SOON.map((item) => (
-          <View
-            key={item.title}
-            className="flex-row items-center justify-between rounded-xl border border-dashed border-border px-4 py-3"
-          >
-            <Text className="flex-1 text-base text-muted-foreground">{item.title}</Text>
-            <Text className="ml-3 text-xs text-muted-foreground">{item.when}</Text>
-          </View>
-        ))}
-      </View>
-
       <View className="mt-6 rounded-xl border border-border bg-card p-3">
         <Text className="text-xs leading-5 text-muted-foreground">
-          应用内提醒说明：仅在本页打开期间到点提醒，退到后台或关闭后不会发送系统通知（系统通知随
-          M5-T8 接入）。漏服不会自动建议补服。
+          提醒说明：应用在前台时用页内弹窗；退到后台或关闭后由系统通知（需在「设置 →
+          通知与提醒设置」里允许通知与后台运行）。漏服不会自动建议补服。
         </Text>
       </View>
 

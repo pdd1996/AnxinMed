@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { FontScaleSync } from "@/components/FontScaleSync";
+import { NotificationSync } from "@/components/NotificationSync";
 import { OnboardingGate } from "@/components/OnboardingGate";
 import { Toaster } from "@/components/ui/sonner-native";
 import { queryClient } from "@/lib/query";
@@ -33,6 +34,8 @@ export default function RootLayout() {
           {/* 系统状态栏图标跟深浅色翻转：浅色下深色图标（否则白压白，时钟/电量看不见）。 */}
           <StatusBar style="auto" />
           <FontScaleSync />
+          {/* 本地到点提醒（M5-T8）：不挂在今日页里——系统通知必须比页面活得久。 */}
+          <NotificationSync />
           <OnboardingGate>
             <Stack
               screenOptions={{
@@ -47,6 +50,7 @@ export default function RootLayout() {
               <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
               <Stack.Screen name="records" options={{ title: "服药记录" }} />
               <Stack.Screen name="settings" options={{ title: "设置" }} />
+              <Stack.Screen name="notification-settings" options={{ title: "通知与提醒设置" }} />
               <Stack.Screen name="probe" options={{ title: "网络探测" }} />
             </Stack>
           </OnboardingGate>

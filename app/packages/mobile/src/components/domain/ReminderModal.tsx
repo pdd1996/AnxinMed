@@ -17,8 +17,8 @@ import { TaskSlotChip } from "@/components/domain/task-slot";
 /**
  * 页内服药提醒弹窗（照 web `domain/ReminderModal.tsx`）：队首计划到点弹出，
  * 提供 已服 / 稍后 / 跳过 三个出口，另加一条时间点胶囊行供选择具体时点。
- * 播报按钮保留位但当前端未注入 TTS（`setSpeechAdapter` 的 mobile 实现在 M5-T7），
- * 故按能力判disabled——不做强装了却点了没反应的假按钮（05d §6 第 12 条同口径）。
+ * 播报接 core 的 SpeechAdapter（mobile 实现为 expo-speech，M5-T7d 起在 wiring.ts 装配）；
+ * 不具备 TTS 能力时按能力禁用——不做点了没反应的假按钮（05d §6 第 12 条同口径）。
  */
 export function ReminderModal({
   group,
@@ -71,8 +71,8 @@ export function ReminderModal({
           >
             <Text>{`确认已服${nextPending ? `（${nextPending.time}）` : ""}`}</Text>
           </Button>
-          {/* 播报单独占一行：它带「待接入」四个字，塞进三钮等宽的那一行会被裁掉一行文字
-              （10-02 模拟器实测）。语音接入属 M5-T7，接上后文案可缩回「播报」。 */}
+          {/* 播报单独占一行：文案较长时塞进三钮等宽那一行会被裁掉一行文字
+              （10-02 模拟器实测）；语音已在 M5-T7 接入，这里保持「播报」短文案。 */}
           <Button
             variant="outline"
             className="min-h-[48px] w-full"

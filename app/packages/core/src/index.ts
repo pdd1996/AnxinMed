@@ -23,6 +23,7 @@ export * from './lib/draft'
 // 测试夹具（仅测试引用，勿进应用代码）：web 的确认页组件测试沿用。
 export * from './lib/draft-fixtures'
 export * from './lib/records'
+export * from './lib/reminder-schedule'
 export * from './lib/tasks'
 export * from './lib/utils'
 export * from './intakeFlow/flow'

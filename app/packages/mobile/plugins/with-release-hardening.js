@@ -27,7 +27,9 @@ const DEV_CLIENT_PACKAGES = [
 
 const SETTINGS_BLOCK = [
   "// ── with-release-hardening：发布包剔除开发者工具链（见 plugins/with-release-hardening.js）──",
-  `if (System.getenv('${MARKER}') == '1') {`,
+  // 用 providers 读客户端环境：System.getenv 在复用的 Gradle daemon 里可能是 daemon 启动时的旧环境，
+  // 读不到本次构建传入的 ANXIN_RELEASE_BUILD，排除段会静默不生效。
+  "if (providers.environmentVariable('ANXIN_RELEASE_BUILD').orNull == '1') {",
   "  expoAutolinking.exclude = [",
   ...DEV_CLIENT_PACKAGES.map((p, i) => `    '${p}'${i === DEV_CLIENT_PACKAGES.length - 1 ? "" : ","}`),
   "  ]",

@@ -70,7 +70,7 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
               、不替代医生或药师；所有用药决定请以医嘱与说明书为准。
             </Bullet>
             <Bullet>AI 回答仅基于已确认的说明书资料；涉及停换药或剂量调整会建议你咨询医生。</Bullet>
-            <Bullet>提醒仅在页面打开期间生效；漏服不会自动建议补服。</Bullet>
+            <Bullet>退到后台或关闭应用后由系统通知到点提醒（需允许通知与后台运行）；漏服不会自动建议补服。</Bullet>
           </View>
           <Pressable
             accessibilityRole="button"
