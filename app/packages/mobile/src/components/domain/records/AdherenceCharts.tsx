@@ -128,6 +128,8 @@ export function AdherenceCharts() {
   const plotWidth = chartWidth - 40;
   const series = data?.series;
   const byDrug = data?.byDrug;
+  /** 端点会给窗口内每一天补零（series 恒满），空态要看窗口里是否真的有一条打卡。 */
+  const hasRecords = series?.some((d) => d.taken + d.skipped + d.later > 0) ?? false;
 
   const charts = useMemo(() => {
     if (!series || !byDrug) return null;
@@ -185,7 +187,7 @@ export function AdherenceCharts() {
             <Text className="text-base font-medium text-primary-foreground">重试</Text>
           </Pressable>
         </View>
-      ) : series && series.length > 0 && charts ? (
+      ) : series && series.length > 0 && hasRecords && charts ? (
         <>
           <View className="mt-3">
             <Legend palette={palette} />

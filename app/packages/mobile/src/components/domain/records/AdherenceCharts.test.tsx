@@ -144,6 +144,18 @@ describe("AdherenceCharts · 三态", () => {
     expect((byDrug.data as unknown[]).length).toBe(1);
   });
 
+  it("无任何打卡：显示引导空态，不画图", async () => {
+    const empty = makeData(7);
+    mockedFetch.mockResolvedValue({
+      ...empty,
+      series: empty.series.map((d) => ({ ...d, taken: 0, skipped: 0, later: 0 })),
+      byDrug: [],
+    });
+    const view = await renderWithQuery(<AdherenceCharts />);
+    await waitFor(() => expect(view.getByText(/还没有打卡数据/)).toBeTruthy());
+    expect(chartProps).toHaveLength(0);
+  });
+
   it("无按药品数据：明示空态而不是留白", async () => {
     mockedFetch.mockResolvedValue({ ...makeData(7), byDrug: [] });
     const view = await renderWithQuery(<AdherenceCharts />);
