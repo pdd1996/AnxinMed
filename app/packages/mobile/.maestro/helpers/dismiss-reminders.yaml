@@ -1,0 +1,24 @@
+appId: com.anxin.mobile
+---
+# 冷启动后今日页会把到点未处理的计划逐个弹窗；每关一个，下一个补位。
+# 弹窗右上角 ✕ 的可访问性标签是 "Close"（坐标点在不同缩放下不稳，改用标签）。
+- runFlow:
+    when:
+      visible: ".*该服药了.*"
+    commands:
+      - tapOn: "Close"
+- runFlow:
+    when:
+      visible: ".*该服药了.*"
+    commands:
+      - tapOn: "Close"
+- runFlow:
+    when:
+      visible: ".*该服药了.*"
+    commands:
+      - tapOn: "Close"
+- runFlow:
+    when:
+      visible: ".*该服药了.*"
+    commands:
+      - tapOn: "Close"

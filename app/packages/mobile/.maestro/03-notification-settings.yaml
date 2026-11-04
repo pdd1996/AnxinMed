@@ -1,0 +1,17 @@
+appId: com.anxin.mobile
+---
+# T9-2 冒烟 4/5：提醒设置（设置页直达引导页）
+- launchApp:
+    clearState: false
+- runFlow: helpers/dismiss-reminders.yaml
+- tapOn:
+    point: "90%,96%"
+- tapOn: "设置"
+- scrollUntilVisible:
+    element:
+      text: "通知与提醒设置"
+    direction: DOWN
+    timeout: 30000
+- tapOn: "通知与提醒设置"
+- assertVisible: "当前状态"
+- assertVisible: "通知权限"

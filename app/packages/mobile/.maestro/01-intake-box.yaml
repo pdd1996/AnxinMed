@@ -1,0 +1,34 @@
+appId: com.anxin.mobile
+---
+# T9-2 冒烟 2/5：录入一条（拍药盒 → 相册第一张 = 预置的 t9-box.png → 草稿确认）
+# 前置：`adb push app/fixtures/drug-box-labeled.png /sdcard/DCIM/Camera/t9-box.png` + 媒体扫描。
+- launchApp:
+    clearState: false
+- runFlow: helpers/dismiss-reminders.yaml
+- tapOn:
+    point: "50%,96%"
+- tapOn:
+    point: "73%,17%"
+- assertVisible: "上传正面清晰的药盒照片"
+- tapOn: "从相册选一张"
+- extendedWaitUntil:
+    visible: "Recent"
+    timeout: 15000
+# 相册缩略图的可访问性标签（PhotoPicker 不暴露文件名）；取第一张药盒图。
+- tapOn: "Photo taken on.*"
+- extendedWaitUntil:
+    visible: "草稿确认"
+    timeout: 120000
+- scrollUntilVisible:
+    element:
+      text: ".*已理解.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn: ".*已理解.*"
+- scrollUntilVisible:
+    element:
+      text: ".*确认建档.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn: ".*确认建档.*"
+- assertVisible: "我的药箱"

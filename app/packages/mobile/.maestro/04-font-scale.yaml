@@ -1,0 +1,13 @@
+appId: com.anxin.mobile
+---
+# T9-2 冒烟 5/5：字号缩放（标准 ↔ 大字，本机持久化）
+- launchApp:
+    clearState: false
+- runFlow: helpers/dismiss-reminders.yaml
+- tapOn:
+    point: "90%,96%"
+- tapOn: "设置"
+- tapOn: "大字"
+- assertVisible: ".*当前：.*大字.*"
+- tapOn: "标准"
+- assertVisible: ".*当前：.*标准.*"

@@ -1,0 +1,10 @@
+appId: com.anxin.mobile
+---
+# T9-2 冒烟 1/5：启动 → 药箱
+- launchApp:
+    clearState: false
+- runFlow: helpers/dismiss-reminders.yaml
+- tapOn:
+    point: "30%,96%"
+- assertVisible: "我的药箱"
+- assertVisible: "手动建档"
