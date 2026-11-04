@@ -35,13 +35,14 @@ async function prepareBaselines(client: postgres.Sql) {
      values ('${DM_ID}', '玻璃酸钠滴眼液', '0.1%（10mL:10mg）', '滴眼液', 'mock')
      on conflict (id) do nothing`,
   )
-  // 说明书 dosage 锚点：上限 10 次/日 → rx-normal 频次 4 → 范围校验 pass
+  // 说明书 dosage 锚点：上限 10 次/日 → rx-normal 频次 4 → 范围校验 pass；
+  // curation_status='reviewed'：M6-T2 未核验门禁（非 reviewed 只走 L0，不调 LLM），E2E 要验 LLM 路径必须显式过门
   await client.unsafe(
-    `insert into package_inserts (id, drug_id, generic_name, dosage, source, version)
+    `insert into package_inserts (id, drug_id, generic_name, dosage, source, version, curation_status)
      values ('${PI_ID}', '${DM_ID}', '玻璃酸钠滴眼液',
        '{"adult":{"dosePerUse":{"value":1,"unit":"滴"},"maxFrequencyPerDay":{"value":10,"unit":"次"}}}'::jsonb,
-       '海露说明书', 'v1')
-     on conflict (id) do nothing`,
+       '海露说明书', 'v1', 'reviewed')
+     on conflict (id) do update set curation_status = excluded.curation_status`,
   )
   console.log('[e2e-setup] 迁移 + seed 完成（p-001 / dm-t9-hycosan / pi-e2e-hycosan）')
   await client.end()

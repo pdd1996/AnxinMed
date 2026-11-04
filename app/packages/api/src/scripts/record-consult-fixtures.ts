@@ -56,12 +56,13 @@ async function ensureDb(): Promise<void> {
      values ('dm-t9-hycosan', '玻璃酸钠滴眼液', '0.1%（10mL:10mg）', '滴眼液', 'mock')
      on conflict (id) do nothing`,
   )
+  // reviewed：M6-T2 未核验门禁（非 reviewed 只走 L0），种子须可直接用于 LLM 路径回放
   await client.unsafe(
-    `insert into package_inserts (id, drug_id, generic_name, dosage, source, version)
+    `insert into package_inserts (id, drug_id, generic_name, dosage, source, version, curation_status)
      values ('pi-e2e-hycosan', 'dm-t9-hycosan', '玻璃酸钠滴眼液',
        '{"adult":{"dosePerUse":{"value":1,"unit":"滴"},"maxFrequencyPerDay":{"value":10,"unit":"次"}}}'::jsonb,
-       '海露说明书', 'v1')
-     on conflict (id) do nothing`,
+       '海露说明书', 'v1', 'reviewed')
+     on conflict (id) do update set curation_status = excluded.curation_status`,
   )
   await client.unsafe(
     `insert into drug_master (id, generic_name, specification, form, curation_status)
@@ -69,12 +70,12 @@ async function ensureDb(): Promise<void> {
      on conflict (id) do nothing`,
   )
   await client.unsafe(
-    `insert into package_inserts (id, drug_id, generic_name, specification, form, indication, contraindications, source, version)
+    `insert into package_inserts (id, drug_id, generic_name, specification, form, indication, contraindications, source, version, curation_status)
      values ('pi-e2e-allergy', 'dm-e2e-allergy', '磺胺嘧啶片', '0.5g', '片剂',
        '用于敏感菌引起的感染治疗',
        '["对磺胺类药物过敏者禁用","孕妇及哺乳期妇女禁用"]'::jsonb,
-       '丁香园用药助手（演示抄录）', '2024-01')
-     on conflict (id) do nothing`,
+       '丁香园用药助手（演示抄录）', '2024-01', 'reviewed')
+     on conflict (id) do update set curation_status = excluded.curation_status`,
   )
   await client.end()
   console.log('[record] 测试库就绪（迁移 + 种子幂等）')

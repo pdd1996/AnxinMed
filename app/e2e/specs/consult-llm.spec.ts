@@ -62,13 +62,14 @@ test.beforeAll(async () => {
     insert into drug_master (id, generic_name, specification, form, curation_status)
     values (${DM_ALLERGY}, '磺胺嘧啶片', '0.5g', '片剂', 'mock')
     on conflict (id) do nothing`
+  // curation_status='reviewed'：M6-T2 未核验门禁（非 reviewed 只走 L0，不调 LLM），本文件验 LLM 生成路径
   await sql`
-    insert into package_inserts (id, drug_id, generic_name, specification, form, indication, contraindications, source, version)
+    insert into package_inserts (id, drug_id, generic_name, specification, form, indication, contraindications, source, version, curation_status)
     values (${PI_ALLERGY}, ${DM_ALLERGY}, '磺胺嘧啶片', '0.5g', '片剂',
       '用于敏感菌引起的感染治疗',
       '["对磺胺类药物过敏者禁用","孕妇及哺乳期妇女禁用"]'::jsonb,
-      '丁香园用药助手（演示抄录）', '2024-01')
-    on conflict (id) do nothing`
+      '丁香园用药助手（演示抄录）', '2024-01', 'reviewed')
+    on conflict (id) do update set curation_status = excluded.curation_status`
   await sql`
     insert into drugs (id, user_id, generic_name, specification, form, drug_master_id, confirm_status)
     values (${DRUG_ALLERGY}, 'p-001', '磺胺嘧啶片', '0.5g', '片剂', ${DM_ALLERGY}, 'ocr_matched')
