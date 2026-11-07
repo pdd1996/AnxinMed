@@ -54,3 +54,7 @@ __pycache__/
 
 # 对打明细（模型输出引用说明书原文，DXY 版权纪律不入库；summary.md 保留）
 data/consult-bakeoff/*.json
+
+# M6 分批导入暂存（草稿导入后并入 data/manuals）
+data/manuals-incoming/
+data/manuals-*.csv

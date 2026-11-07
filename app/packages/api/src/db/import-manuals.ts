@@ -5,6 +5,7 @@
  *   npm run db:import-manuals                # 导入全部草稿（幂等，可重复运行）
  *   npm run db:import-manuals -- --dry-run   # 只打印将执行的动作（事务内执行后回滚），不落库、不记日志
  *   npm run db:import-manuals -- --status    # 草稿 ↔ 数据库对账
+ *   npm run db:import-manuals -- --dir <目录> # 只导入指定目录的草稿（分批导入用）
  *
  * 语义与 import-crawled 一致：
  * - 草稿以 curationStatus='crawled' 入库（staging），人工核对后才可升 reviewed；
@@ -14,7 +15,7 @@
  */
 import 'dotenv/config'
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { and, eq, TransactionRollbackError } from 'drizzle-orm'
@@ -156,16 +157,22 @@ async function main(): Promise<number> {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry-run')
   const statusOnly = args.includes('--status')
+  const dirArg = args.includes('--dir') ? args[args.indexOf('--dir') + 1] : null
+  if (dirArg === undefined) {
+    console.error('❌ --dir 需要目录参数')
+    return 1
+  }
+  const targetDir = dirArg ? resolve(dirArg) : manualsDir
 
   let files: string[]
   try {
-    files = readdirSync(manualsDir).filter((f) => f.endsWith('.json')).sort()
+    files = readdirSync(targetDir).filter((f) => f.endsWith('.json')).sort()
   } catch {
-    console.error(`❌ 未找到草稿目录：${manualsDir}`)
+    console.error(`❌ 未找到草稿目录：${targetDir}`)
     return 1
   }
   if (files.length === 0) {
-    console.error(`❌ 未找到草稿：${manualsDir}/*.json`)
+    console.error(`❌ 未找到草稿：${targetDir}/*.json`)
     return 1
   }
 
@@ -173,7 +180,7 @@ async function main(): Promise<number> {
   const errors: string[] = []
   const seenDrugIds = new Set<string>()
   for (const file of files) {
-    const path = join(manualsDir, file)
+    const path = join(targetDir, file)
     let parsed: unknown
     try {
       parsed = JSON.parse(readFileSync(path, 'utf8'))
