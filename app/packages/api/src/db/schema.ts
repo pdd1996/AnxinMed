@@ -16,10 +16,21 @@
  *
  * 核心不变式：药品主数据库 ≠ 用户药箱；医嘱只抄录不生成；条目禁止模型生成。
  */
-import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date, uniqueIndex } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date, uniqueIndex, serial } from 'drizzle-orm/pg-core'
 
 /** 产品类型（通用名层与产品层共用）。 */
 export const PRODUCT_TYPES = ['化学药', '生物制品', '中成药', '中药材', '医疗器械', '其他'] as const
+
+/** 说明书人工核对：段级处置。source-missing 表示源文本身无该段，content 必须为空。 */
+export type ReviewSectionStatus = 'verified' | 'source-missing' | 'corrected'
+
+/** 说明书人工核对留档（package_inserts.review_meta）。 */
+export interface ReviewMeta {
+  version: 1
+  sections: Record<string, ReviewSectionStatus>
+  optionalSections: 'verified'
+  corrections?: { field: string; from: unknown; to: unknown; reason: string }[]
+}
 
 // ---------------------------------------------------------------------------
 // drug_generics · 通用名层（2026-10-24）
@@ -140,12 +151,29 @@ export const packageInserts = pgTable('package_inserts', {
     .notNull()
     .default('mock'),
   curationNote: text('curation_note'),                   // 整理备注
+  reviewedBy: text('reviewed_by'),                       // 人工核对人（reviewed 时必填）
+  reviewedAt: timestamp('reviewed_at'),                  // 人工核对时间
+  reviewMeta: jsonb('review_meta').$type<ReviewMeta>(),  // 段级核对结果与修正留痕
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
   uniqueIndex('package_inserts_drug_source_uq').on(table.drugId, table.sourceDocumentId),
 ])
+
+// ---------------------------------------------------------------------------
+// manual_review_log · 说明书人工核对审计（append-only）
+// 每次 promote / reject / correct 都落一行；diff 存变更前后值。
+// ---------------------------------------------------------------------------
+export const manualReviewLog = pgTable('manual_review_log', {
+  id: serial('id').primaryKey(),
+  insertId: text('insert_id').notNull(),                 // → package_inserts.id
+  action: varchar('action', { enum: ['promote', 'reject', 'correct'] }).notNull(),
+  reviewer: text('reviewer').notNull(),
+  diff: jsonb('diff'),                                   // 变更前后值 + 原因
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
 
 // ---------------------------------------------------------------------------
 // interaction_rules · 相互作用规则库

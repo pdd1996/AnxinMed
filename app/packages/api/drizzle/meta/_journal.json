@@ -64,6 +64,13 @@
       "when": 1792852057386,
       "tag": "0008_brown_abomination",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794066398031,
+      "tag": "0009_fast_shaman",
+      "breakpoints": true
     }
   ]
 }

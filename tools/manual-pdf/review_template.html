@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>说明书人工核对</title>
+<style>
+  :root { --bg:#f6f7f8; --card:#fff; --line:#dfe3e6; --ink:#1d2327; --muted:#66707a; --brand:#25695b; --warn:#b45309; --bad:#b91c1c; --ok:#166534; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+  header { position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:17px; }
+  header .meta { color:var(--muted); font-size:12px; }
+  header label { display:flex; gap:6px; align-items:center; }
+  header input[type=text] { width:140px; padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
+  button { padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+  main { display:grid; grid-template-columns:240px minmax(0,1fr); gap:16px; padding:16px; max-width:1500px; margin:0 auto; }
+  nav { position:sticky; top:70px; align-self:start; max-height:calc(100vh - 90px); overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px; }
+  nav a { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; color:var(--ink); text-decoration:none; border-radius:5px; font-size:13px; }
+  nav a:hover { background:#eef2f1; }
+  nav a.done { color:var(--ok); }
+  nav a .dot { flex:0 0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; margin-bottom:16px; padding:14px 16px; scroll-margin-top:70px; }
+  .banner { max-width:1500px; margin:12px auto -4px; padding:0 16px; color:var(--muted); font-size:13px; }
+  .card h2 { margin:0 0 4px; font-size:16px; }
+  .sub { color:var(--muted); font-size:12px; margin-bottom:10px; }
+  .cols { display:grid; grid-template-columns:minmax(340px,44%) minmax(0,1fr); gap:14px; }
+  @media (max-width:1100px){ .cols { grid-template-columns:1fr; } main { grid-template-columns:1fr; } nav { position:static; max-height:none; display:flex; flex-wrap:wrap; } nav a { flex:0 0 auto; } }
+  .pdf { max-height:520px; overflow:auto; background:#fafafa; border:1px solid var(--line); border-radius:6px; padding:6px; }
+  .pdf img { display:block; width:100%; height:auto; margin:0 0 8px; border:1px solid #eee; background:#fff; }
+  .identity { display:grid; grid-template-columns:110px minmax(0,1fr); gap:4px 10px; font-size:13px; }
+  .identity dt { color:var(--muted); }
+  .identity dd { margin:0; word-break:break-all; }
+  .confirm { margin:10px 0; padding:8px 10px; background:#f1f6f4; border-radius:6px; }
+  .sec { border-top:1px dashed var(--line); padding:10px 0; }
+  .sec h3 { margin:0 0 4px; font-size:14px; }
+  .sec .hint { color:var(--muted); font-size:12px; margin-bottom:4px; }
+  .sec pre { margin:0 0 8px; padding:8px; background:#fafafa; border:1px solid #eee; border-radius:5px; white-space:pre-wrap; word-break:break-word; max-height:260px; overflow:auto; font:13px/1.65 inherit; }
+  .choices { display:flex; flex-wrap:wrap; gap:12px; font-size:13px; }
+  .choices label { display:flex; gap:4px; align-items:center; }
+  .correct { display:none; margin-top:8px; }
+  .correct.show { display:block; }
+  .correct textarea { width:100%; min-height:90px; padding:8px; border:1px solid var(--line); border-radius:5px; font:13px/1.6 inherit; }
+  .correct input { width:100%; margin-top:6px; padding:6px 8px; border:1px solid var(--line); border-radius:5px; }
+  details { margin-top:8px; }
+  details pre { max-height:220px; overflow:auto; white-space:pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; }
+  .actions { display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); font-size:13px; }
+  .actions .reject { display:none; }
+  .actions .reject.show { display:block; flex-basis:100%; }
+  .actions .reject input { width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:12px; }
+  .badge.ok { background:#dcfce7; color:var(--ok); }
+  .badge.todo { background:#fef3c7; color:var(--warn); }
+  .badge.rej { background:#fee2e2; color:var(--bad); }
+  .empty { color:var(--warn); }
+  #toast { position:fixed; right:18px; bottom:18px; background:#1d2327; color:#fff; padding:10px 14px; border-radius:6px; display:none; z-index:50; }
+</style>
+</head>
+<body>
+<header>
+  <h1>说明书人工核对</h1>
+  <span class="meta" id="meta"></span>
+  <label>核对人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+  <button class="primary" id="export">导出 decisions.json</button>
+  <span class="meta" id="progress"></span>
+</header>
+<div class="banner">每份需完成：身份字段确认 + 6 个必核段处置（与源文一致 / 源文无此段 / 需修正）+ 其余段落扫读确认；全部完成后才能导出。退回请写原因。</div>
+<main>
+  <nav id="sidebar"></nav>
+  <section id="items"></section>
+</main>
+<div id="toast"></div>
+<script src="review-data.js"></script>
+<script>
+(function () {
+  const DATA = window.REVIEW_DATA;
+  const STORE = 'anxin-review:' + DATA.batchId;
+  const REQUIRED = DATA.requiredSections;
+  const state = load();
+
+  function load() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (_) {}
+    const items = {};
+    for (const item of DATA.items) {
+      const base = { action: 'promote', identityConfirmed: false, optionalConfirmed: false, sections: {}, rejectReason: '' };
+      const s = saved && saved.items && saved.items[item.insertId];
+      items[item.insertId] = s ? Object.assign(base, s) : base;
+      if (!items[item.insertId].sections) items[item.insertId].sections = {};
+      // 源文本身无该段时预选 source-missing（仍可在页面上改）
+      for (const slot of REQUIRED) {
+        if (!items[item.insertId].sections[slot.key]) {
+          const text = resolveText(item, slot).text.trim();
+          items[item.insertId].sections[slot.key] = text ? { status: '', text: '', reason: '' } : { status: 'source-missing', text: '', reason: '' };
+        }
+      }
+    }
+    return { reviewer: (saved && saved.reviewer) || '', items };
+  }
+  function save() { localStorage.setItem(STORE, JSON.stringify(state)); }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function resolveText(item, slot) {
+    for (const key of slot.sourceKeys) {
+      const text = item.sourceSections[key];
+      if (text && text.trim()) return { text, key };
+    }
+    return { text: item.mapped[slot.key] || '', key: null };
+  }
+  function slotComplete(st) {
+    if (!st || !st.status) return false;
+    if (st.status === 'corrected') return !!st.text.trim() && !!st.reason.trim();
+    return true;
+  }
+  function itemComplete(item) {
+    const st = state.items[item.insertId];
+    if (st.action === 'skip') return true;
+    if (st.action === 'reject') return !!st.rejectReason.trim();
+    if (!st.identityConfirmed || !st.optionalConfirmed) return false;
+    return REQUIRED.every((slot) => slotComplete(st.sections[slot.key]));
+  }
+
+  function render() {
+    document.getElementById('meta').textContent =
+      DATA.batchId + ' · ' + DATA.items.length + ' 份（待核 ' + DATA.totalPending + '）· 生成 ' + DATA.generatedAt.slice(0, 10);
+    document.getElementById('reviewer').value = state.reviewer;
+    const wrap = document.getElementById('items');
+    wrap.innerHTML = DATA.items.map(cardHtml).join('');
+    document.getElementById('sidebar').innerHTML = DATA.items.map((item, idx) => {
+      const done = itemComplete(item);
+      const st = state.items[item.insertId];
+      const cls = st.action === 'reject' ? '' : (done ? 'done' : '');
+      return '<a class="' + cls + '" href="#item-' + idx + '" data-nav="' + esc(item.insertId) + '"><span>' + esc(item.identity.genericName) + '</span><span class="dot">' + (st.action === 'reject' ? '✕' : (done ? '✓' : '·')) + '</span></a>';
+    }).join('');
+    updateProgress();
+    restoreUI();
+  }
+
+  function cardHtml(item, idx) {
+    const st = state.items[item.insertId];
+    const id = esc(item.insertId);
+    const images = (item._images || []).map((src) => '<img src="' + esc(src) + '" alt="PDF 第 ' + src + ' 页">').join('');
+    const sections = REQUIRED.map((slot) => sectionHtml(item, slot, st)).join('');
+    const otherKeys = Object.keys(item.sourceSections).filter((k) => !REQUIRED.some((s) => s.sourceKeys.includes(k)));
+    const other = otherKeys.length
+      ? '<details><summary>其余段落 ' + otherKeys.length + ' 段（展开扫读）</summary>' + otherKeys.map((k) => '<div class="sec"><h3>' + esc(k) + '</h3><pre>' + esc(item.sourceSections[k]) + '</pre></div>').join('') + '</details>'
+      : '<p class="empty">源文无其余段落。</p>';
+    return '' +
+      '<article class="card" id="item-' + idx + '">' +
+        '<h2>' + esc(item.identity.genericName) + ' <span class="badge ' + (itemComplete(item) ? 'ok' : 'todo') + '" data-badge="' + id + '">' + (itemComplete(item) ? '可提交' : '待核对') + '</span></h2>' +
+        '<div class="sub">' + esc(item.identity.specification || '') + ' · ' + esc(item.identity.form || '') + ' · ' + esc(item.identity.manufacturer || '（缺厂家）') + ' · ' + esc(item.identity.productType || '') +
+          '<br>源文件：' + esc(item.sourceFile) + ' · 版本：' + esc(item.version || '') + ' · 页数：' + esc(item.pageCount || '?') + ' · 指纹：' + esc((item.contentHash || '').slice(0, 12)) + '</div>' +
+        '<div class="cols">' +
+          '<div class="pdf">' + (images || '<p class="empty">未找到 PDF 页图，请按文件名手工核对。</p>') + '</div>' +
+          '<div>' +
+            '<dl class="identity">' +
+              '<dt>通用名</dt><dd>' + esc(item.identity.genericName) + '</dd>' +
+              '<dt>商品名</dt><dd>' + esc(item.identity.brandName || '—') + '</dd>' +
+              '<dt>剂型</dt><dd>' + esc(item.identity.form || '—') + '</dd>' +
+              '<dt>规格</dt><dd>' + esc(item.identity.specification || '—') + '</dd>' +
+              '<dt>生产企业</dt><dd>' + esc(item.identity.manufacturer || '—') + '</dd>' +
+              '<dt>批准文号</dt><dd>' + esc((item.identity.approvalNumbers || []).join('、') || '—') + '</dd>' +
+            '</dl>' +
+            '<div class="confirm"><label><input type="checkbox" data-field="identity" data-insert="' + id + '"' + (st.identityConfirmed ? ' checked' : '') + '> 身份字段已逐项核对（不符请点「退回」并写原因）</label></div>' +
+            sections +
+            other +
+            '<div class="confirm"><label><input type="checkbox" data-field="optional" data-insert="' + id + '"' + (st.optionalConfirmed ? ' checked' : '') + '> 其余段落已扫读，与源文一致</label></div>' +
+            '<div class="actions">' +
+              '<label><input type="radio" name="action-' + id + '" value="promote" data-field="action" data-insert="' + id + '"' + (st.action === 'promote' ? ' checked' : '') + '> 通过（升 reviewed）</label>' +
+              '<label><input type="radio" name="action-' + id + '" value="reject" data-field="action" data-insert="' + id + '"' + (st.action === 'reject' ? ' checked' : '') + '> 退回（不升 reviewed）</label>' +
+              '<label><input type="radio" name="action-' + id + '" value="skip" data-field="action" data-insert="' + id + '"' + (st.action === 'skip' ? ' checked' : '') + '> 本批跳过</label>' +
+              '<div class="reject' + (st.action === 'reject' ? ' show' : '') + '" data-reject="' + id + '"><input type="text" data-field="rejectReason" data-insert="' + id + '" placeholder="退回原因（必填）" value="' + esc(st.rejectReason) + '"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</article>';
+  }
+
+  function sectionHtml(item, slot, st) {
+    const resolved = resolveText(item, slot);
+    const value = (st.sections[slot.key] && st.sections[slot.key].status) || '';
+    const id = esc(item.insertId);
+    const text = resolved.text || '';
+    const hint = resolved.key ? '源文段名：' + esc(resolved.key) : (text ? '源文无该段键，正文来自结构化字段' : '源文与结构化字段均为空');
+    return '' +
+      '<div class="sec" data-sec="' + id + '-' + slot.key + '">' +
+        '<h3>' + esc(slot.label) + '</h3>' +
+        '<div class="hint">' + hint + '</div>' +
+        '<pre>' + (text ? esc(text) : '（空）') + '</pre>' +
+        '<div class="choices">' +
+          '<label><input type="radio" name="sec-' + id + '-' + slot.key + '" value="verified" data-field="section" data-slot="' + slot.key + '" data-insert="' + id + '"' + (value === 'verified' ? ' checked' : '') + (text ? '' : ' disabled') + '> 与源文一致</label>' +
+          '<label><input type="radio" name="sec-' + id + '-' + slot.key + '" value="source-missing" data-field="section" data-slot="' + slot.key + '" data-insert="' + id + '"' + (value === 'source-missing' ? ' checked' : '') + (text ? ' disabled' : '') + '> 源文无此段</label>' +
+          '<label><input type="radio" name="sec-' + id + '-' + slot.key + '" value="corrected" data-field="section" data-slot="' + slot.key + '" data-insert="' + id + '"' + (value === 'corrected' ? ' checked' : '') + '> 需修正</label>' +
+        '</div>' +
+        '<div class="correct' + (value === 'corrected' ? ' show' : '') + '" data-correct="' + id + '-' + slot.key + '">' +
+          '<textarea data-field="sectionText" data-slot="' + slot.key + '" data-insert="' + id + '" placeholder="粘贴修正后的该段正文（逐字抄录源文）">' + esc((st.sections[slot.key] && st.sections[slot.key].text) || '') + '</textarea>' +
+          '<input type="text" data-field="sectionReason" data-slot="' + slot.key + '" data-insert="' + id + '" placeholder="修正原因（必填）" value="' + esc((st.sections[slot.key] && st.sections[slot.key].reason) || '') + '">' +
+        '</div>' +
+      '</div>';
+  }
+
+  function restoreUI() {
+    // 修正面板显隐已由渲染处理；这里只刷新进度与徽章
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const done = DATA.items.filter(itemComplete).length;
+    document.getElementById('progress').textContent = '完成 ' + done + ' / ' + DATA.items.length;
+    for (const item of DATA.items) {
+      const st = state.items[item.insertId];
+      const ok = itemComplete(item);
+      const badge = document.querySelector('[data-badge="' + CSS.escape(item.insertId) + '"]');
+      if (badge) {
+        badge.textContent = st.action === 'reject' ? '已退回' : (ok ? '可提交' : '待核对');
+        badge.className = 'badge ' + (st.action === 'reject' ? 'rej' : (ok ? 'ok' : 'todo'));
+      }
+      const nav = document.querySelector('[data-nav="' + CSS.escape(item.insertId) + '"]');
+      if (nav) {
+        nav.classList.toggle('done', ok && st.action !== 'reject');
+        const dot = nav.querySelector('.dot');
+        if (dot) dot.textContent = st.action === 'reject' ? '✕' : (ok ? '✓' : '·');
+      }
+    }
+  }
+
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    const insertId = el.dataset.insert;
+    if (!insertId) return;
+    const st = state.items[insertId];
+    if (el.dataset.field === 'identity') st.identityConfirmed = el.checked;
+    else if (el.dataset.field === 'optional') st.optionalConfirmed = el.checked;
+    else if (el.dataset.field === 'action') {
+      st.action = el.value;
+      const rej = document.querySelector('[data-reject="' + CSS.escape(insertId) + '"]');
+      if (rej) rej.classList.toggle('show', st.action === 'reject');
+    } else if (el.dataset.field === 'section') {
+      const slot = el.dataset.slot;
+      st.sections[slot] = st.sections[slot] || { status: '', text: '', reason: '' };
+      st.sections[slot].status = el.value;
+      const panel = document.querySelector('[data-correct="' + CSS.escape(insertId + '-' + slot) + '"]');
+      if (panel) panel.classList.toggle('show', el.value === 'corrected');
+    }
+    save(); updateProgress();
+  });
+
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    const insertId = el.dataset.insert;
+    if (!insertId) return;
+    const st = state.items[insertId];
+    if (el.dataset.field === 'rejectReason') st.rejectReason = el.value;
+    else if (el.dataset.field === 'sectionText') {
+      const slot = el.dataset.slot;
+      st.sections[slot] = st.sections[slot] || { status: '', text: '', reason: '' };
+      st.sections[slot].text = el.value;
+    } else if (el.dataset.field === 'sectionReason') {
+      const slot = el.dataset.slot;
+      st.sections[slot] = st.sections[slot] || { status: '', text: '', reason: '' };
+      st.sections[slot].reason = el.value;
+    }
+    save(); updateProgress();
+  });
+
+  document.getElementById('reviewer').addEventListener('input', (e) => { state.reviewer = e.target.value; save(); });
+
+  document.getElementById('export').addEventListener('click', () => {
+    const reviewer = state.reviewer.trim();
+    if (!reviewer) { toast('请先填写核对人'); return; }
+    const incomplete = DATA.items.filter((item) => !itemComplete(item));
+    if (incomplete.length) {
+      toast('还有 ' + incomplete.length + ' 份未完成：' + incomplete.slice(0, 3).map((i) => i.identity.genericName).join('、') + (incomplete.length > 3 ? ' …' : ''));
+      return;
+    }
+    const items = DATA.items.map((item) => {
+      const st = state.items[item.insertId];
+      return {
+        insertId: item.insertId,
+        drugId: item.drugId,
+        contentHash: item.contentHash,
+        action: st.action,
+        identityConfirmed: st.identityConfirmed,
+        optionalConfirmed: st.optionalConfirmed,
+        rejectReason: st.rejectReason.trim(),
+        sections: st.sections,
+      };
+    });
+    const payload = { schemaVersion: 1, batchId: DATA.batchId, reviewer, exportedAt: new Date().toISOString(), items };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = DATA.batchId + '-decisions.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('已导出 decisions.json');
+  });
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
