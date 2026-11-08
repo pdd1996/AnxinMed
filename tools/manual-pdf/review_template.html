@@ -271,12 +271,10 @@
   document.getElementById('export').addEventListener('click', () => {
     const reviewer = state.reviewer.trim();
     if (!reviewer) { toast('请先填写核对人'); return; }
-    const incomplete = DATA.items.filter((item) => !itemComplete(item));
-    if (incomplete.length) {
-      toast('还有 ' + incomplete.length + ' 份未完成：' + incomplete.slice(0, 3).map((i) => i.identity.genericName).join('、') + (incomplete.length > 3 ? ' …' : ''));
-      return;
-    }
-    const items = DATA.items.map((item) => {
+    const completed = DATA.items.filter(itemComplete);
+    const incomplete = DATA.items.length - completed.length;
+    if (!completed.length) { toast('还没有完成的条目'); return; }
+    const items = completed.map((item) => {
       const st = state.items[item.insertId];
       return {
         insertId: item.insertId,
@@ -296,7 +294,7 @@
     a.download = DATA.batchId + '-decisions.json';
     a.click();
     URL.revokeObjectURL(a.href);
-    toast('已导出 decisions.json');
+    toast('已导出 ' + completed.length + ' 份' + (incomplete ? '（' + incomplete + ' 份未完成，保留在页面）' : ''));
   });
 
   let toastTimer = null;
