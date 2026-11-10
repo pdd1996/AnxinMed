@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M6 说明书抽检</title>
+<style>
+  :root { --bg:#f6f7f8; --card:#fff; --line:#dfe3e6; --ink:#1d2327; --muted:#66707a; --brand:#25695b; --warn:#b45309; --bad:#b91c1c; --ok:#166534; --mark:#fff7cc; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+  header { position:sticky; top:0; z-index:20; display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:17px; }
+  header .meta { color:var(--muted); font-size:12px; }
+  header label { display:flex; gap:6px; align-items:center; font-size:13px; }
+  header input[type=text] { width:130px; padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
+  button { padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+  .banner { max-width:1560px; margin:12px auto -2px; padding:0 16px; display:grid; gap:4px; color:#3a444d; font-size:13px; }
+  .banner div { background:#eef4f2; border:1px solid #d7e5e0; border-radius:8px; padding:8px 12px; }
+  .banner b { color:var(--brand); }
+  .banner em { font-style:normal; color:var(--bad); font-weight:600; }
+  main { display:grid; grid-template-columns:230px minmax(0,1fr); gap:16px; padding:16px; max-width:1560px; margin:0 auto; }
+  nav { position:sticky; top:74px; align-self:start; max-height:calc(100vh - 96px); overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px; }
+  nav a { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; color:var(--ink); text-decoration:none; border-radius:5px; font-size:13px; }
+  nav a:hover { background:#eef2f1; }
+  nav a.done { color:var(--ok); }
+  nav a.suspect { color:var(--bad); }
+  nav a .b { display:block; color:var(--muted); font-size:11px; word-break:break-word; }
+  nav a span:first-child { min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; margin-bottom:18px; padding:14px 16px; scroll-margin-top:80px; }
+  .card.done { border-color:#b9d8cd; }
+  .card.suspect { border-color:#e7b4b4; }
+  .cardhead h2 { margin:0; font-size:17px; word-break:break-word; }
+  .cardhead .sub { color:var(--muted); font-size:12px; margin:2px 0 4px; }
+  .cardhead .row { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; color:var(--muted); font-size:12px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; margin-left:6px; vertical-align:middle; }
+  .badge.ok { background:#dcfce7; color:var(--ok); }
+  .badge.todo { background:#fef3c7; color:var(--warn); }
+  .badge.rej { background:#fee2e2; color:var(--bad); }
+  .tag { display:inline-block; padding:0 6px; border-radius:4px; background:#e8f1ee; color:var(--brand); font-size:11px; font-weight:400; margin-left:6px; }
+  .warnbox { margin-top:8px; padding:7px 10px; border:1px solid #f0d8a8; background:#fffbeb; color:#8a5a07; border-radius:6px; font-size:12px; }
+  .warnbox.risk { border-color:#f3b4b4; background:#fff5f5; color:#8f1d1d; }
+  .identity { display:grid; grid-template-columns:minmax(320px,1fr) minmax(320px,1.1fr); gap:14px; margin:12px 0; padding:10px 0; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
+  .identity dl { display:grid; grid-template-columns:88px minmax(0,1fr); gap:3px 10px; margin:0; font-size:13px; align-content:start; }
+  .identity dt { color:var(--muted); }
+  .identity dd { margin:0; word-break:break-all; }
+  .idimgs { display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:start; }
+  .sec { border-top:1px solid var(--line); padding:12px 0 4px; }
+  .sec:first-child { border-top:0; }
+  .sechead { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:6px; }
+  .sechead h3 { margin:0; font-size:14px; }
+  .suspect { display:flex; gap:4px; align-items:center; color:var(--bad); font-size:12px; white-space:nowrap; }
+  .secbody { display:grid; grid-template-columns:minmax(320px,1fr) minmax(320px,1.1fr); gap:14px; }
+  .hint { color:var(--muted); font-size:12px; margin-bottom:4px; }
+  .hint b { color:var(--ink); font-weight:600; }
+  pre { margin:0; padding:9px 10px; background:#fafbfa; border:1px solid #e7eae8; border-radius:6px; white-space:pre-wrap; word-break:break-word; max-height:360px; overflow:auto; font:13px/1.7 inherit; }
+  .imgs { display:grid; gap:8px; align-content:start; }
+  figure { margin:0; }
+  figcaption { color:var(--muted); font-size:11px; margin-bottom:2px; }
+  .imgwrap { border:1px solid #e7eae8; border-radius:6px; overflow:auto; max-height:470px; background:#fff; }
+  .imgwrap img { display:block; width:100%; height:auto; }
+  .imgwrap a { display:block; cursor:zoom-in; }
+  details { margin-top:10px; }
+  details > summary { cursor:pointer; color:var(--brand); font-size:13px; padding:6px 0; }
+  details .sec { padding-left:2px; }
+  .verdict { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-top:14px; padding-top:12px; border-top:1px solid var(--line); font-size:13px; }
+  .verdict label { display:flex; gap:5px; align-items:center; }
+  .verdict textarea { display:none; width:100%; min-height:64px; margin-top:8px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font:13px/1.6 inherit; }
+  .verdict textarea.show { display:block; }
+  .empty { color:var(--warn); }
+  #toast { position:fixed; right:18px; bottom:18px; background:#1d2327; color:#fff; padding:10px 14px; border-radius:6px; display:none; z-index:50; max-width:420px; }
+  @media (max-width:1100px) {
+    main { grid-template-columns:1fr; }
+    nav { position:static; max-height:none; display:flex; flex-wrap:wrap; }
+    nav a { flex:0 0 auto; }
+    .identity, .secbody { grid-template-columns:1fr; }
+    .idimgs { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>M6 说明书抽检</h1>
+  <span class="meta" id="meta"></span>
+  <label>抽检人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+  <button class="primary" id="export">导出 verdicts.json</button>
+  <span class="meta" id="progress"></span>
+</header>
+<div class="banner">
+  <div><b>样本：</b>15 份随机分层（pilot/B1–B4 各 3 份）+ 3 份已知规格疑点（卡片标「风险补充」）。<b>看什么：</b>身份（通用名 / 规格 / 生产企业 / 批准文号）+ <em>用法用量</em> + 轮换段；其余 4 段折叠可展开。每份约 1 分钟。</div>
+  <div><b>判定口径：</b>reviewed = 身份字段与源文一致、6 个必核段逐字对照、其余段落已扫读；<b>不代表剂量已结构化</b>，也不做医学判断。本页只验转录，不评医学正确性。</div>
+  <div><b>发现问题：</b>勾「此段存疑」或整份选「存疑」，写一句问题（如：串段 / 截断 / 规格对不上）。我会按同一模式复查整批 230 条。</div>
+</div>
+<main>
+  <nav id="sidebar"></nav>
+  <section id="items"></section>
+</main>
+<div id="toast"></div>
+<script src="review-data.js"></script>
+<script>
+(function () {
+  const DATA = window.SPOTCHECK_DATA;
+  const STORE = 'anxin-spotcheck:' + DATA.batchId;
+  const REQUIRED = DATA.requiredSections;
+  const state = load();
+
+  function load() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (_) {}
+    const items = {};
+    for (const item of DATA.items) {
+      const base = { verdict: '', note: '', sections: {} };
+      const s = saved && saved.items && saved.items[item.insertId];
+      items[item.insertId] = s ? Object.assign(base, s) : base;
+      for (const slot of REQUIRED) {
+        items[item.insertId].sections[slot.key] = Object.assign({ suspect: false }, items[item.insertId].sections[slot.key] || {});
+      }
+    }
+    return { reviewer: (saved && saved.reviewer) || '', items };
+  }
+  function save() { localStorage.setItem(STORE, JSON.stringify(state)); }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function sectionEntry(item, key) {
+    return (item._source && item._source.sections && item._source.sections[key]) || {};
+  }
+  function sectionText(item, slot) {
+    for (const key of slot.sourceKeys) {
+      const text = item.sourceSections[key];
+      if (text && text.trim()) return text;
+    }
+    return item.mapped[slot.key] || '';
+  }
+  function itemComplete(item) {
+    const st = state.items[item.insertId];
+    if (st.verdict === 'pass') return true;
+    return st.verdict === 'suspect' && !!st.note.trim();
+  }
+  function itemStatus(item) {
+    const st = state.items[item.insertId];
+    if (st.verdict === 'suspect') return { cls: 'rej', text: '存疑' };
+    if (st.verdict === 'pass') return { cls: 'ok', text: '口径正确' };
+    return { cls: 'todo', text: '待抽检' };
+  }
+  function reviewMeta(item) {
+    const r = item.review || {};
+    const at = r.reviewedAt ? String(r.reviewedAt).slice(0, 16).replace('T', ' ') : '—';
+    return (r.reviewedBy || '—') + ' · ' + at;
+  }
+
+  function render() {
+    const plan = DATA.plan || {};
+    const randomCount = DATA.items.filter((item) => !item._spotcheck.risk).length;
+    const riskCount = DATA.items.length - randomCount;
+    document.getElementById('meta').textContent =
+      DATA.items.length + ' 份（随机 ' + randomCount + ' + 风险补充 ' + riskCount + '）· 已 reviewed ' + (plan.totalReviewed || '—') + ' 条 · seed ' + (plan.seed || '—');
+    document.getElementById('reviewer').value = state.reviewer;
+    document.getElementById('items').innerHTML = DATA.items.map(cardHtml).join('');
+    document.getElementById('sidebar').innerHTML = DATA.items.map((item, idx) => {
+      const st = state.items[item.insertId];
+      const status = itemComplete(item) ? 'done' : (st.verdict === 'suspect' ? 'suspect' : '');
+      const dot = st.verdict === 'suspect' ? '✕' : (itemComplete(item) ? '✓' : '·');
+      return '<a class="' + status + '" href="#item-' + idx + '" data-nav="' + esc(item.insertId) + '"><span>' +
+        esc(item.identity.genericName) + '<span class="b">' + esc(item._spotcheck.batchLabel) + ' · ' + esc(item.identity.specification || '') + '</span></span><span>' + dot + '</span></a>';
+    }).join('');
+    updateProgress();
+  }
+
+  function imageHtml(img) {
+    return '<figure><figcaption>' + esc(img.label) + '</figcaption><div class="imgwrap"><a href="' + esc(img.src) + '" target="_blank" rel="noopener" title="点击看原图"><img loading="lazy" src="' + esc(img.src) + '" alt="' + esc(img.label) + '"></a></div></figure>';
+  }
+
+  const CONF_LABEL = {
+    'heading-bracket': '多标签按段标题定位',
+    'heading-plain': '按段标题定位（源文无【】标题）',
+    'heading-unique': '',
+    approval: '多标签按正文与批准文号定位',
+    first: '多页命中取首个',
+    'page-fallback': '正文与标题均未定位，已退回第 1 页',
+    missing: '源文未定位',
+  };
+  function sectionHtml(item, slot) {
+    const st = state.items[item.insertId];
+    const entry = sectionEntry(item, slot.key);
+    const text = sectionText(item, slot);
+    const label = slot.key === 'dosage' ? '用法用量' : (slot.key === item._spotcheck.focusSection ? '轮换段' : '');
+    const from = entry.resolvedFrom === 'mapped' ? '结构化字段' : ('sourceSections · ' + (entry.resolvedFrom || ''));
+    const conf = CONF_LABEL[entry.confidence] ? ' · 定位：' + CONF_LABEL[entry.confidence] : '';
+    const imgs = (entry.images || []).map(imageHtml).join('');
+    const suspect = st.sections[slot.key] && st.sections[slot.key].suspect;
+    return '<div class="sec" data-sec="' + esc(item.insertId) + '-' + slot.key + '">' +
+      '<div class="sechead"><h3>' + esc(slot.label) + (label ? '<span class="tag">' + label + '</span>' : '') + '</h3>' +
+        '<label class="suspect"><input type="checkbox" data-field="suspect" data-slot="' + slot.key + '" data-insert="' + esc(item.insertId) + '"' + (suspect ? ' checked' : '') + '> 此段存疑</label></div>' +
+      '<div class="hint">来自 <b>' + esc(from) + '</b> · ' + (text.trim().length) + ' 字' + esc(conf) + '</div>' +
+      '<div class="secbody"><div><pre>' + (text.trim() ? esc(text) : '（空）') + '</pre></div>' +
+        '<div class="imgs">' + (imgs || '<div class="empty">未生成源文页图，请按源文件人工核对：' + esc(item.sourceFile) + '</div>') + '</div></div>' +
+    '</div>';
+  }
+
+  function cardHtml(item, idx) {
+    const sc = item._spotcheck;
+    const status = itemStatus(item);
+    const st = state.items[item.insertId];
+    const warnings = (item._source && item._source.warnings) || [];
+    const identityImgs = ((item._source && item._source.identityImages) || []).map(imageHtml).join('');
+    const dosageSlot = REQUIRED.find((s) => s.key === 'dosage');
+    const focusSlot = REQUIRED.find((s) => s.key === sc.focusSection);
+    const otherSlots = REQUIRED.filter((s) => s.key !== 'dosage' && s.key !== sc.focusSection);
+    const mainSlots = [dosageSlot, focusSlot].filter(Boolean);
+    const approval = (item.identity.approvalNumbers || []).join('、') || '—';
+    return '<article class="card ' + (st.verdict === 'suspect' ? 'suspect' : (itemComplete(item) ? 'done' : '')) + '" id="item-' + idx + '">' +
+      '<div class="cardhead">' +
+        '<h2>' + esc(item.identity.genericName) + '<span class="badge ' + status.cls + '" data-badge="' + esc(item.insertId) + '">' + status.text + '</span></h2>' +
+        '<div class="sub">' + esc(item.identity.specification || '（缺规格）') + ' · ' + esc(item.identity.form || '') + ' · ' + esc(item.identity.manufacturer || '（缺厂家）') + ' · 批准文号 ' + esc(approval) + '</div>' +
+        '<div class="row"><span>' + esc(sc.batchLabel) + '</span><span>' + esc(item.identity.productType || '') + '</span>' +
+          (sc.multiLabel ? '<span>多批准文号合并 PDF</span>' : '') +
+          '<span>代理核对：' + esc(reviewMeta(item)) + '</span><span>指纹 ' + esc((item.contentHash || '').slice(0, 12)) + '</span>' +
+          '<span>源文件 ' + esc(item.sourceFile) + '</span></div>' +
+        (sc.risk && sc.riskReason ? '<div class="warnbox risk">风险补充：' + esc(sc.riskReason) + '</div>' : '') +
+        (warnings.length ? '<div class="warnbox">' + warnings.map(esc).join('；') + '</div>' : '') +
+      '</div>' +
+      '<div class="identity"><dl>' +
+        '<dt>通用名</dt><dd>' + esc(item.identity.genericName) + '</dd>' +
+        '<dt>商品名</dt><dd>' + esc(item.identity.brandName || '—') + '</dd>' +
+        '<dt>剂型</dt><dd>' + esc(item.identity.form || '—') + '</dd>' +
+        '<dt>规格</dt><dd>' + esc(item.identity.specification || '—') + '</dd>' +
+        '<dt>生产企业</dt><dd>' + esc(item.identity.manufacturer || '—') + '</dd>' +
+        '<dt>批准文号</dt><dd>' + esc(approval) + '</dd>' +
+      '</dl><div class="idimgs">' + (identityImgs || '<div class="empty">未生成身份区页图</div>') + '</div></div>' +
+      mainSlots.map((slot) => sectionHtml(item, slot)).join('') +
+      '<details><summary>其余必核段（' + otherSlots.length + ' 段，展开抽查）</summary>' +
+        otherSlots.map((slot) => sectionHtml(item, slot)).join('') + '</details>' +
+      '<div class="verdict">' +
+        '<span>本份判定：</span>' +
+        '<label><input type="radio" name="verdict-' + esc(item.insertId) + '" value="pass" data-field="verdict" data-insert="' + esc(item.insertId) + '"' + (st.verdict === 'pass' ? ' checked' : '') + '> 口径正确</label>' +
+        '<label><input type="radio" name="verdict-' + esc(item.insertId) + '" value="suspect" data-field="verdict" data-insert="' + esc(item.insertId) + '"' + (st.verdict === 'suspect' ? ' checked' : '') + '> 存疑</label>' +
+        '<textarea class="' + (st.verdict === 'suspect' ? 'show' : '') + '" data-field="note" data-insert="' + esc(item.insertId) + '" placeholder="存疑说明（必填）：哪一段、什么问题（串段 / 截断 / 规格或厂家对不上 / 错药）">' + esc(st.note) + '</textarea>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function updateProgress() {
+    const done = DATA.items.filter(itemComplete).length;
+    document.getElementById('progress').textContent = '完成 ' + done + ' / ' + DATA.items.length;
+    for (const item of DATA.items) {
+      const st = state.items[item.insertId];
+      const badge = document.querySelector('[data-badge="' + CSS.escape(item.insertId) + '"]');
+      if (badge) {
+        const status = itemStatus(item);
+        badge.textContent = status.text;
+        badge.className = 'badge ' + status.cls;
+      }
+      const nav = document.querySelector('[data-nav="' + CSS.escape(item.insertId) + '"]');
+      if (nav) {
+        nav.classList.toggle('done', itemComplete(item) && st.verdict !== 'suspect');
+        nav.classList.toggle('suspect', st.verdict === 'suspect');
+        const dot = nav.lastElementChild;
+        if (dot) dot.textContent = st.verdict === 'suspect' ? '✕' : (itemComplete(item) ? '✓' : '·');
+      }
+      const card = document.querySelector('#item-' + DATA.items.indexOf(item));
+      if (card) {
+        card.classList.toggle('done', itemComplete(item) && st.verdict !== 'suspect');
+        card.classList.toggle('suspect', st.verdict === 'suspect');
+      }
+    }
+  }
+
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    const insertId = el.dataset.insert;
+    if (!insertId) return;
+    const st = state.items[insertId];
+    if (el.dataset.field === 'verdict') {
+      st.verdict = el.value;
+      const panel = document.querySelector('textarea[data-field="note"][data-insert="' + CSS.escape(insertId) + '"]');
+      if (panel) panel.classList.toggle('show', st.verdict === 'suspect');
+      if (st.verdict === 'suspect') {
+        const ta = document.querySelector('textarea[data-field="note"][data-insert="' + CSS.escape(insertId) + '"]');
+        if (ta) ta.focus();
+      }
+    } else if (el.dataset.field === 'suspect') {
+      const slot = el.dataset.slot;
+      st.sections[slot] = st.sections[slot] || { suspect: false };
+      st.sections[slot].suspect = el.checked;
+      if (el.checked) {
+        st.verdict = 'suspect';
+        const radio = document.querySelector('input[data-field="verdict"][data-insert="' + CSS.escape(insertId) + '"][value="suspect"]');
+        if (radio) radio.checked = true;
+        const panel = document.querySelector('textarea[data-field="note"][data-insert="' + CSS.escape(insertId) + '"]');
+        if (panel) { panel.classList.add('show'); panel.focus(); }
+      }
+    }
+    save(); updateProgress();
+  });
+
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    const insertId = el.dataset.insert;
+    if (!insertId || el.dataset.field !== 'note') return;
+    state.items[insertId].note = el.value;
+    save(); updateProgress();
+  });
+
+  document.getElementById('reviewer').addEventListener('input', (e) => { state.reviewer = e.target.value; save(); });
+
+  document.getElementById('export').addEventListener('click', () => {
+    const reviewer = state.reviewer.trim();
+    if (!reviewer) { toast('请先填写抽检人'); return; }
+    const completed = DATA.items.filter(itemComplete);
+    const incomplete = DATA.items.length - completed.length;
+    if (!completed.length) { toast('还没有完成的条目'); return; }
+    const items = completed.map((item) => {
+      const st = state.items[item.insertId];
+      return {
+        insertId: item.insertId,
+        drugId: item.drugId,
+        contentHash: item.contentHash,
+        batch: item._spotcheck.batch,
+        batchLabel: item._spotcheck.batchLabel,
+        focusSection: item._spotcheck.focusSection,
+        verdict: st.verdict,
+        note: st.note.trim(),
+        sections: st.sections,
+        reviewedBy: item.review ? item.review.reviewedBy : null,
+        reviewedAt: item.review ? item.review.reviewedAt : null,
+      };
+    });
+    const payload = {
+      schemaVersion: 1,
+      kind: 'spotcheck',
+      batchId: DATA.batchId,
+      plan: DATA.plan || null,
+      reviewer,
+      exportedAt: new Date().toISOString(),
+      items,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = DATA.batchId + '-verdicts.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('已导出 ' + completed.length + ' 份' + (incomplete ? '（' + incomplete + ' 份未完成，保留在页面）' : ''));
+  });
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

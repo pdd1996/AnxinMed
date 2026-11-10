@@ -1,13 +1,15 @@
 /**
  * 说明书人工核对 · 批次导出（M6-T9）。
  *
- * 只导出 curationStatus='crawled' 且带 sourceSections 的 PDF 说明书行；
- * 输出 JSON 供 tools/manual-pdf/review_page.py 生成离线审核页。
+ * 默认导出 curationStatus='crawled' 且带 sourceSections 的 PDF 说明书行；
+ * --status reviewed 供已完成批次抽检（携带核对留档）。
+ * 输出 JSON 供 tools/manual-pdf/review_page.py / spotcheck_page.py 生成离线审核页。
  *
  * 用法（cd app/packages/api）：
- *   npm run db:review-export -- --out ../../data/review-batches/batch-01.json --limit 30
+ *   npm run db:review-export -- --out ../../../data/review-batches/batch-01.json --limit 30
  *   npm run db:review-export -- --out ... --ids drug-a,drug-b
  *   npm run db:review-export -- --out ... --ids-file ids.txt --limit 30
+ *   npm run db:review-export -- --out ... --ids-file ids.txt --status reviewed
  */
 import 'dotenv/config'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -45,6 +47,12 @@ async function main(): Promise<number> {
     console.error('❌ --limit / --offset 非法')
     return 1
   }
+  const statusArg = arg('--status') ?? 'crawled'
+  if (statusArg !== 'crawled' && statusArg !== 'reviewed') {
+    console.error('❌ --status 只能是 crawled 或 reviewed')
+    return 1
+  }
+  const status = statusArg
 
   let ids: string[] = []
   const idsArg = arg('--ids')
@@ -56,8 +64,8 @@ async function main(): Promise<number> {
   }
 
   const where = ids.length
-    ? and(eq(packageInserts.curationStatus, 'crawled'), isNotNull(packageInserts.sourceFile), inArray(packageInserts.drugId, ids))
-    : and(eq(packageInserts.curationStatus, 'crawled'), isNotNull(packageInserts.sourceFile))
+    ? and(eq(packageInserts.curationStatus, status), isNotNull(packageInserts.sourceFile), inArray(packageInserts.drugId, ids))
+    : and(eq(packageInserts.curationStatus, status), isNotNull(packageInserts.sourceFile))
 
   const rows = await db
     .select({ insert: packageInserts, master: drugMaster })
@@ -79,14 +87,14 @@ async function main(): Promise<number> {
     const found = new Set(pending.map((r) => r.insert.drugId))
     const missing = ids.filter((id) => !found.has(id))
     if (missing.length) {
-      console.error(`❌ 以下 drugId 不是可核对的 crawled 行：${missing.join(', ')}`)
+      console.error(`❌ 以下 drugId 不是可核对的 ${status} 行：${missing.join(', ')}`)
       return 1
     }
   }
 
   const batch = pending.slice(offset, offset + limit)
   if (batch.length === 0) {
-    console.error(`❌ 批次为空（可核对 ${pending.length} 行，offset=${offset}）`)
+    console.error(`❌ 批次为空（${status} 可核对 ${pending.length} 行，offset=${offset}）`)
     return 1
   }
 
@@ -124,6 +132,13 @@ async function main(): Promise<number> {
         dosage: dosageRaw(insert.dosage),
       },
       sourceSections: insert.sourceSections ?? {},
+      review: status === 'reviewed'
+        ? {
+            reviewedBy: insert.reviewedBy,
+            reviewedAt: insert.reviewedAt,
+            reviewMeta: insert.reviewMeta,
+          }
+        : null,
     }
   })
 
@@ -131,6 +146,7 @@ async function main(): Promise<number> {
     schemaVersion: 1,
     batchId: `review-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '')}`,
     generatedAt: new Date().toISOString(),
+    status,
     requiredSections: REQUIRED_SECTIONS,
     totalPending: pending.length,
     offset,
@@ -146,7 +162,7 @@ async function main(): Promise<number> {
     const key = item.identity.productType ?? '未标注'
     byType.set(key, (byType.get(key) ?? 0) + 1)
   }
-  console.log(`✅ 导出 ${items.length} 行（可核对 ${pending.length} 行，offset=${offset}）`)
+  console.log(`✅ 导出 ${items.length} 行（${status} 可核对 ${pending.length} 行，offset=${offset}）`)
   console.log(`   类型：${[...byType].map(([k, v]) => `${k} ${v}`).join(' / ')}`)
   console.log(`   文件：${absolute}`)
   return 0
