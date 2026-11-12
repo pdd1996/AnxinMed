@@ -1,7 +1,11 @@
-# app/fixtures · golden case 样张资产（M2-T9 / T10 共用，git 管理）
+# app/fixtures · golden case 样张资产（M2-T9 / T10 共用；文本真相入库，处方笺 PNG 不入库）
 
 > 本目录是录入主线 golden case 的**测试资产真相源**。CI 与日常回归只消费文本真相（`golden-cases.json`），
 > 不读像素；PNG 供 T10 `test:e2e:live` 真实 OCR（qwen3.5-ocr 云端转录，ADR #16）与人工 oracle 审核。
+
+> **药方图片不入库（2026-11-12 口径）**：`rx-*.png` 与 `tools/ocr-bench/sample-prescription.png` 虽为合成样张，
+> 仍按「药方不上传」处理——已从 git 索引移除并写入 `.gitignore`，只在本地生成。需要图片时跑下面「重新生成样张」；
+> CI 缺图由 `e2e/scripts/make-sample-images.ts` 在 globalSetup 补纯色占位图（回放不读像素，占位图足够）。
 
 ## 唯一真相源
 
@@ -19,8 +23,8 @@ E2E 回放包 `e2e/fixtures/*.json` 由 `e2e/scripts/make-fixtures.ts` 从本目
 
 | 文件 | 场景 | 说明 |
 |------|------|------|
-| `rx-normal.png` | rx-normal | 合成处方笺 golden case：前记含姓名/电话/病历号/地址（L0 裁掉）+ 诊断内嵌复诊电话（L2 脱敏）。全字段完整，不触发兜底 |
-| `rx-redacted.png` | rx-redacted | 涂黑变体：日期行 + 用法行涂黑 → needsManual → 触发 Baichuan 兜底（验第三方请求体零泄漏 + 回链拦截不预填） |
+| `rx-normal.png` | rx-normal | 合成处方笺 golden case：前记含姓名/电话/病历号/地址（L0 裁掉）+ 诊断内嵌复诊电话（L2 脱敏）。全字段完整，不触发兜底。**本地生成，不入库** |
+| `rx-redacted.png` | rx-redacted | 涂黑变体：日期行 + 用法行涂黑 → needsManual → 触发 Baichuan 兜底（验第三方请求体零泄漏 + 回链拦截不预填）。**本地生成，不入库** |
 | `golden-cases.json` | — | 文本真相源：逐行处方 + redact 行号 + VLM identity + 兜底幻觉值 + 合成 PII 块 |
 | `make-fixtures.py` | — | Pillow 渲染器（对齐 `tools/ocr-bench/make_sample.py` 做法） |
 
@@ -32,6 +36,13 @@ python app/fixtures/make-fixtures.py
 ```
 
 渲染用微软雅黑（`C:/Windows/Fonts/msyh.ttc`）；字体缺失时打印 `[warn]` 回退默认字体（不静默）。
+
+CI / 新克隆无需 Pillow：`pnpm test:e2e` 的 globalSetup 会调
+`pnpm --filter @anxin/e2e make-sample-images`（同脚本可直接手跑）给缺失的 `rx-*.png` 补纯色占位图——
+回放模式不读像素，上传与质量预检（「仍要上传」放行）照常走真代码。占位图**不覆盖**已有样张，
+要给人看或跑 `test:e2e:live` 时用上面的 Python 渲染器出带字样张。
+
+`tools/ocr-bench/sample-prescription.png` 同理不入库，用 `python tools/ocr-bench/make_sample.py` 重建（同时刷 `ground-truth.json`）。
 
 ## quality/ · 质量预检退化样张（M5-T6b，不进 golden case）
 

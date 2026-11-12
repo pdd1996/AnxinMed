@@ -14,6 +14,7 @@ import postgres from 'postgres'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { ADMIN_URL, TEST_URL, TEST_DB_NAME, MIGRATIONS_DIR, isRemoteDbTarget } from './lib/test-db.js'
+import { ensureSampleImages } from './scripts/make-sample-images.js'
 
 /** golden case 的库条目（与 fixtures/golden-cases.json drug.drugMaster 对齐）。 */
 const DM_ID = 'dm-t9-hycosan'
@@ -49,6 +50,11 @@ async function prepareBaselines(client: postgres.Sql) {
 }
 
 export default async function setup() {
+  // 0. 处方笺样张本地生成、不入库（M6 隐私口径）：缺失即补占位 PNG，否则 setInputFiles 无文件可传。
+  //    回放模式不读像素，故占位图足够；要带字样张/真实 OCR 时跑 python app/fixtures/make-fixtures.py。
+  const made = ensureSampleImages()
+  if (made.length > 0) console.log(`[e2e-setup] 补处方笺占位样张 ${made.length} 张（不入库）：${made.join('、')}`)
+
   if (isRemoteDbTarget) {
     console.log('[e2e-setup] 远端模式：目标库为部署自身的库，跳过建库/删库生命周期')
     await prepareBaselines(postgres(TEST_URL, { max: 1 }))
