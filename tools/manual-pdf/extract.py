@@ -26,6 +26,8 @@ SECTION_RE = re.compile(r'【([^】]{1,20})】')
 FILENAME_RE = re.compile(r'^(?P<name>.*?)\[(?P<ids>[^\]]+)\](?:-\d+)?$')
 LABEL_RE = re.compile(r'^\s*([^：:]{1,16})\s*[：:]\s*(.+?)\s*$')
 STRENGTH_RE = re.compile(r'(\d+(?:\.\d+)?)\s*(%|mg|g|μg|µg|ml|mL|毫升|毫克|微克|克)', re.I)
+# 列表编号前缀：仅剥「(1)」「1.」「1、」，不碰「50mg」「0.1g」这类规格数字
+LIST_MARKER_RE = re.compile(r'^[\(（]\s*\d+\s*[\)）]\s*|^\d{1,2}\s*[.、](?!\d)\s*')
 APPROVAL_RE = re.compile(
     r'(国药准字[A-Za-z0-9]+(?:[（(][^）)]*[）)])?|进口药品注册证号[^\s，,；;]+|H\d{8,}|[A-Z]\d{8,})'
 )
@@ -160,7 +162,7 @@ def parse_specs(raw: str) -> list[str]:
         return specs
 
     if len(lines) > 1 and all(has_strength(l) for l in lines):
-        return [re.sub(r'^[\(（]?\d+[\)）]?[.、]?\s*', '', l).strip(' ；;。') for l in lines]
+        return [LIST_MARKER_RE.sub('', l).strip(' ；;。') for l in lines]
 
     parts = [p.strip(' ；;。') for p in re.split(r'[；;]', joined) if p.strip()]
     if len(parts) > 1 and all(has_strength(p) for p in parts):
@@ -378,12 +380,15 @@ def build_note(
     shelf_life: str | None,
     spec_count: int,
     unmapped: list[str],
+    name_note: str | None = None,
 ) -> str:
     notes = [
         '【PDF 自动提取·未人工核对】',
         '按【段名】逐字切分，仅空白归一化',
         f'PDF 批次 {date}（{source_file}）',
     ]
+    if name_note:
+        notes.append(name_note)
     if record_ids:
         notes.append(f'源记录 ID {"、".join(record_ids)}')
     if spec_count > 1:
@@ -414,7 +419,11 @@ def extract(pdf_path: Path, out_dir: Path, id_prefix: str | None) -> list[Path]:
 
     name_block = sections.get('药品名称', '')
     names = labeled_values(name_block)
-    generic_name = names.get('通用名称') or file_name
+    generic_name_raw = names.get('通用名称') or file_name
+    generic_name = re.sub(r'^[\s:：]+', '', generic_name_raw)
+    name_note = None
+    if generic_name != generic_name_raw:
+        name_note = f'源文「通用名称」标签后重复冒号（{generic_name_raw[:4]}…），身份字段已剔除前导冒号，正文段保持原样'
     brand_name = names.get('商品名称')
     if brand_name in {'无', '—', '-'}:
         brand_name = None
@@ -499,6 +508,7 @@ def extract(pdf_path: Path, out_dir: Path, id_prefix: str | None) -> list[Path]:
                 shelf_life=shelf_life,
                 spec_count=len(specs),
                 unmapped=unmapped,
+                name_note=name_note,
             ),
         }
         out_path = out_dir / f'{drug_id}.json'
