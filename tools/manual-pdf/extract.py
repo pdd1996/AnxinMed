@@ -18,16 +18,30 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import fitz
+try:  # PyMuPDF 只在 extract() 里用；parse_specs 等纯函数单测不需要它
+    import fitz
+except ModuleNotFoundError:  # pragma: no cover - 缺依赖时 extract() 会显式报错
+    fitz = None  # type: ignore[assignment]
 
-EXTRACTOR_VERSION = 'manual-pdf-2026-10-25'
+EXTRACTOR_VERSION = 'manual-pdf-2026-11-14'
 
 SECTION_RE = re.compile(r'【([^】]{1,20})】')
 FILENAME_RE = re.compile(r'^(?P<name>.*?)\[(?P<ids>[^\]]+)\](?:-\d+)?$')
 LABEL_RE = re.compile(r'^\s*([^：:]{1,16})\s*[：:]\s*(.+?)\s*$')
 STRENGTH_RE = re.compile(r'(\d+(?:\.\d+)?)\s*(%|mg|g|μg|µg|ml|mL|毫升|毫克|微克|克)', re.I)
-# 列表编号前缀：仅剥「(1)」「1.」「1、」，不碰「50mg」「0.1g」这类规格数字
-LIST_MARKER_RE = re.compile(r'^[\(（]\s*\d+\s*[\)）]\s*|^\d{1,2}\s*[.、](?!\d)\s*')
+# 列表编号前缀：仅剥「(1)」「1）」「1.」「1、」，不碰「50mg」「0.1g」这类规格数字
+LIST_MARKER_RE = re.compile(
+    r'^[\(（]\s*\d{1,2}\s*[\)）]\s*|^\d{1,2}\s*[\)）]\s*|^\d{1,2}\s*[.、](?!\d)\s*'
+)
+# 规格段内的列表标记（括号深度为 0 才算标记；「(16)」「(13)」这类在 [] 内的是成份分子式，不能切）
+SPEC_MARKER_RE = re.compile(r'[\(（]\s*(\d{1,2})\s*[\)）]')
+BRACKET_PAIRS = {'(': ')', '（': '）', '[': ']', '【': '】'}
+BRACKET_CLOSERS = set(BRACKET_PAIRS.values())
+# 折行判断：行尾是这些字符说明句子没写完（PDF 排版换行，不是新条目）
+LINE_OPEN_TAIL = (
+    '（', '(', '[', '【', '：', ':', '、', '，', ',',
+    '与', '和', '及', '的', '—', '-',
+)
 APPROVAL_RE = re.compile(
     r'(国药准字[A-Za-z0-9]+(?:[（(][^）)]*[）)])?|进口药品注册证号[^\s，,；;]+|H\d{8,}|[A-Z]\d{8,})'
 )
@@ -144,27 +158,120 @@ def strength_tokens(text: str) -> set[str]:
     return tokens
 
 
+def bracket_depths(text: str) -> list[int]:
+    """每个字符之前所处的括号深度。"""
+    depth = 0
+    depths: list[int] = []
+    for ch in text:
+        depths.append(depth)
+        if ch in BRACKET_PAIRS:
+            depth += 1
+        elif ch in BRACKET_CLOSERS:
+            depth = max(0, depth - 1)
+    return depths
+
+
+def top_level_markers(text: str) -> list[tuple[re.Match[str], int]]:
+    """只取括号深度 0 的「(1)」「（1）」标记，跳过段内的「(16)」这类成份编号。"""
+    depths = bracket_depths(text)
+    return [(m, depths[m.start()]) for m in SPEC_MARKER_RE.finditer(text) if depths[m.start()] == 0]
+
+
+def split_top_level(text: str, separators: str) -> list[str]:
+    """按分隔符切分，但括号内的分隔符不切。"""
+    depths = bracket_depths(text)
+    parts: list[str] = []
+    buf: list[str] = []
+    for ch, depth in zip(text, depths):
+        if ch in separators and depth == 0:
+            parts.append(''.join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    parts.append(''.join(buf))
+    return parts
+
+
+def line_complete(line: str) -> bool:
+    """判断规格段里的这一行是不是一个写完了的条目（而不是 PDF 排版折行）。"""
+    s = line.strip()
+    if not s:
+        return False
+    # 行内括号没闭合，或本行以右括号开头 → 上一行/下一行是排版折行
+    depth = 0
+    for ch in s:
+        if ch in BRACKET_PAIRS:
+            depth += 1
+        elif ch in BRACKET_CLOSERS:
+            depth = max(0, depth - 1)
+    if depth != 0 or s[0] in BRACKET_CLOSERS:
+        return False
+    if s.endswith(('。', '；', ';')):
+        return True
+    if len(s) > 60:
+        return False
+    return not s.endswith(LINE_OPEN_TAIL)
+
+
+UNIT_TAIL_RE = re.compile(r'(?:ml|mL|mg|g|μg|µg|IU|lU|U|kg|%)$')
+
+
+def join_lines(lines: list[str]) -> str:
+    """把折行拼回一行：PDF 排版换行多数不该留空格（中文、化学式、数值+单位）。"""
+    out = ''
+    for line in lines:
+        if not out:
+            out = line
+            continue
+        prev, nxt = out[-1], line[0]
+        if _join_with_space(out, nxt):
+            out += ' ' + line
+        else:
+            out += line
+    return out
+
+
+def _join_with_space(text: str, next_char: str) -> bool:
+    prev = text[-1]
+    if not (prev.isascii() and next_char.isascii()):
+        return False
+    if prev == '+' and next_char.isdigit():  # Cr3+ 0.2μmol
+        return True
+    if not (prev.isalnum() and next_char.isalnum()):
+        return False
+    if UNIT_TAIL_RE.search(text):  # 75ml / 500ml 这类单位后接数字
+        return True
+    if prev.isdigit() and next_char.isdigit():  # 表格列：0.52 | 1.3
+        return True
+    return prev.isalpha() and next_char.isalpha()  # 英文单词折行
+
+
 def parse_specs(raw: str) -> list[str]:
     raw = raw.strip()
     if not raw:
         return []
     lines = [clean_line(l) for l in raw.splitlines() if clean_line(l)]
-    joined = ' '.join(lines)
+    joined = join_lines(lines)
 
-    markers = list(re.finditer(r'[\(（]\s*(\d+)\s*[\)）]\s*', joined))
+    markers = top_level_markers(joined)
     if len(markers) >= 2:
         specs = []
-        for i, marker in enumerate(markers):
-            end = markers[i + 1].start() if i + 1 < len(markers) else len(joined)
+        for i, (marker, _depth) in enumerate(markers):
+            end = markers[i + 1][0].start() if i + 1 < len(markers) else len(joined)
             part = joined[marker.end():end].strip(' ；;。')
             if part:
                 specs.append(part)
         return specs
 
-    if len(lines) > 1 and all(has_strength(l) for l in lines):
-        return [LIST_MARKER_RE.sub('', l).strip(' ；;。') for l in lines]
+    if len(lines) > 1:
+        complete = all(line_complete(l) for l in lines)
+        if complete and all(has_strength(l) for l in lines):
+            return [LIST_MARKER_RE.sub('', l).strip(' ；;。') for l in lines]
+        if not complete:
+            # 折行段落：换行只是排版，不是新条目——整段当一个规格
+            return [joined.strip(' ；;。')]
 
-    parts = [p.strip(' ；;。') for p in re.split(r'[；;]', joined) if p.strip()]
+    parts = [p.strip(' ；;。') for p in split_top_level(joined, '；;') if p.strip()]
     if len(parts) > 1 and all(has_strength(p) for p in parts):
         return parts
     return [joined.strip(' ；;。')]
@@ -408,6 +515,8 @@ def build_note(
 
 
 def extract(pdf_path: Path, out_dir: Path, id_prefix: str | None) -> list[Path]:
+    if fitz is None:
+        raise RuntimeError('缺少 PyMuPDF：pip install pymupdf（只有 extract() 需要，纯解析函数不受影响）')
     doc = fitz.open(pdf_path)
     raw_text = '\n'.join(page.get_text() for page in doc)
     _, sections = split_sections(raw_text)
