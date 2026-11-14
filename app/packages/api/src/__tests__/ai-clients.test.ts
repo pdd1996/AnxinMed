@@ -254,6 +254,22 @@ describe('buildConsultRequest 白名单（M4-T8 conditions 注入）', () => {
     expect(req.temperature).toBe(0.1)
     expect(req.model).toBe('baichuan-m3-plus')
   })
+
+  it('tableUnreliable=true：prompt 注入表格告警，禁止频率归属、只允许「以原说明书表格为准」', () => {
+    const req = baichuan.buildConsultRequest({
+      ...basePayload,
+      section: { ...basePayload.section, tableUnreliable: true },
+    })
+    const content = req.messages[0].content as string
+    expect(content).toContain('表格告警')
+    expect(content).toContain('禁止给出频率归属')
+    expect(content).toContain('具体发生频率分级请以原说明书表格为准')
+  })
+
+  it('tableUnreliable 缺省：prompt 不含表格告警（缺省 = 原行为）', () => {
+    const content = baichuan.buildConsultRequest(basePayload).messages[0].content as string
+    expect(content).not.toContain('表格告警')
+  })
 })
 
 describe('baichuan 客户端（CONSULT_PROVIDER=baichuan 回滚通道）', () => {

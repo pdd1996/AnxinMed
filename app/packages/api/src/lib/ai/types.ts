@@ -72,7 +72,13 @@ export interface ConsultPromptPayload {
     isManual: boolean
   }
   /** 本次取用的说明书段落（label + version + text）。 */
-  section: { label: string; version: string | null; text: string }
+  section: {
+    label: string
+    version: string | null
+    text: string
+    /** 段落源自被拉平的表格（行列结构丢失）→ prompt 禁止频率归属判断。缺省 false。 */
+    tableUnreliable?: boolean
+  }
   /** 相互作用上下文渲染后的文本（已含「未覆盖 ≠ 无风险」提示）。 */
   interactionsText: string
   /**

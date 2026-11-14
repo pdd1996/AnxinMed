@@ -24,7 +24,7 @@ import { AIUnavailableError } from '../../lib/ai/types.js'
 import type { AiClients } from '../../lib/ai/types.js'
 import { insertCitation } from './citations.js'
 import { guardConsult } from './guards.js'
-import { fallbackSectionsFromInsert, normalizeSections, pickInsertSections } from './sections.js'
+import { fallbackSectionsFromInsert, hasFrequencyTable, normalizeSections, pickInsertSections } from './sections.js'
 import type {
   Citation,
   ConsultDrug,
@@ -276,7 +276,12 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
         form: insert.form,
         isManual,
       },
-      section: { label: section.label, version: insert.version, text: section.text },
+      section: {
+        label: section.label,
+        version: insert.version,
+        text: section.text,
+        tableUnreliable: hasFrequencyTable(section.text),
+      },
       interactionsText: renderInteractionsForPrompt(interactions),
       conditions: input.conditions,
       otherDrugs,

@@ -39,6 +39,17 @@ export function pickInsertSections(question: string, insert: InsertSlice): Picke
   return { key: route.key, label: route.label, text }
 }
 
+/**
+ * 频率表特征：PDF 表格被文本层拉平后，单元格按文本块顺序拼接，行/列归属丢失。
+ * 命中则 prompt 侧禁止做「反应 ↔ 频率档位」的对应判断（M6 已知缺陷的临时防线）。
+ * 判据：表头三档词共现（十分常见/常见/偶见|罕见），或「系统器官分类」+ 频率词。
+ */
+export function hasFrequencyTable(text: string): boolean {
+  const t = String(text ?? '')
+  if (/系统器官分类/.test(t) && /(十分常见|常见)/.test(t)) return true
+  return /十分常见[\s\S]{0,80}常见[\s\S]{0,160}(?:偶见|罕见)/.test(t)
+}
+
 /** source_sections 取原文（支持 PDF/DXY 段名变体）；未收录返回空串。 */
 function sourceText(insert: InsertSlice, keys: string[]): string {
   const sections = insert.sourceSections ?? {}

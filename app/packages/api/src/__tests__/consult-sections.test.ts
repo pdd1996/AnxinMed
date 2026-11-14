@@ -19,6 +19,7 @@ import {
 } from '../services/consult/sanitize.js'
 import {
   fallbackSectionsFromInsert,
+  hasFrequencyTable,
   normalizeSections,
   pickInsertSections,
 } from '../services/consult/sections.js'
@@ -296,5 +297,33 @@ describe('citations · 引用三件套', () => {
     const c = insertCitation(mkInsert({ source: null, version: null }))
     expect(c.source).toContain('未标注')
     expect(c.version).toContain('未标注')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// hasFrequencyTable · 表格拉平检测（M6 已知缺陷的 prompt 防线）
+// ---------------------------------------------------------------------------
+
+describe('hasFrequencyTable · 频率表特征', () => {
+  it('真实拉平片段（度拉糖肽不良反应表）→ true', () => {
+    const text =
+      '根据对Ⅱ期、Ⅲ期临床研究的评估确认以下不良反应，列于表1（十分常见：≥1/10；常见：≥1/100，＜1/10；' +
+      '偶见：≥1/1000，＜1/100；罕见：≥1/10000，＜1/1000）。\n系统器官分类\n十分常见\n常见\n偶见\n罕见\n未知\n' +
+      '免疫系统疾病\n过敏反应\n速发过敏反应#\n代谢和营养疾病\n低血糖*\n脱水'
+    expect(hasFrequencyTable(text)).toBe(true)
+  })
+
+  it('「系统器官分类」+ 频率词（无连续表头）→ true', () => {
+    expect(hasFrequencyTable('系统器官分类\n十分常见\n腹泻\n恶心')).toBe(true)
+  })
+
+  it('段落式定性描述（无频率分档表头）→ false，不误伤正常文本', () => {
+    const text = '临床试验中最常见的不良反应为胃肠道不良反应，包括恶心、呕吐和腹泻，通常为轻度或中度。'
+    expect(hasFrequencyTable(text)).toBe(false)
+  })
+
+  it('空文本/短文本 → false', () => {
+    expect(hasFrequencyTable('')).toBe(false)
+    expect(hasFrequencyTable('常见')).toBe(false)
   })
 })

@@ -91,6 +91,7 @@ JSON 格式：
 ${drug.isManual ? '注意：该药品为用户手动建档（未经 OCR 确认），回答仅做一般性资料解释（L0），不得结合个体情况展开。' : ''}
 本次取用的说明书段落（${section.label}，版本 ${section.version || '未标注'}）：
 ${section.text}
+${section.tableUnreliable ? '表格告警：该段落摘自说明书表格，表格行列结构在转录时未保留（单元格顺序可能错乱）。禁止判断某项反应/事件与「十分常见/常见/偶见/罕见/未知」等发生频率档位的对应关系，禁止给出频率归属；用户询问具体分级时，只能回答「具体发生频率分级请以原说明书表格为准」。段落中成段叙述的定性描述可正常引用。\n' : ''}
 ${conditionsBlock ? `\n${conditionsBlock}\n` : ''}${otherDrugsBlock ? `\n${otherDrugsBlock}\n` : ''}
 ${interactionsText}
 
