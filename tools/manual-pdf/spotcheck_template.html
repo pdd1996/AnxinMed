@@ -75,7 +75,8 @@
   .sec .toggle { padding:1px 8px; font-size:12px; border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--brand); cursor:pointer; white-space:nowrap; }
   .sec .toggle:hover { background:#eef4f2; }
   .sec.collapsed .secbody { display:none; }
-  .suspect { display:flex; gap:4px; align-items:center; color:var(--bad); font-size:12px; white-space:nowrap; }
+  /* 限定 label：card/nav 也挂 suspect 状态类，裸 .suspect 会把卡片变成横向 flex */
+  label.suspect { display:flex; gap:4px; align-items:center; color:var(--bad); font-size:12px; white-space:nowrap; }
   .secbody { display:grid; grid-template-columns:minmax(280px,1fr) minmax(420px,1.35fr); gap:14px; }
   .hint { color:var(--muted); font-size:12px; margin-bottom:4px; }
   .hint b { color:var(--ink); font-weight:600; }
