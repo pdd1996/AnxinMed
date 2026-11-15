@@ -53,6 +53,7 @@
   .choices label { display:flex; gap:4px; align-items:center; }
   .correct { display:none; margin-top:8px; }
   .correct.show { display:block; }
+  .corr-label { color:var(--muted); font-size:12px; margin:6px 0 3px; }
   .correct textarea { width:100%; min-height:260px; max-height:70vh; resize:vertical; padding:8px 10px; border:1px solid var(--line); border-radius:5px; font:14px/1.7 inherit; }
   .correct input { width:100%; margin-top:6px; padding:6px 8px; border:1px solid var(--line); border-radius:5px; }
   details { margin-top:8px; }
@@ -226,7 +227,9 @@
           '<label><input type="radio" name="sec-' + id + '-' + slot.key + '" value="corrected" data-field="section" data-slot="' + slot.key + '" data-insert="' + id + '"' + (value === 'corrected' ? ' checked' : '') + '> 需修正</label>' +
         '</div>' +
         '<div class="correct' + (value === 'corrected' ? ' show' : '') + '" data-correct="' + id + '-' + slot.key + '">' +
+          '<div class="corr-label">修正后正文（逐字抄录源文，不生成内容）</div>' +
           '<textarea data-field="sectionText" data-slot="' + slot.key + '" data-insert="' + id + '" placeholder="粘贴修正后的该段正文（逐字抄录源文）">' + esc((st.sections[slot.key] && st.sections[slot.key].text) || '') + '</textarea>' +
+          '<div class="corr-label">修正原因（必填，一句话说明问题）</div>' +
           '<input type="text" data-field="sectionReason" data-slot="' + slot.key + '" data-insert="' + id + '" placeholder="修正原因（必填）" value="' + esc((st.sections[slot.key] && st.sections[slot.key].reason) || '') + '">' +
         '</div>' +
       '</div>';
