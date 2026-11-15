@@ -200,30 +200,22 @@ def section_image(doc: fitz.Document, page_index: int, text: str, slot: dict, ap
     render_crop(page, rect, image_path, dpi)
     images = [{'src': f'assets/{image_path.name}', 'label': f'第 {page_index + 1} 页', 'page': page_index + 1}]
 
-    # 长段落补续页：从起始页往后，直到下一页顶部出现新段标题为止（最多再补 2 页，整页渲染便于逐字对照）
-    if heading is not None:
-        cur = page_index
-        for k in range(1, 3):
-            if cur + 1 >= doc.page_count:
-                break
-            nxt = doc.load_page(cur + 1)
-            nxt_text = nxt.get_text()
-            nxt_bracket = '【' in nxt_text and '】' in nxt_text
-            first_lines = [l.strip() for l in nxt_text.splitlines() if l.strip()][:3]
-            if nxt_bracket:
-                new_section = any(re.match(r'^【[^】]{1,15}】', l) for l in first_lines)
-            else:
-                next_heads = heading_rects(nxt, nxt_bracket, names)
-                first_head = min((r.y0 for r, _ in next_heads), default=None)
-                new_section = first_head is not None and first_head <= 60
-            if new_section:
-                break  # 下一页顶部已是新段标题 → 本段结束
+    # 长段落补续页：用段落尾部文本定位结束页（最多再补 2 页），逐页整页渲染便于逐字对照
+    if heading is not None and text and len(norm(text)) > 120:
+        tail = norm(text)[-80:-10]
+        end_page = page_index
+        if tail:
+            for pi in range(page_index, min(page_index + 4, doc.page_count)):
+                if tail in norm(doc.load_page(pi).get_text()):
+                    end_page = pi
+                    break
+        for pi in range(page_index + 1, min(end_page + 1, page_index + 3)):
+            nxt = doc.load_page(pi)
             cont_rect = fitz.Rect(nxt.rect.x0 + 18, nxt.rect.y0 + 8, nxt.rect.x1 - 18, nxt.rect.y1 - 12)
-            suffix = '-cont' if k == 1 else f'-cont{k}'
+            suffix = '-cont' if pi == page_index + 1 else f'-cont{pi - page_index}'
             cont_path = assets / f'{stem}{suffix}.png'
             render_crop(nxt, cont_rect, cont_path, dpi)
-            images.append({'src': f'assets/{cont_path.name}', 'label': f'第 {cur + 2} 页（续）', 'page': cur + 2})
-            cur += 1
+            images.append({'src': f'assets/{cont_path.name}', 'label': f'第 {pi + 1} 页（续）', 'page': pi + 1})
 
     return {
         'images': images,
