@@ -23,7 +23,23 @@ try:  # PyMuPDF 只在 extract() 里用；parse_specs 等纯函数单测不需�
 except ModuleNotFoundError:  # pragma: no cover - 缺依赖时 extract() 会显式报错
     fitz = None  # type: ignore[assignment]
 
-EXTRACTOR_VERSION = 'manual-pdf-2026-11-14'
+EXTRACTOR_VERSION = 'manual-pdf-2026-11-15'
+
+# ── 阅读顺序与表格重建（M7-T1，2026-11-15）──────────────────────────────────
+# PDF 文本层按内容流顺序输出，表格单元格是后画的对象 → 整张表被排到页尾，跨页时
+# 错落到别的段落中间（M6 §3.5：结构脂肪乳组份表落进【用法用量】、培哚普利提示框插断
+# 句子、氟康唑【注意事项】混入不良反应表碎片）。修复：每页按 bbox 重建阅读顺序，
+# 表格按「行 → 单元格」渲染成 Markdown 表插回 bbox 所在位置。
+TABLE_TOP_MARGIN = 42.0     # 表格 bbox 顶边距页顶 ≤ 该值 → 视为页首表格，可跨页续接
+TABLE_BOTTOM_MARGIN = 42.0  # 表格 bbox 底边距页底 ≤ 该值 → 视为页尾表格，可跨页续接
+TABLE_COVERAGE_MIN = 0.98   # 单元格字符覆盖率下限；低于此值整张表回退为原始文本块（不丢字）
+TABLE_MIN_ROWS = 2
+TABLE_MIN_COLS = 2
+CJK_RE = re.compile(r'[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]')
+HEADING_CELL_RE = re.compile(r'^【[^】]{1,20}】$')
+# 相邻两张 Markdown 表之间的段落分隔哨兵：normalize_section 见到它才保留一个空行，
+# 其余位置仍折叠空行（与 M6 草稿口径一致，不给无表格段落制造空白差异）。
+TABLE_BREAK = '\u0001'
 
 SECTION_RE = re.compile(r'【([^】]{1,20})】')
 FILENAME_RE = re.compile(r'^(?P<name>.*?)\[(?P<ids>[^\]]+)\](?:-\d+)?$')
@@ -94,12 +110,206 @@ def clean_line(line: str) -> str:
 
 
 def normalize_section(body: str) -> str:
-    body = body.replace('\r\n', '\n').replace('\r', '\n')
-    body = re.sub(r'[ \t]+\n', '\n', body)
-    body = re.sub(r'\n[ \t]+', '\n', body)
-    body = re.sub(r'\n{2,}', '\n', body)
-    body = re.sub(r'[ \t]{2,}', ' ', body)
-    return body.strip()
+    """空白归一化：折叠排版空白，但两张相邻 Markdown 表之间保留一个空行。"""
+    parts = body.split(TABLE_BREAK)
+    cleaned: list[str] = []
+    for part in parts:
+        part = part.replace('\r\n', '\n').replace('\r', '\n')
+        part = re.sub(r'[ \t]+\n', '\n', part)
+        part = re.sub(r'\n[ \t]+', '\n', part)
+        part = re.sub(r'\n{2,}', '\n', part)
+        part = re.sub(r'[ \t]{2,}', ' ', part)
+        cleaned.append(part.strip('\n'))
+    return '\n\n'.join(part for part in cleaned if part).strip()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 表格重建（纯函数，可脱 PDF 单测）
+# ─────────────────────────────────────────────────────────────────────────────
+
+def norm_cell_text(value: str) -> str:
+    """单元格文本只做空白归一化，不增删字符：换行按中文/西文规则并回一行。"""
+    s = str(value or '').replace('\r\n', '\n').replace('\r', '\n')
+    s = s.replace('\u00a0', ' ').replace('\u3000', ' ').replace(TABLE_BREAK, '')
+    out = ''
+    for line in s.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if not out:
+            out = line
+            continue
+        prev, nxt = out[-1], line[0]
+        if CJK_RE.match(prev) and CJK_RE.match(nxt):
+            out += line                      # 中文折行：不插空格
+        elif prev.isascii() and nxt.isascii() and prev.isalnum() and nxt.isalnum():
+            out += ' ' + line                # 英文单词 / 数值列：保留分隔
+        else:
+            out += line
+    return re.sub(r'[ \t]{2,}', ' ', out)
+
+
+def _is_heading_row(row: list[str]) -> bool:
+    """整行只有一个【段名】：find_tables 偶尔把段标题吞进表格（结构脂肪乳【不良反应】）。"""
+    cells = [c.strip() for c in row if c and c.strip()]
+    return len(cells) == 1 and bool(HEADING_CELL_RE.match(cells[0]))
+
+
+def render_table(rows: list[list[str]]) -> tuple[str, list[str]]:
+    """「行 → 单元格」渲染 Markdown 表；返回 (markdown, 被吐出的段标题)。
+
+    口径：只恢复行列归属，不改字；空单元格保留占位；整张表少于 2 行/2 列视为误判。
+    """
+    cleaned = [[norm_cell_text(c) for c in row] for row in rows if row is not None]
+    headings: list[str] = []
+    while cleaned and _is_heading_row(cleaned[0]):
+        headings.extend(c.strip() for c in cleaned.pop(0) if c and c.strip())
+    while cleaned and not any(c for c in cleaned[-1]):
+        cleaned.pop()
+    width = max((len(r) for r in cleaned), default=0)
+    if len(cleaned) < TABLE_MIN_ROWS or width < TABLE_MIN_COLS:
+        return '', headings
+    padded = [r + [''] * (width - len(r)) for r in cleaned]
+    lines = ['| ' + ' | '.join(padded[0]) + ' |', '|' + ' --- |' * width]
+    lines.extend('| ' + ' | '.join(r) + ' |' for r in padded[1:])
+    return '\n'.join(lines), headings
+
+
+def char_multiset(text: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for ch in text:
+        if ch.isspace():
+            continue
+        counts[ch] = counts.get(ch, 0) + 1
+    return counts
+
+
+def table_coverage(raw_text: str, rows: list[list[str]]) -> float:
+    """表格 bbox 内原文的非空白字符，有多大比例出现在重建单元格里（安全网）。"""
+    want = char_multiset(raw_text)
+    total = sum(want.values())
+    if total == 0:
+        return 1.0
+    have = char_multiset(''.join(''.join(str(c or '') for c in row) for row in rows))
+    covered = sum(min(n, have.get(ch, 0)) for ch, n in want.items())
+    return covered / total
+
+
+def order_items(items: list[dict]) -> list[dict]:
+    """按 bbox 重建阅读顺序：先上后下、同一行内先左后右。"""
+    return sorted(items, key=lambda it: (round(it['bbox'][1], 2), round(it['bbox'][0], 2)))
+
+
+def block_inside_table(block_bbox: tuple[float, float, float, float],
+                       table_bbox: tuple[float, float, float, float]) -> bool:
+    """文本块是否属于表格：中心点在表内，或与表格重叠面积超过自身一半。"""
+    bx0, by0, bx1, by1 = block_bbox
+    tx0, ty0, tx1, ty1 = table_bbox
+    cx, cy = (bx0 + bx1) / 2, (by0 + by1) / 2
+    if tx0 <= cx <= tx1 and ty0 <= cy <= ty1:
+        return True
+    ix = max(0.0, min(bx1, tx1) - max(bx0, tx0))
+    iy = max(0.0, min(by1, ty1) - max(by0, ty0))
+    area = max((bx1 - bx0) * (by1 - by0), 1e-6)
+    return ix * iy / area > 0.5
+
+
+def can_merge_continuation(prev: dict, cur: dict) -> bool:
+    """跨页续表：上一页表格触底、本页表格触顶、列数相同（bbox 均为 (x0,y0,x1,y1)）。"""
+    if prev['kind'] != 'table' or cur['kind'] != 'table':
+        return False
+    prev_bbox, cur_bbox = prev['bbox'], cur['bbox']
+    if prev_bbox[3] < prev['pageHeight'] - TABLE_BOTTOM_MARGIN:
+        return False
+    if cur_bbox[1] > TABLE_TOP_MARGIN:
+        return False
+    prev_cols = max((len(r) for r in prev.get('rows') or []), default=0)
+    cur_cols = max((len(r) for r in cur.get('rows') or []), default=0)
+    return prev_cols > 0 and prev_cols == cur_cols
+
+
+def _cells_aligned(prev_cells: list, cur_cells: list) -> bool:
+    """续行判定：至少一列（首列之后）的 x 区间与前一行同列对齐。"""
+    for i in range(1, min(len(prev_cells), len(cur_cells))):
+        a, b = prev_cells[i], cur_cells[i]
+        if not a or not b:
+            continue
+        if abs(a[0] - b[0]) < 5 and abs(a[2] - b[2]) < 5:
+            return True
+    return False
+
+
+def merge_table_rows(prev: dict, cur: dict) -> None:
+    """把下一页续接的表格行并入 prev（原地修改）。
+
+    跨页被截断的单元格：续页首列通常为空、正文从第 2 列起 → 按列拼回上一行；
+    续页重复的表头行去重。
+    """
+    prev_rows: list[list[str]] = prev['rows']
+    prev_cells: list[list] = prev.get('cells') or []
+    cur_rows: list[list[str]] = cur['rows']
+    cur_cells: list[list] = cur.get('cells') or []
+    start = 0
+    if cur_rows and prev_rows and cur_cells and prev_cells:
+        first = cur_rows[0]
+        if first and norm_cell_text(first[0]) == '' and norm_cell_text(prev_rows[-1][0]) != '':
+            if _cells_aligned(prev_cells[-1], cur_cells[0]):
+                for ci, cell in enumerate(first):
+                    text = norm_cell_text(cell)
+                    if not text or ci >= len(prev_rows[-1]):
+                        continue
+                    prev_rows[-1][ci] = (prev_rows[-1][ci] + text).strip()
+                start = 1
+    if start < len(cur_rows) and prev_rows:
+        same_header = [norm_cell_text(c) for c in cur_rows[start]] == [norm_cell_text(c) for c in prev_rows[0]]
+        if same_header:
+            start += 1
+    prev_rows.extend(cur_rows[start:])
+    prev['cells'] = prev_cells + cur_cells[start:]
+
+
+def assemble_pages(pages: list[list[dict]], page_heights: list[float]) -> tuple[str, dict]:
+    """逐页按 bbox 顺序拼正文，处理跨页续表，最后渲染 Markdown 表。"""
+    audit = {'tables': 0, 'mergedContinuations': 0, 'headingsExtracted': 0}
+    flat: list[dict] = []
+    for pno, items in enumerate(pages):
+        height = page_heights[pno] if pno < len(page_heights) else 0.0
+        for raw_item in items:
+            item = dict(raw_item)
+            item['page'] = pno
+            item['pageHeight'] = height
+            if item['kind'] == 'table':
+                last = flat[-1] if flat else None
+                if last is not None and last['kind'] == 'table' and last['page'] == pno - 1 \
+                        and can_merge_continuation(last, item):
+                    merge_table_rows(last, item)
+                    audit['mergedContinuations'] += 1
+                    continue
+            flat.append(item)
+
+    blocks: list[tuple[str, str]] = []
+    for item in flat:
+        if item['kind'] != 'table':
+            blocks.append(('text', item['text']))
+            continue
+        audit['tables'] += 1
+        markdown, headings = render_table(item['rows'])
+        if headings:
+            audit['headingsExtracted'] += len(headings)
+            blocks.append(('text', '\n'.join(headings)))
+        if markdown:
+            blocks.append(('table', markdown))
+    # 相邻两张表之间插哨兵 → normalize_section 保留一个空行（Markdown 表需要分隔）
+    parts: list[str] = []
+    prev_kind: str | None = None
+    for kind, text in blocks:
+        if not text:
+            continue
+        if kind == 'table' and prev_kind == 'table':
+            parts.append(TABLE_BREAK)
+        parts.append(text)
+        prev_kind = kind
+    return '\n'.join(parts), audit
 
 
 def split_sections(text: str) -> tuple[str, dict[str, str]]:
@@ -156,6 +366,67 @@ def strength_tokens(text: str) -> set[str]:
         u = {'毫升': 'ml', '毫克': 'mg', '微克': 'ug', '克': 'g'}.get(unit, unit.lower())
         tokens.add(f'{value}{u}')
     return tokens
+
+
+# 规格比较用：换算到统一基准单位，0.15g ≡ 150mg、1ml ≡ 1毫升。
+# （源文正文与【规格】段经常不同单位，氟康唑胶囊【规格】写 150mg、【批准文号】写 0.15g）
+_STRENGTH_BASE_UNITS: dict[str, tuple[str, float]] = {
+    'mg': ('mg', 1.0), '毫克': ('mg', 1.0),
+    'g': ('mg', 1000.0), '克': ('mg', 1000.0),
+    'μg': ('mg', 0.001), 'µg': ('mg', 0.001), 'ug': ('mg', 0.001), 'mcg': ('mg', 0.001),
+    '微克': ('mg', 0.001),
+    'ml': ('ml', 1.0), '毫升': ('ml', 1.0),
+    'l': ('ml', 1000.0), '升': ('ml', 1000.0),
+    '%': ('%', 1.0),
+}
+
+
+def canonical_strengths(text: str) -> set[str]:
+    """把文本里的「数值+单位」换算成基准单位 token（0.15g → 150mg）。"""
+    tokens: set[str] = set()
+    for value, unit in STRENGTH_RE.findall(str(text or '')):
+        key = unit.lower().replace('µ', 'μ')
+        base = _STRENGTH_BASE_UNITS.get(key)
+        if not base:
+            tokens.add(f'{value}{key}')
+            continue
+        base_unit, factor = base
+        try:
+            number = float(value) * factor
+        except ValueError:
+            tokens.add(f'{value}{key}')
+            continue
+        tokens.add(f'{number:g}{base_unit}')
+    return tokens
+
+
+def approval_tokens(line: str) -> list[str]:
+    """一行里的批准文号（去掉「进口药品注册证号：」这类标签前缀与标点）。"""
+    tokens: list[str] = []
+    for match in APPROVAL_RE.finditer(line):
+        token = re.sub(r'\s+', '', match.group(0)).strip('：:；;,，')
+        token = re.sub(r'^进口药品注册证号[：:]?', '', token)
+        if not re.search(r'\d', token):
+            continue
+        if token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def split_by_strength_tokens(line: str) -> list[str]:
+    """按行内「数值+单位」位置切段：一格规格 token 开一段，文号归属紧随其后的那段。
+
+    例：`0.25μg国药准字H20000065 0.5μg国药准字H20000066`
+        → ['0.25μg国药准字H20000065 ', '0.5μg国药准字H20000066']
+    """
+    matches = list(STRENGTH_RE.finditer(line))
+    if len(matches) <= 1:
+        return [line]
+    segments: list[str] = []
+    for i, match in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(line)
+        segments.append(line[match.start():end])
+    return segments
 
 
 def bracket_depths(text: str) -> list[int]:
@@ -246,6 +517,26 @@ def _join_with_space(text: str, next_char: str) -> bool:
     return prev.isalpha() and next_char.isalpha()  # 英文单词折行
 
 
+def pick_brand_name(names: dict[str, str]) -> str | None:
+    """商品名标签变体（M7-T3）：源文有「商品名称：」「商品名：」「商品名称（中文）：」等多种写法。"""
+    for label in ('商品名称', '商品名'):
+        if names.get(label):
+            return names[label]
+    for label, value in names.items():
+        if value and label.startswith('商品名') and '英文' not in label and '外文' not in label:
+            return value
+    return None
+
+
+def clean_brand_name(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip().strip('：:').strip()
+    if cleaned in {'', '无', '—', '-', '/', '无商品名', '无。', '未标注'}:
+        return None
+    return cleaned
+
+
 def parse_specs(raw: str) -> list[str]:
     raw = raw.strip()
     if not raw:
@@ -287,52 +578,76 @@ def id_token(spec: str, index: int) -> str:
 
 
 def parse_approvals(raw: str, specs: list[str]) -> tuple[dict[str, list[str]], list[str]]:
+    """按规格归属批准文号（M7-T2）。
+
+    源文有两种写法：
+      1. 「0.25μg：国药准字H20000065」——有冒号，旧逻辑靠 LABEL_RE 分组；
+      2. 「0.25μg国药准字H20000065」「①5mg；国药准字H20041506」——**无冒号**，
+         旧逻辑分组失败，退化为每个规格都挂整组文号（M6 §3.6：93 份 PDF 命中）。
+    新逻辑以**行内规格 token** 归属：行里出现哪个规格的数字/单位（含 0.15g≡150mg 的
+    单位换算），文号就归给哪个规格；一行多组按分隔符切段各自归属；多规格 PDF 里无法
+    归属的文号**留空并告警**，绝不退化为「全挂」。
+    """
     if not raw.strip():
         return {s: [] for s in specs}, []
 
-    groups: list[dict[str, object]] = []
-    current: dict[str, object] | None = None
-    for line in (clean_line(l) for l in raw.splitlines() if clean_line(l)):
-        m = LABEL_RE.match(line)
-        label = m.group(1).strip() if m and re.search(r'\d', m.group(1)) else None
-        rest = m.group(2).strip() if m else line
-        found = [re.sub(r'\s+', '', x) for x in APPROVAL_RE.findall(rest)]
-        if label:
-            current = {'label': label, 'approvals': []}
-            groups.append(current)
-        if found:
-            if current is None:
-                current = {'label': '', 'approvals': []}
-                groups.append(current)
-            current['approvals'].extend(found)  # type: ignore[union-attr]
+    result: dict[str, list[str]] = {s: [] for s in specs}
+    warnings: list[str] = []
+    spec_tokens = [(spec, canonical_strengths(spec)) for spec in specs]
 
-    if not groups:
-        return {s: [] for s in specs}, []
+    def assign(spec: str, tokens: list[str]) -> None:
+        for token in tokens:
+            if token not in result[spec]:
+                result[spec].append(token)
 
-    unmapped = [
-        str(group['label'])
-        for group in groups
-        if group['label']
-        and not any(strength_tokens(str(group['label'])) & strength_tokens(spec) for spec in specs)
-    ]
+    def match_specs(text: str) -> list[str]:
+        tokens = canonical_strengths(text)
+        if not tokens:
+            return []
+        return [spec for spec, spec_set in spec_tokens if spec_set & tokens]
 
-    result: dict[str, list[str]] = {}
+    pending: list[str] = []  # 已定位到规格、但文号在下一行的行（「0.25μg：」换行）
+    for raw_line in raw.splitlines():
+        line = clean_line(raw_line)
+        if not line:
+            continue
+        tokens = approval_tokens(line)
+        matched = match_specs(line)
+        if len(matched) == 1:
+            if tokens:
+                assign(matched[0], tokens)
+                pending = []
+            else:
+                pending = matched
+            continue
+        if len(matched) > 1:
+            assigned = False
+            for segment in split_by_strength_tokens(line):
+                segment_tokens = approval_tokens(segment)
+                segment_matched = match_specs(segment)
+                if len(segment_matched) == 1 and segment_tokens:
+                    assign(segment_matched[0], segment_tokens)
+                    assigned = True
+            if not assigned and tokens:
+                # 一行覆盖多规格（伏立康唑「1）50mg 2）200mg」）：文号由两规格共享
+                for spec in matched:
+                    assign(spec, tokens)
+            pending = []
+            continue
+        if not tokens:
+            continue
+        if pending:
+            for spec in pending:
+                assign(spec, tokens)
+            pending = []
+        elif len(specs) == 1:
+            assign(specs[0], tokens)
+        else:
+            warnings.append(f"未归属文号 {'、'.join(tokens)}（行：{line[:40]}）")
+
     for spec in specs:
-        approvals: list[str] = []
-        matched = False
-        for group in groups:
-            label = str(group['label'])
-            if not label or strength_tokens(label) & strength_tokens(spec):
-                matched = True
-                approvals.extend(group['approvals'])  # type: ignore[arg-type]
-        if not matched:
-            for group in groups:
-                approvals.extend(group['approvals'])  # type: ignore[arg-type]
-        seen: set[str] = set()
-        ordered = [a for a in approvals if not (a in seen or seen.add(a))]
-        ordered.sort(key=lambda a: 1 if '分包装' in a else 0)
-        result[spec] = ordered
-    return result, unmapped
+        result[spec].sort(key=lambda a: 1 if '分包装' in a else 0)
+    return result, warnings
 
 
 def company_like(value: str) -> bool:
@@ -504,7 +819,7 @@ def build_note(
     if approvals:
         notes.append(f'批准文号 {"、".join(approvals)}')
     if unmapped:
-        notes.append(f'批准文号分组与规格未能一一对应（{ "、".join(unmapped) }），已按全部文号处理')
+        notes.append(f'批准文号无法归属到具体规格（{ "、".join(unmapped) }），已留空待人工补')
     if exec_standard:
         notes.append(f'执行标准 {exec_standard}')
     if shelf_life:
@@ -514,11 +829,100 @@ def build_note(
     return '；'.join(notes)
 
 
-def extract(pdf_path: Path, out_dir: Path, id_prefix: str | None) -> list[Path]:
+def _table_cell_boxes(tab) -> list[list]:
+    boxes: list[list] = []
+    for row in tab.rows:
+        cells = []
+        for cell in row.cells:
+            cells.append(None if cell is None else tuple(cell))
+        boxes.append(cells)
+    return boxes
+
+
+def page_items(page) -> tuple[list[dict], list[dict]]:
+    """一页的阅读项：表格 + 文本块，已按 bbox 排序；表格 bbox 内的文本块丢弃。"""
+    items: list[dict] = []
+    fallbacks: list[dict] = []
+    table_boxes: list[tuple[float, float, float, float]] = []
+    tables = []
+    try:
+        tables = list(page.find_tables().tables)
+    except Exception as exc:  # find_tables 在个别畸形页面上会抛错——失败必须可见
+        fallbacks.append({'page': page.number + 1, 'reason': f'find_tables 失败：{exc}'})
+    for tab in tables:
+        bbox = tuple(tab.bbox)
+        rows = [list(r) for r in tab.extract()]
+        cols = max((len(r) for r in rows), default=0)
+        if len(rows) < TABLE_MIN_ROWS or cols < TABLE_MIN_COLS:
+            continue  # 误判：单行/单列不足以构成表格
+        raw = page.get_text('text', clip=fitz.Rect(bbox))
+        coverage = table_coverage(raw, rows)
+        if coverage < TABLE_COVERAGE_MIN:
+            # 找不到的单元格会丢字 → 整张表回退为原始文本块（宁可保留拉平文本）
+            fallbacks.append({'page': page.number + 1, 'bbox': [round(v, 1) for v in bbox],
+                              'coverage': round(coverage, 4), 'reason': '单元格覆盖率不足'})
+            continue
+        table_boxes.append(bbox)
+        items.append({'kind': 'table', 'bbox': bbox, 'rows': rows,
+                      'cells': _table_cell_boxes(tab), 'coverage': coverage})
+    for block in page.get_text('dict')['blocks']:
+        if block.get('type') != 0:
+            continue
+        # 逐行保留换行：规格/批准文号段依赖行结构（一行一条），不能把行首尾拼死
+        text = '\n'.join(''.join(span['text'] for span in line['spans']) for line in block['lines'])
+        if not text.strip():
+            continue
+        bbox = tuple(block['bbox'])
+        if any(block_inside_table(bbox, tb) for tb in table_boxes):
+            continue
+        items.append({'kind': 'text', 'bbox': bbox, 'text': text})
+    return order_items(items), fallbacks
+
+
+def document_text(doc) -> tuple[str, dict]:
+    """整份 PDF 的正文：逐页 bbox 排序 + 表格 Markdown 重建 + 跨页续表合并。"""
+    pages: list[list[dict]] = []
+    heights: list[float] = []
+    fallbacks: list[dict] = []
+    for page in doc:
+        items, page_fallbacks = page_items(page)
+        pages.append(items)
+        heights.append(page.rect.height)
+        fallbacks.extend(page_fallbacks)
+    text, audit = assemble_pages(pages, heights)
+    audit['fallbacks'] = fallbacks
+    return text, audit
+
+
+def audit_pdf(pdf_path: Path) -> dict:
+    """诊断入口（--audit）：逐页打印表格、回退与阅读项，供抽检定位。"""
+    doc = fitz.open(pdf_path)
+    report = {'file': pdf_path.name, 'pages': []}
+    for page in doc:
+        items, fallbacks = page_items(page)
+        page_report = {
+            'page': page.number + 1,
+            'fallbacks': fallbacks,
+            'items': [
+                {'kind': it['kind'], 'bbox': [round(v, 1) for v in it['bbox']],
+                 'rows': len(it.get('rows') or []), 'cols': max((len(r) for r in it.get('rows') or []), default=0),
+                 'coverage': round(it.get('coverage', 1.0), 4) if it['kind'] == 'table' else None,
+                 'preview': (render_table(it['rows'])[0] if it['kind'] == 'table' else it['text'])[:120].replace('\n', ' ⏎ ')}
+                for it in items
+            ],
+        }
+        report['pages'].append(page_report)
+    return report
+
+
+def extract(pdf_path: Path, out_dir: Path, id_prefix: str | None, audit: dict | None = None) -> list[Path]:
     if fitz is None:
         raise RuntimeError('缺少 PyMuPDF：pip install pymupdf（只有 extract() 需要，纯解析函数不受影响）')
     doc = fitz.open(pdf_path)
-    raw_text = '\n'.join(page.get_text() for page in doc)
+    raw_text, doc_audit = document_text(doc)
+    if audit is not None:
+        audit.clear()
+        audit.update(doc_audit)
     _, sections = split_sections(raw_text)
     date = pdf_date(doc, pdf_path)
 
@@ -533,9 +937,7 @@ def extract(pdf_path: Path, out_dir: Path, id_prefix: str | None) -> list[Path]:
     name_note = None
     if generic_name != generic_name_raw:
         name_note = f'源文「通用名称」标签后重复冒号（{generic_name_raw[:4]}…），身份字段已剔除前导冒号，正文段保持原样'
-    brand_name = names.get('商品名称')
-    if brand_name in {'无', '—', '-'}:
-        brand_name = None
+    brand_name = clean_brand_name(pick_brand_name(names))
     english_name = names.get('英文名称')
     pinyin = names.get('汉语拼音')
 
@@ -632,20 +1034,39 @@ def main() -> int:
     parser.add_argument('pdfs', nargs='+', type=Path)
     parser.add_argument('--out', type=Path, default=default_out)
     parser.add_argument('--drug-id-prefix', help='单 PDF 试跑时指定 drugId 前缀，如 drug-omega-3-fish-oil')
+    parser.add_argument('--audit', action='store_true',
+                        help='诊断模式：逐页打印表格识别、回退原因与阅读项（不写草稿）')
     args = parser.parse_args()
 
     if args.drug_id_prefix and len(args.pdfs) > 1:
         parser.error('--drug-id-prefix 只能用于单个 PDF；批量请留空')
 
+    if args.audit:
+        for pdf_path in args.pdfs:
+            report = audit_pdf(pdf_path)
+            print(f"📄 {report['file']}")
+            for page in report['pages']:
+                print(f"  ── 第 {page['page']} 页：{len(page['items'])} 个阅读项")
+                for fb in page['fallbacks']:
+                    print(f"     ⚠️ 表格回退：{fb.get('reason')} bbox={fb.get('bbox')} 覆盖率={fb.get('coverage')}")
+                for it in page['items']:
+                    extra = f" rows={it['rows']} cols={it['cols']} cov={it['coverage']}" if it['kind'] == 'table' else ''
+                    print(f"     [{it['kind']}{extra}] y={it['bbox'][1]:.0f} :: {it['preview']}")
+        return 0
+
     failed = False
     for pdf_path in args.pdfs:
+        audit: dict = {}
         try:
-            written = extract(pdf_path, args.out, args.drug_id_prefix)
+            written = extract(pdf_path, args.out, args.drug_id_prefix, audit=audit)
         except Exception as exc:  # 失败必须可见，不静默跳过
             failed = True
             print(f'❌ {pdf_path.name}: {exc}', file=sys.stderr)
             continue
-        print(f'✅ {pdf_path.name} → {len(written)} 份草稿')
+        fb = len(audit.get('fallbacks') or [])
+        print(f"✅ {pdf_path.name} → {len(written)} 份草稿"
+              f"（表格 {audit.get('tables', 0)} 张 / 跨页合并 {audit.get('mergedContinuations', 0)}"
+              f" / 回退 {fb}）")
         for path in written:
             print(f'   {path}')
     return 1 if failed else 0
