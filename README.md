@@ -130,7 +130,16 @@ api 多阶段镜像同时托管 web 构建产物，浏览器直接打开 <http:/
 
 ## 项目状态
 
-M1 / M2 / M3 / M4 全部完成（`m1-done` ~ `m4-done` tag 均已打）：golden case E2E 全过、PRD §16 验收项通过，详见 [docs/specs/acceptance-MVP.md](docs/specs/acceptance-MVP.md)；M4 咨询 Agent 架构改革见 [docs/10-咨询Agent架构改革方案.md](docs/10-咨询Agent架构改革方案.md) 与 [docs/11-咨询Agent评估与指标口径-M4.md](docs/11-咨询Agent评估与指标口径-M4.md)。
+| 里程碑 | 状态 | tag | 说明 |
+| --- | --- | --- | --- |
+| M1 地基 | ✅ 完成 | `m1-done` | pnpm 三包、九表 + seed、API/前端骨架、demo 功能迁移、docker-compose、OCR 选型 |
+| M2 录入主线 | ✅ 完成 | `m2-done` | 医嘱线管线七步、身份三项匹配、草稿确认闸门、脱敏四层 + 零泄漏断言 |
+| M3 打磨与验收 | ✅ 完成 | `m3-done` | 医生端 Agent、语音、性能、PRD §16 验收（详见 [acceptance-MVP](docs/specs/acceptance-MVP.md)） |
+| M4 咨询 Agent 改革 | ✅ 完成 | `m4-done` | 意图路由 + 数据直查 + 四层守门（[docs/10](docs/10-咨询Agent架构改革方案.md)、[docs/11](docs/11-咨询Agent评估与指标口径-M4.md)） |
+| M5 安卓迁移与服务端上云 | ✅ 完成（带真机取证缺口） | `m5-done` | RN 患者端、Maestro 5/5、云端 API；T8 P1–P10 与 T9 部分真机取证未跑 |
+| M6 说明书库落地与关账 | ✅ 完成（带 3 条已知缺陷） | `m6-done` | 1588 行说明书库、230 行 reviewed、规格解析缺陷修复；已知缺陷见 [06 文档](docs/specs/06-M6-说明书库落地与关账.md) §3.5–§3.7，M7 统一重提取修复 |
+
+M1–M4：golden case E2E 全过、PRD §16 验收项通过（详见 [docs/specs/acceptance-MVP.md](docs/specs/acceptance-MVP.md)）。M6 的 3 条已知缺陷（表格结构 / 批准文号归属 / 商品名缺失）均为提取器层问题，咨询侧对表格已有频率归属防线，M7 修复并重新抽检。
 
 **性能数据**（详见 [docs/09-性能与健壮性报告-M3-T5.md](docs/09-性能与健壮性报告-M3-T5.md)）：非模型开销 P50 = 6.2ms / P95 = 10.6ms；首屏 143.54KB gzip。
 
