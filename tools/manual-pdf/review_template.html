@@ -53,7 +53,7 @@
   .choices label { display:flex; gap:4px; align-items:center; }
   .correct { display:none; margin-top:8px; }
   .correct.show { display:block; }
-  .correct textarea { width:100%; min-height:90px; padding:8px; border:1px solid var(--line); border-radius:5px; font:13px/1.6 inherit; }
+  .correct textarea { width:100%; min-height:260px; max-height:70vh; resize:vertical; padding:8px 10px; border:1px solid var(--line); border-radius:5px; font:14px/1.7 inherit; }
   .correct input { width:100%; margin-top:6px; padding:6px 8px; border:1px solid var(--line); border-radius:5px; }
   details { margin-top:8px; }
   details pre { max-height:220px; overflow:auto; white-space:pre-wrap; background:#fafafa; border:1px solid #eee; padding:8px; }
@@ -157,7 +157,15 @@
       return '<a class="' + cls + '" href="#item-' + idx + '" data-nav="' + esc(item.insertId) + '"><span>' + esc(item.identity.genericName) + '</span><span class="dot">' + (st.action === 'reject' ? '✕' : (done ? '✓' : '·')) + '</span></a>';
     }).join('');
     updateProgress();
+    document.querySelectorAll('.correct.show textarea').forEach(autoGrow);
     restoreUI();
+  }
+
+  // 修正文本框随内容自动增高（上限 70vh，避免整页被撑爆），长段落一屏可读
+  function autoGrow(ta) {
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(Math.max(ta.scrollHeight + 4, 260), Math.round(window.innerHeight * 0.7)) + 'px';
   }
 
   function cardHtml(item, idx) {
@@ -265,7 +273,10 @@
       st.sections[slot] = st.sections[slot] || { status: '', text: '', reason: '' };
       st.sections[slot].status = el.value;
       const panel = document.querySelector('[data-correct="' + CSS.escape(insertId + '-' + slot) + '"]');
-      if (panel) panel.classList.toggle('show', el.value === 'corrected');
+      if (panel) {
+        panel.classList.toggle('show', el.value === 'corrected');
+        if (el.value === 'corrected') autoGrow(panel.querySelector('textarea'));
+      }
     }
     save(); updateProgress();
   });
@@ -280,6 +291,7 @@
       const slot = el.dataset.slot;
       st.sections[slot] = st.sections[slot] || { status: '', text: '', reason: '' };
       st.sections[slot].text = el.value;
+      autoGrow(el);
     } else if (el.dataset.field === 'sectionReason') {
       const slot = el.dataset.slot;
       st.sections[slot] = st.sections[slot] || { status: '', text: '', reason: '' };
