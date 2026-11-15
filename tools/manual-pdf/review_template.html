@@ -35,7 +35,12 @@
   .confirm { margin:10px 0; padding:8px 10px; background:#f1f6f4; border-radius:6px; }
   .sec { border-top:1px dashed var(--line); padding:10px 0; }
   .sec h3 { margin:0 0 4px; font-size:14px; }
-  .sec .hint { color:var(--muted); font-size:12px; margin-bottom:4px; }
+  .sechead { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .sechead h3 { margin:0; }
+  .sec .toggle { padding:2px 9px; font-size:12px; border:1px solid var(--line); border-radius:4px; background:#fff; cursor:pointer; color:var(--brand); white-space:nowrap; }
+  .sec .toggle:hover { background:#eef4f2; }
+  .sec.collapsed .secbody { display:none; }
+  .sec .hint { color:var(--muted); font-size:12px; margin:2px 0 4px; }
   .sec pre { margin:0 0 8px; padding:8px; background:#fafafa; border:1px solid #eee; border-radius:5px; white-space:pre-wrap; word-break:break-word; max-height:260px; overflow:auto; font:13px/1.65 inherit; }
   .choices { display:flex; flex-wrap:wrap; gap:12px; font-size:13px; }
   .choices label { display:flex; gap:4px; align-items:center; }
@@ -62,6 +67,8 @@
   <h1>说明书人工核对</h1>
   <span class="meta" id="meta"></span>
   <label>核对人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+  <button id="foldAll" type="button">全部折叠</button>
+  <button id="unfoldAll" type="button">全部展开</button>
   <button class="primary" id="export">导出 decisions.json</button>
   <span class="meta" id="progress"></span>
 </header>
@@ -186,10 +193,11 @@
     const text = resolved.text || '';
     const hint = resolved.key ? '源文段名：' + esc(resolved.key) : (text ? '源文无该段键，正文来自结构化字段' : '源文与结构化字段均为空');
     return '' +
-      '<div class="sec" data-sec="' + id + '-' + slot.key + '">' +
-        '<h3>' + esc(slot.label) + '</h3>' +
+      '<div class="sec collapsed" data-sec="' + id + '-' + slot.key + '">' +
+        '<div class="sechead"><h3>' + esc(slot.label) + '</h3>' +
+          '<button type="button" class="toggle" data-toggle="' + id + '-' + slot.key + '">展开</button></div>' +
         '<div class="hint">' + hint + '</div>' +
-        '<pre>' + (text ? esc(text) : '（空）') + '</pre>' +
+        '<div class="secbody"><pre>' + (text ? esc(text) : '（空）') + '</pre></div>' +
         '<div class="choices">' +
           '<label><input type="radio" name="sec-' + id + '-' + slot.key + '" value="verified" data-field="section" data-slot="' + slot.key + '" data-insert="' + id + '"' + (value === 'verified' ? ' checked' : '') + (text ? '' : ' disabled') + '> 与源文一致</label>' +
           '<label><input type="radio" name="sec-' + id + '-' + slot.key + '" value="source-missing" data-field="section" data-slot="' + slot.key + '" data-insert="' + id + '"' + (value === 'source-missing' ? ' checked' : '') + (text ? ' disabled' : '') + '> 源文无此段</label>' +
@@ -267,6 +275,25 @@
   });
 
   document.getElementById('reviewer').addEventListener('input', (e) => { state.reviewer = e.target.value; save(); });
+
+  // 段落正文折叠：默认收起，点「展开」看正文；顶栏支持全部折叠/展开（减小右侧占位，便于左右对照）
+  function setSectionCollapsed(sec, collapsed) {
+    sec.classList.toggle('collapsed', collapsed);
+    const btn = sec.querySelector('.toggle');
+    if (btn) btn.textContent = collapsed ? '展开' : '收起';
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest ? e.target.closest('.toggle') : null;
+    if (!t) return;
+    const sec = t.closest('.sec');
+    if (sec) setSectionCollapsed(sec, !sec.classList.contains('collapsed'));
+  });
+  document.getElementById('foldAll').addEventListener('click', () => {
+    document.querySelectorAll('.sec').forEach((s) => setSectionCollapsed(s, true));
+  });
+  document.getElementById('unfoldAll').addEventListener('click', () => {
+    document.querySelectorAll('.sec').forEach((s) => setSectionCollapsed(s, false));
+  });
 
   document.getElementById('export').addEventListener('click', () => {
     const reviewer = state.reviewer.trim();
