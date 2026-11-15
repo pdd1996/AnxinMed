@@ -205,11 +205,11 @@ def section_image(doc: fitz.Document, page_index: int, text: str, slot: dict, ap
         tail = norm(text)[-80:-10]
         end_page = page_index
         if tail:
-            for pi in range(page_index, min(page_index + 4, doc.page_count)):
+            for pi in range(page_index, min(page_index + 9, doc.page_count)):
                 if tail in norm(doc.load_page(pi).get_text()):
                     end_page = pi
                     break
-        for pi in range(page_index + 1, min(end_page + 1, page_index + 3)):
+        for pi in range(page_index + 1, min(end_page + 1, page_index + 6)):
             nxt = doc.load_page(pi)
             cont_rect = fitz.Rect(nxt.rect.x0 + 18, nxt.rect.y0 + 8, nxt.rect.x1 - 18, nxt.rect.y1 - 12)
             suffix = '-cont' if pi == page_index + 1 else f'-cont{pi - page_index}'
