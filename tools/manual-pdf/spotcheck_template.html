@@ -51,6 +51,10 @@
   .sec:first-child { border-top:0; }
   .sechead { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:6px; }
   .sechead h3 { margin:0; font-size:14px; }
+  .sec-tools { display:flex; align-items:center; gap:10px; }
+  .sec .toggle { padding:1px 8px; font-size:12px; border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--brand); cursor:pointer; white-space:nowrap; }
+  .sec .toggle:hover { background:#eef4f2; }
+  .sec.collapsed .secbody { display:none; }
   .suspect { display:flex; gap:4px; align-items:center; color:var(--bad); font-size:12px; white-space:nowrap; }
   .secbody { display:grid; grid-template-columns:minmax(320px,1fr) minmax(320px,1.1fr); gap:14px; }
   .hint { color:var(--muted); font-size:12px; margin-bottom:4px; }
@@ -85,6 +89,8 @@
   <h1>M6 说明书抽检</h1>
   <span class="meta" id="meta"></span>
   <label>抽检人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+  <button id="foldAll" type="button">全部折叠</button>
+  <button id="unfoldAll" type="button">全部展开</button>
   <button id="toggleNav" type="button">隐藏目录</button>
   <button class="primary" id="export">导出 verdicts.json</button>
   <span class="meta" id="progress"></span>
@@ -195,7 +201,8 @@
     const suspect = st.sections[slot.key] && st.sections[slot.key].suspect;
     return '<div class="sec" data-sec="' + esc(item.insertId) + '-' + slot.key + '">' +
       '<div class="sechead"><h3>' + esc(slot.label) + (label ? '<span class="tag">' + label + '</span>' : '') + '</h3>' +
-        '<label class="suspect"><input type="checkbox" data-field="suspect" data-slot="' + slot.key + '" data-insert="' + esc(item.insertId) + '"' + (suspect ? ' checked' : '') + '> 此段存疑</label></div>' +
+        '<div class="sec-tools"><label class="suspect"><input type="checkbox" data-field="suspect" data-slot="' + slot.key + '" data-insert="' + esc(item.insertId) + '"' + (suspect ? ' checked' : '') + '> 此段存疑</label>' +
+        '<button type="button" class="toggle">收起</button></div></div>' +
       '<div class="hint">来自 <b>' + esc(from) + '</b> · ' + (text.trim().length) + ' 字' + esc(conf) + '</div>' +
       '<div class="secbody"><div><pre>' + (text.trim() ? esc(text) : '（空）') + '</pre></div>' +
         '<div class="imgs">' + (imgs || '<div class="empty">未生成源文页图，请按源文件人工核对：' + esc(item.sourceFile) + '</div>') + '</div></div>' +
@@ -355,6 +362,25 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
   }
+
+  // 段落折叠：默认展开；点右上「收起」或顶栏全部折叠/展开（只影响显示，不影响判定）
+  function setSecCollapsed(sec, collapsed) {
+    sec.classList.toggle('collapsed', collapsed);
+    const btn = sec.querySelector('.toggle');
+    if (btn) btn.textContent = collapsed ? '展开' : '收起';
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest ? e.target.closest('.toggle') : null;
+    if (!t) return;
+    const sec = t.closest('.sec');
+    if (sec) setSecCollapsed(sec, !sec.classList.contains('collapsed'));
+  });
+  document.getElementById('foldAll').addEventListener('click', () => {
+    document.querySelectorAll('.sec').forEach((s) => { if (s.querySelector('.toggle')) setSecCollapsed(s, true); });
+  });
+  document.getElementById('unfoldAll').addEventListener('click', () => {
+    document.querySelectorAll('.sec').forEach((s) => { if (s.querySelector('.toggle')) setSecCollapsed(s, false); });
+  });
 
   // 目录栏可隐藏：把 230px 横向空间让给正文；状态记 localStorage，刷新不丢
   const NAV_HIDDEN_KEY = 'anxin-spotcheck:nav-hidden';
