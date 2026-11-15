@@ -47,11 +47,13 @@
   .tag { display:inline-block; padding:0 6px; border-radius:4px; background:#e8f1ee; color:var(--brand); font-size:11px; font-weight:400; margin-left:6px; }
   .warnbox { margin-top:8px; padding:7px 10px; border:1px solid #f0d8a8; background:#fffbeb; color:#8a5a07; border-radius:6px; font-size:12px; }
   .warnbox.risk { border-color:#f3b4b4; background:#fff5f5; color:#8f1d1d; }
-  .identity { display:grid; grid-template-columns:minmax(320px,1fr) minmax(320px,1.1fr); gap:14px; margin:12px 0; padding:10px 0; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
+  .identity { display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:14px; margin:12px 0; padding:10px 0; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
   .identity dl { display:grid; grid-template-columns:88px minmax(0,1fr); gap:3px 10px; margin:0; font-size:13px; align-content:start; }
   .identity dt { color:var(--muted); }
   .identity dd { margin:0; word-break:break-all; }
-  .idimgs { display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:start; }
+  .zoom.mini { margin-left:6px; font-size:11px; color:var(--brand); text-decoration:none; border:1px solid #cfe0da; border-radius:4px; padding:0 5px; white-space:nowrap; }
+  .zoom.mini:hover { background:#eef4f2; }
+  .idimgs { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px; align-items:start; }
   .sec { border-top:1px solid var(--line); padding:12px 0 4px; }
   .sec:first-child { border-top:0; }
   .sechead { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:6px; }
@@ -237,6 +239,10 @@
     const st = state.items[item.insertId];
     const warnings = (item._source && item._source.warnings) || [];
     const identityImgs = ((item._source && item._source.identityImages) || []).map(imageHtml).join('');
+    // 身份字段 → 对应源图的原图链接（页面内灯箱放大），减少左右来回找图
+    const idImgs = (item._source && item._source.identityImages) || [];
+    const pickImg = (kws) => (idImgs.find((im) => kws.some((k) => String(im.label || '').includes(k))) || idImgs[0] || {}).src;
+    const zoomLink = (src) => (src ? ' <a class="zoom mini" href="' + esc(src) + '" title="页面内查看源图">源图</a>' : '');
     const dosageSlot = REQUIRED.find((s) => s.key === 'dosage');
     const focusSlot = REQUIRED.find((s) => s.key === sc.focusSection);
     const otherSlots = REQUIRED.filter((s) => s.key !== 'dosage' && s.key !== sc.focusSection);
@@ -254,12 +260,12 @@
         (warnings.length ? '<div class="warnbox">' + warnings.map(esc).join('；') + '</div>' : '') +
       '</div>' +
       '<div class="identity"><dl>' +
-        '<dt>通用名</dt><dd>' + esc(item.identity.genericName) + '</dd>' +
-        '<dt>商品名</dt><dd>' + esc(item.identity.brandName || '—') + '</dd>' +
-        '<dt>剂型</dt><dd>' + esc(item.identity.form || '—') + '</dd>' +
-        '<dt>规格</dt><dd>' + esc(item.identity.specification || '—') + '</dd>' +
-        '<dt>生产企业</dt><dd>' + esc(item.identity.manufacturer || '—') + '</dd>' +
-        '<dt>批准文号</dt><dd>' + esc(approval) + '</dd>' +
+        '<dt>通用名</dt><dd>' + esc(item.identity.genericName) + zoomLink(pickImg(['身份'])) + '</dd>' +
+        '<dt>商品名</dt><dd>' + esc(item.identity.brandName || '—') + zoomLink(pickImg(['身份'])) + '</dd>' +
+        '<dt>剂型</dt><dd>' + esc(item.identity.form || '—') + zoomLink(pickImg(['身份'])) + '</dd>' +
+        '<dt>规格</dt><dd>' + esc(item.identity.specification || '—') + zoomLink(pickImg(['规格', '身份'])) + '</dd>' +
+        '<dt>生产企业</dt><dd>' + esc(item.identity.manufacturer || '—') + zoomLink(pickImg(['批准', '生产', '身份'])) + '</dd>' +
+        '<dt>批准文号</dt><dd>' + esc(approval) + zoomLink(pickImg(['批准', '文号', '身份'])) + '</dd>' +
       '</dl><div class="idimgs">' + (identityImgs || '<div class="empty">未生成身份区页图</div>') + '</div></div>' +
       mainSlots.map((slot) => sectionHtml(item, slot)).join('') +
       '<details><summary>其余必核段（' + otherSlots.length + ' 段，展开抽查）</summary>' +
@@ -388,9 +394,15 @@
   // 图片预览：页面内灯箱，替代新开标签页（点图片切原始大小；点空白/Esc 关闭）
   const lb = document.getElementById('lightbox');
   const lbImg = lb.querySelector('img');
-  function openLightbox(src) {
+  function openLightbox(src, upscale) {
     if (!src) return;
     lbImg.classList.remove('actual');
+    lbImg.style.width = '';
+    lbImg.onload = () => {
+      if (upscale && lbImg.naturalWidth) {
+        lbImg.style.width = Math.round(Math.min(window.innerWidth * 0.96, lbImg.naturalWidth * 2)) + 'px';
+      }
+    };
     lbImg.src = src;
     lb.classList.add('show');
     lb.setAttribute('aria-hidden', 'false');
@@ -398,13 +410,14 @@
   function closeLightbox() {
     lb.classList.remove('show');
     lb.setAttribute('aria-hidden', 'true');
+    lbImg.style.width = '';
     lbImg.removeAttribute('src');
   }
   document.addEventListener('click', (e) => {
     const t = e.target;
     if (!t) return;
     const a = t.closest ? t.closest('a.zoom') : null;
-    if (a) { e.preventDefault(); openLightbox(a.getAttribute('href')); return; }
+    if (a) { e.preventDefault(); openLightbox(a.getAttribute('href'), a.classList.contains('mini')); return; }
     if (t === lb || (t.classList && t.classList.contains('lb-close'))) { closeLightbox(); return; }
     if (t === lbImg) lbImg.classList.toggle('actual');
   });
