@@ -149,7 +149,7 @@
   function cardHtml(item, idx) {
     const st = state.items[item.insertId];
     const id = esc(item.insertId);
-    const images = (item._images || []).map((src) => '<img loading="lazy" decoding="async" data-page="' + esc(src) + '" src="' + esc(src) + '" alt="PDF 第 ' + esc(src) + ' 页">').join('');
+    const images = (item._images || []).map((src) => '<img decoding="async" data-page="' + esc(src) + '" src="' + esc(src) + '" alt="PDF 第 ' + esc(src) + ' 页">').join('');
     const sections = REQUIRED.map((slot) => sectionHtml(item, slot, st)).join('');
     const otherKeys = Object.keys(item.sourceSections).filter((k) => !REQUIRED.some((s) => s.sourceKeys.includes(k)));
     const other = otherKeys.length
