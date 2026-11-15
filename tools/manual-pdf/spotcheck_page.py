@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """生成离线抽检页（M6-T9 后续）。
 
 输入 review-export --status reviewed 导出的 JSON 与采样 plan：
@@ -223,7 +223,7 @@ def section_image(doc: fitz.Document, page_index: int, text: str, slot: dict, ap
     }
 
 
-def identity_images(doc: fitz.Document, item: dict, assets: Path, stem: str) -> tuple[list[dict], list[str]]:
+def identity_images(doc: fitz.Document, item: dict, assets: Path, stem: str, dpi: int) -> tuple[list[dict], list[str]]:
     warnings = []
     pages = [page.get_text() for page in doc]
     norms = [norm(text) for text in pages]
@@ -252,7 +252,7 @@ def identity_images(doc: fitz.Document, item: dict, assets: Path, stem: str) -> 
     end = (min(starts) - 4) if starts else page.rect.y0 + page.rect.height * 0.45
     rect = fitz.Rect(page.rect.x0 + 18, page.rect.y0 + 8, page.rect.x1 - 18, max(page.rect.y0 + 120, end))
     path = assets / f'{stem}-identity.png'
-    render_crop(page, rect, path, 105)
+    render_crop(page, rect, path, dpi)
     images = [{'src': f'assets/{path.name}', 'label': f'身份区（第 {id_page + 1} 页）', 'page': id_page + 1}]
 
     spec_rects = page.search_for('【规格】')
@@ -278,7 +278,7 @@ def identity_images(doc: fitz.Document, item: dict, assets: Path, stem: str) -> 
                 if send - srect.y0 < 36:
                     send = min(spage.rect.y1 - 12, srect.y0 + 100)
                 spec_path = assets / f'{stem}-spec.png'
-                render_crop(spage, fitz.Rect(spage.rect.x0 + 18, srect.y0 - 4, spage.rect.x1 - 18, send), spec_path, 105)
+                render_crop(spage, fitz.Rect(spage.rect.x0 + 18, srect.y0 - 4, spage.rect.x1 - 18, send), spec_path, dpi)
                 images.append({'src': f'assets/{spec_path.name}', 'label': f'规格（第 {sp + 1} 页）', 'page': sp + 1})
             else:
                 warnings.append('源文未定位到「规格」标题，请人工核对规格')
@@ -303,7 +303,7 @@ def identity_images(doc: fitz.Document, item: dict, assets: Path, stem: str) -> 
                               apage.rect.x1 - 18, apage.rect.y1 - 12)
             warnings.append(f'第 {ap + 1} 页未找到「批准文号」标题，已截取页尾')
         path2 = assets / f'{stem}-approval.png'
-        render_crop(apage, rect2, path2, 105)
+        render_crop(apage, rect2, path2, dpi)
         images.append({'src': f'assets/{path2.name}', 'label': f'批准文号/生产企业（第 {ap + 1} 页）', 'page': ap + 1})
     else:
         warnings.append('源文未定位到本行批准文号，请人工核对批准文号与生产企业')
@@ -374,7 +374,7 @@ def main() -> int:
             norms = [norm(text) for text in texts]
             names = list(dict.fromkeys(CANON_HEADINGS + list(item['sourceSections'].keys())))
             approvals = item['identity'].get('approvalNumbers') or []
-            image_list, warns = identity_images(doc, item, assets, f'item-{idx:03d}')
+            image_list, warns = identity_images(doc, item, assets, f'item-{idx:03d}', args.dpi)
             item['_source']['identityImages'] = image_list
             item['_source']['warnings'].extend(warns)
 

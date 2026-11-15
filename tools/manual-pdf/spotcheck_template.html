@@ -48,12 +48,13 @@
   .warnbox { margin-top:8px; padding:7px 10px; border:1px solid #f0d8a8; background:#fffbeb; color:#8a5a07; border-radius:6px; font-size:12px; }
   .warnbox.risk { border-color:#f3b4b4; background:#fff5f5; color:#8f1d1d; }
   .identity { display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:14px; margin:12px 0; padding:10px 0; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
-  .identity dl { display:grid; grid-template-columns:88px minmax(0,1fr); gap:3px 10px; margin:0; font-size:13px; align-content:start; }
+  .identity dl { display:grid; grid-template-columns:88px minmax(0,1fr); gap:3px 10px; margin:0; font-size:13px; align-content:start; position:sticky; top:80px; align-self:start; }
   .identity dt { color:var(--muted); }
   .identity dd { margin:0; word-break:break-all; }
   .zoom.mini { margin-left:6px; font-size:11px; color:var(--brand); text-decoration:none; border:1px solid #cfe0da; border-radius:4px; padding:0 5px; white-space:nowrap; }
   .zoom.mini:hover { background:#eef4f2; }
-  .idimgs { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px; align-items:start; }
+  .idimgs { display:grid; grid-template-columns:1fr; gap:12px; align-items:start; }
+  .idimgs .imgwrap { max-height:none; }
   .sec { border-top:1px solid var(--line); padding:12px 0 4px; }
   .sec:first-child { border-top:0; }
   .sechead { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:6px; }
@@ -63,7 +64,7 @@
   .sec .toggle:hover { background:#eef4f2; }
   .sec.collapsed .secbody { display:none; }
   .suspect { display:flex; gap:4px; align-items:center; color:var(--bad); font-size:12px; white-space:nowrap; }
-  .secbody { display:grid; grid-template-columns:minmax(320px,1fr) minmax(320px,1.1fr); gap:14px; }
+  .secbody { display:grid; grid-template-columns:minmax(280px,1fr) minmax(420px,1.35fr); gap:14px; }
   .hint { color:var(--muted); font-size:12px; margin-bottom:4px; }
   .hint b { color:var(--ink); font-weight:600; }
   pre { margin:0; padding:9px 10px; background:#fafbfa; border:1px solid #e7eae8; border-radius:6px; white-space:pre-wrap; word-break:break-word; max-height:360px; overflow:auto; font:13px/1.7 inherit; }
