@@ -8,11 +8,16 @@
   :root { --bg:#f6f7f8; --card:#fff; --line:#dfe3e6; --ink:#1d2327; --muted:#66707a; --brand:#25695b; --warn:#b45309; --bad:#b91c1c; --ok:#166534; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
-  header { position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); }
-  header h1 { margin:0; font-size:17px; }
+  header { position:sticky; top:0; z-index:20; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  .head-main { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-right:auto; min-width:0; }
+  header h1 { margin:0; font-size:17px; white-space:nowrap; }
   header .meta { color:var(--muted); font-size:12px; }
-  header label { display:flex; gap:6px; align-items:center; }
-  header input[type=text] { width:140px; padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
+  .progress-pill { padding:2px 10px; border-radius:999px; background:#eef4f2; color:var(--brand); font-size:12px; font-weight:600; white-space:nowrap; }
+  .head-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  header label { display:flex; gap:6px; align-items:center; font-size:13px; color:var(--muted); }
+  header input[type=text] { width:120px; padding:4px 8px; border:1px solid var(--line); border-radius:6px; }
+  .tool-group { display:flex; gap:6px; padding-left:8px; border-left:1px solid var(--line); }
+  .tool-group button { padding:4px 10px; font-size:13px; }
   button { padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
   button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
   main { display:grid; grid-template-columns:240px minmax(0,1fr); gap:16px; padding:16px; max-width:1500px; margin:0 auto; }
@@ -66,14 +71,20 @@
 </head>
 <body>
 <header>
-  <h1>说明书人工核对</h1>
-  <span class="meta" id="meta"></span>
-  <label>核对人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
-  <button id="toggleNav" type="button">隐藏目录</button>
-  <button id="foldAll" type="button">全部折叠</button>
-  <button id="unfoldAll" type="button">全部展开</button>
-  <button class="primary" id="export">导出 decisions.json</button>
-  <span class="meta" id="progress"></span>
+  <div class="head-main">
+    <h1>说明书人工核对</h1>
+    <span class="meta" id="meta"></span>
+    <span class="progress-pill" id="progress"></span>
+  </div>
+  <div class="head-tools">
+    <label>核对人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+    <div class="tool-group">
+      <button id="toggleNav" type="button">隐藏目录</button>
+      <button id="foldAll" type="button">全部折叠</button>
+      <button id="unfoldAll" type="button">全部展开</button>
+    </div>
+    <button class="primary" id="export">导出 decisions.json</button>
+  </div>
 </header>
 <div class="banner">每份需完成：身份字段确认 + 6 个必核段处置（与源文一致 / 源文无此段 / 需修正）+ 其余段落扫读确认；全部完成后才能导出。退回请写原因。</div>
 <main>
