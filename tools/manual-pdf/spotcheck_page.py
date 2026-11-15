@@ -200,19 +200,30 @@ def section_image(doc: fitz.Document, page_index: int, text: str, slot: dict, ap
     render_crop(page, rect, image_path, dpi)
     images = [{'src': f'assets/{image_path.name}', 'label': f'第 {page_index + 1} 页', 'page': page_index + 1}]
 
-    # 段落触底时补一张续页（下一文件页无新标题才截）
-    if heading is not None and end >= page.rect.y1 - 20 and page_index + 1 < doc.page_count:
-        nxt = doc.load_page(page_index + 1)
-        nxt_text = nxt.get_text()
-        nxt_bracket = '【' in nxt_text and '】' in nxt_text
-        next_heads = heading_rects(nxt, nxt_bracket, names)
-        first_head = min((r.y0 for r, _ in next_heads), default=None)
-        if first_head is None or first_head > 90:
-            cont_end = (first_head - 4) if first_head is not None else nxt.rect.y1 - 12
-            cont_rect = fitz.Rect(nxt.rect.x0 + 18, nxt.rect.y0 + 8, nxt.rect.x1 - 18, cont_end)
-            cont_path = assets / f'{stem}-cont.png'
+    # 长段落补续页：从起始页往后，直到下一页顶部出现新段标题为止（最多再补 2 页，整页渲染便于逐字对照）
+    if heading is not None:
+        cur = page_index
+        for k in range(1, 3):
+            if cur + 1 >= doc.page_count:
+                break
+            nxt = doc.load_page(cur + 1)
+            nxt_text = nxt.get_text()
+            nxt_bracket = '【' in nxt_text and '】' in nxt_text
+            first_lines = [l.strip() for l in nxt_text.splitlines() if l.strip()][:3]
+            if nxt_bracket:
+                new_section = any(re.match(r'^【[^】]{1,15}】', l) for l in first_lines)
+            else:
+                next_heads = heading_rects(nxt, nxt_bracket, names)
+                first_head = min((r.y0 for r, _ in next_heads), default=None)
+                new_section = first_head is not None and first_head <= 60
+            if new_section:
+                break  # 下一页顶部已是新段标题 → 本段结束
+            cont_rect = fitz.Rect(nxt.rect.x0 + 18, nxt.rect.y0 + 8, nxt.rect.x1 - 18, nxt.rect.y1 - 12)
+            suffix = '-cont' if k == 1 else f'-cont{k}'
+            cont_path = assets / f'{stem}{suffix}.png'
             render_crop(nxt, cont_rect, cont_path, dpi)
-            images.append({'src': f'assets/{cont_path.name}', 'label': f'第 {page_index + 2} 页（续）', 'page': page_index + 2})
+            images.append({'src': f'assets/{cont_path.name}', 'label': f'第 {cur + 2} 页（续）', 'page': cur + 2})
+            cur += 1
 
     return {
         'images': images,
