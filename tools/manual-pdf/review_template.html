@@ -26,6 +26,8 @@
   .card h2 { margin:0 0 4px; font-size:16px; }
   .sub { color:var(--muted); font-size:12px; margin-bottom:10px; }
   .cols { display:grid; grid-template-columns:minmax(340px,44%) minmax(0,1fr); gap:14px; }
+  body.nav-hidden main { grid-template-columns:minmax(0,1fr); }
+  body.nav-hidden nav { display:none; }
   @media (max-width:1100px){ .cols { grid-template-columns:1fr; } main { grid-template-columns:1fr; } nav { position:static; max-height:none; display:flex; flex-wrap:wrap; } nav a { flex:0 0 auto; } }
   .pdf { max-height:calc(100vh - 150px); min-height:520px; overflow:auto; background:#fafafa; border:1px solid var(--line); border-radius:6px; padding:6px; }
   .pdf img { display:block; width:100%; height:auto; margin:0 0 8px; border:1px solid #eee; background:#fff; }
@@ -67,6 +69,7 @@
   <h1>说明书人工核对</h1>
   <span class="meta" id="meta"></span>
   <label>核对人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+  <button id="toggleNav" type="button">隐藏目录</button>
   <button id="foldAll" type="button">全部折叠</button>
   <button id="unfoldAll" type="button">全部展开</button>
   <button class="primary" id="export">导出 decisions.json</button>
@@ -294,6 +297,20 @@
   document.getElementById('unfoldAll').addEventListener('click', () => {
     document.querySelectorAll('.sec').forEach((s) => setSectionCollapsed(s, false));
   });
+
+  // 目录栏可隐藏：把 230px 横向空间让给页图/正文；状态记 localStorage，刷新不丢
+  const NAV_HIDDEN_KEY = 'anxin-review:nav-hidden';
+  function applyNavHidden(hidden) {
+    document.body.classList.toggle('nav-hidden', hidden);
+    const btn = document.getElementById('toggleNav');
+    if (btn) btn.textContent = hidden ? '显示目录' : '隐藏目录';
+  }
+  document.getElementById('toggleNav').addEventListener('click', () => {
+    const next = !document.body.classList.contains('nav-hidden');
+    applyNavHidden(next);
+    try { localStorage.setItem(NAV_HIDDEN_KEY, next ? '1' : '0'); } catch (_) {}
+  });
+  try { applyNavHidden(localStorage.getItem(NAV_HIDDEN_KEY) === '1'); } catch (_) {}
 
   document.getElementById('export').addEventListener('click', () => {
     const reviewer = state.reviewer.trim();
