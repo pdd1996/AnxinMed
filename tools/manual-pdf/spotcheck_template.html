@@ -20,6 +20,8 @@
   .banner b { color:var(--brand); }
   .banner em { font-style:normal; color:var(--bad); font-weight:600; }
   main { display:grid; grid-template-columns:230px minmax(0,1fr); gap:16px; padding:16px; max-width:1560px; margin:0 auto; }
+  body.nav-hidden main { grid-template-columns:minmax(0,1fr); }
+  body.nav-hidden nav { display:none; }
   nav { position:sticky; top:74px; align-self:start; max-height:calc(100vh - 96px); overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px; }
   nav a { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; color:var(--ink); text-decoration:none; border-radius:5px; font-size:13px; }
   nav a:hover { background:#eef2f1; }
@@ -83,11 +85,12 @@
   <h1>M6 说明书抽检</h1>
   <span class="meta" id="meta"></span>
   <label>抽检人 <input id="reviewer" type="text" placeholder="你的名字" autocomplete="off"></label>
+  <button id="toggleNav" type="button">隐藏目录</button>
   <button class="primary" id="export">导出 verdicts.json</button>
   <span class="meta" id="progress"></span>
 </header>
 <div class="banner">
-  <div><b>样本：</b>15 份随机分层（pilot/B1–B4 各 3 份）+ 3 份已知规格疑点（卡片标「风险补充」）。<b>看什么：</b>身份（通用名 / 规格 / 生产企业 / 批准文号）+ <em>用法用量</em> + 轮换段；其余 4 段折叠可展开。每份约 1 分钟。</div>
+  <div><b>样本：</b>15 份随机分层 + 5 份风险补充（多批准文号合并 PDF，卡片标「风险补充」，核对标签与文号对应）。<b>看什么：</b>身份（通用名 / 规格 / 生产企业 / 批准文号）+ <em>用法用量</em> + 轮换段；其余 4 段折叠可展开。每份约 1 分钟。</div>
   <div><b>判定口径：</b>reviewed = 身份字段与源文一致、6 个必核段逐字对照、其余段落已扫读；<b>不代表剂量已结构化</b>，也不做医学判断。本页只验转录，不评医学正确性。</div>
   <div><b>发现问题：</b>勾「此段存疑」或整份选「存疑」，写一句问题（如：串段 / 截断 / 规格对不上）。我会按同一模式复查整批 230 条。</div>
 </div>
@@ -352,6 +355,20 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
   }
+
+  // 目录栏可隐藏：把 230px 横向空间让给正文；状态记 localStorage，刷新不丢
+  const NAV_HIDDEN_KEY = 'anxin-spotcheck:nav-hidden';
+  function applyNavHidden(hidden) {
+    document.body.classList.toggle('nav-hidden', hidden);
+    const btn = document.getElementById('toggleNav');
+    if (btn) btn.textContent = hidden ? '显示目录' : '隐藏目录';
+  }
+  document.getElementById('toggleNav').addEventListener('click', () => {
+    const next = !document.body.classList.contains('nav-hidden');
+    applyNavHidden(next);
+    try { localStorage.setItem(NAV_HIDDEN_KEY, next ? '1' : '0'); } catch (_) {}
+  });
+  try { applyNavHidden(localStorage.getItem(NAV_HIDDEN_KEY) === '1'); } catch (_) {}
 
   render();
 })();
