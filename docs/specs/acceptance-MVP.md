@@ -47,6 +47,7 @@
 | 1 | 草稿确认时对新计划与生效计划集合执行检查 | `Draft.test.tsx` › `confirm 响应含规则检查发现 → 跳转前弹出结果（只标注不阻止）`；`drafts-confirm.test.ts`（confirm 事务重跑 checkInteractions） | ✅ |
 | 2 | 为老药建新计划（无入箱事件）时同样执行 | `plans-rules.test.ts`（POST /api/plans 接 checkInteractions）；`rules-interactions.test.ts` | ✅ |
 | 3 | 命中展示分级/来源/咨询引导，不阻止创建、不修改方案 | `rules-interactions.test.ts`（level/source/note）；`components/domain/draft/RiskCards.tsx`（只标注不阻止，`development_practice` 规则引擎原则） | ✅ |
+| 4 | **M8 增补**：命中项标注规则状态（`demo` 演示抄录 / `curated` 逐字核验），演示条目不得冒充正式 | mobile `RiskCards.test.tsx` › `status=demo 显示「演示抄录 · 非正式规则库」` / `curated 不显示`；`rules-interactions.test.ts` › `M8：命中透传 status；retired 不参与匹配` | ✅ |
 
 ---
 
