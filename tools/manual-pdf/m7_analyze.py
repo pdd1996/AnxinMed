@@ -34,21 +34,29 @@ def load(dirpath: Path, drug_ids: set[str] | None = None) -> dict[str, dict]:
 
 
 def main() -> int:
-    summary = json.loads((REPORTS / 'summary.json').read_text(encoding='utf-8'))
+    import argparse
+
+    parser = argparse.ArgumentParser(description='M7 重提取结果分析')
+    parser.add_argument('--before', type=Path, default=BEFORE, help='重提取前的草稿池（M6 归档副本）')
+    parser.add_argument('--after', type=Path, default=AFTER)
+    parser.add_argument('--reports', type=Path, default=REPORTS)
+    args = parser.parse_args()
+    before_dir, after_dir, reports_dir = args.before, args.after, args.reports
+
     ids = set()
-    for line in (REPORTS / 'rows.jsonl').open(encoding='utf-8'):
+    for line in (reports_dir / 'rows.jsonl').open(encoding='utf-8'):
         row = json.loads(line)
         ids.add(row['drugId'])
         if row.get('oldDrugId'):
             ids.add(row['oldDrugId'])
-    before = load(BEFORE, ids)
-    after = load(AFTER, set(r['drugId'] for r in (json.loads(l) for l in (REPORTS / 'rows.jsonl').open(encoding='utf-8'))))
+    before = load(before_dir, ids)
+    after = load(after_dir, set(r['drugId'] for r in (json.loads(l) for l in (reports_dir / 'rows.jsonl').open(encoding='utf-8'))))
 
-    rows = [json.loads(line) for line in (REPORTS / 'rows.jsonl').open(encoding='utf-8')]
+    rows = [json.loads(line) for line in (reports_dir / 'rows.jsonl').open(encoding='utf-8')]
     new_by_id = {r['drugId']: r for r in rows}
 
     print('=== 1. 完整性异常（丢字）===')
-    comps = [json.loads(line) for line in (REPORTS / 'completeness.jsonl').open(encoding='utf-8')]
+    comps = [json.loads(line) for line in (reports_dir / 'completeness.jsonl').open(encoding='utf-8')]
     heavy = [c for c in comps if c['lostRatio'] > 0.02]
     print(f' 丢字行 {len([c for c in comps if c["lost"] > 0])}，超 2% 阈值 {len(heavy)}')
     for c in sorted(heavy, key=lambda x: -x['lostRatio'])[:15]:

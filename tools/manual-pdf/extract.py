@@ -61,6 +61,9 @@ LINE_OPEN_TAIL = (
 APPROVAL_RE = re.compile(
     r'(国药准字[A-Za-z0-9]+(?:[（(][^）)]*[）)])?|进口药品注册证号[^\s，,；;]+|H\d{8,}|[A-Z]\d{8,})'
 )
+# 批准文号本体：只留证号（国药准字H20000065 / H20150051 / J20150002），
+# 去掉「进口药品注册证号：」「(50ml：05g)」这类标签与规格注释（M7-T2 收尾清理）
+APPROVAL_CODE_RE = re.compile(r'国药准字[A-Za-z0-9]+|[A-Za-z]\d{8,}')
 
 MANUFACTURER_LABELS = {
     '企业名称', '企业各称', '公司名称', '生产名称', '生产企业', '生产企业名称',
@@ -401,14 +404,10 @@ def canonical_strengths(text: str) -> set[str]:
 
 
 def approval_tokens(line: str) -> list[str]:
-    """一行里的批准文号（去掉「进口药品注册证号：」这类标签前缀与标点）。"""
+    """一行里的批准文号本体（去掉「进口药品注册证号：」标签、规格注释与标点）。"""
     tokens: list[str] = []
-    for match in APPROVAL_RE.finditer(line):
-        token = re.sub(r'\s+', '', match.group(0)).strip('：:；;,，')
-        token = re.sub(r'^进口药品注册证号[：:]?', '', token)
-        if not re.search(r'\d', token):
-            continue
-        if token not in tokens:
+    for token in APPROVAL_CODE_RE.findall(line):
+        if token and token not in tokens:
             tokens.append(token)
     return tokens
 

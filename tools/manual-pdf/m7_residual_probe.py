@@ -28,14 +28,24 @@ def flatten_signature(text: str) -> bool:
 
 
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description='残留拉平签名分类诊断')
+    parser.add_argument('--before', type=Path, default=Path('data/manuals'),
+                        help='重提取前的草稿池（M6 归档副本）')
+    parser.add_argument('--after', type=Path, default=AFTER)
+    parser.add_argument('--pdf-dir', type=Path, default=PDF_DIR)
+    args = parser.parse_args()
+    pdf_dir = args.pdf_dir
+
     drafts = {}
-    for path in AFTER.glob('*.json'):
+    for path in args.after.glob('*.json'):
         d = json.loads(path.read_text(encoding='utf-8'))
         drafts[d['drugId']] = d
 
     # 旧签名行：从旧草稿池里找
     rows = []
-    for path in Path('data/manuals').glob('*.json'):
+    for path in args.before.glob('*.json'):
         d = json.loads(path.read_text(encoding='utf-8'))
         if not flatten_signature((d.get('sections') or {}).get('不良反应', '')):
             continue
@@ -50,7 +60,7 @@ def main() -> int:
     print(f'残留候选 {len(rows)} 行')
     classified = {'source-has-table': [], 'no-table-anywhere': [], 'pdf-missing': [], 'prose-only': []}
     for drug_id, source_file, text in rows:
-        pdf = PDF_DIR / source_file
+        pdf = pdf_dir / source_file
         if not pdf.exists():
             classified['pdf-missing'].append((drug_id, source_file))
             continue

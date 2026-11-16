@@ -36,6 +36,8 @@ export interface InsertLite {
   brandName: string | null
   approvalNumbers: string[] | null
   sourceSections: Record<string, string> | null
+  /** 其余映射列（curationNote / genericName / 内容列…）：线上传整行，单测可缺省 */
+  [column: string]: unknown
 }
 
 export interface MasterLite {

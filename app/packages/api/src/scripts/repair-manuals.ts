@@ -63,7 +63,9 @@ async function loadContext(): Promise<RepairContext> {
   const insertsById = new Map<string, InsertLite>()
   const insertsByKey = new Map<string, InsertLite>()
   for (const row of rows) {
+    // 整行带进规划器：内容列（含 curationNote/genericName）都要参与 diff，否则会漏更新
     const lite: InsertLite = {
+      ...(row as unknown as Record<string, unknown>),
       id: row.id,
       drugId: row.drugId,
       sourceFile: row.sourceFile,

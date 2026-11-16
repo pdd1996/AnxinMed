@@ -383,9 +383,17 @@ class TestApprovalTokens(unittest.TestCase):
     def test_cn_approval_kept(self):
         self.assertEqual(extract.approval_tokens('0.25μg国药准字H20000065'), ['国药准字H20000065'])
 
-    def test_packaging_suffix_kept(self):
-        tokens = extract.approval_tokens('国药准字H20000065（分包装）')
-        self.assertEqual(tokens, ['国药准字H20000065（分包装）'])
+    def test_paren_spec_suffix_stripped(self):
+        tokens = extract.approval_tokens('国药准字H20040300(50ml：05g)')
+        self.assertEqual(tokens, ['国药准字H20040300'])
+
+    def test_import_line_with_spec_prefix(self):
+        tokens = extract.approval_tokens('进口药品注册证号：1）50ml：100mg：H20181195；')
+        self.assertEqual(tokens, ['H20181195'])
+
+    def test_multiple_codes_in_one_label_segment(self):
+        tokens = extract.approval_tokens('进口药品注册证号：(1)5mg：H20180007，H20191003；')
+        self.assertEqual(tokens, ['H20180007', 'H20191003'])
 
 
 class TestParseApprovals(unittest.TestCase):
