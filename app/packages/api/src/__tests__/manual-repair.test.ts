@@ -125,6 +125,16 @@ describe('planManualRepair · 行内容更新', () => {
     expect(plan.errors).toEqual([])
   })
 
+  it('jsonb 键序不同不算变化（PostgreSQL jsonb 会重排键）', () => {
+    const d = draft({ sections: { 用法用量: '每次 0.75mg。', 不良反应: '常见：恶心、腹泻。' } })
+    const row = insert({
+      sourceSections: { 不良反应: '常见：恶心、腹泻。', 用法用量: '每次 0.75mg。' },
+    })
+    const plan = planManualRepair([d], context([row], [master()]))
+    expect(plan.counts.unchanged).toBe(1)
+    expect(plan.updates).toHaveLength(0)
+  })
+
   it('表格重建后的段落变化 → 更新行并记录段落差异', () => {
     const d = draft({ sections: { 不良反应: '| 系统器官 | 频率 |\n| --- | --- |\n| 恶心 | 常见 |', 用法用量: '每次 0.75mg。' } })
     const plan = planManualRepair([d], context([insert()], [master()]))

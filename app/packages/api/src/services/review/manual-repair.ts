@@ -12,6 +12,7 @@
  * - 产品行同步 brand_name / approval_number(s) / specification / identity_key，身份指纹撞车整批拒绝；
  * - 字符完整性校验：重提取只允许重排、不允许丢字（Markdown 分隔符与空白不计）。
  */
+import { isDeepStrictEqual } from 'node:util'
 import { makeIdentityKey, fallbackContentHash } from '../../db/identity.js'
 import {
   MAPPED_COLUMNS,
@@ -171,8 +172,8 @@ export function completeness(before: Record<string, string>, after: Record<strin
 }
 
 function jsonEqual(a: unknown, b: unknown): boolean {
-  // jsonb 会重排对象键；这里对已知结构做 JSON 字符串比较即可（数组顺序有意义）
-  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  // jsonb 会重排对象键（PostgreSQL 按 key 排序），字符串比较会把同内容误判为变化
+  return isDeepStrictEqual(a ?? null, b ?? null)
 }
 
 export function draftKey(drugId: string, sourceFile: string | null | undefined): string {
