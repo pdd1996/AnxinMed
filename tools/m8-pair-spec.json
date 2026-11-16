@@ -1,0 +1,85 @@
+{
+  "note": "M8-T2 demo 组合账本输入：p-001 药箱 5 药 + 左氧氟沙星滴眼液（ir-003 引用）。aliases 用于在说明书中找提及；demoRuleId 标记现有演示规则。",
+  "drugs": [
+    {
+      "drugId": "drug-amlodipine-5",
+      "genericName": "苯磺酸氨氯地平片",
+      "aliases": ["氨氯地平", "络活喜"],
+      "demoRuleIds": ["ir-001"]
+    },
+    {
+      "drugId": "drug-atorvastatin-20",
+      "genericName": "阿托伐他汀钙片",
+      "aliases": ["阿托伐他汀", "立普妥"],
+      "demoRuleIds": ["ir-001"]
+    },
+    {
+      "drugId": "drug-metformin-500",
+      "genericName": "盐酸二甲双胍片",
+      "aliases": ["二甲双胍", "格华止"],
+      "demoRuleIds": ["ir-002"]
+    },
+    {
+      "drugId": "drug-glipizide-5",
+      "genericName": "格列吡嗪片",
+      "aliases": ["格列吡嗪", "美吡达"],
+      "demoRuleIds": ["ir-002"]
+    },
+    {
+      "drugId": "drug-hycosan-01",
+      "genericName": "玻璃酸钠滴眼液",
+      "aliases": ["玻璃酸钠", "透明质酸钠", "海露"],
+      "demoRuleIds": ["ir-003"]
+    },
+    {
+      "drugId": "drug-levofloxacin-eye-01",
+      "genericName": "左氧氟沙星滴眼液",
+      "aliases": ["左氧氟沙星", "可乐必妥"],
+      "demoRuleIds": ["ir-003"]
+    }
+  ],
+  "sectionKey": "药物相互作用",
+  "noEffectMarkers": [
+    "不改变",
+    "不影响",
+    "无影响",
+    "未见",
+    "未观察到",
+    "无临床意义",
+    "无相互作用",
+    "不抑制",
+    "不诱导",
+    "不增加",
+    "不减少",
+    "无显著影响",
+    "不改变其"
+  ],
+  "riskMarkers": [
+    "禁止",
+    "禁用",
+    "不宜",
+    "慎用",
+    "避免",
+    "风险",
+    "增加",
+    "升高",
+    "降低",
+    "增强",
+    "减弱",
+    "应监测",
+    "密切监测",
+    "监测",
+    "注意",
+    "谨慎",
+    "中毒",
+    "出血",
+    "低血糖",
+    "心律失常",
+    "不良反应"
+  ],
+  "demoNotes": {
+    "ir-001": "氨氯地平与阿托伐他汀联用时，少数患者可能出现肌痛或肝酶升高，需关注。",
+    "ir-002": "二甲双胍与格列吡嗪联用可能增加低血糖风险，需关注血糖监测。",
+    "ir-003": "两种滴眼液同时使用需间隔至少 30 分钟，先后顺序请咨询医生或药师。"
+  }
+}
