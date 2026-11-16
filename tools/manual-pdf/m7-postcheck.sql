@@ -39,8 +39,8 @@ from package_inserts;
 \echo '== 规格变化（修复后与草稿对账） =='
 select count(*) from package_inserts where specification is null or specification = '';
 
-\echo '== 身份指纹重复（应为 0） =='
-select count(*) from (select identity_key from drug_master group by identity_key having count(*) > 1) t;
+\echo '== 身份指纹重复（应为 0；NULL = M1 演示产品，不参与指纹） =='
+select count(*) from (select identity_key from drug_master where identity_key is not null group by identity_key having count(*) > 1) t;
 
 \echo '== 孤儿产品行 / 一行多说明书重复来源（应为 0） =='
 select (select count(*) from drug_master m where not exists (select 1 from package_inserts p where p.drug_id = m.id)) as orphan_masters,
