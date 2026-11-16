@@ -839,11 +839,26 @@ def _table_cell_boxes(tab) -> list[list]:
     return boxes
 
 
+def table_char_counts(rows: list[list[str]]) -> dict[str, int]:
+    return char_multiset(''.join(''.join(str(c or '') for c in row) for row in rows))
+
+
+def text_covered(text: str, table_chars: dict[str, int]) -> float:
+    """文本块的非空白字符有多大比例被表格重建覆盖（判断能否安全丢弃该块）。"""
+    counts = char_multiset(text)
+    total = sum(counts.values())
+    if total == 0:
+        return 1.0
+    covered = sum(min(n, table_chars.get(ch, 0)) for ch, n in counts.items())
+    return covered / total
+
+
 def page_items(page) -> tuple[list[dict], list[dict]]:
     """一页的阅读项：表格 + 文本块，已按 bbox 排序；表格 bbox 内的文本块丢弃。"""
     items: list[dict] = []
     fallbacks: list[dict] = []
     table_boxes: list[tuple[float, float, float, float]] = []
+    table_chars: list[dict[str, int]] = []
     tables = []
     try:
         tables = list(page.find_tables().tables)
@@ -863,19 +878,31 @@ def page_items(page) -> tuple[list[dict], list[dict]]:
                               'coverage': round(coverage, 4), 'reason': '单元格覆盖率不足'})
             continue
         table_boxes.append(bbox)
+        table_chars.append(table_char_counts(rows))
         items.append({'kind': 'table', 'bbox': bbox, 'rows': rows,
                       'cells': _table_cell_boxes(tab), 'coverage': coverage})
     for block in page.get_text('dict')['blocks']:
         if block.get('type') != 0:
             continue
-        # 逐行保留换行：规格/批准文号段依赖行结构（一行一条），不能把行首尾拼死
-        text = '\n'.join(''.join(span['text'] for span in line['spans']) for line in block['lines'])
-        if not text.strip():
+        # 行级取舍：表格里的行由 Markdown 表承担，只保留「没被表格重建覆盖」的行。
+        # （块级一刀切会把表格 bbox 外沿的正文一起丢掉；M7 完整性校验抓到过 2% 丢字）
+        kept: list[str] = []
+        for line in block['lines']:
+            line_text = ''.join(span['text'] for span in line['spans'])
+            if not line_text.strip():
+                continue
+            line_bbox = tuple(line['bbox'])
+            owners = [i for i, tb in enumerate(table_boxes) if block_inside_table(line_bbox, tb)]
+            if owners:
+                covered = max(text_covered(line_text, table_chars[i]) for i in owners)
+                if covered >= 0.95:
+                    continue
+                fallbacks.append({'page': page.number + 1, 'bbox': [round(v, 1) for v in line_bbox],
+                                  'coverage': round(covered, 4), 'reason': '表格行未被重建完全覆盖，保留原文本行'})
+            kept.append(line_text)
+        if not kept:
             continue
-        bbox = tuple(block['bbox'])
-        if any(block_inside_table(bbox, tb) for tb in table_boxes):
-            continue
-        items.append({'kind': 'text', 'bbox': bbox, 'text': text})
+        items.append({'kind': 'text', 'bbox': tuple(block['bbox']), 'text': '\n'.join(kept)})
     return order_items(items), fallbacks
 
 

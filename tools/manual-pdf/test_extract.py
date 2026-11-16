@@ -221,6 +221,15 @@ class TestTableCoverage(unittest.TestCase):
     def test_empty_raw(self):
         self.assertEqual(extract.table_coverage('  \n', [['a']]), 1.0)
 
+    def test_text_covered_uses_table_chars(self):
+        chars = extract.table_char_counts([['系统器官', '常见'], ['恶心', '腹泻']])
+        self.assertEqual(extract.text_covered('常见恶心', chars), 1.0)
+        self.assertLess(extract.text_covered('常见头痛', chars), 1.0)
+        self.assertAlmostEqual(extract.text_covered('常见：恶心', chars), 0.8)
+
+    def test_text_covered_empty(self):
+        self.assertEqual(extract.text_covered('   ', {}), 1.0)
+
 
 class TestOrderItems(unittest.TestCase):
     def test_y_then_x(self):

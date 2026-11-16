@@ -187,7 +187,7 @@ def file_meta(p: Path) -> dict:
     source_file_hash = file_sha256(p)
     doc = ex.fitz.open(p)
     try:
-        raw_text = '\n'.join(page.get_text() for page in doc)
+        raw_text, _audit = ex.document_text(doc)  # M7-T1：bbox 阅读顺序 + 表格重建
         date = ex.pdf_date(doc, p)
         page_count = doc.page_count
     finally:
@@ -200,9 +200,7 @@ def file_meta(p: Path) -> dict:
 
     names = ex.labeled_values(sections.get('药品名称', ''))
     generic = names.get('通用名称') or file_name
-    brand = names.get('商品名称')
-    if brand in {'无', '—', '-'}:
-        brand = None
+    brand = ex.clean_brand_name(ex.pick_brand_name(names))  # M7-T3：商品名标签变体
     english = names.get('英文名称')
     pinyin = names.get('汉语拼音')
 
