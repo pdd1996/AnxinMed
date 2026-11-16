@@ -25,6 +25,7 @@
     "db:review-export": "tsx src/scripts/review-export.ts",
     "db:review-apply": "tsx src/scripts/review-apply.ts",
     "db:repair-specs": "tsx src/scripts/repair-specs.ts",
+    "db:repair-manuals": "tsx src/scripts/repair-manuals.ts",
     "db:audit": "tsx src/db/data-audit.ts",
     "perf:intake": "tsx src/scripts/perf-intake.ts",
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",
