@@ -1,12 +1,14 @@
 /**
- * 说明书人工核对 · 批次导出（M6-T9）。
+ * 说明书人工核对 · 批次导出（M6-T9 / M8-T3 扩 DXY）。
  *
  * 默认导出 curationStatus='crawled' 且带 sourceSections 的 PDF 说明书行；
- * --status reviewed 供已完成批次抽检（携带核对留档）。
+ * `--source dxy` 导出丁香园来源行（M8-T3 回填 source_sections/content_hash 后可用），
+ * `--status reviewed` 供已完成批次抽检（携带核对留档）。
  * 输出 JSON 供 tools/manual-pdf/review_page.py / spotcheck_page.py 生成离线审核页。
  *
  * 用法（cd app/packages/api）：
  *   npm run db:review-export -- --out ../../../data/review-batches/batch-01.json --limit 30
+ *   npm run db:review-export -- --source dxy --out ../../../data/m8-reports/dxy-15.json
  *   npm run db:review-export -- --out ... --ids drug-a,drug-b
  *   npm run db:review-export -- --out ... --ids-file ids.txt --limit 30
  *   npm run db:review-export -- --out ... --ids-file ids.txt --status reviewed
@@ -14,7 +16,7 @@
 import 'dotenv/config'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { and, eq, inArray, isNotNull } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, like } from 'drizzle-orm'
 import { db, client } from '../db/client.js'
 import { drugMaster, packageInserts, sourceDocuments } from '../db/schema.js'
 import { REQUIRED_SECTIONS } from '../services/review/decisions.js'
@@ -53,6 +55,12 @@ async function main(): Promise<number> {
     return 1
   }
   const status = statusArg
+  const sourceArg = arg('--source') ?? 'pdf'
+  if (sourceArg !== 'pdf' && sourceArg !== 'dxy') {
+    console.error('❌ --source 只能是 pdf 或 dxy')
+    return 1
+  }
+  const sourceKind = sourceArg
 
   let ids: string[] = []
   const idsArg = arg('--ids')
@@ -63,9 +71,12 @@ async function main(): Promise<number> {
       .split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'))
   }
 
+  const sourceCond = sourceKind === 'pdf'
+    ? isNotNull(packageInserts.sourceFile)
+    : like(packageInserts.source, '%丁香园%')
   const where = ids.length
-    ? and(eq(packageInserts.curationStatus, status), isNotNull(packageInserts.sourceFile), inArray(packageInserts.drugId, ids))
-    : and(eq(packageInserts.curationStatus, status), isNotNull(packageInserts.sourceFile))
+    ? and(eq(packageInserts.curationStatus, status), sourceCond, inArray(packageInserts.drugId, ids))
+    : and(eq(packageInserts.curationStatus, status), sourceCond)
 
   const rows = await db
     .select({ insert: packageInserts, master: drugMaster })
@@ -109,7 +120,9 @@ async function main(): Promise<number> {
       insertId: insert.id,
       drugId: insert.drugId,
       version: insert.version,
+      sourceKind,
       sourceFile: insert.sourceFile,
+      sourceUrl: insert.sourceUrl,
       sourceDocumentId: insert.sourceDocumentId,
       contentHash: insert.contentHash,
       pageCount: metadata?.pageCount ?? null,
@@ -147,6 +160,7 @@ async function main(): Promise<number> {
     batchId: `review-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '')}`,
     generatedAt: new Date().toISOString(),
     status,
+    sourceKind,
     requiredSections: REQUIRED_SECTIONS,
     totalPending: pending.length,
     offset,

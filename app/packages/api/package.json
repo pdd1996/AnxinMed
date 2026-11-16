@@ -24,6 +24,8 @@
     "db:import-manuals": "tsx src/db/import-manuals.ts",
     "db:review-export": "tsx src/scripts/review-export.ts",
     "db:review-apply": "tsx src/scripts/review-apply.ts",
+    "db:backfill-dxy-sections": "tsx src/scripts/backfill-dxy-sections.ts",
+    "db:review-dxy-check": "tsx src/scripts/review-dxy-check.ts",
     "db:repair-specs": "tsx src/scripts/repair-specs.ts",
     "db:repair-manuals": "tsx src/scripts/repair-manuals.ts",
     "db:audit": "tsx src/db/data-audit.ts",
