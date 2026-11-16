@@ -40,9 +40,12 @@ export function pickInsertSections(question: string, insert: InsertSlice): Picke
 }
 
 /**
- * 频率表特征：PDF 表格被文本层拉平后，单元格按文本块顺序拼接，行/列归属丢失。
- * 命中则 prompt 侧禁止做「反应 ↔ 频率档位」的对应判断（M6 已知缺陷的临时防线）。
- * 判据：表头三档词共现（十分常见/常见/偶见|罕见），或「系统器官分类」+ 频率词。
+ * 频率表特征（**M7 起仅保留作诊断用，不再进 prompt**）。
+ *
+ * M6 曾用它在 prompt 里禁止「反应 ↔ 频率档位」归属（表格被文本层拉平的临时防线）；
+ * M7 已在提取器层重建表格行列（Markdown 表），防线撤除——正常表格与段落式分频率
+ * 叙述都能被模型按结构读取，继续禁用会把「十分常见/常见」等档位的正确引用一并禁掉。
+ * 保留此函数供抽检/质量扫描判断「段落是否仍呈拉平形态」。
  */
 export function hasFrequencyTable(text: string): boolean {
   const t = String(text ?? '')

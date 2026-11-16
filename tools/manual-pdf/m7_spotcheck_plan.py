@@ -27,32 +27,34 @@ FREQ_SIGNATURE = re.compile(r'十分常见[\s\S]{0,80}常见[\s\S]{0,160}(?:偶�
 
 # M6 已确认的跨段泄漏样本（genericName 关键字 → 聚焦段）
 CROSS_SAMPLES = [
-    ('阿卡波糖', 'precautions', '注意事项混入不良反应频率表（低血糖被劈开）'),
-    ('结构脂肪乳', 'dosage', '用法用量混入组份汇总表（劈句）'),
-    ('乳果糖', 'precautions', '注意事项混入用法用量表片段'),
-    ('氟康唑胶囊', 'precautions', '注意事项开头即不良反应表格碎片'),
-    ('培哚普利', 'interactions', '药物相互作用被提示框从句子中间插断'),
-    ('度拉糖肽', 'adverse', '不良反应频率表跨页拆分'),
-    ('阿卡波糖', 'adverse', '不良反应频率表（reviewed）'),
-    ('结构脂肪乳', 'adverse', '不良反应表（reviewed）'),
+    ('阿卡波糖', '片', 'precautions', '注意事项混入不良反应频率表（低血糖被劈开）'),
+    ('结构脂肪乳', '20', 'dosage', '用法用量混入组份汇总表（劈句）'),
+    ('乳果糖', '口服溶液', 'precautions', '注意事项混入用法用量表片段'),
+    ('氟康唑胶囊', '胶囊', 'precautions', '注意事项开头即不良反应表格碎片'),
+    ('培哚普利', '片', 'interactions', '药物相互作用被提示框从句子中间插断'),
+    ('度拉糖肽', '注射液', 'adverse', '不良反应频率表跨页拆分'),
+    ('那屈肝素钙', '注射液', 'dosage', '用法用量剂量表（体重分段）'),
+    ('结构脂肪乳', '20', 'adverse', '不良反应表（同源另一规格）'),
 ]
 
-# M7-T2 / T3 已确认样本（genericName 关键字）
+# M7-T2 / T3 已确认样本（genericName 关键字 + 剂型偏好）
 APPROVAL_SAMPLES = [
-    ('阿法骨化醇', '吸入', '阿法骨化醇软胶囊：0.25μg/0.5μg 各挂两文号'),
+    ('阿法骨化醇', '软胶囊', '阿法骨化醇软胶囊：0.25μg/0.5μg 各挂两文号'),
     ('阿立哌唑', '片', '①5mg/②10mg 无冒号行归属失败'),
     ('氟康唑胶囊', '胶囊', '0.15g 与 50mg 单位换算归属'),
     ('达比加群酯', '胶囊', '（1）110mg/（2）150mg 冒号行误分组'),
-    ('布地奈德鼻喷雾剂', '喷', '同规格三文号（正常多包装）'),
+    ('布地奈德鼻喷雾剂', '鼻', '同规格三文号（正常多包装）'),
     ('阿仑膦酸钠', '片', '同规格多文号（正常多包装）'),
 ]
 BRAND_SAMPLES = [
     ('阿仑膦酸钠', '福善美（M6 确认缺陷）'),
     ('头孢呋辛酯', '达力新（M6 确认缺陷）'),
     ('培哚普利叔丁胺', '雅施达（M6 确认缺陷）'),
-    ('富马酸喹硫平', '思瑞康/SEROQUEL'),
+    ('富马酸喹硫平', '思瑞康/SEREROQUEL'),
     ('甲巯咪唑', '赛治'),
-    ('硫酸沙丁胺醇吸入气雾剂', '万托林'),
+    ('硫酸沙丁胺醇', '万托林'),
+    ('盐酸特比萘芬', '丁克'),
+    ('马来酸曲美布汀', '瑞健'),
 ]
 
 LABEL = {
@@ -72,8 +74,10 @@ def load(directory: Path) -> list[dict]:
     return drafts
 
 
-def find_by_generic(drafts: list[dict], keyword: str, prefer_contains: str = '') -> dict | None:
-    hits = [d for d in drafts if keyword in d['genericName']]
+def find_by_generic(drafts: list[dict], keyword: str, prefer_contains: str = '',
+                    used: set[str] | None = None) -> dict | None:
+    used = used or set()
+    hits = [d for d in drafts if keyword in d['genericName'] and d['drugId'] not in used]
     if prefer_contains:
         preferred = [d for d in hits if prefer_contains in d['genericName']]
         if preferred:
@@ -121,16 +125,18 @@ def main() -> int:
         return True
 
     # 1) 跨段泄漏已知样本（8）
-    for keyword, focus, note in CROSS_SAMPLES:
-        add(find_by_generic(staging, keyword), 'cross', '跨段泄漏已知样本', focus, note)
+    for keyword, prefer, focus, note in CROSS_SAMPLES:
+        add(find_by_generic(staging, keyword, prefer, used), 'cross', '跨段泄漏已知样本', focus, note)
 
     # 2) 文号样本（6）
     for keyword, prefer, note in APPROVAL_SAMPLES:
-        add(find_by_generic(staging, keyword, prefer), 'approval', '批准文号归属', 'indication', note)
+        add(find_by_generic(staging, keyword, prefer, used), 'approval', '批准文号归属', 'indication', note)
 
     # 3) 商品名样本（6）
     for keyword, note in BRAND_SAMPLES:
-        add(find_by_generic(staging, keyword), 'brand', '商品名补齐', 'indication', note)
+        if sum(1 for it in items if it['batch'] == 'brand') >= 6:
+            break
+        add(find_by_generic(staging, keyword, '', used), 'brand', '商品名补齐', 'indication', note)
 
     # 4) 表格样本（20）：旧签名行随机抽（reviewed 行由落库脚本单独审计，不在此重复）
     old_sig = [
@@ -163,7 +169,7 @@ def main() -> int:
         print(f'   {batch}: {len(subset)}')
         for it in subset[:3]:
             print(f'      {it["drugId"]}  [{it["focusLabel"]}] {it["focusNote"]}')
-    missing = [kw for kw, _f, _n in CROSS_SAMPLES if not any(kw in it['genericName'] for it in items)]
+    missing = [kw for kw, _p, _f, _n in CROSS_SAMPLES if not any(kw in it['genericName'] for it in items)]
     if missing:
         print(f'⚠️ 未找到样本：{missing}', file=__import__('sys').stderr)
     return 0
