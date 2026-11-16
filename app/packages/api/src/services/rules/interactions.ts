@@ -9,6 +9,7 @@
  * 条目内容只能抄录（PRD §7.8.1）——本函数只匹配既有规则，绝不生成 note/source。
  */
 import { INTERACTION_LEVEL_ORDER, type InteractionLevel } from '@anxin/shared'
+import type { RuleStatus } from './rule-curation.js'
 
 /** 相互作用规则（interaction_rules 行的匹配所需形态）。 */
 export interface InteractionRuleInput {
@@ -17,13 +18,16 @@ export interface InteractionRuleInput {
   level: InteractionLevel
   note: string
   source: string
+  /** M8：demo=演示抄录（UI 必须标注）/ curated=已逐字核验 / retired=停用（不匹配） */
+  status: RuleStatus
 }
 
-/** 命中项：分级 + 说明 + 来源 + 涉及药品（id 与名称）。 */
+/** 命中项：分级 + 说明 + 来源 + 涉及药品（id 与名称）+ 规则状态（供 UI 标注演示）。 */
 export interface InteractionHit {
   level: InteractionLevel
   note: string
   source: string
+  status: RuleStatus
   drugIds: string[]
   drugNames: string[]
 }
@@ -56,6 +60,8 @@ export function checkInteractions(
 
   const hits: InteractionHit[] = []
   for (const rule of rules ?? []) {
+    // M8：停用规则不参与匹配
+    if ((rule.status ?? 'demo') === 'retired') continue
     const ids = rule.drugIds ?? []
     // 规则的每个药都必须在生效集合内（≥2 药才构成相互作用）
     if (ids.length >= 2 && ids.every((id) => set.has(id))) {
@@ -63,6 +69,7 @@ export function checkInteractions(
         level: rule.level,
         note: rule.note,
         source: rule.source,
+        status: rule.status ?? 'demo',
         drugIds: ids,
         drugNames: ids.map((id) => drugNameById[id] ?? id),
       })

@@ -5,6 +5,8 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^lucide-react-native$": "<rootDir>/test/lucide-stub.js",
+    // 工作区包的 TS 源码使用 ESM 风格 `./x.js` 相对引用；Jest 直接读 .ts 源码时去掉 .js 后缀
+    "^(\\.{1,2}/.*)\\.js$": "$1",
   },
   // jest-expo 默认不转 node_modules；RNR 的 Slot 与 nativewind 的产物是 JSX/ESM，必须放行。
   transformIgnorePatterns: [

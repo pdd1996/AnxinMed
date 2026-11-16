@@ -81,6 +81,11 @@ function HitList({ hits }: { hits: Hit[] }) {
                 <Text className="font-bold">{hit.level} </Text>
                 {hit.note}
               </Text>
+              {hit.status === "demo" ? (
+                <Text className="mt-1 text-xs font-bold text-risk-l3">
+                  演示抄录 · 非正式规则库，请以医生/药师意见为准
+                </Text>
+              ) : null}
               <Text className="mt-1 text-xs leading-5 text-muted-foreground">
                 涉及：{(hit.drugNames ?? []).join("、") || "—"} · 来源：{hit.source}
               </Text>

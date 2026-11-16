@@ -183,8 +183,18 @@ export const interactionRules = pgTable('interaction_rules', {
   id: text('id').primaryKey(),
   drugIds: jsonb('drug_ids').notNull(),                  // 涉及的药品 ID 数组 → drug_master.id[]
   level: varchar('level', { enum: ['禁忌', '慎用', '需监测', '注意'] }).notNull(),
-  note: text('note').notNull(),                          // 相互作用说明
-  source: text('source').notNull(),                      // 来源（说明书相互作用段/修订公告/指南）
+  note: text('note').notNull(),                          // 相互作用说明（curated 时必须为 quote 的逐字子串）
+  source: text('source').notNull(),                      // 来源描述（人读；演示条目须含「演示」）
+
+  // ── M8 正式化：来源分级 / 逐字引用 / 审核留痕（PRD §7.8.1 只许抄录）──
+  status: varchar('status', { enum: ['demo', 'curated', 'retired'] })
+    .notNull()
+    .default('demo'),                                    // demo=演示抄录（未通过逐字校验）/ curated=已核验 / retired=停用
+  sourceType: varchar('source_type', { enum: ['manual-interaction', 'nmpa-announcement', 'guideline'] }),
+  sourceRef: text('source_ref'),                         // manual-interaction: JSON {insertId,drugId,sectionKey,version,url?}
+  quote: text('quote'),                                  // 逐字抄录原文（curated 必填，note 必须为其子串）
+  reviewedBy: text('reviewed_by'),                       // 抄录/核对人（curated 必填）
+  reviewedAt: timestamp('reviewed_at'),
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

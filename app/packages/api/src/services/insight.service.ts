@@ -81,6 +81,7 @@ async function resolveInteractionsSummary(userId: string): Promise<InteractionsS
     id: r.id,
     drugIds: (r.drugIds as string[] | null) ?? [],
     level: r.level,
+    status: r.status,
     note: r.note,
     source: r.source,
   }))
@@ -276,6 +277,7 @@ export async function insightAsk(question: string, patientId: string | null): Pr
         id: r.id,
         drugIds: (r.drugIds as string[] | null) ?? [],
         level: r.level,
+        status: r.status,
         note: r.note,
         source: r.source,
       }))

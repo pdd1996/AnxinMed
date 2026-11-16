@@ -10,9 +10,9 @@ import {
   type InteractionRuleInput,
 } from '../services/rules/index.js'
 
-const RULE_AB: InteractionRuleInput = { id: 'ir-001', drugIds: ['dm-a', 'dm-b'], level: '需监测', note: 'A 与 B 联用需监测', source: '两药说明书相互作用段' }
-const RULE_BC: InteractionRuleInput = { id: 'ir-002', drugIds: ['dm-b', 'dm-c'], level: '禁忌', note: 'B 与 C 禁忌联用', source: '药监局修订公告' }
-const RULE_ABC: InteractionRuleInput = { id: 'ir-003', drugIds: ['dm-a', 'dm-b', 'dm-c'], level: '慎用', note: 'A/B/C 三药慎用', source: '权威指南' }
+const RULE_AB: InteractionRuleInput = { id: 'ir-001', drugIds: ['dm-a', 'dm-b'], level: '需监测', note: 'A 与 B 联用需监测', source: '两药说明书相互作用段', status: 'demo' }
+const RULE_BC: InteractionRuleInput = { id: 'ir-002', drugIds: ['dm-b', 'dm-c'], level: '禁忌', note: 'B 与 C 禁忌联用', source: '药监局修订公告', status: 'curated' }
+const RULE_ABC: InteractionRuleInput = { id: 'ir-003', drugIds: ['dm-a', 'dm-b', 'dm-c'], level: '慎用', note: 'A/B/C 三药慎用', source: '权威指南', status: 'curated' }
 const NAMES: Record<string, string> = { 'dm-a': '药A', 'dm-b': '药B', 'dm-c': '药C' }
 
 describe('checkInteractions · 相互作用（生效计划集合）', () => {
@@ -63,5 +63,17 @@ describe('checkInteractions · 相互作用（生效计划集合）', () => {
   it('生效集合去重 + 过滤空值后仍正确匹配', () => {
     const r = checkInteractions(['dm-a', 'dm-a', '', 'dm-b'], [RULE_AB], NAMES)
     expect(r.hits).toHaveLength(1)
+  })
+
+  it('M8：命中透传 status（demo 供 UI 标注）；retired 规则不参与匹配', () => {
+    const demoHit = checkInteractions(['dm-a', 'dm-b'], [RULE_AB], NAMES)
+    expect(demoHit.hits[0].status).toBe('demo')
+    const curatedHit = checkInteractions(['dm-b', 'dm-c'], [RULE_BC], NAMES)
+    expect(curatedHit.hits[0].status).toBe('curated')
+
+    const retired: InteractionRuleInput = { ...RULE_AB, status: 'retired' }
+    const r = checkInteractions(['dm-a', 'dm-b'], [retired], NAMES)
+    expect(r.hits).toEqual([])
+    expect(r.coverageNote).toBe(INTERACTION_COVERAGE_NOTE)
   })
 })

@@ -10,7 +10,8 @@
  * - package_inserts.source 含「说明书 PDF」→ 真实（本地 PDF 说明书提取）
  * - package_inserts.source 含「本地演示 / 本地 Mock」→ 演示（demo 虚构内容，未经整理流程）
  * - drug_master.dataSource 含「丁香园」→ 真实（爬虫建档）；含「说明书 PDF」→ 真实（PDF 建档）；含 demo 路径 → 演示档案（demo seed 带入）
- * - interaction_rules.source 含「演示」→ 演示抄录（正式条目待人工抄录，PRD §7.8.1 禁止模型生成）
+ * - interaction_rules.status = 'curated' → 真实（逐字抄录且已核验）；'demo' → 演示抄录（UI 必须标注）；
+ *   'retired' → 停用；历史行的 source 字符串仅作兜底（M8 起以 status 为准）。
  *
  * 清理语义：只删「演示内容 且 同药已有真实说明书行」的 package_inserts 行；
  * drug_master 演示档案不删——它被真实说明书行按 drugId 引用，身份字段升级走人工核对闸门；
@@ -50,7 +51,11 @@ function masterProv(r: { dataSource: string | null }): Prov {
   return { label: '⚠️未知来源   ', real: false }
 }
 
-function ruleProv(r: { source: string }): Prov {
+function ruleProv(r: { source: string; status?: string }): Prov {
+  // M8 起以 status 为准（source 字符串仅作历史兜底）
+  if (r.status === 'curated') return { label: '真实·逐字抄录', real: true }
+  if (r.status === 'retired') return { label: '停用·已停用 ', real: false }
+  if (r.status === 'demo') return { label: '演示·演示抄录', real: false }
   return r.source.includes('演示')
     ? { label: '演示·演示抄录', real: false }
     : { label: '真实·人工抄录', real: true }

@@ -274,6 +274,7 @@ describe('renderInteractionsSections · 相互作用模板（纯函数）', () =
           level: '禁忌',
           note: '出血风险升高',
           source: '测试规则库',
+          status: 'curated',
           drugIds: ['dm-a', 'dm-b'],
           drugNames: ['华法林钠片', '阿司匹林肠溶片'],
         },
@@ -438,7 +439,7 @@ describe('runDataQuery · interaction-check 集成（纯传参，不查库）', 
       mkInput('interaction-check', {
         activeMasterIds: ['dm-a', 'dm-b'],
         interactionRules: [
-          { id: 'r1', drugIds: ['dm-a', 'dm-b'], level: '禁忌', note: '华法林与阿司匹林联用出血风险升高（测试抄录）', source: '测试规则库' },
+          { id: 'r1', drugIds: ['dm-a', 'dm-b'], level: '禁忌', note: '华法林与阿司匹林联用出血风险升高（测试抄录）', source: '测试规则库', status: 'curated' },
         ],
         drugNameById: { 'dm-a': '华法林钠片', 'dm-b': '阿司匹林肠溶片' },
       }),

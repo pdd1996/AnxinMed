@@ -97,6 +97,7 @@ export async function runRuleChecks(
     id: r.id,
     drugIds: (r.drugIds as string[] | null) ?? [],
     level: r.level,
+    status: r.status,
     note: r.note,
     source: r.source,
   }))

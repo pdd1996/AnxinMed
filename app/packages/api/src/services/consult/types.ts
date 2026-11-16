@@ -12,6 +12,7 @@
  */
 import type { ConfirmStatus, InteractionLevel, RiskLevel } from '@anxin/shared'
 import type { AiClients, ConsultPromptPayload, ConsultRawSections } from '../../lib/ai/types.js'
+import type { RuleStatus } from '../rules/rule-curation.js'
 
 export type { AiClients, ConsultPromptPayload, ConsultRawSections }
 
@@ -137,8 +138,15 @@ export interface ConsultRunInput {
   drugs: ConsultDrug[]
   /** 生效计划集合的 drug_master.id（供相互作用注入）；空数组 = 无生效计划。 */
   activeMasterIds: string[]
-  /** 相互作用规则（全量或按相关药预筛）；由 repository 提供。 */
-  interactionRules: Array<{ id: string; drugIds: string[]; level: InteractionLevel; note: string; source: string }>
+  /** 相互作用规则（全量或按相关药预筛）；由 repository 提供。status：demo/curated/retired（M8）。 */
+  interactionRules: Array<{
+    id: string
+    drugIds: string[]
+    level: InteractionLevel
+    note: string
+    source: string
+    status: RuleStatus
+  }>
   /** drug_master.id → 通用名（供命中项展示）。 */
   drugNameById: Record<string, string>
   /** 用户自述慢病（M4-T8 · 已过 L3 出口脱敏 + 条数/字数封顶；空/缺省 = 不注入 prompt）。 */

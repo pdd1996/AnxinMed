@@ -71,6 +71,13 @@
       "when": 1794066398031,
       "tag": "0009_fast_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794806980754,
+      "tag": "0010_m8_interaction_rule_provenance",
+      "breakpoints": true
     }
   ]
 }
