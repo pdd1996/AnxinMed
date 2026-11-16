@@ -7,6 +7,10 @@
 3. 表格行宽分布（2 列表格占比）；
 4. 表格里出现「常见/偶见」前缀的概率（说明频率列被粘进了描述列）。
 
+⚠️ 计数判据：本脚本按「连续 `|` 行块」计表格块，**不要求分隔行**，因此会多计
+源文里的非表格管道行（例：`drug-cusuanlujidingrongye-0p05pct` 有 2 条，M6 起就存在）；
+关账权威口径以 `m7_verify_numbers.py`（按 `|---|` 分隔行）为准。本脚本仅作诊断。
+
 用法：python tools/manual-pdf/m7_quality_scan.py --drafts data/manuals-incoming-m7 --out data/m7-reports/quality-scan.json
 """
 from __future__ import annotations
