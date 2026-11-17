@@ -13,6 +13,26 @@ pnpm --filter @anxin/mobile env:print        # 只打印探测到的 API 地址�
 pnpm --filter @anxin/mobile machine:id       # 打印本机指纹（主机名/系统/内存/有无模拟器），状态表标机器用
 ```
 
+## G8 正式签名与分发（2026-11-18）
+
+release APK 已从「debug keystore 签名」切换为**正式 keystore 签名**，流水线可复现、可验签：
+
+```bash
+# 首次（仅一次）：生成正式 keystore + .credentials/release-signing.env（gitignored）
+cd app/packages/mobile && node scripts/gen-release-keystore.mjs
+# ⚠ 立刻把 .credentials/ 整目录离线双备份；丢了=已装用户无法覆盖升级
+
+# 日常出包（构建 + 自动验签 + 归档 dist/release/）
+cd app && pnpm --filter @anxin/mobile android:release
+
+# 对任意 APK 复验（证书 CN=AnxinMed / 非 Android Debug / ABI / 包名 / 非 debuggable / SHA-256）
+cd app && node packages/mobile/scripts/verify-release-apk.mjs <APK 路径>
+```
+
+- 签名落在 `plugins/with-release-signing.js`（expo config plugin）：`android/` 不入 git，**prebuild 后自动重新注入**；release 构建缺凭据会在 Gradle 配置期失败（不会静默打出 debug 签名包）。
+- 已装 G7 debug 签名包的设备/模拟器**必须先 `adb uninstall com.anxin.mobile`** 再装新包（签名不同，`INSTALL_FAILED_UPDATE_INCOMPATIBLE` 属预期）。
+- 密钥管理、CI secret 映射、分发与覆盖升级规则见 [SIGNING.md](./SIGNING.md)；里程碑判据、安装/分发说明与验收证据见 [docs/specs/14](../../../docs/specs/14-G8-正式签名与分发.md)；≥3 ROM 真机回归矩阵见 [G8-真机回归.md](./G8-真机回归.md)。
+
 ### metro 调试白屏：先查 8081 是否被上次会话遗留的 metro 占着
 
 `expo run:android` / `expo start` 会**复用**已在 8081 上的 dev server，而不是新起一个。若上一次会话的 metro 已成僵尸（端口在听、打包请求不返回），debug 包装上后就是**一直白屏**——现象与「代码有问题」极像，实际是连不上可用打包服务。

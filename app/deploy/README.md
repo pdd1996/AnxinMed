@@ -384,12 +384,67 @@ ls -lh logs/metrics-$(date +%F).json logs/api-errors-$(date +%F).jsonl 2>/dev/nu
 
 ## 10. 备案下来后：切 HTTPS（一次做完，别留半截）
 
-1. 域名备案主体信息与域名持有者**完全一致**（不一致是最常见的返工点）；A 记录解析到 `<ECS_IP>`；
-2. `cd /opt/AnxinMed/app && cp deploy/Caddyfile.https.example deploy/Caddyfile`，把里面两处 `anxin.example.com` 换成真实域名，`docker compose up -d caddy`，`docker compose logs caddy` 看证书签发成功；
-3. 本机 `app/packages/mobile/.env.local` / release 环境把 `EXPO_PUBLIC_API_URL` 改成 `https://<域名>`，重打 APK；
-4. `app/packages/mobile/app.json` 的 `android.usesCleartextTraffic` 改 `false`（cleartext 收口）；
-5. 安全组**关闭 8787 公网入站**（compose 里的映射保留，云侧不放行即可）；
-6. 医生端 / H5 / 真机各点一遍，确认没有残留 `http://IP:8787` 的硬编码。
+> 状态（2026-11-18）：**未执行**——域名/ICP 备案是外部依赖。G7 起登录密码/token 在 `http://IP:8787` 明文传输，**接真实用户前必须完成本节**。Caddy 配置已备好（`deploy/Caddyfile.https.example`），切完按 §10.5 验收并回填 [docs/specs/14](../../docs/specs/14-G8-正式签名与分发.md) §8。
+
+### 10.1 前置（外部依赖，缺一不可）
+
+1. 域名已备案且**备案主体与域名持有者完全一致**（不一致是最常见返工点）；
+2. 域名 A 记录解析到 `<ECS_IP>`，等待生效：`nslookup <域名>` / `dig +short <域名>`；
+3. 安全组放行 80/443（80 用于 ACME HTTP-01 校验），8787 暂时保留（切换完成后再关）；
+4. 域名可被公网访问（大陆 IP 未备案域名的 80/443 会被云厂商拦截——先备案再切）。
+
+### 10.2 服务端切换（Caddy 自动申请并续期证书）
+
+```bash
+cd /opt/AnxinMed/app
+cp deploy/Caddyfile.https.example deploy/Caddyfile
+# 把 Caddyfile 里两处 anxin.example.com 换成真实域名（含 www 跳转段）
+docker compose up -d caddy
+docker compose logs --tail=50 caddy     # 看到 certificate obtained / serving HTTPS 即成功
+```
+
+Caddy 默认用 Let's Encrypt 自动签发+续期（HTTP-01 / TLS-ALPN）；证书到期前自动续，无需 cron。首次失败先查 DNS 与 80/443 放行（`.well-known/acme-challenge` 必须公网可达）。
+
+### 10.3 客户端切换（重打 APK）
+
+1. `app/packages/mobile/.env.production.local` 的 `EXPO_PUBLIC_API_URL` 改为 `https://<域名>`（dev 联调改 `.env.local`）；
+2. `app/packages/mobile/app.json`：`android.usesCleartextTraffic` 改 `false`（明文收口；改后需 prebuild 才生效）；
+3. 重打正式包：`cd app && pnpm --filter @anxin/mobile android:release`（自动验签 + 归档，见 [SIGNING.md](../../packages/mobile/SIGNING.md)）；
+4. 真机回归：登录/退出/断网中文提示/主链路各点一遍，确认 APK 内没有残留 `http://<IP>:8787`。
+
+### 10.4 收口
+
+- 安全组**关闭 8787 公网入站**（compose 的 `8787:8787` 映射保留，供本机/隧道运维；云侧不放行即可）；
+- 更新试点账号交付说明里的服务地址（docs/specs/14 §5）；
+- 记录切换日期与证书到期策略到 docs/specs/14 §8。
+
+### 10.5 验收（逐条打勾，证据留档）
+
+```bash
+# 1. 证书链与主机名
+curl -sS -o /dev/null -w '%{http_code} %{ssl_verify_result}\n' https://<域名>/api/health
+openssl s_client -connect <域名>:443 -servername <域名> </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates
+# 2. 未登录仍 401（鉴权未被 Caddy 破坏）
+curl -sS -o /dev/null -w '%{http_code}\n' https://<域名>/api/drugs
+# 3. 明文入口不再对公网开放（从公网机器执行，应超时/拒绝）
+curl -m 5 -sS http://<ECS_IP>:8787/api/health || echo "8787 已关闭（预期）"
+# 4. 客户端：APK 内只应命中 https 域名，无 http://IP:8787
+unzip -p dist/release/<APK> assets/index.android.bundle | grep -c "http://<ECS_IP>:8787"   # 预期 0（Hermes 包内中文串按 UTF-16LE，URL 为 ASCII 可直接 grep）
+```
+
+| # | 验收项 | 证据 |
+|---|---|---|
+| 1 | `https://<域名>/api/health` 200 且证书校验通过（`ssl_verify_result=0`） | ____ |
+| 2 | 未登录 `/api/drugs` 401（AUTH_REQUIRED/AUTH_INVALID） | ____ |
+| 3 | 公网 8787 已关闭（超时/拒绝） | ____ |
+| 4 | 新 APK 登录/退出/断网中文提示 真机通过 | ____ |
+| 5 | 旧 http APK 停用（通知试点用户重装/升级） | ____ |
+
+### 10.6 应急回滚
+
+- 服务端：把 `deploy/Caddyfile` 换回占位版（`deploy/Caddyfile`）→ `docker compose restart caddy`，同时安全组重新放行 8787；
+- 客户端：切回 `http://<ECS_IP>:8787` 对应的上一版 APK（**必须仍用同一正式 keystore 签名，否则无法覆盖安装**）。
+
 
 ## 11. 回滚
 
