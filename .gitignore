@@ -73,6 +73,9 @@ data/m7-baseline.json
 # M8 上线前收口：基线 / 规则候选账本 / 覆盖报告 / reviewed 队列（含说明书正文与来源引用，不入库）
 data/m8-reports/
 
+# M9 模拟准备：基线 / 清理报告 / 规则候选池（含说明书正文，不入库）
+data/m9-reports/
+
 # ── 药方样张：处方笺图片一律不入库（2026-11-12 口径；图片留本地，脚本可重建）──
 # 生成方式：python app/fixtures/make-fixtures.py（带字，Pillow）/ python tools/ocr-bench/make_sample.py
 # CI 缺图由 e2e/scripts/make-sample-images.ts 在 globalSetup 补纯色占位图（回放不读像素）
