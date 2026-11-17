@@ -276,7 +276,7 @@ cd /opt/AnxinMed/app && sed -i 's/^AI_MODE=fixtures/AI_MODE=/' .env && docker co
 > 三行必须由 e2e 侧经隧道预先建好。跑完建议用 §9 的备份恢复一次，把云端数据退回干净态。
 > 真正干净的远端 E2E 需要独立 staging 实例（独立库 + 独立端口）——超出 T1 边界，未做。
 
-## 9. 运维底线（三件，一次配好）
+## 9. 运维底线（四件，一次配好）
 
 **9.1 `pg_dump` 每日 cron**
 
@@ -303,6 +303,84 @@ docker compose exec -T db pg_restore -U anxin -d anxin_medication --no-owner --c
 **9.2 云盘快照每日**：控制台 → ECS → 云盘 → 快照策略：每天 1 次、保留 7 天、关联系统盘，并在快照策略里**绑定到这台实例**（策略建了不绑等于没做）。
 
 **9.3 可用性监控**：UptimeRobot（或等价）建 HTTP monitor 指向 `http://<ECS_IP>:8787/api/health`，间隔 ≤5 分钟，告警发到自己的邮箱/微信。
+
+**9.4 可观测性与成本（G10，2026-11-18）**
+
+> 最小可观测性：错误日志落盘 + 模型调用计数 + 日预算告警 + 限流；不引入第三方依赖。
+> 配置项在 `.env`（`deploy/.env.example` 的「可观测性」段），代码默认值与之相同。
+
+**9.4.1 日志与指标落盘（位置 / 轮转 / tail）**
+
+| 文件 | 内容 | 轮转与保留 |
+|---|---|---|
+| `/app/logs/api-errors-YYYY-MM-DD.jsonl` | 5xx/未处理错误（requestId/错误码/状态/方法/path/错误名/消息/栈），**无请求体、用户问题、模型输出、PII** | 单文件 10MB → 改名 `.1` 再写新文件；保留 14 天（首次写与每日清理） |
+| `/app/logs/metrics-YYYY-MM-DD.json` | 当日各模型 client 的 attempts/success/failure/retries/latency、usage tokens、预算告警已触发档位 | 每次更新原子写（临时文件+rename）；不自动清理（单日文件很小，可人工按需保留/归档）；容器重启后 load 当日文件恢复累计 |
+
+容器内目录固定 `/app/logs`，compose 已把宿主机 `app/logs/` 挂载进去（目录不存在 Docker 自动创建；根 `.gitignore` 已排除 `logs/`）。本地开发不配 `LOG_DIR` 时默认 `./logs`（从 `app/packages/api` 启动即 `app/packages/api/logs`）。
+
+```bash
+cd /opt/AnxinMed/app
+ls -lh logs/
+# 实时看错误（按日文件；跨天用通配符）
+tail -f logs/api-errors-$(date +%F).jsonl
+# 容器内看/宿主机看等价（挂载同一目录）
+docker compose exec api tail -n 50 /app/logs/api-errors-$(date +%F).jsonl
+# 当日指标（排查模型调用/成本口径）
+cat logs/metrics-$(date +%F).json | jq .
+```
+
+**9.4.2 观测快照接口**（`OBS_ADMIN_TOKEN` 必须已在 `.env` 配置并重启 api；未配置时端点返回 404，token 错返回 401）：
+
+```bash
+# .env 里 OBS_ADMIN_TOKEN 的值；生成：openssl rand -hex 24
+curl -sS -H "x-obs-token: $OBS_ADMIN_TOKEN" http://<ECS_IP>:8787/api/observability/summary | jq .data
+```
+
+返回 `data`：`date` / `modelCalls.byClient`（attempts/success/failure/retries/avgLatencyMs + tokens{prompt,completion,cached,total}）与 `totals` / `estimatedCostCny` / `budget{limitCny,spentCny,percent,status}` / `rateLimited` / `errors` / `uptimeSec` / `version`。**无 PII**，可安全发给运维/账务对账。若 404：确认 `.env` 有 `OBS_ADMIN_TOKEN` 且执行过 `docker compose up -d api`（env 变更需重建/重启容器）。
+
+**9.4.3 日预算告警（80% / 100%）**
+
+- 成本口径：`未缓存输入 tokens×输入价 + 缓存命中 tokens×缓存价 + 输出 tokens×输出价`（默认 ¥0.8 / ¥2.7 / ¥0.1 每百万 tokens，价目见 docs/11 §2.2），价目可用 `LLM_PRICE_*_CNY_PER_M` 覆盖；**是估算，以控制台账单为准**。
+- 日预算 `LLM_DAILY_BUDGET_CNY`（默认 20 元）。当日估算成本达到 **80%** 输出一行 `console.warn [obs:budget] {"level":"warn","spent":...,"limit":...,"percent":...}`；达到 **100%** 再输出 `"level":"over"`。每档每天只告警一次；告警状态随 `metrics-*.json` 持久化，容器重启不重复告警、预算累计不清零。
+- 当前实现是**告警不熔断**（不会因为超预算拒绝请求）；要止血按 9.4.4 收紧限流或临时下调 `RL_LLM_PER_MIN/DAY`，或更换 key/停止流量。
+- 查看告警：`docker compose logs --tail=200 api | grep '\[obs:budget\]'`；核对当日花费：9.4.2 的 `budget.spentCny`。
+
+**9.4.4 限流调参与 429 表现**
+
+| 配置 | 默认 | 作用域 |
+|---|---|---|
+| `RL_LLM_PER_MIN` | 10 | LLM 路由按 **userId**，每分钟滑动窗口 |
+| `RL_LLM_PER_DAY` | 200 | LLM 路由按 **userId**，24h 滚动窗口 |
+| `RL_IP_PER_MIN` | 240 | 所有 `/api/*` 按来源 IP 兜底；`/api/health` 豁免（监控探针恒可达） |
+
+LLM 路由集合：`POST /api/consult`、`/api/intake/{prescription,drug,detect}`、`/api/insight/{summary,queue-summary,ask}`。超限统一返回：
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+
+{"ok":false,"code":"RATE_LIMITED","message":"操作太频繁，请稍后再试"}
+```
+
+客户端应按 `Retry-After` 退避重试（H5/App 已按统一错误码提示，不要静默重试）。调参后 `docker compose up -d api` 生效（env 需重建容器；限流计数在进程内存，重建/重启清零）。
+
+> 边界：限流是**单实例内存**实现（与 G7 登录失败限流同构）；多副本部署前需换 Redis 等共享存储。测试环境（`NODE_ENV=test`）默认关闭限流以免误伤回归，`RL_FORCE=1` 可强制开启。IP 取 `x-forwarded-for` 首段（反向代理后为标准做法；过渡期裸 IP 直连时该头客户端可伪造，故 IP 档只作兜底，不承担鉴权）。
+
+**9.4.5 staging 重启后累计验证**（每次部署/重启后做一次）
+
+```bash
+cd /opt/AnxinMed/app
+# 1) 重启前取一次快照，记下 modelCalls.byClient.*.attempts / budget.spentCny
+curl -sS -H "x-obs-token: $OBS_ADMIN_TOKEN" http://127.0.0.1:8787/api/observability/summary | jq '.data | {date, attempts: .modelCalls.totals.attempts, spent: .budget.spentCny, alerts: .budget.status}'
+# 2) 重启 api（当日指标从 metrics-*.json 恢复）
+docker compose restart api && sleep 3
+# 3) 再取一次：attempts/spent 应 >= 重启前（不清零），budget.status 不因重启重复触发告警
+curl -sS -H "x-obs-token: $OBS_ADMIN_TOKEN" http://127.0.0.1:8787/api/observability/summary | jq '.data | {date, attempts: .modelCalls.totals.attempts, spent: .budget.spentCny, alerts: .budget.status}'
+# 4) 确认落盘文件存在且可读
+ls -lh logs/metrics-$(date +%F).json logs/api-errors-$(date +%F).jsonl 2>/dev/null || true
+```
+
+期望：两次 `attempts` 单调不减（重启后继续累计）；`budget.status` 与 `spentCny` 保持；`logs/` 下文件在容器重启后仍在（宿主机挂载）。若重启后 attempts 归零：检查 compose 是否带 `LOG_DIR=/app/logs` 与 `./logs:/app/logs` 挂载（本仓库 2026-11-18 起已加）。
 
 ## 10. 备案下来后：切 HTTPS（一次做完，别留半截）
 

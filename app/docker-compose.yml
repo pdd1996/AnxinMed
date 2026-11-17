@@ -27,12 +27,19 @@ services:
     environment:
       NODE_ENV: production
       PORT: "8787"
+      # G10 可观测性：错误日志/指标落盘目录（容器内固定 /app/logs，宿主机 app/logs 挂载持久化；
+      # 重启后当日模型累计从 metrics-*.json 恢复，预算不归零）。
+      LOG_DIR: /app/logs
       # G7：受控验收默认必须登录（旧 .env 没有该键也 fail-closed，不给公网留免登录旁路）；
       # 显式写 AUTH_MODE=demo 才回到注入 p-001 的演示旁路。
       AUTH_MODE: ${AUTH_MODE:-password}
       # 指向 compose 内的 db 服务；口令与 db 服务同源（deploy/.env.example 的 POSTGRES_PASSWORD）。
       # environment 优先级高于 env_file，故 .env 里那条指向宿主 localhost 的 DATABASE_URL 不会漏进来。
       DATABASE_URL: postgres://anxin:${POSTGRES_PASSWORD:-anxin_dev_2026}@db:5432/anxin_medication
+    volumes:
+      # G10：错误日志（api-errors-*.jsonl，10MB 轮转、保留 14 天）与当日指标（metrics-*.json）落宿主机。
+      # 宿主机目录 app/logs/ 已在根 .gitignore 排除；不存在时 Docker 会自动创建。
+      - ./logs:/app/logs
 
   db:
     image: postgres:18-alpine

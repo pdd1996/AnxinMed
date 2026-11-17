@@ -4,6 +4,8 @@
  * 后仍失败 → AIUnavailableError。
  */
 import { AIUnavailableError, type AiClientName, type ImageInput } from './types.js'
+import { recordModelCall } from '../observability/metrics.js'
+import type { TokenTotals } from '../observability/budget.js'
 
 export interface CallOptions {
   client: AiClientName
@@ -27,9 +29,23 @@ export async function callJson<T>(url: string, init: RequestInit, opts: CallOpti
     if (attempt > 0) await sleep(backoffDelayMs()) // 重试前退避（能走到第二轮的必是可重试失败）
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    const startedAt = Date.now()
+    let recorded = false
     try {
       const res = await fetch(url, { ...init, signal: ctrl.signal })
-      if (res.ok) return (await res.json()) as T
+      if (res.ok) {
+        const payload = (await res.json()) as T
+        // G10 埋点（唯一收敛点）：成功尝试 + usage token；绝不记录响应内容/模型输出。
+        recordModelCall({
+          client: opts.client,
+          attempt,
+          success: true,
+          latencyMs: Date.now() - startedAt,
+          usage: extractUsageTokens(payload),
+        })
+        recorded = true
+        return payload
+      }
       if (res.status >= 400 && res.status < 500 && res.status !== 429) {
         throw new AIUnavailableError(opts.client, `${opts.client} 请求被拒 HTTP ${res.status}（不重试）`)
       }
@@ -39,6 +55,10 @@ export async function callJson<T>(url: string, init: RequestInit, opts: CallOpti
       lastErr = e
     } finally {
       clearTimeout(timer)
+      // 每次失败尝试都计数（含重试与 4xx 拒绝）；成功已在上面记录过。
+      if (!recorded) {
+        recordModelCall({ client: opts.client, attempt, success: false, latencyMs: Date.now() - startedAt })
+      }
     }
   }
   throw new AIUnavailableError(
@@ -46,6 +66,31 @@ export async function callJson<T>(url: string, init: RequestInit, opts: CallOpti
     `${opts.client} 调用失败（超时/网络/5xx，已重试 ${retries} 次）`,
     lastErr,
   )
+}
+
+/**
+ * 从成功响应中提取 usage（OpenAI 兼容字段）：prompt_tokens / completion_tokens /
+ * prompt_tokens_details.cached_tokens；缺失或非法 → null（不计 token，不猜）。
+ * 只读数值字段，不触碰 choices/content（模型输出绝不进日志/指标）。
+ */
+export function extractUsageTokens(payload: unknown): TokenTotals | null {
+  if (!payload || typeof payload !== 'object') return null
+  const usage = (payload as { usage?: unknown }).usage
+  if (!usage || typeof usage !== 'object') return null
+
+  const row = usage as Record<string, unknown>
+  const details = row.prompt_tokens_details
+  const cachedRow = details && typeof details === 'object' ? (details as Record<string, unknown>) : undefined
+  const prompt = readTokenCount(row.prompt_tokens)
+  const completion = readTokenCount(row.completion_tokens)
+  const cached = readTokenCount(cachedRow?.cached_tokens)
+  if (prompt === undefined && completion === undefined && cached === undefined) return null
+  return { prompt: prompt ?? 0, completion: completion ?? 0, cached: cached ?? 0 }
+}
+
+/** usage 字段数值化：只接受有限非负数，其余视为缺失（不把脏数据写成 token 累计）。 */
+function readTokenCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : undefined
 }
 
 /** ImageInput → dataURL（qwen/ocr 图像入参共用：data:${mime};base64,${base64}）。 */

@@ -25,6 +25,10 @@ yarn.lock
 Thumbs.db
 *.log
 
+# ── 可观测性落盘（G10：错误日志/指标运行时产物，永不入库）──
+# 本地默认 app/packages/api/logs；部署为宿主机 app/logs（container /app/logs）。
+logs/
+
 # ── Playwright E2E 产物（M2-T10）──
 test-results/
 playwright-report/

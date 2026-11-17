@@ -16,6 +16,7 @@ export const ERR_CODES = {
   AUTH_REQUIRED: 'AUTH_REQUIRED',           // 未登录 / 缺 Bearer token → 401（G7）
   AUTH_INVALID: 'AUTH_INVALID',             // 登录凭据错误 / token 失效 → 401（统一措辞，不泄漏账号是否存在）
   AUTH_LOCKED: 'AUTH_LOCKED',               // 登录失败次数过多 → 429（G7 限流）
+  RATE_LIMITED: 'RATE_LIMITED',             // 请求过于频繁（LLM 路由/IP 限流）→ 429（G10）
 } as const
 
 export type ErrCode = (typeof ERR_CODES)[keyof typeof ERR_CODES]
