@@ -23,6 +23,10 @@ import type { InteractionLevel } from '@anxin/shared'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(__dirname, '..', '..', '..', '..', '..')
 
+function resolvePath(p: string): string {
+  return /^[A-Za-z]:[\\/]|^\//.test(p) ? p : join(repoRoot, p)
+}
+
 function arg(name: string): string | null {
   const i = process.argv.indexOf(name)
   return i >= 0 ? (process.argv[i + 1] ?? null) : null
@@ -93,9 +97,20 @@ function selectTwenty(candidates: Candidate[]): Candidate[] {
 }
 
 async function main(): Promise<number> {
-  const inPath = join(repoRoot, arg('--in') ?? join('data', 'm9-reports', 'rule-candidates.jsonl'))
   const outDir = join(repoRoot, arg('--out') ?? join('data', 'm10-reports'))
   mkdirSync(outDir, { recursive: true })
+
+  // 只重渲染已有 report JSON（预审修正版签核页用），不重新选候选/不查库
+  const rerender = arg('--rerender')
+  if (rerender) {
+    const report = JSON.parse(readFileSync(resolvePath(rerender), 'utf8'))
+    const prefix = arg('--out-prefix') ?? 'signoff-rerender'
+    writeFileSync(join(outDir, `${prefix}.html`), renderReviewHtml(report))
+    console.log(`✅ 已重渲染签核页：${join(outDir, `${prefix}.html`)}（${report.items?.length ?? 0} 条）`)
+    return 0
+  }
+
+  const inPath = join(repoRoot, arg('--in') ?? join('data', 'm9-reports', 'rule-candidates.jsonl'))
 
   const all = readFileSync(inPath, 'utf8')
     .split(/\r?\n/)
