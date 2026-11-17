@@ -483,5 +483,569 @@
     "quote": "接受华法林治疗的患者在开始或终止氟西汀治疗时应当加以仔细监测(参见[注意事项]异常出血)。",
     "reviewedBy": "泮栋栋",
     "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m11-b2-cand-01",
+    "drugIds": [
+      "drug-kelameisu-huanshi-pian-0p5g",
+      "drug-kelameisu-pian-0p25g",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-kelameisu-huanshi-pian-0p5g",
+        "drug-kelameisu-pian-0p25g"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "患者在合用地高辛和克拉霉素时应该密切监测地高辛的血清浓度。",
+    "source": "克拉霉素说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-kelameisu-pian-0p25g@nmpa-YBH06492020-5cb42ee0\",\"drugId\":\"drug-kelameisu-pian-0p25g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06492020\"}",
+    "quote": "患者在合用地高辛和克拉霉素时应该密切监测地高辛的血清浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-02",
+    "drugIds": [
+      "drug-zuoyangfushaxing-pian-0p5g-h20203307",
+      "drug-zuoyangfushaxing-pian-0p5g",
+      "drug-yansuan-zuoyangfushaxing-jiaonang-0p1g",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-zuoyangfushaxing-pian-0p5g-h20203307",
+        "drug-zuoyangfushaxing-pian-0p5g",
+        "drug-yansuan-zuoyangfushaxing-jiaonang-0p1g"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "同时应用左氧氟沙星和华法林时应密切监测凝血酶原时间、国际标准化比值(INR)或其他抗凝试验，并注意患者有无出血的表现。",
+    "source": "左氧氟沙星说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-zuoyangfushaxing-pian-0p5g-h20203307@nmpa-YBH02132020-a29721e4\",\"drugId\":\"drug-zuoyangfushaxing-pian-0p5g-h20203307\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH02132020\"}",
+    "quote": "同时应用左氧氟沙星和华法林时应密切监测凝血酶原时间、国际标准化比值(INR)或其他抗凝试验，并注意患者有无出血的表现。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-03",
+    "drugIds": [
+      "drug-ruishufatatinggai-pian-5mg-h20180007",
+      "drug-ruishufatatinggai-pian-10mg-h20080483",
+      "drug-ruishufatatinggai-pian-10mg-h20080670",
+      "drug-ruishufatatinggai-pian-10mg",
+      "drug-ruishufatatinggai-pian-20mg",
+      "drug-ruishufatatinggai-pian-5mg",
+      "drug-ruishufatatinggai-pian-10mg-h20180007",
+      "drug-qiushuixianjian-pian-1mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-ruishufatatinggai-pian-5mg-h20180007",
+        "drug-ruishufatatinggai-pian-10mg-h20080483",
+        "drug-ruishufatatinggai-pian-10mg-h20080670",
+        "drug-ruishufatatinggai-pian-10mg",
+        "drug-ruishufatatinggai-pian-20mg",
+        "drug-ruishufatatinggai-pian-5mg",
+        "drug-ruishufatatinggai-pian-10mg-h20180007"
+      ],
+      [
+        "drug-qiushuixianjian-pian-1mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "秋水仙碱：有报告包括瑞舒伐他汀在内的HMG-CoA还原酶抑制剂与秋水仙碱合用时发现包括横纹肌溶解在内的肌病，因此，本品与秋水仙碱合用要谨慎。",
+    "source": "瑞舒伐他汀说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-ruishufatatinggai-pian-5mg-h20180007@nmpa-JX20120042-746e849c\",\"drugId\":\"drug-ruishufatatinggai-pian-5mg-h20180007\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20120042\"}",
+    "quote": "秋水仙碱：有报告包括瑞舒伐他汀在内的HMG-CoA还原酶抑制剂与秋水仙碱合用时发现包括横纹肌溶解在内的肌病，因此，本品与秋水仙碱合用要谨慎。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-04",
+    "drugIds": [
+      "drug-digaoxin-pian-0p25mg",
+      "drug-luoneizhi-pian-20mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ],
+      [
+        "drug-luoneizhi-pian-20mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "(8)螺内酯可延长本品半衰期，需调整剂量或给药间期，随访监测本品的血药浓度。",
+    "source": "地高辛说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-digaoxin-pian-0p25mg@nmpa-2020-0ffe8dec\",\"drugId\":\"drug-digaoxin-pian-0p25mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "(8)螺内酯可延长本品半衰期，需调整剂量或给药间期，随访监测本品的血药浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-05",
+    "drugIds": [
+      "drug-xinfatating-pian-20mg",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-xinfatating-pian-20mg"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "联合使用地高辛和辛伐他汀时应当监测地高辛血药浓度。",
+    "source": "辛伐他汀说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-xinfatating-pian-20mg@nmpa-YBH06472019-2020-a5cf992f\",\"drugId\":\"drug-xinfatating-pian-20mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06472019-2020\"}",
+    "quote": "联合使用地高辛和辛伐他汀时应当监测地高辛血药浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-06",
+    "drugIds": [
+      "drug-yansuan-andiantong-zhusheye-3ml",
+      "drug-yansuan-andiantongpian-0p2g",
+      "drug-ynsun-andinton-zhusheye-3ml",
+      "drug-bentuoyingna-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-andiantong-zhusheye-3ml",
+        "drug-yansuan-andiantongpian-0p2g",
+        "drug-ynsun-andinton-zhusheye-3ml"
+      ],
+      [
+        "drug-bentuoyingna-pian-0p1g"
+      ]
+    ],
+    "level": "需监测",
+    "note": "苯妥英与胺碘酮联用可能导致苯妥英药物过量，从而出现神经症状。一旦出现药物过量的症状，应立即进行临床监测，并减少剂量以控制苯妥英的血药浓度。",
+    "source": "胺碘酮说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-andiantongpian-0p2g@nmpa-2020-18bbffeb\",\"drugId\":\"drug-yansuan-andiantongpian-0p2g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "苯妥英与胺碘酮联用可能导致苯妥英药物过量，从而出现神经症状。一旦出现药物过量的症状，应立即进行临床监测，并减少剂量以控制苯妥英的血药浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-07",
+    "drugIds": [
+      "drug-omeprazole-20",
+      "drug-aomeilazuo-changrongjiaonang-10mg",
+      "drug-aomeilazuo-changrongjiaonang-20mg",
+      "drug-aomeilazuochangrongjiaonang-20mg",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-omeprazole-20",
+        "drug-aomeilazuo-changrongjiaonang-10mg",
+        "drug-aomeilazuo-changrongjiaonang-20mg",
+        "drug-aomeilazuochangrongjiaonang-20mg"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "如果必须联合使用，应该加强对地高辛的治疗药物监测。",
+    "source": "奥美拉唑说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-aomeilazuo-changrongjiaonang-10mg@nmpa-YBH00352022-b435e201\",\"drugId\":\"drug-aomeilazuo-changrongjiaonang-10mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH00352022\"}",
+    "quote": "如果必须联合使用，应该加强对地高辛的治疗药物监测。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-08",
+    "drugIds": [
+      "drug-atorvastatin-20",
+      "drug-atuofatatinggai-pian-10mg-h20133127",
+      "drug-atuofatatinggai-pian-10mg",
+      "drug-atuofatatinggai-pian-20mg-h20163270",
+      "drug-atuofatatinggai-pian-20mg",
+      "drug-atuofatatinggai-pian-40mg",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-atorvastatin-20",
+        "drug-atuofatatinggai-pian-10mg-h20133127",
+        "drug-atuofatatinggai-pian-10mg",
+        "drug-atuofatatinggai-pian-20mg-h20163270",
+        "drug-atuofatatinggai-pian-20mg",
+        "drug-atuofatatinggai-pian-40mg"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "8、地高辛：当多剂量阿托伐他汀钙与地高辛合用时，地高辛的稳态血浆浓度增加约20%，患者服用地高辛时应适当地监测。",
+    "source": "阿托伐他汀说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-atuofatatinggai-pian-20mg-h20163270@nmpa-YBH05802018-b68bb537\",\"drugId\":\"drug-atuofatatinggai-pian-20mg-h20163270\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH05802018\"}",
+    "quote": "8、地高辛：当多剂量阿托伐他汀钙与地高辛合用时，地高辛的稳态血浆浓度增加约20%，患者服用地高辛时应适当地监测。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-09",
+    "drugIds": [
+      "drug-feinuobeite-jiaonang-200mg",
+      "drug-qiushuixianjian-pian-1mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-feinuobeite-jiaonang-200mg"
+      ],
+      [
+        "drug-qiushuixianjian-pian-1mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "秋水仙碱：有报告非诺贝特合用秋水仙碱发生包括横纹肌溶解在内的肌病，两者合用要谨慎。",
+    "source": "非诺贝特说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-feinuobeite-jiaonang-200mg@nmpa-JX20090069-165f5df6\",\"drugId\":\"drug-feinuobeite-jiaonang-200mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20090069\"}",
+    "quote": "秋水仙碱：有报告非诺贝特合用秋水仙碱发生包括横纹肌溶解在内的肌病，两者合用要谨慎。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-10",
+    "drugIds": [
+      "drug-yansuan-paluoxiting-pian-20mg-h20133084",
+      "drug-yansuan-paluoxiting-pian-20mg",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-paluoxiting-pian-20mg-h20133084",
+        "drug-yansuan-paluoxiting-pian-20mg"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "由于临床经验少，盐酸帕罗西汀片与华法林合用应谨慎。",
+    "source": "帕罗西汀说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-paluoxiting-pian-20mg-h20133084@nmpa-YBH06662019-9e89d47d\",\"drugId\":\"drug-yansuan-paluoxiting-pian-20mg-h20133084\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06662019\"}",
+    "quote": "由于临床经验少，盐酸帕罗西汀片与华法林合用应谨慎。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-11",
+    "drugIds": [
+      "drug-yansuan-andiantong-zhusheye-3ml",
+      "drug-yansuan-andiantongpian-0p2g",
+      "drug-ynsun-andinton-zhusheye-3ml",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-andiantong-zhusheye-3ml",
+        "drug-yansuan-andiantongpian-0p2g",
+        "drug-ynsun-andinton-zhusheye-3ml"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "华法林与胺碘酮联用可升高抗凝药物血浆浓度，增加抗凝药物的效应，可能导致严重或致命性出血。",
+    "source": "胺碘酮说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-andiantongpian-0p2g@nmpa-2020-18bbffeb\",\"drugId\":\"drug-yansuan-andiantongpian-0p2g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "华法林与胺碘酮联用可升高抗凝药物血浆浓度，增加抗凝药物的效应，可能导致严重或致命性出血。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-12",
+    "drugIds": [
+      "drug-yansuan-andiantongpian-0p2g",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-andiantongpian-0p2g"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "在接受地高辛治疗的患者中，口服胺碘酮可导致血清地高辛浓度增加，导致临床毒性。",
+    "source": "胺碘酮说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-andiantongpian-0p2g@nmpa-2020-18bbffeb\",\"drugId\":\"drug-yansuan-andiantongpian-0p2g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "在接受地高辛治疗的患者中，口服胺碘酮可导致血清地高辛浓度增加，导致临床毒性。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-13",
+    "drugIds": [
+      "drug-xinfatating-pian-20mg",
+      "drug-yansuan-andiantong-zhusheye-3ml",
+      "drug-yansuan-andiantongpian-0p2g",
+      "drug-ynsun-andinton-zhusheye-3ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-xinfatating-pian-20mg"
+      ],
+      [
+        "drug-yansuan-andiantong-zhusheye-3ml",
+        "drug-yansuan-andiantongpian-0p2g",
+        "drug-ynsun-andinton-zhusheye-3ml"
+      ]
+    ],
+    "level": "需监测",
+    "note": "胺碘酮：胺碘酮与辛伐他汀联合应用时，肌病/横纹肌溶解的风险可能会增加（见用法用量；注意事项，肌病/横纹肌溶解）。",
+    "source": "辛伐他汀说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-xinfatating-pian-20mg@nmpa-YBH06472019-2020-a5cf992f\",\"drugId\":\"drug-xinfatating-pian-20mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06472019-2020\"}",
+    "quote": "胺碘酮：胺碘酮与辛伐他汀联合应用时，肌病/横纹肌溶解的风险可能会增加（见用法用量；注意事项，肌病/横纹肌溶解）。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-14",
+    "drugIds": [
+      "drug-kelameisu-huanshi-pian-0p5g",
+      "drug-kelameisu-pian-0p25g",
+      "drug-omeprazole-20",
+      "drug-aomeilazuo-changrongjiaonang-10mg",
+      "drug-aomeilazuo-changrongjiaonang-20mg",
+      "drug-aomeilazuochangrongjiaonang-20mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-kelameisu-huanshi-pian-0p5g",
+        "drug-kelameisu-pian-0p25g"
+      ],
+      [
+        "drug-omeprazole-20",
+        "drug-aomeilazuo-changrongjiaonang-10mg",
+        "drug-aomeilazuo-changrongjiaonang-20mg",
+        "drug-aomeilazuochangrongjiaonang-20mg"
+      ]
+    ],
+    "level": "注意",
+    "note": "由于与克拉霉素同时给药，奥美拉唑的稳态血浆浓度升高（Cmax、AUC0-24和t1/2分别升高30%、89%和34%）。",
+    "source": "克拉霉素说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-kelameisu-pian-0p25g@nmpa-YBH06492020-5cb42ee0\",\"drugId\":\"drug-kelameisu-pian-0p25g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06492020\"}",
+    "quote": "由于与克拉霉素同时给药，奥美拉唑的稳态血浆浓度升高（Cmax、AUC0-24和t1/2分别升高30%、89%和34%）。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-15",
+    "drugIds": [
+      "drug-fumasuan-bisuoluo-er-pian-2p5mg",
+      "drug-yidaosu-zhusheye-10ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-fumasuan-bisuoluo-er-pian-2p5mg"
+      ],
+      [
+        "drug-yidaosu-zhusheye-10ml"
+      ]
+    ],
+    "level": "需监测",
+    "note": "胰岛素和口服抗糖尿病药物：增加降血糖效果。阻断β-肾上腺素受体可能掩盖低血糖症状。",
+    "source": "比索洛尔说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-fumasuan-bisuoluo-er-pian-2p5mg@nmpa-2.5mg-YBH05182020-5mg-YBH05892018-27fb7bfd\",\"drugId\":\"drug-fumasuan-bisuoluo-er-pian-2p5mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2.5mg-YBH05182020-5mg-YBH05892018\"}",
+    "quote": "胰岛素和口服抗糖尿病药物：增加降血糖效果。阻断β-肾上腺素受体可能掩盖低血糖症状。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-16",
+    "drugIds": [
+      "drug-huafalinna-pian-2p5mg",
+      "drug-bentuoyingna-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ],
+      [
+        "drug-bentuoyingna-pian-0p1g"
+      ]
+    ],
+    "level": "需监测",
+    "note": "2.降低本品抗凝作用的药物：苯妥英钠、巴比妥类、口服避孕药、雌激素、考来烯胺、利福平、维生素K类、氯噻酮、螺内酯、扑痫酮、皮质激素等。",
+    "source": "华法林说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-huafalinna-pian-2p5mg@nmpa-2015-a865f904\",\"drugId\":\"drug-huafalinna-pian-2p5mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2015\"}",
+    "quote": "2.降低本品抗凝作用的药物：苯妥英钠、巴比妥类、口服避孕药、雌激素、考来烯胺、利福平、维生素K类、氯噻酮、螺内酯、扑痫酮、皮质激素等。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-17",
+    "drugIds": [
+      "drug-bingwusuanmei-huanshi-pian-0p25g",
+      "drug-bingwusuanna-huanshipian-0p333g",
+      "drug-bingwusuanna-koufurongye-300ml",
+      "drug-bingwusuanna-pian-0p2g",
+      "drug-huafalinna-pian-2p5mg",
+      "drug-gansuna-zhusheye-2ml-2",
+      "drug-gansuna-zhusheye-2ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-bingwusuanmei-huanshi-pian-0p25g",
+        "drug-bingwusuanna-huanshipian-0p333g",
+        "drug-bingwusuanna-koufurongye-300ml",
+        "drug-bingwusuanna-pian-0p2g"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg",
+        "drug-gansuna-zhusheye-2ml-2",
+        "drug-gansuna-zhusheye-2ml"
+      ]
+    ],
+    "level": "需监测",
+    "note": "（3）与抗凝药如华法林或肝素等，以及溶血栓药合用，出血的危险性增加。",
+    "source": "丙戊酸说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-bingwusuanna-pian-0p2g@nmpa-2020-63128eb8\",\"drugId\":\"drug-bingwusuanna-pian-0p2g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "（3）与抗凝药如华法林或肝素等，以及溶血栓药合用，出血的危险性增加。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-18",
+    "drugIds": [
+      "drug-biepiaochun-pian-0p1g",
+      "drug-fusaimi-pian-20mg",
+      "drug-fusaimi-zhusheye-2ml-h32021527",
+      "drug-fusaimi-zhusheye-2ml-h37020293",
+      "drug-fusaimi-zhusheye-2ml-h42020034",
+      "drug-fusaimi-zhusheye-2ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-biepiaochun-pian-0p1g"
+      ],
+      [
+        "drug-fusaimi-pian-20mg",
+        "drug-fusaimi-zhusheye-2ml-h32021527",
+        "drug-fusaimi-zhusheye-2ml-h37020293",
+        "drug-fusaimi-zhusheye-2ml-h42020034",
+        "drug-fusaimi-zhusheye-2ml"
+      ]
+    ],
+    "level": "注意",
+    "note": "(1)饮酒、氯噻酮、依他尼酸、呋塞米、美托拉宗、吡嗪酰胺或噻嗪类利尿剂均可增加血清中尿酸含量。",
+    "source": "别嘌醇说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-biepiaochun-pian-0p1g@nmpa-YBH06052019-5476b598\",\"drugId\":\"drug-biepiaochun-pian-0p1g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06052019\"}",
+    "quote": "(1)饮酒、氯噻酮、依他尼酸、呋塞米、美托拉宗、吡嗪酰胺或噻嗪类利尿剂均可增加血清中尿酸含量。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-19",
+    "drugIds": [
+      "drug-fumasuan-bisuoluo-er-pian-2p5mg",
+      "drug-yansuan-andiantong-zhusheye-3ml",
+      "drug-yansuan-andiantongpian-0p2g",
+      "drug-ynsun-andinton-zhusheye-3ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-fumasuan-bisuoluo-er-pian-2p5mg"
+      ],
+      [
+        "drug-yansuan-andiantong-zhusheye-3ml",
+        "drug-yansuan-andiantongpian-0p2g",
+        "drug-ynsun-andinton-zhusheye-3ml"
+      ]
+    ],
+    "level": "需监测",
+    "note": "三类抗心律失常药物（如胺碘酮）：可能延长房室传导时间。",
+    "source": "比索洛尔说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-fumasuan-bisuoluo-er-pian-2p5mg@nmpa-2.5mg-YBH05182020-5mg-YBH05892018-27fb7bfd\",\"drugId\":\"drug-fumasuan-bisuoluo-er-pian-2p5mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2.5mg-YBH05182020-5mg-YBH05892018\"}",
+    "quote": "三类抗心律失常药物（如胺碘酮）：可能延长房室传导时间。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m11-b2-cand-20",
+    "drugIds": [
+      "drug-bingwusuanmei-huanshi-pian-0p25g",
+      "drug-bingwusuanna-huanshipian-0p333g",
+      "drug-bingwusuanna-koufurongye-300ml",
+      "drug-bingwusuanna-pian-0p2g",
+      "drug-kamaxiping-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-bingwusuanmei-huanshi-pian-0p25g",
+        "drug-bingwusuanna-huanshipian-0p333g",
+        "drug-bingwusuanna-koufurongye-300ml",
+        "drug-bingwusuanna-pian-0p2g"
+      ],
+      [
+        "drug-kamaxiping-pian-0p1g"
+      ]
+    ],
+    "level": "需监测",
+    "note": "（9）与卡马西平合用，由于肝酶的诱导而致药物代谢加速，可使二者的血药浓度和半衰期降低，故须检测血药浓度已决定是否需要调整用量。",
+    "source": "丙戊酸说明书·药物相互作用（M11 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-bingwusuanna-pian-0p2g@nmpa-2020-63128eb8\",\"drugId\":\"drug-bingwusuanna-pian-0p2g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "（9）与卡马西平合用，由于肝酶的诱导而致药物代谢加速，可使二者的血药浓度和半衰期降低，故须检测血药浓度已决定是否需要调整用量。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T07:50:14.580Z"
   }
 ]
