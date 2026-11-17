@@ -3,15 +3,33 @@
  * M5-T4 · 追加：API 基址注入接缝（web 相对 '/'，RN 绝对地址；实例按基址惰性重建）。
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { client, getApiBaseUrl, setApiBaseUrl, setApiNotifier, unwrap } from './client'
+import {
+  client,
+  getApiBaseUrl,
+  setApiBaseUrl,
+  setApiNotifier,
+  setUnauthorizedHandler,
+  settle,
+  unwrap,
+} from './client'
 
-/** 构造一个伪 Response（unwrap 只用 ok/json 两个成员）。 */
-function res(ok: boolean, body: unknown) {
-  return { ok, json: () => Promise.resolve(body as { ok: boolean }) }
+/** 构造一个伪 Response（unwrap / settle 只用 ok/status/json 成员）。 */
+function res(ok: boolean, body: unknown, status?: number) {
+  return { ok, status, json: () => Promise.resolve(body as { ok: boolean }) }
+}
+
+/** 构造一个「响应体不是 JSON」的伪 Response（网关 HTML 报错页 / 502 空响应）。 */
+function brokenRes(status: number) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON at position 0')),
+  }
 }
 
 afterEach(() => {
   setApiNotifier({ onError: () => {} })
+  setUnauthorizedHandler(null)
 })
 
 describe('unwrap · 成功分支', () => {
@@ -40,6 +58,68 @@ describe('unwrap · 失败分支必须可见（执行总纲 §0.5）', () => {
 
   it('未装配 notifier（默认 no-op）→ 依然抛错：提示可以没有，错误不能静默', async () => {
     await expect(unwrap(res(false, { ok: false, message: '炸了' }))).rejects.toThrow('炸了')
+  })
+})
+
+// ── G8：响应体不可解析（网关 HTML 报错页 / 502 空响应）→ 中文兜底，不把解析器英文异常交给用户 ──
+
+describe('unwrap · 响应体不是 JSON', () => {
+  it('res.json() 抛错 → 包成中文 ApiRequestError（BAD_RESPONSE），失败仍然可见', async () => {
+    const onError = vi.fn()
+    setApiNotifier({ onError })
+    await expect(unwrap(brokenRes(502))).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      message: '服务返回异常，请稍后重试',
+      code: 'BAD_RESPONSE',
+      status: 502,
+    })
+    expect(onError).toHaveBeenCalledWith('服务返回异常，请稍后重试', 'BAD_RESPONSE')
+  })
+
+  it('silent 调用（登录页/启动检查）→ 不弹出重复提示，但错误照样抛给调用方', async () => {
+    const onError = vi.fn()
+    setApiNotifier({ onError })
+    await expect(unwrap(brokenRes(200), { silent: true })).rejects.toThrow('服务返回异常，请稍后重试')
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('401 且响应体不可解析 → 仍触发登录失效出口（清登录态跳登录页）', async () => {
+    const onUnauthorized = vi.fn()
+    setUnauthorizedHandler(onUnauthorized)
+    await expect(unwrap(brokenRes(401))).rejects.toThrow('服务返回异常，请稍后重试')
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('settle · 响应体不是 JSON（失败卡直接消费 message）', () => {
+  it('res.json() 抛错 → 返回中文失败分支（BAD_RESPONSE），不把解析器异常抛给页面', async () => {
+    await expect(settle(brokenRes(502))).resolves.toEqual({
+      ok: false,
+      status: 502,
+      code: 'BAD_RESPONSE',
+      message: '服务返回异常，请稍后重试',
+      details: {},
+    })
+  })
+
+  it('401 且响应体不可解析 → 仍触发登录失效出口', async () => {
+    const onUnauthorized = vi.fn()
+    setUnauthorizedHandler(onUnauthorized)
+    const result = await settle(brokenRes(401))
+    expect(result.ok).toBe(false)
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+
+  it('服务端业务失败（响应体可解析）行为不变：原样带出 code/message/details', async () => {
+    const result = await settle({
+      ok: false,
+      status: 422,
+      json: () => Promise.resolve({ ok: false, code: 'UNSUPPORTED_OBJECT', message: '该对象暂不支持' }),
+    })
+    const failure = result as Extract<typeof result, { ok: false }>
+    expect(failure.code).toBe('UNSUPPORTED_OBJECT')
+    expect(failure.message).toBe('该对象暂不支持')
+    expect(failure.status).toBe(422)
   })
 })
 

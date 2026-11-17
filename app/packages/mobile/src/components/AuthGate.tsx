@@ -3,7 +3,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { ScrollView, View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { ShieldAlert } from "lucide-react-native";
-import { ApiRequestError, bootstrapAuth, signIn, useAuthStore } from "@anxin/core";
+import { bootstrapAuth, signIn, toUserMessage, useAuthStore } from "@anxin/core";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,6 +24,9 @@ import { Text } from "@/components/ui/text";
  * - error：检查本身失败（网络/服务异常）→ 说明 + 重试，不静默当作未登录；
  * - anonymous：password 模式的登录界面（就渲染在本组件里，不新增登录路由）；
  * - authenticated：直接渲染 children（demo 模式自动通过，既有本地开发行为不变）。
+ *
+ * error 在 core/bootstrapAuth 写入 store 前已归成中文（G8）；这里再过一次 toUserMessage
+ * 只作兜底，保证任何来源的技术英文都不会直接上屏（G7 真机验收 §9.8 的返工点）。
  *
  * 登录成功后 store 变 authenticated，本组件自然重渲染为 children —— 不做任何手动跳转。
  * 退出登录（设置页）把 store 切回 anonymous，本组件同样自动切回登录界面。
@@ -52,7 +55,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           <CardHeader>
             <CardTitle className="text-xl">暂时无法确认登录状态</CardTitle>
             <CardDescription className="text-base leading-7">
-              {error ?? "请检查网络或服务器连接后重试。"}
+              {toUserMessage(error, "请检查网络或服务器连接后重试。")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -96,9 +99,9 @@ function LoginScreen() {
       // 成功后 store 切 authenticated → AuthGate 重渲染为 children，这里无需跳转；
       // 失败文案直接用服务端返回（账号或密码错误 / 登录尝试次数过多…），网络异常换人话。
     } catch (err) {
-      setFailure(
-        err instanceof ApiRequestError ? err.message : "网络连接失败，请检查网络后重试",
-      );
+      // 服务端中文 message 原样透传（账号或密码错误 / 登录尝试次数过多…）；
+      // 断网、超时、服务异常等英文技术错误由 core 统一换成中文，绝不原样上屏。
+      setFailure(toUserMessage(err, "登录失败，请稍后重试"));
     } finally {
       setPending(false);
     }

@@ -1,6 +1,7 @@
 import { hc } from 'hono/client'
 import type { AppType } from '@anxin/api'
 import type { ConsultSkillId, DraftConfirm } from '@anxin/shared'
+import { BAD_RESPONSE_ERROR_CODE, BAD_RESPONSE_ERROR_MESSAGE } from '../lib/error-messages'
 
 /**
  * hc<AppType> 端到端类型客户端（技术方案 §1）。
@@ -133,6 +134,9 @@ export class ApiRequestError extends Error {
  * 统一拆包 + 错误提示：res.ok 或 body.ok 为假时，解析 { ok:false, code, message } → 交给注入的
  * notifier 报错并抛错。成功返回精确响应体（hc<AppType> 推导）。禁止静默吞错（执行总纲 §0.5）。
  *
+ * 响应体不是合法 JSON（网关 HTML 报错页、502 空响应、断网时被代理截断）时不能把
+ * 解析器异常原样抛给调用方——包成中文 ApiRequestError（BAD_RESPONSE），失败仍然可见。
+ *
  * opts.silent：调用方自己渲染错误（登录页/启动 bootstrap）时置 true，避免重复 toast；
  * 错误仍然抛出，只是不提示——不改变「失败可见」原则。
  */
@@ -140,7 +144,14 @@ export async function unwrap<T extends { ok: boolean }>(
   res: { ok: boolean; status?: number; json(): Promise<T> },
   opts: { silent?: boolean } = {},
 ): Promise<T> {
-  const body = await res.json()
+  let body: T
+  try {
+    body = await res.json()
+  } catch {
+    if (!opts.silent) apiNotifier.onError(BAD_RESPONSE_ERROR_MESSAGE, BAD_RESPONSE_ERROR_CODE)
+    notifyUnauthorized(res.status)
+    throw new ApiRequestError(BAD_RESPONSE_ERROR_MESSAGE, BAD_RESPONSE_ERROR_CODE, res.status)
+  }
   if (!res.ok || !body.ok) {
     const err = body as unknown as { message?: string; code?: string }
     const message = typeof err.message === 'string' ? err.message : '请求失败，请稍后重试'
@@ -240,7 +251,20 @@ export async function settle<T extends { ok: boolean }>(res: {
   status: number
   json(): Promise<T>
 }): Promise<Settled<Omit<T, 'ok'>>> {
-  const body = await res.json()
+  let body: T
+  try {
+    body = await res.json()
+  } catch {
+    // 响应体不可解析：与 unwrap 同一套中文兜底（settle 的 message 会被录入失败卡直接展示）。
+    notifyUnauthorized(res.status)
+    return {
+      ok: false,
+      status: res.status,
+      code: BAD_RESPONSE_ERROR_CODE,
+      message: BAD_RESPONSE_ERROR_MESSAGE,
+      details: {},
+    }
+  }
   if (res.ok && body.ok) {
     const { ok: _ok, ...data } = body
     return { ok: true, data: data as Omit<T, 'ok'> }

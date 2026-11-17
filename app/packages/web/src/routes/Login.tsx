@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router'
-import { ApiRequestError, signIn, useAuthStore } from '@anxin/core'
+import { signIn, toUserMessage, useAuthStore } from '@anxin/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
  *
  * - 已登录访问 → 回原页（state.from）或首页；
  * - demo 模式不会出现本页（/api/auth/me 直接返回 p-001，路由守卫放行）；
- * - 失败文案直接用服务端返回（账号或密码错误 / 登录尝试次数过多…），网络层异常换人话；
+ * - 失败文案优先用服务端返回（账号或密码错误 / 登录尝试次数过多…）；网络/超时/服务异常
+ *   等技术错误统一经 core 的 toUserMessage 归成中文（G8，禁止把 Failed to fetch 原样上屏）；
  * - 无自助注册/找回：账号由 CLI 开通，忘记密码走管理员重置（G7 已知边界）。
  */
 export default function Login() {
@@ -48,7 +49,8 @@ export default function Login() {
       await signIn(account, password)
       // 成功后 store 切 authenticated → 本组件重渲染为 <Navigate>，无需手动跳转。
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : '网络连接失败，请检查网络后重试')
+      // 服务端中文 message 原样透传；网络/超时/服务异常等英文技术错误由 core 统一换中文。
+      setError(toUserMessage(err, '登录失败，请稍后重试'))
     } finally {
       setPending(false)
     }

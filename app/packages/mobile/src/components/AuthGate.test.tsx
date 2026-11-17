@@ -64,6 +64,22 @@ describe("AuthGate · 登录门", () => {
     await waitFor(() => expect(mockBootstrap).toHaveBeenCalledTimes(2));
   });
 
+  it("error 里混入英文技术串 → 展示中文网络文案，不把英文原样上屏", async () => {
+    useAuthStore.setState({ status: "error", mode: null, user: null, error: "Failed to fetch" });
+    const view = await renderGate();
+
+    expect(view.getByText("网络连接失败，请检查网络后重试")).toBeTruthy();
+    expect(view.queryByText("Failed to fetch")).toBeNull();
+  });
+
+  it("error 为空 → 展示中文默认提示，仍给重试入口", async () => {
+    useAuthStore.setState({ status: "error", mode: null, user: null, error: null });
+    const view = await renderGate();
+
+    expect(view.getByText("请检查网络或服务器连接后重试。")).toBeTruthy();
+    expect(view.getByRole("button")).toBeTruthy();
+  });
+
   it("anonymous 渲染登录界面与底部说明，不渲染受保护内容", async () => {
     useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
     const view = await renderGate();
@@ -88,6 +104,32 @@ describe("AuthGate · 登录门", () => {
     expect(await view.findByText("账号或密码错误")).toBeTruthy();
     // pending 结束后按钮文案回到「登录」，即防重复提交的禁用态已解除。
     expect(view.getByText("登录")).toBeTruthy();
+  });
+
+  it("断网/网络层异常 → 内联展示中文「网络连接失败」，不露英文技术串", async () => {
+    useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
+    mockSignIn.mockRejectedValue(new TypeError("Network request failed"));
+    const view = await renderGate();
+
+    await fireEvent.changeText(view.getByLabelText("账号"), "demo-user");
+    await fireEvent.changeText(view.getByLabelText("密码"), "secret-123");
+    await fireEvent.press(view.getByRole("button"));
+
+    expect(await view.findByText("网络连接失败，请检查网络后重试")).toBeTruthy();
+    expect(view.queryByText("Network request failed")).toBeNull();
+  });
+
+  it("英文服务异常（500）→ 内联展示中文「服务暂时不可用」", async () => {
+    useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
+    mockSignIn.mockRejectedValue(new ApiRequestError("Internal Server Error", undefined, 500));
+    const view = await renderGate();
+
+    await fireEvent.changeText(view.getByLabelText("账号"), "demo-user");
+    await fireEvent.changeText(view.getByLabelText("密码"), "secret-123");
+    await fireEvent.press(view.getByRole("button"));
+
+    expect(await view.findByText("服务暂时不可用，请稍后重试")).toBeTruthy();
+    expect(view.queryByText("Internal Server Error")).toBeNull();
   });
 
   it("authenticated 直接放行 children", async () => {

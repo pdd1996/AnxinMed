@@ -64,6 +64,24 @@ describe('Login 页 · 账号密码登录', () => {
     expect(alert.textContent).toContain('登录尝试次数过多')
   })
 
+  it('断网/网络层异常 → 展示中文「网络连接失败」，不把英文技术串上屏', async () => {
+    mocks.signIn.mockRejectedValue(new TypeError('Failed to fetch'))
+    renderLogin()
+    fillAndSubmit('demo-user', 'secret-123')
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('网络连接失败，请检查网络后重试')
+    expect(alert.textContent).not.toContain('Failed to fetch')
+  })
+
+  it('英文服务异常（500）→ 展示中文「服务暂时不可用」', async () => {
+    mocks.signIn.mockRejectedValue(new ApiRequestError('Internal Server Error', undefined, 500))
+    renderLogin()
+    fillAndSubmit('demo-user', 'secret-123')
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('服务暂时不可用，请稍后重试')
+    expect(alert.textContent).not.toContain('Internal Server Error')
+  })
+
   it('空表单提交 → 不请求接口，提示请输入账号和密码', async () => {
     renderLogin()
     fireEvent.click(screen.getByRole('button', { name: '登录' }))

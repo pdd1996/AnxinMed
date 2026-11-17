@@ -12,6 +12,7 @@ import { ERR_CODES } from '@anxin/shared'
 import { ApiRequestError, setAuthToken } from '../api/client'
 import { fetchAuthMe, loginWithPassword, logoutSession } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
+import { toUserMessage } from './errors'
 
 /** 各端注入的 token 持久化后端（读/写/清）。未注入 = 纯内存（App 冷启动需重新登录）。 */
 export interface AuthTokenStorage {
@@ -80,7 +81,8 @@ export async function bootstrapAuth(): Promise<void> {
       await clearLocalSession()
       return
     }
-    authStore().setError(error instanceof Error ? error.message : '登录状态检查失败，请重试')
+    // 技术异常（断网 / 超时 / 服务异常）先归成中文再进 store：界面直接展示，绝不露英文技术串。
+    authStore().setError(toUserMessage(error, '登录状态检查失败，请重试'))
   }
 }
 

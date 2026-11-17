@@ -87,12 +87,27 @@ describe('bootstrapAuth · 启动恢复', () => {
     expect(mocks.setAuthToken).toHaveBeenLastCalledWith(null)
   })
 
-  it('网络/服务异常 → error 状态（不静默当未登录）', async () => {
-    mocks.fetchAuthMe.mockRejectedValue(new Error('Failed to fetch'))
+  it('网络异常 → error 状态，store 里是中文文案（不静默当未登录，也不露英文技术串）', async () => {
+    mocks.fetchAuthMe.mockRejectedValue(new TypeError('Failed to fetch'))
     await bootstrapAuth()
     expect(useAuthStore.getState().status).toBe('error')
-    expect(useAuthStore.getState().error).toContain('Failed to fetch')
+    expect(useAuthStore.getState().error).toBe('网络连接失败，请检查网络后重试')
+    expect(useAuthStore.getState().error).not.toContain('Failed to fetch')
     expect(storage.clear).not.toHaveBeenCalled()
+  })
+
+  it('英文服务异常（500）→ error 状态展示中文「服务暂时不可用」', async () => {
+    mocks.fetchAuthMe.mockRejectedValue(new ApiRequestError('Internal Server Error', undefined, 500))
+    await bootstrapAuth()
+    expect(useAuthStore.getState().status).toBe('error')
+    expect(useAuthStore.getState().error).toBe('服务暂时不可用，请稍后重试')
+  })
+
+  it('无法归类的异常 → 中文兜底「登录状态检查失败，请重试」', async () => {
+    mocks.fetchAuthMe.mockRejectedValue(new Error('boom'))
+    await bootstrapAuth()
+    expect(useAuthStore.getState().status).toBe('error')
+    expect(useAuthStore.getState().error).toBe('登录状态检查失败，请重试')
   })
 
   it('幂等：已登录时重复调用不再请求', async () => {

@@ -63,4 +63,18 @@ describe('RequireAuth · 登录守卫', () => {
     expect(screen.getByText('网络连接失败')).toBeTruthy()
     expect(screen.getByRole('button', { name: '重试' })).toBeTruthy()
   })
+
+  it('error 里混入英文技术串 → 展示中文网络文案（兜底不让英文上屏）', () => {
+    useAuthStore.setState({ status: 'error', mode: null, user: null, error: 'Failed to fetch' })
+    renderGate()
+    expect(screen.getByText('网络连接失败，请检查网络后重试')).toBeTruthy()
+    expect(screen.queryByText('Failed to fetch')).toBeNull()
+  })
+
+  it('error 为空 → 展示中文默认提示，仍给重试入口', () => {
+    useAuthStore.setState({ status: 'error', mode: null, user: null, error: null })
+    renderGate()
+    expect(screen.getByText('请检查网络或服务器连接后重试。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '重试' })).toBeTruthy()
+  })
 })
