@@ -225,6 +225,8 @@ curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '已登录 /api/drug
 > 账号清单建议与演示用户一一对应（p-001 起），初始密码随机生成、一次性交付给演示人；
 > 忘记密码只能管理员 CLI 重置（G7 不做自助找回）。
 
+**6.6 实跑记录（2026-11-17/18，`iv-yeha6zo9a8qbxyrwefzp`）**：迁移 0012 经隧道应用成功 → `docker compose build` 17m 后 `up -d` 成功 → 15 个账号（`p-001`…`p-107`）批量开通 → 公网验证：未登录 `/api/drugs` 401、p-001 登录 200、p-002 数据隔离、退出后旧 token 401。真机（PJZ110 / Android 15）登录/退出/重启保持/断网重试均通过，详见 [G7-真机验收.md](../../packages/mobile/G7-真机验收.md)。
+
 ## 7. 验收（05 任务书 T1 完成标准逐条）
 
 | # | 验收项 | 命令 / 做法 | 期望 |
