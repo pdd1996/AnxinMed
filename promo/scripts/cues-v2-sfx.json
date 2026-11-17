@@ -1,0 +1,341 @@
+{
+  "duration": 30,
+  "bpm": 120,
+  "loop": false,
+  "palette": "ink",
+  "mix": {
+    "bright": 0.42,
+    "reverb": 0.3
+  },
+  "seed": 7,
+  "master": 0.9,
+  "events": [
+    {
+      "t": 0.5,
+      "type": "bell",
+      "note": "E5",
+      "gain": 0.14
+    },
+    {
+      "t": 1.5,
+      "type": "bell",
+      "note": "A4",
+      "gain": 0.1
+    },
+    {
+      "t": 4,
+      "type": "knock",
+      "freq": 700,
+      "gain": 0.08
+    },
+    {
+      "t": 5,
+      "type": "whoosh",
+      "dur": 0.5,
+      "gain": 0.22
+    },
+    {
+      "t": 5.1,
+      "type": "scratch",
+      "dur": 0.5,
+      "gain": 0.07
+    },
+    {
+      "t": 5.375,
+      "type": "tick",
+      "freq": 3000,
+      "gain": 0.12
+    },
+    {
+      "t": 5.5,
+      "type": "tick",
+      "freq": 3200,
+      "gain": 0.1
+    },
+    {
+      "t": 5.625,
+      "type": "tick",
+      "freq": 3400,
+      "gain": 0.08
+    },
+    {
+      "t": 6.75,
+      "type": "whoosh",
+      "dur": 0.3,
+      "gain": 0.12
+    },
+    {
+      "t": 7,
+      "type": "whoosh",
+      "dur": 0.6,
+      "gain": 0.18
+    },
+    {
+      "t": 7.2,
+      "type": "tick",
+      "freq": 2400,
+      "gain": 0.1,
+      "pan": -0.4
+    },
+    {
+      "t": 7.55,
+      "type": "tick",
+      "freq": 2600,
+      "gain": 0.09,
+      "pan": -0.2
+    },
+    {
+      "t": 7.85,
+      "type": "tick",
+      "freq": 2800,
+      "gain": 0.08,
+      "pan": 0.2
+    },
+    {
+      "t": 8.1,
+      "type": "tick",
+      "freq": 3000,
+      "gain": 0.07,
+      "pan": 0.4
+    },
+    {
+      "t": 8.6667,
+      "type": "whoosh",
+      "dur": 0.33,
+      "gain": 0.16
+    },
+    {
+      "t": 9,
+      "type": "knock",
+      "gain": 0.3
+    },
+    {
+      "t": 9,
+      "type": "bell",
+      "note": "D5",
+      "gain": 0.18
+    },
+    {
+      "t": 9.25,
+      "type": "tick",
+      "freq": 3600,
+      "gain": 0.08
+    },
+    {
+      "t": 10,
+      "type": "whoosh",
+      "dur": 0.4,
+      "gain": 0.18
+    },
+    {
+      "t": 10.65,
+      "type": "knock",
+      "freq": 700,
+      "gain": 0.12
+    },
+    {
+      "t": 11.05,
+      "type": "tick",
+      "freq": 2600,
+      "gain": 0.16
+    },
+    {
+      "t": 11.45,
+      "type": "tick",
+      "freq": 2900,
+      "gain": 0.13
+    },
+    {
+      "t": 11.7,
+      "type": "tick",
+      "freq": 3200,
+      "gain": 0.1
+    },
+    {
+      "t": 12.25,
+      "type": "knock",
+      "freq": 620,
+      "gain": 0.18
+    },
+    {
+      "t": 12.75,
+      "type": "knock",
+      "freq": 660,
+      "gain": 0.15
+    },
+    {
+      "t": 13.25,
+      "type": "knock",
+      "freq": 700,
+      "gain": 0.12
+    },
+    {
+      "t": 13.25,
+      "type": "bell",
+      "note": "A4",
+      "gain": 0.1
+    },
+    {
+      "t": 13.75,
+      "type": "bell",
+      "note": "E5",
+      "gain": 0.08
+    },
+    {
+      "t": 15,
+      "type": "whoosh",
+      "dur": 0.45,
+      "gain": 0.26
+    },
+    {
+      "t": 15,
+      "type": "boom",
+      "freq": 40,
+      "dur": 1.2,
+      "gain": 0.22
+    },
+    {
+      "t": 16.5,
+      "type": "knock",
+      "freq": 500,
+      "gain": 0.14
+    },
+    {
+      "t": 17,
+      "type": "knock",
+      "freq": 440,
+      "dur": 0.3,
+      "gain": 0.32
+    },
+    {
+      "t": 17.05,
+      "type": "scratch",
+      "dur": 0.6,
+      "gain": 0.05
+    },
+    {
+      "t": 18.4667,
+      "type": "tick",
+      "freq": 3600,
+      "gain": 0.14
+    },
+    {
+      "t": 18.4667,
+      "type": "knock",
+      "freq": 800,
+      "gain": 0.12
+    },
+    {
+      "t": 18.6,
+      "type": "knock",
+      "freq": 600,
+      "gain": 0.1
+    },
+    {
+      "t": 18.8,
+      "type": "bell",
+      "note": "A4",
+      "gain": 0.1
+    },
+    {
+      "t": 20,
+      "type": "whoosh",
+      "dur": 0.4,
+      "gain": 0.18
+    },
+    {
+      "t": 20.5,
+      "type": "scratch",
+      "dur": 0.9,
+      "gain": 0.07
+    },
+    {
+      "t": 22,
+      "type": "knock",
+      "gain": 0.22
+    },
+    {
+      "t": 23.5,
+      "type": "knock",
+      "freq": 900,
+      "gain": 0.12
+    },
+    {
+      "t": 23.75,
+      "type": "bell",
+      "note": "A4",
+      "gain": 0.1
+    },
+    {
+      "t": 25,
+      "type": "whoosh",
+      "dur": 1,
+      "gain": 0.24
+    },
+    {
+      "t": 26.5,
+      "type": "boom",
+      "freq": 38,
+      "dur": 1.6,
+      "gain": 0.26
+    },
+    {
+      "t": 26.5,
+      "type": "knock",
+      "gain": 0.2
+    },
+    {
+      "t": 26.5,
+      "type": "bell",
+      "note": "D5",
+      "gain": 0.22
+    },
+    {
+      "t": 27,
+      "type": "bell",
+      "note": "A4",
+      "gain": 0.14
+    },
+    {
+      "t": 27,
+      "type": "knock",
+      "freq": 760,
+      "gain": 0.12,
+      "pan": -0.5
+    },
+    {
+      "t": 27.2667,
+      "type": "pluck",
+      "note": "D4",
+      "gain": 0.12
+    },
+    {
+      "t": 27.3,
+      "type": "knock",
+      "freq": 820,
+      "gain": 0.1,
+      "pan": 0.5
+    },
+    {
+      "t": 27.55,
+      "type": "knock",
+      "freq": 880,
+      "gain": 0.08,
+      "pan": -0.3
+    },
+    {
+      "t": 27.75,
+      "type": "knock",
+      "freq": 940,
+      "gain": 0.06,
+      "pan": 0.3
+    },
+    {
+      "t": 28.75,
+      "type": "bell",
+      "note": "D5",
+      "dur": 3,
+      "gain": 0.16
+    }
+  ]
+}

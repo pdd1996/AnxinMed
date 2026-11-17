@@ -1,6 +1,8 @@
 import React from 'react';
 import {Composition} from 'remotion';
 import {Film} from './Film';
+import {FilmV2} from './FilmV2';
+import {Sample} from './Sample';
 import {Paper} from './lib/motion';
 import {COLOR, FILM} from './spec';
 
@@ -11,6 +13,9 @@ export const Root: React.FC = () => (
   <>
     <Composition id="Film" component={Film} durationInFrames={Math.round(FILM.duration * FILM.fps)}
       fps={FILM.fps} width={FILM.width} height={FILM.height} />
+    <Composition id="FilmV2" component={FilmV2} durationInFrames={Math.round(FILM.duration * FILM.fps)}
+      fps={FILM.fps} width={FILM.width} height={FILM.height} />
     <Composition id="Paper" component={PaperStill} durationInFrames={1} fps={FILM.fps} width={FILM.width} height={FILM.height} />
+    <Composition id="Sample" component={Sample} durationInFrames={20 * FILM.fps} fps={FILM.fps} width={FILM.width} height={FILM.height} />
   </>
 );

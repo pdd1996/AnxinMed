@@ -17,6 +17,7 @@
   "dependencies": {
     "@remotion/cli": "4.0.537",
     "@remotion/google-fonts": "4.0.537",
+    "@remotion/motion-blur": "^4.0.537",
     "@remotion/noise": "4.0.537",
     "@remotion/paths": "4.0.537",
     "@remotion/shapes": "4.0.537",

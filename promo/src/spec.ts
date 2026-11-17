@@ -30,6 +30,7 @@ export const COPY = {                                                           
   s2scan: '拍一下，认得出',
   fields: [['通用名', '阿托伐他汀钙片'], ['规格', '20mg'], ['剂型', '片剂']],
   s2cap: '所有药，一个药箱',
+  s2flock: '医院、药店、网购——收进一个箱',
   boxCountSuffix: ' 种药已入箱',
   s3title: '今日服药',
   s3stamp: '依从',
