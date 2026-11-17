@@ -101,11 +101,21 @@ async function main(): Promise<number> {
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Candidate)
-  const selected = selectTwenty(all)
+  const indicesArg = arg('--indices')
+  const selected = indicesArg
+    ? indicesArg
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isInteger(n) && n >= 0)
+        .map((i) => all[i])
+        .filter((c): c is Candidate => Boolean(c))
+    : selectTwenty(all)
   if (selected.length === 0) {
     console.error('❌ 没有可签核候选（先跑 db:rule-candidates）')
     return 1
   }
+  const outPrefix = arg('--out-prefix') ?? 'signoff-20'
+  const batchLabel = `${selected.length} 条窄批`
 
   const drugRows = (await db
     .select({ id: drugMaster.id, genericName: drugMaster.genericName, brandName: drugMaster.brandName, form: drugMaster.form })
@@ -264,6 +274,8 @@ async function main(): Promise<number> {
   }
   const report = {
     generatedAt: new Date().toISOString(),
+    batchId: outPrefix,
+    batchLabel,
     source: inPath,
     totalSelected: items.length,
     byLevel,
@@ -274,10 +286,10 @@ async function main(): Promise<number> {
     groupDetails,
     note: '只产出签核清单；proposedRule 是草案，reviewedBy 空白；签核人逐条 pass/改判/reject 后才另起入库任务。',
   }
-  writeFileSync(join(outDir, 'signoff-20.json'), `${JSON.stringify(report, null, 2)}\n`)
+  writeFileSync(join(outDir, `${outPrefix}.json`), `${JSON.stringify(report, null, 2)}\n`)
 
   const md: string[] = []
-  md.push('# M10-T2 · 规则签核清单（20 条窄批）')
+  md.push(`# 规则签核清单（${batchLabel}）`)
   md.push('')
   md.push(`生成：${report.generatedAt} · 来源候选池：${all.length} 条 · 本批 **${items.length}** 条（禁忌 ${byLevel['禁忌'] ?? 0} / 慎用 ${byLevel['慎用'] ?? 0} / 需监测 ${byLevel['需监测'] ?? 0}）`)
   md.push('')
@@ -303,12 +315,12 @@ async function main(): Promise<number> {
   md.push('2. `db:seed-interaction-rules --check` 必须全过（逐字/来源/概念组一致性）；')
   md.push('3. `--apply` 后再跑 `db:audit` 与规则命中测试；')
   md.push('4. 本批之外的候选仍留在候选池，不自动入库。')
-  writeFileSync(join(outDir, 'signoff-20.md'), md.join('\n') + '\n')
-  writeFileSync(join(outDir, 'signoff-20.html'), renderReviewHtml(report))
+  writeFileSync(join(outDir, `${outPrefix}.md`), md.join('\n') + '\n')
+  writeFileSync(join(outDir, `${outPrefix}.html`), renderReviewHtml(report))
 
   console.log(`\n✅ 签核清单：${items.length} 条（禁忌 ${byLevel['禁忌'] ?? 0} / 慎用 ${byLevel['慎用'] ?? 0} / 需监测 ${byLevel['需监测'] ?? 0}）`)
   console.log(`   flags：${JSON.stringify(flagCounts)}；逐字失败 ${report.verbatimFailures} 条`)
-  console.log(`   输出：${join(outDir, 'signoff-20.json')} / signoff-20.md / signoff-20.html`)
+  console.log(`   输出：${join(outDir, `${outPrefix}.json`)} / ${outPrefix}.md / ${outPrefix}.html`)
   return report.verbatimFailures === 0 ? 0 : 1
 }
 
@@ -320,7 +332,7 @@ function renderReviewHtml(report: unknown): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>M10 · 规则签核清单（20 条）</title>
+<title>规则签核清单</title>
 <style>
   :root { --bg:#f6f5f2; --card:#fffdf9; --ink:#1f2933; --muted:#6b7280; --line:#e5e0d8; --accent:#2f6f5e; --warn:#b45309; --bad:#b91c1c; --chip:#f1ede5; }
   * { box-sizing:border-box; }
@@ -399,7 +411,7 @@ function renderReviewHtml(report: unknown): string {
   <div class="head-inner">
   <div class="head-top">
     <div>
-      <h1>M10 · 规则签核清单 <span class="batch">20 条窄批</span></h1>
+      <h1>规则签核清单 <span class="batch" id="batchLabel">20 条窄批</span></h1>
       <div class="meta">只做人工签核，不写库。通过 = 你确认「原文逐字、分级合理、概念组不误伤」；改判/拒绝请写清原因。</div>
     </div>
     <div class="head-actions">
@@ -436,6 +448,7 @@ function renderReviewHtml(report: unknown): string {
 <script>
 (function () {
   var report = JSON.parse(document.getElementById('report').textContent);
+  document.getElementById('batchLabel').textContent = report.batchLabel || '规则签核';
   var KEY = 'm10-signoff-v1';
   var LEVELS = ['禁忌', '慎用', '需监测', '注意'];
   var FLAG_HELP = {
@@ -605,11 +618,11 @@ function renderReviewHtml(report: unknown): string {
       decisions.push({ index: it.index, decision: s.decision, level: s.level || it.level, note: s.note || '', reason: s.reason || '' });
     });
     if (decisions.length === 0) { alert('还没有任何判定'); return; }
-    var out = { schemaVersion: 1, batchId: 'm10-signoff-20', reviewer: r, exportedAt: new Date().toISOString(), total: report.items.length, decisions: decisions };
+    var out = { schemaVersion: 1, batchId: report.batchId || 'm10-signoff-20', reviewer: r, exportedAt: new Date().toISOString(), total: report.items.length, decisions: decisions };
     var blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'signoff-20-decisions.json';
+    a.download = (report.batchId || 'signoff-20') + '-decisions.json';
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     document.getElementById('hint').textContent = '已导出 ' + decisions.length + ' 条；把文件放到 data/m10-reports/ 或发回对话。';
