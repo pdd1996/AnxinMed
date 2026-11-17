@@ -464,7 +464,8 @@ function renderReviewHtml(report: unknown): string {
 (function () {
   var report = JSON.parse(document.getElementById('report').textContent);
   document.getElementById('batchLabel').textContent = report.batchLabel || '规则签核';
-  var KEY = 'm10-signoff-v1';
+  // 批次隔离的 localStorage key：不同批次签核页不能复用同一份进度（否则会把上一批判定套到新条目上）
+  var KEY = 'anxin-signoff-' + (report.batchId || 'default');
   var LEVELS = ['禁忌', '慎用', '需监测', '注意'];
   var FLAG_HELP = {
     quoteExpanded: '引文已扩到完整句，需复核语义范围',
