@@ -76,7 +76,8 @@ export async function listPatientsWithStats(days = 30): Promise<PatientListItem[
 
   // 常数 4 次查询（患者数无关；原实现逐用户 3-4 次循环 → N+1，spec §T7.2 硬要求改造）
   const [userRows, healthRows, planCounts, adherence, lastActives] = await Promise.all([
-    db.select().from(users).orderBy(users.id),
+    // 只取展示所需列：G7 起 users 含 password_hash，禁止整行 select 后不慎序列化到响应。
+    db.select({ id: users.id, name: users.name, createdAt: users.createdAt }).from(users).orderBy(users.id),
     db.select().from(healthProfiles),
     db
       .select({

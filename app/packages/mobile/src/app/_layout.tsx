@@ -6,6 +6,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { AuthGate } from "@/components/AuthGate";
 import { FontScaleSync } from "@/components/FontScaleSync";
 import { NotificationSync } from "@/components/NotificationSync";
 import { OnboardingGate } from "@/components/OnboardingGate";
@@ -37,22 +38,26 @@ export default function RootLayout() {
           {/* 本地到点提醒（M5-T8）：不挂在今日页里——系统通知必须比页面活得久。 */}
           <NotificationSync />
           <OnboardingGate>
-            <Stack
-              screenOptions={{
-                headerTitleAlign: "center",
-                headerTitleStyle: { fontWeight: "600" },
-              }}
-            >
-              <Stack.Screen name="(patient)" options={{ headerShown: false }} />
-              <Stack.Screen name="intake/flow" options={{ title: "拍照录入" }} />
-              <Stack.Screen name="intake/rx" options={{ title: "拍照录入" }} />
-              <Stack.Screen name="intake/drug" options={{ title: "拍照录入" }} />
-              <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
-              <Stack.Screen name="records" options={{ title: "服药记录" }} />
-              <Stack.Screen name="settings" options={{ title: "设置" }} />
-              <Stack.Screen name="notification-settings" options={{ title: "通知与提醒设置" }} />
-              <Stack.Screen name="probe" options={{ title: "网络探测" }} />
-            </Stack>
+            {/* 登录门（G7）：声明卡确认之后再检查登录态——首次用户先看到声明，再看到登录页；
+                demo 模式 /api/auth/me 直接放行，password 模式在这里登录后才进路由。 */}
+            <AuthGate>
+              <Stack
+                screenOptions={{
+                  headerTitleAlign: "center",
+                  headerTitleStyle: { fontWeight: "600" },
+                }}
+              >
+                <Stack.Screen name="(patient)" options={{ headerShown: false }} />
+                <Stack.Screen name="intake/flow" options={{ title: "拍照录入" }} />
+                <Stack.Screen name="intake/rx" options={{ title: "拍照录入" }} />
+                <Stack.Screen name="intake/drug" options={{ title: "拍照录入" }} />
+                <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
+                <Stack.Screen name="records" options={{ title: "服药记录" }} />
+                <Stack.Screen name="settings" options={{ title: "设置" }} />
+                <Stack.Screen name="notification-settings" options={{ title: "通知与提醒设置" }} />
+                <Stack.Screen name="probe" options={{ title: "网络探测" }} />
+              </Stack>
+            </AuthGate>
           </OnboardingGate>
           <Toaster />
           {/* Dialog / Sheet 的内容经 @rn-primitives/portal 的 Portal 走 zustand 挂载表，

@@ -14,6 +14,9 @@
  */
 
 export * from './api/client'
+export * from './api/auth'
+export * from './stores/auth'
+export * from './lib/auth'
 export * from './stores/fontScale'
 export * from './stores/intakeSession'
 export * from './stores/reminderQueue'

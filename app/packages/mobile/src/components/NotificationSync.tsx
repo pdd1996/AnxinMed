@@ -3,7 +3,7 @@ import { AppState } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
-import { fetchDrugs, fetchPlans } from "@anxin/core";
+import { fetchDrugs, fetchPlans, useAuthStore } from "@anxin/core";
 import { isApiConfigured } from "@/lib/wiring";
 import { syncRemindersFromServer } from "@/lib/reminder-sync";
 import { useReminderSync } from "@/stores/reminderSync";
@@ -13,20 +13,34 @@ import { useReminderSync } from "@/stores/reminderSync";
  *
  * 放在根布局里（不依赖任何页面是否挂载）——今日页只在打开期间轮询，系统通知必须比页面活得久。
  * 提醒内容全部来自用户亲自确认的计划；没有计划时排定结果为空，不产生任何通知。
+ *
+ * 登录门（G7）：本组件挂在 AuthGate 之外、先于 bootstrapAuth 挂载；password 模式冷启动时
+ * token 还在 AsyncStorage 里异步恢复，若照常请求 /api/plans、/api/drugs，401 会经 core 的
+ * unauthorized handler 把刚恢复的登录态清掉。故所有服务端读取与同步都等 status=authenticated
+ * （demo 模式 /api/auth/me 很快放行，延迟可忽略）。
  */
 export function NotificationSync() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const configured = isApiConfigured();
+  const authenticated = useAuthStore((s) => s.status === "authenticated");
   const lastResponse = Notifications.useLastNotificationResponse();
   const handledResponse = useRef<string | null>(null);
   // 订阅与药箱页相同的查询键：计划/药品一变（新建、暂停、结束、删药）就重排。
-  const plansQuery = useQuery({ queryKey: ["plans"], queryFn: fetchPlans, enabled: configured });
-  const drugsQuery = useQuery({ queryKey: ["drugs"], queryFn: fetchDrugs, enabled: configured });
+  const plansQuery = useQuery({
+    queryKey: ["plans"],
+    queryFn: fetchPlans,
+    enabled: configured && authenticated,
+  });
+  const drugsQuery = useQuery({
+    queryKey: ["drugs"],
+    queryFn: fetchDrugs,
+    enabled: configured && authenticated,
+  });
 
   const sync = useCallback(
     async (force: boolean) => {
-      if (!configured) return;
+      if (!configured || !authenticated) return;
       useReminderSync.getState().markSyncing();
       try {
         await syncRemindersFromServer(queryClient, { force });
@@ -37,7 +51,7 @@ export function NotificationSync() {
           .applyError(error instanceof Error ? error.message : "提醒排定失败，请检查网络");
       }
     },
-    [configured, queryClient],
+    [authenticated, configured, queryClient],
   );
 
   useEffect(() => {
@@ -64,21 +78,22 @@ export function NotificationSync() {
 
   // 点击通知（含冷启动）→ 回今日页处理。只认 1 分钟内的响应，避免冷启动翻出很久以前的旧响应。
   useEffect(() => {
+    if (!authenticated) return;
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       handledResponse.current = response.notification.request.identifier;
       router.push("/");
     });
     return () => subscription.remove();
-  }, [router]);
+  }, [authenticated, router]);
 
   useEffect(() => {
-    if (!lastResponse) return;
+    if (!authenticated || !lastResponse) return;
     const identifier = lastResponse.notification.request.identifier;
     if (handledResponse.current === identifier) return;
     if (Date.now() - lastResponse.notification.date > 60_000) return;
     handledResponse.current = identifier;
     router.push("/");
-  }, [lastResponse, router]);
+  }, [authenticated, lastResponse, router]);
 
   return null;
 }

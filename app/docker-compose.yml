@@ -27,6 +27,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: "8787"
+      # G7：受控验收默认必须登录（旧 .env 没有该键也 fail-closed，不给公网留免登录旁路）；
+      # 显式写 AUTH_MODE=demo 才回到注入 p-001 的演示旁路。
+      AUTH_MODE: ${AUTH_MODE:-password}
       # 指向 compose 内的 db 服务；口令与 db 服务同源（deploy/.env.example 的 POSTGRES_PASSWORD）。
       # environment 优先级高于 env_file，故 .env 里那条指向宿主 localhost 的 DATABASE_URL 不会漏进来。
       DATABASE_URL: postgres://anxin:${POSTGRES_PASSWORD:-anxin_dev_2026}@db:5432/anxin_medication

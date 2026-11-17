@@ -85,6 +85,13 @@
       "when": 1794875840717,
       "tag": "0011_m10_interaction_rule_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794925371244,
+      "tag": "0012_g7_auth_accounts",
+      "breakpoints": true
     }
   ]
 }

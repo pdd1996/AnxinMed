@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
-import { Type, Bell, Wifi } from "lucide-react-native";
+import { Type, Bell, Wifi, LogOut, UserRound } from "lucide-react-native";
+import { signOut, useAuthStore } from "@anxin/core";
 import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Text 必须走 ui/text：09-30 深夜修过一条「settings.tsx 直引 react-native 的 Text，接不到
@@ -23,6 +25,20 @@ export default function Settings() {
   const reminderPermission = useReminderSync((s) => s.permission);
   // 图标是 SVG，取 --primary 令牌而不是写死色值（深浅色都要对，05d §6 第 16 条）。
   const primary = useUnstableNativeVariable("--primary");
+  // 登录态（G7）：password 模式展示当前账号并可退出；demo 模式是演示旁路，退出无意义故只写说明。
+  const authMode = useAuthStore((s) => s.mode);
+  const authUser = useAuthStore((s) => s.user);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+      // 退出后 store 切 anonymous，AuthGate 自动切回登录页；本页随之卸载，无需手动导航。
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   return (
     <ScrollView
@@ -67,6 +83,45 @@ export default function Settings() {
           <RiskBadge level="L3" />
           <RiskBadge level="L4" />
         </View>
+      </View>
+
+      {/* 账号（G7）：password 模式展示当前用户 + 退出；demo 模式免登录，说明清楚即可。 */}
+      <View className="mt-8 gap-2">
+        <View className="flex-row items-center gap-2">
+          <UserRound size={20} color={primary} importantForAccessibility="no" />
+          <Text className="text-lg font-semibold text-foreground">账号</Text>
+        </View>
+        {authMode === "demo" ? (
+          <Text className="text-sm leading-6 text-muted-foreground">
+            演示模式（免登录）：当前数据归属演示用户
+            <Text className="font-bold text-foreground">
+              {authUser?.name ?? authUser?.username ?? "p-001"}
+            </Text>
+            。正式验收环境会要求账号密码登录。
+          </Text>
+        ) : (
+          <>
+            <Text className="text-sm leading-6 text-muted-foreground">
+              当前登录：
+              <Text className="font-bold text-foreground">
+                {authUser?.name ?? authUser?.username ?? "—"}
+              </Text>
+              {authUser?.name && authUser.username ? `（${authUser.username}）` : null}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: signingOut }}
+              disabled={signingOut}
+              onPress={() => void handleSignOut()}
+              className="mt-1 min-h-[52px] flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 active:opacity-80"
+            >
+              <LogOut size={20} color={primary} importantForAccessibility="no" />
+              <Text className="flex-1 text-base font-medium text-card-foreground">
+                {signingOut ? "正在退出…" : "退出登录"}
+              </Text>
+            </Pressable>
+          </>
+        )}
       </View>
 
       <View className="mt-8 gap-2">

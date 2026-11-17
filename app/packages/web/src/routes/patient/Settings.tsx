@@ -1,9 +1,12 @@
-import { Type } from 'lucide-react'
+import { useState } from 'react'
+import { Type, User } from 'lucide-react'
+import { signOut, useAuthStore } from '@anxin/core'
 import { useFontScale, type FontScale } from '@/stores/fontScale'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { RiskBadge } from '@/components/domain/RiskBadge'
+import { Card, CardContent } from '@/components/ui/card'
 
 /**
  * 设置页（M1-T8 起可用）：承载字号两档切换（T8 完成标准的验证入口）+ 风险语义色预览。
@@ -13,6 +16,21 @@ export default function Settings() {
   const scale = useFontScale((s) => s.scale)
   const setScale = useFontScale((s) => s.setScale)
   const toggle = useFontScale((s) => s.toggle)
+
+  // 登录态（G7）：demo 模式显示旁路说明；password 模式显示当前账号 + 退出。
+  const authMode = useAuthStore((s) => s.mode)
+  const user = useAuthStore((s) => s.user)
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      // 退出后 status=anonymous，RequireAuth 自动跳 /login；这里无需手动导航。
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   return (
     <PlaceholderPage title="设置" route="/settings" milestone="M1-T8（字号档已可用）">
@@ -39,6 +57,37 @@ export default function Settings() {
           <Button variant="outline" className="min-h-11" onClick={toggle}>
             切换字号档
           </Button>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
+            <User className="size-5 text-primary" aria-hidden />
+            账号
+          </h2>
+          {authMode === 'demo' ? (
+            <p className="text-sm leading-6 text-muted-foreground">
+              演示模式：当前免登录，数据归属演示用户 <strong className="text-foreground">p-001</strong>。
+              正式验收环境会要求账号密码登录。
+            </p>
+          ) : (
+            <Card>
+              <CardContent className="space-y-3 pt-0">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  当前登录：
+                  <strong className="text-foreground">{user?.name ?? user?.username ?? '—'}</strong>
+                  {user?.username ? <span className="text-muted-foreground">（{user.username}）</span> : null}
+                </p>
+                <Button
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => void handleSignOut()}
+                  disabled={signingOut}
+                >
+                  {signingOut ? '正在退出…' : '退出登录'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </section>
 
         <section className="space-y-3">

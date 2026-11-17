@@ -16,15 +16,38 @@ type ApiClient = ReturnType<typeof hc<AppType>>
 let apiBaseUrl = '/'
 /** 附加请求头（dev-only 测试通道，见 setExtraHeaders）。 */
 let extraHeaders: Record<string, string> = {}
+/** 登录态 Bearer token（G7）：与 extraHeaders 分开，避免 dev 测试通道误覆盖。 */
+let authToken: string | null = null
 let built: { base: string; headersKey: string; client: ApiClient } | null = null
 
+/** 合并请求头：auth token 优先于同名 extraHeaders 键（登录态是唯一真相）。 */
+function requestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { ...extraHeaders }
+  if (authToken) headers.authorization = `Bearer ${authToken}`
+  return headers
+}
+
 function resolveClient(): ApiClient {
-  const headersKey = JSON.stringify(extraHeaders)
+  const headers = requestHeaders()
+  const headersKey = JSON.stringify(headers)
   if (!built || built.base !== apiBaseUrl || built.headersKey !== headersKey) {
-    const init = Object.keys(extraHeaders).length ? { headers: extraHeaders } : undefined
+    const init = Object.keys(headers).length ? { headers } : undefined
     built = { base: apiBaseUrl, headersKey, client: hc<AppType>(apiBaseUrl, init) }
   }
   return built.client
+}
+
+/**
+ * 设置/清除登录 token（G7）。设置后**所有** hc 请求自动带 Authorization: Bearer。
+ * 起效方式与基址相同：改一次、下一次请求前惰性重建客户端（不是每请求重建）。
+ */
+export function setAuthToken(token: string | null): void {
+  authToken = token?.trim() ? token.trim() : null
+}
+
+/** 当前内存中的 token（持久化由各端注入的 AuthTokenStorage 负责，见 lib/auth）。 */
+export function getAuthToken(): string | null {
+  return authToken
 }
 
 /** 装配本端 API 基址（mobile 在平台装配阶段调用；传 '/' 即回到 web 的同源相对路径语义）。 */
@@ -80,18 +103,51 @@ export function setApiNotifier(notifier: ApiNotifier): void {
 }
 
 /**
+ * 401 登录失效出口（G7）：web 跳登录页、App 回登录页。
+ * 与 ApiNotifier 分开：toast 只管提示，清登录态/跳转是路由职责，由各端在装配阶段注入。
+ */
+let unauthorizedHandler: (() => void) | null = null
+
+/** 装配本端的登录失效处理（web/mobile 在 wiring 里注入；未注入时只抛错不跳转）。 */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler
+}
+
+function notifyUnauthorized(status?: number): void {
+  if (status === 401) unauthorizedHandler?.()
+}
+
+/** API 业务错误（G7 起带 code/status，调用方据此区分「登录失效」等分支；message 已是用户可读文案）。 */
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly status?: number,
+  ) {
+    super(message)
+    this.name = 'ApiRequestError'
+  }
+}
+
+/**
  * 统一拆包 + 错误提示：res.ok 或 body.ok 为假时，解析 { ok:false, code, message } → 交给注入的
  * notifier 报错并抛错。成功返回精确响应体（hc<AppType> 推导）。禁止静默吞错（执行总纲 §0.5）。
+ *
+ * opts.silent：调用方自己渲染错误（登录页/启动 bootstrap）时置 true，避免重复 toast；
+ * 错误仍然抛出，只是不提示——不改变「失败可见」原则。
  */
 export async function unwrap<T extends { ok: boolean }>(
-  res: { ok: boolean; json(): Promise<T> },
+  res: { ok: boolean; status?: number; json(): Promise<T> },
+  opts: { silent?: boolean } = {},
 ): Promise<T> {
   const body = await res.json()
   if (!res.ok || !body.ok) {
     const err = body as unknown as { message?: string; code?: string }
     const message = typeof err.message === 'string' ? err.message : '请求失败，请稍后重试'
-    apiNotifier.onError(message, typeof err.code === 'string' ? err.code : undefined)
-    throw new Error(message)
+    const code = typeof err.code === 'string' ? err.code : undefined
+    if (!opts.silent) apiNotifier.onError(message, code)
+    notifyUnauthorized(res.status)
+    throw new ApiRequestError(message, code, res.status)
   }
   return body
 }
@@ -190,6 +246,8 @@ export async function settle<T extends { ok: boolean }>(res: {
     return { ok: true, data: data as Omit<T, 'ok'> }
   }
   const err = body as unknown as Record<string, unknown>
+  // 401 同样走登录失效出口（录入管线等用 settle 的地方也能触发跳登录）。
+  notifyUnauthorized(res.status)
   return {
     ok: false,
     status: res.status,

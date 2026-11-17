@@ -21,6 +21,7 @@ import { withScenario } from './lib/ai/scenario.js'
 import { aiCallLog } from './lib/ai/fixtures.js'
 import { resolveUser } from './middleware/resolveUser.js'
 import { healthHandler } from './routes/health.js'
+import { authRoute } from './routes/auth.js'
 import { drugsRoute } from './routes/drugs.js'
 import { plansRoute } from './routes/plans.js'
 import { tasksRoute } from './routes/tasks.js'
@@ -63,10 +64,12 @@ if (process.env.AI_MODE === 'fixtures') {
 }
 
 // 单条链式表达式注册路由并导出 AppType（hc<AppType> 端到端类型推导，技术方案 §1）。
-// 顺序即语义：健康检查在 resolveUser 之前（公开），其余 /api/* 经守卫（MVP 注入演示用户 p-001）。
+// 顺序即语义：健康检查 + 认证路由在 resolveUser 之前（公开，auth 自行解析凭据），
+// 其余 /api/* 经守卫（AUTH_MODE=demo 注入 p-001；password 模式解析 Bearer token）。
 // .get/.use/.route 运行时均返回同一 app 实例，故 export const app 与集成测试 app.request() 不受影响。
 const route = app
   .get('/api/health', healthHandler)
+  .route('/api/auth', authRoute)
   .use('/api/*', resolveUser)
   .route('/api/drugs', drugsRoute)
   .route('/api/plans', plansRoute)

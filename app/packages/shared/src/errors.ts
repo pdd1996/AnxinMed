@@ -13,6 +13,9 @@ export const ERR_CODES = {
   AI_UNAVAILABLE: 'AI_UNAVAILABLE',         // 模型不可用（503/超时）→ 降级，不影响药箱/计划/提醒
   RISK_INTERCEPTED: 'RISK_INTERCEPTED',     // 风险守门拦截（L3 拒答 / L4 急救）
   CONFLICT: 'CONFLICT',                     // 冲突（防重复 409 / 身份多候选等）
+  AUTH_REQUIRED: 'AUTH_REQUIRED',           // 未登录 / 缺 Bearer token → 401（G7）
+  AUTH_INVALID: 'AUTH_INVALID',             // 登录凭据错误 / token 失效 → 401（统一措辞，不泄漏账号是否存在）
+  AUTH_LOCKED: 'AUTH_LOCKED',               // 登录失败次数过多 → 429（G7 限流）
 } as const
 
 export type ErrCode = (typeof ERR_CODES)[keyof typeof ERR_CODES]

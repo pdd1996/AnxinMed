@@ -1,4 +1,14 @@
-import { getApiBaseUrl, setApiBaseUrl, setApiNotifier, setExtraHeaders, setSpeechAdapter } from "@anxin/core";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getApiBaseUrl,
+  resetAuthState,
+  setApiBaseUrl,
+  setApiNotifier,
+  setAuthTokenStorage,
+  setExtraHeaders,
+  setSpeechAdapter,
+  setUnauthorizedHandler,
+} from "@anxin/core";
 import { toast } from "sonner-native";
 import { mobileSpeechAdapter } from "./speech";
 
@@ -18,6 +28,9 @@ export const API_URL_MISSING_HINT =
   "未配置 API 地址：dev 用 `pnpm --filter @anxin/mobile android:dev`（自动探测电脑局域网 IP），" +
   "或手写 packages/mobile/.env.local 的 EXPO_PUBLIC_API_URL 指向服务器";
 
+/** 登录 token 的 AsyncStorage 键（与 web 的 localStorage 同键名，便于运维排查）。 */
+export const AUTH_TOKEN_KEY = "anxin-auth-token";
+
 /** 配置是否可用（绝对 http/https 地址）。false 时界面必须显式告知，禁止让请求静默失败。 */
 export function isApiConfigured(): boolean {
   return /^https?:\/\//i.test(RAW_API_URL.trim());
@@ -28,7 +41,13 @@ export function apiBaseUrl(): string {
   return getApiBaseUrl();
 }
 
-/** 装配本端接缝：API 基址 + 错误提示出口 + TTS + dev-only 场景头。 */
+/**
+ * 装配本端接缝：API 基址 + 错误提示出口 + TTS + dev-only 场景头 + 登录态（G7）。
+ *
+ * 登录态两个接缝与 web 的 `src/lib/wiring.ts` 同构：
+ *   · AuthTokenStorage —— token 存 AsyncStorage（读写是异步的，core 侧 await 返回的 Promise）；
+ *   · UnauthorizedHandler —— 401 时清本地登录态，AuthGate 看到 anonymous 自动回登录页。
+ */
 export function wireMobilePlatform(): void {
   setApiBaseUrl(RAW_API_URL);
   setSpeechAdapter(mobileSpeechAdapter);
@@ -39,5 +58,13 @@ export function wireMobilePlatform(): void {
     onError: (message, code) => {
       toast.error(code ? `${message}（${code}）` : message);
     },
+  });
+  setAuthTokenStorage({
+    load: () => AsyncStorage.getItem(AUTH_TOKEN_KEY),
+    save: (token) => AsyncStorage.setItem(AUTH_TOKEN_KEY, token),
+    clear: () => AsyncStorage.removeItem(AUTH_TOKEN_KEY),
+  });
+  setUnauthorizedHandler(() => {
+    void resetAuthState();
   });
 }

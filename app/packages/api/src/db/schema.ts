@@ -1,5 +1,5 @@
 /**
- * 安心用药 · 数据库 Schema（17 张表 = 资产域五库 + 用户域/咨询留痕）
+ * 安心用药 · 数据库 Schema（19 张表 = 资产域五库 + 用户域/咨询留痕 + 登录会话）
  *
  * PRD V2 §12.3/§13 · 技术方案 §4 · 执行总纲 §3.2。
  *
@@ -13,10 +13,11 @@
  * 用户域（全部带 userId，多用户边界从第一天贯通）：
  *   users / drugs（药箱）/ plans（计划）/ records（记录）/ sources（来源）/ health_profiles（健康信息）
  *   drafts（录入草稿，M2-T6）—— 拍照录入管线产物，确认页唯一闸门前的暂存区
+ *   sessions（登录会话，G7）—— token 只存 SHA-256，明文仅在登录响应出现一次
  *
  * 核心不变式：药品主数据库 ≠ 用户药箱；医嘱只抄录不生成；条目禁止模型生成。
  */
-import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date, uniqueIndex, serial } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, jsonb, timestamp, boolean, varchar, date, uniqueIndex, index, serial } from 'drizzle-orm/pg-core'
 
 /** 产品类型（通用名层与产品层共用）。 */
 export const PRODUCT_TYPES = ['化学药', '生物制品', '中成药', '中药材', '医疗器械', '其他'] as const
@@ -212,6 +213,8 @@ export const interactionRules = pgTable('interaction_rules', {
 
 // ---------------------------------------------------------------------------
 // users · 用户（Better Auth 兼容形态；MVP seed 演示用户，P1 接手机号验证码登录 —— ADR #11）
+// G7 增补：username/password_hash 为「最小账号密码登录」的过渡凭据（ADR #20 增补），
+//         可空以兼容 demo 用户；P1 换 Better Auth 时账号列保留、session 层可复用。
 // ---------------------------------------------------------------------------
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
@@ -219,9 +222,31 @@ export const users = pgTable('users', {
   email: text('email').unique(),                         // 邮箱（唯一，Better Auth 兼容）
   phone: text('phone'),                                  // 手机号（P1 验证码登录预留）
 
+  username: text('username').unique(),                   // G7 登录账号（唯一；null = 未开通登录）
+  passwordHash: text('password_hash'),                   // G7 密码哈希（scrypt$N$r$p$salt$hash；null = 未开通）
+  passwordUpdatedAt: timestamp('password_updated_at'),   // G7 上次设密时间（审计/重置留痕）
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// sessions · 登录会话（G7 · ADR #20 增补）
+// 不变式：token 明文只在登录响应出现一次，DB 只存 SHA-256；跨用户隔离靠 userId 过滤
+//        （与既有用户域一致，不设 DB 外键）。7 天过期；登出即删行。
+// ---------------------------------------------------------------------------
+export const sessions = pgTable('sessions', {
+  id: text('id').primaryKey(),                           // sess-<uuid>，应用生成
+  userId: text('user_id').notNull(),                     // → users.id（应用层过滤）
+  tokenHash: text('token_hash').notNull(),               // sha256(token) hex
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  lastUsedAt: timestamp('last_used_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+}, (table) => [
+  uniqueIndex('sessions_token_hash_uq').on(table.tokenHash),
+  index('sessions_user_id_idx').on(table.userId),
+  index('sessions_expires_at_idx').on(table.expiresAt),
+])
 
 // ---------------------------------------------------------------------------
 // drugs · 用户药箱（≠ drug_master 资产库；确认后拷贝的个人档案）

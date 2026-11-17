@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node --watch --import tsx src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --external:postgres --external:drizzle-orm --external:hono --external:@hono/node-server --external:@hono/zod-validator --external:dotenv --external:zod",
+    "build": "esbuild src/index.ts src/scripts/auth-create-user.ts src/scripts/auth-reset-password.ts --bundle --platform=node --target=node20 --format=esm --outdir=dist --outbase=src --external:postgres --external:drizzle-orm --external:hono --external:@hono/node-server --external:@hono/zod-validator --external:dotenv --external:zod",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -42,6 +42,8 @@
     "perf:consult": "tsx src/scripts/perf-consult.ts",
     "perf:consult-live": "tsx src/scripts/perf-consult-live.ts",
     "db:studio": "drizzle-kit studio",
+    "auth:create-user": "tsx src/scripts/auth-create-user.ts",
+    "auth:reset-password": "tsx src/scripts/auth-reset-password.ts",
     "eval:record-consult-fixtures": "tsx src/scripts/record-consult-fixtures.ts",
     "eval:consult-bakeoff": "tsx src/scripts/consult-bakeoff.ts"
   },

@@ -192,6 +192,39 @@ docker compose exec -T db psql -U anxin -d anxin_medication -c \
 docker compose restart api
 ```
 
+**6.6 登录迁移与账号开通（G7 · 账号密码登录，新增于 2026-11-17）**
+
+> runtime 镜像没有 drizzle-kit，迁移只能从本机经 SSH 隧道对部署库执行；账号开通用镜像内 CLI。
+> 顺序必须是：先应用迁移（0012）→ 再起/重启新镜像（compose 默认 `AUTH_MODE=password`，fail-closed）→ 再开账号。
+
+```bash
+# 本机开隧道（另开一个终端，保持不关）
+ssh -N -L 55432:127.0.0.1:5432 <user>@<ECS_IP>
+
+# 本机 app/ 下：对远端库应用迁移（口令用 deploy/.env 里的 POSTGRES_PASSWORD）
+DATABASE_URL=postgresql://anxin:<POSTGRES_PASSWORD>@127.0.0.1:55432/anxin_medication \
+  pnpm --filter @anxin/api db:migrate
+
+# 服务器 app/ 下：部署新镜像后开通演示账号（每个账号执行一次；--id 指向已有 seed 用户）
+docker compose exec api node packages/api/dist/scripts/auth-create-user.js \
+  --username p-001 --id p-001 --name 张某某
+# stdout 里的一次性初始密码立即记录（不落库明文）；重置：
+docker compose exec api node packages/api/dist/scripts/auth-reset-password.js --username p-001
+```
+
+验收（应看到 401 → 换 token 后 200）：
+
+```bash
+curl -sS -o /dev/null -w '未登录 /api/drugs = %{http_code}\n' http://<ECS_IP>:8787/api/drugs
+curl -sS -X POST http://<ECS_IP>:8787/api/auth/login \
+  -H 'content-type: application/json' -d '{"username":"p-001","password":"<初始密码>"}'
+# 响应里 token 拿来再请求：
+curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '已登录 /api/drugs = %{http_code}\n' http://<ECS_IP>:8787/api/drugs
+```
+
+> 账号清单建议与演示用户一一对应（p-001 起），初始密码随机生成、一次性交付给演示人；
+> 忘记密码只能管理员 CLI 重置（G7 不做自助找回）。
+
 ## 7. 验收（05 任务书 T1 完成标准逐条）
 
 | # | 验收项 | 命令 / 做法 | 期望 |
@@ -202,6 +235,8 @@ docker compose restart api
 | 4 | 真机可达 | 手机用 4G/5G（**不连家里 Wi-Fi**）打开上面的地址 | 公网可达，不只是 LAN |
 | 5 | e2e fixtures 全绿 | 见 §8 | Playwright 全套 pass |
 | 6 | 备份实测 | 见 §9，跑一次 `backup.sh` 并恢复一次 | 恢复后 §6.4 行数对得上 |
+| 7 | 登录已生效（G7） | 见 §6.6 的 curl 三连 | 未登录 401 / 登录后 200 / 前端出现登录页 |
+| 8 | 登录审计可见性 | `docker compose logs --tail=20 api` | 401/登录请求有访问日志；无明文密码输出 |
 
 ## 8. e2e（AI_MODE=fixtures）对火山部署跑一遍
 
@@ -306,3 +341,9 @@ docker compose exec -T db pg_restore -U anxin -d anxin_medication --no-owner --c
 2. **远端 e2e 有结构性限制**：见 §8 的警示块——写正式库、需隧道、跑完建议回滚。独立 staging 实例不在 T1 边界内。
 3. **改 `POSTGRES_PASSWORD` 不会自动同步到已有库**（compose 口令只在卷首次初始化时生效），跨环境复制时按 `deploy/.env.example` 里的注释用 `alter role` 改。
 4. **过渡期裸 IP + cleartext**：无 HTTPS、无域名，`http://IP:8787` 明文传输，属真实模拟阶段的已知接受项（05 任务书 T1 第 5 条），备案后按 §10 收口。
+5. **G7 账号密码登录是过渡实现（2026-11-17）**：
+   - 明文 HTTP 下登录密码在公网裸传——只给演示账号 + 纯演示数据用，**接真实用户前必须 §10 HTTPS**；
+   - 无自助注册/改密/找回：账号由 CLI 开通，忘记密码走 `auth-reset-password.js`；
+   - 登录失败限流是**单实例内存**（5 次/15 分钟，按 IP+账号）：多副本部署前要换共享存储；
+   - session 固定 7 天过期，登出即删行；token 明文只在登录响应出现一次，DB 只存 SHA-256；
+   - 与 ADR #11（Better Auth + 手机号验证码）的偏差已记入 [docs/specs/13](../../docs/specs/13-G7-最小账号密码登录.md)，换 Better Auth 时只替换 `resolveUser` 函数体。
