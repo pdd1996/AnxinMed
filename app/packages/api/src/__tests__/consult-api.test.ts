@@ -274,6 +274,23 @@ describe('POST /api/consult · L3 拒答（PRD §7.5.2）', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/consult · manual 档门禁（PRD §7.5.4）', () => {
+  it('manual + reviewed 说明书 → 仍 manual-gate（M9：reviewed 不能绕过 manual 门禁）', async () => {
+    await db.update(drugs).set({ confirmStatus: 'manual' }).where(eq(drugs.id, DRUG_HYCOSAN))
+    try {
+      prevClients = setAiClients(mockClients({}))
+      const res = await req('POST', '/api/consult', {
+        question: '这个药通常用于什么',
+        drugIds: [DRUG_HYCOSAN],
+      })
+      expect(res.status).toBe(200)
+      expect(res.body.status).toBe('manual-gate')
+      expect(res.body.blocked).toBe(true)
+      expect(res.body.l0Notice).toContain('手动建档')
+    } finally {
+      await db.update(drugs).set({ confirmStatus: 'ocr_matched' }).where(eq(drugs.id, DRUG_HYCOSAN))
+    }
+  })
+
   it('manual 档药 + 无 insert → manual-gate + l0Notice + risk_events 留痕', async () => {
     prevClients = setAiClients(mockClients({}))
 
