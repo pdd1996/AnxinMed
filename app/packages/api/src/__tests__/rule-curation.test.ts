@@ -213,4 +213,41 @@ describe('rule-curation · 守门', () => {
       retired: 0,
     })
   })
+
+  it('M10 概念组：合法组通过；drugIds 必须等于展开并集', () => {
+    const grouped = curated({
+      drugIds: ['dm-a', 'dm-b', 'dm-c'],
+      drugGroups: [
+        ['dm-a', 'dm-b'],
+        ['dm-c'],
+      ],
+      quote: SECTION_TEXT,
+      note: '辛伐他汀的暴露量比单独使用辛伐他汀增加了 77%',
+    })
+    // sourceRef 指向 dm-a 的说明书行；drugGroups 包含 dm-a → 通过
+    expect(validateRule(grouped, ctx()).errors).toEqual([])
+
+    const mismatched = curated({ drugIds: ['dm-a', 'dm-b'], drugGroups: [['dm-a'], ['dm-b'], ['dm-c']] })
+    expect(validateRule(mismatched, ctx()).errors.some((e) => e.includes('展开不一致'))).toBe(true)
+  })
+
+  it('M10 概念组：空组/跨组重复/未知 ID/少于 2 组 → 报错', () => {
+    const oneGroup = curated({ drugGroups: [['dm-a', 'dm-b']] })
+    expect(validateRule(oneGroup, ctx()).errors.some((e) => e.includes('至少 2 组'))).toBe(true)
+
+    const emptyGroup = curated({ drugIds: ['dm-a', 'dm-b'], drugGroups: [['dm-a'], []] })
+    expect(validateRule(emptyGroup, ctx()).errors.some((e) => e.includes('为空组'))).toBe(true)
+
+    const crossDup = curated({ drugIds: ['dm-a', 'dm-b'], drugGroups: [['dm-a', 'dm-b'], ['dm-b', 'dm-c']] })
+    expect(validateRule(crossDup, ctx()).errors.some((e) => e.includes('多个概念组'))).toBe(true)
+
+    const unknown = curated({ drugIds: ['dm-a', 'dm-x'], drugGroups: [['dm-a'], ['dm-x']] })
+    expect(validateRule(unknown, ctx()).errors.some((e) => e.includes('不存在的药品'))).toBe(true)
+  })
+
+  it('M10 概念组药对去重：组顺序不同视为同一药对', () => {
+    const a = curated({ id: 'g1', drugIds: ['dm-a', 'dm-b'], drugGroups: [['dm-a'], ['dm-b']] })
+    const b = curated({ id: 'g2', drugIds: ['dm-b', 'dm-a'], drugGroups: [['dm-b'], ['dm-a']] })
+    expect(validateRules([a, b], ctx()).errors.some((e) => e.includes('同一药品组合'))).toBe(true)
+  })
 })

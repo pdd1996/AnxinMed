@@ -76,4 +76,41 @@ describe('checkInteractions · 相互作用（生效计划集合）', () => {
     expect(r.hits).toEqual([])
     expect(r.coverageNote).toBe(INTERACTION_COVERAGE_NOTE)
   })
+
+  it('M10 概念组：每组任一生效即命中，hit.drugIds 是实际命中的具体 ID', () => {
+    const rule: InteractionRuleInput = {
+      id: 'ir-group',
+      drugIds: ['sim-a', 'sim-b', 'clar-a', 'clar-b'],
+      drugGroups: [
+        ['sim-a', 'sim-b'],
+        ['clar-a', 'clar-b'],
+      ],
+      level: '禁忌',
+      note: '辛伐他汀与克拉霉素禁止合用（测试）',
+      source: '测试规则库',
+      status: 'curated',
+    }
+    const names = { 'sim-a': '辛伐他汀片A', 'sim-b': '辛伐他汀片B', 'clar-a': '克拉霉素片A', 'clar-b': '克拉霉素片B' }
+    const hit = checkInteractions(['sim-b', 'clar-a'], [rule], names)
+    expect(hit.hits).toHaveLength(1)
+    expect(hit.hits[0].drugIds).toEqual(['sim-b', 'clar-a'])
+    expect(hit.hits[0].drugNames).toEqual(['辛伐他汀片B', '克拉霉素片A'])
+
+    // 只有一组命中 → 不触发；旧 flat 语义不会误触发
+    expect(checkInteractions(['sim-b'], [rule], names).hits).toEqual([])
+    expect(checkInteractions(['sim-b', 'clar-c'], [rule], names).hits).toEqual([])
+  })
+
+  it('M10 概念组 retired 不参与匹配', () => {
+    const rule: InteractionRuleInput = {
+      id: 'ir-group-retired',
+      drugIds: ['sim-a', 'clar-a'],
+      drugGroups: [['sim-a'], ['clar-a']],
+      level: '禁忌',
+      note: 'x',
+      source: 'x',
+      status: 'retired',
+    }
+    expect(checkInteractions(['sim-a', 'clar-a'], [rule], {}).hits).toEqual([])
+  })
 })

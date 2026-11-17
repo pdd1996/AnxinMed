@@ -14,7 +14,9 @@ import type { RuleStatus } from './rule-curation.js'
 /** 相互作用规则（interaction_rules 行的匹配所需形态）。 */
 export interface InteractionRuleInput {
   id: string
-  drugIds: string[] // → drug_master.id[]
+  drugIds: string[] // → drug_master.id[]（旧语义：全命中；有 drugGroups 时作为展开并集）
+  /** M10 概念组：每组 any-of，全部组命中才触发；null/缺省=旧 flat 语义 */
+  drugGroups?: string[][] | null
   level: InteractionLevel
   note: string
   source: string
@@ -62,18 +64,32 @@ export function checkInteractions(
   for (const rule of rules ?? []) {
     // M8：停用规则不参与匹配
     if ((rule.status ?? 'demo') === 'retired') continue
-    const ids = rule.drugIds ?? []
-    // 规则的每个药都必须在生效集合内（≥2 药才构成相互作用）
-    if (ids.length >= 2 && ids.every((id) => set.has(id))) {
-      hits.push({
-        level: rule.level,
-        note: rule.note,
-        source: rule.source,
-        status: rule.status ?? 'demo',
-        drugIds: ids,
-        drugNames: ids.map((id) => drugNameById[id] ?? id),
-      })
+    // M10：有概念组 → 每组取一个生效集合内的 ID（组内多产品 any-of）；否则旧 flat 全命中
+    let matchedIds: string[] | null = null
+    if (rule.drugGroups && rule.drugGroups.length >= 2) {
+      const perGroup: string[] = []
+      for (const group of rule.drugGroups) {
+        const hit = group.find((id) => set.has(id))
+        if (!hit) {
+          perGroup.length = 0
+          break
+        }
+        perGroup.push(hit)
+      }
+      matchedIds = perGroup.length === rule.drugGroups.length ? perGroup : null
+    } else {
+      const ids = rule.drugIds ?? []
+      matchedIds = ids.length >= 2 && ids.every((id) => set.has(id)) ? ids : null
     }
+    if (!matchedIds) continue
+    hits.push({
+      level: rule.level,
+      note: rule.note,
+      source: rule.source,
+      status: rule.status ?? 'demo',
+      drugIds: matchedIds,
+      drugNames: matchedIds.map((id) => drugNameById[id] ?? id),
+    })
   }
   hits.sort((a, b) => INTERACTION_LEVEL_ORDER[b.level] - INTERACTION_LEVEL_ORDER[a.level])
 

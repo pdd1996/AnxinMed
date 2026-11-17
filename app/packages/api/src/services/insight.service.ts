@@ -80,6 +80,7 @@ async function resolveInteractionsSummary(userId: string): Promise<InteractionsS
   const rules: InteractionRuleInput[] = ruleRows.map((r) => ({
     id: r.id,
     drugIds: (r.drugIds as string[] | null) ?? [],
+    drugGroups: (r.drugGroups as string[][] | null) ?? null,
     level: r.level,
     status: r.status,
     note: r.note,
@@ -276,6 +277,7 @@ export async function insightAsk(question: string, patientId: string | null): Pr
       const interactionRules: InteractionRuleInput[] = ruleRows.map((r) => ({
         id: r.id,
         drugIds: (r.drugIds as string[] | null) ?? [],
+        drugGroups: (r.drugGroups as string[][] | null) ?? null,
         level: r.level,
         status: r.status,
         note: r.note,

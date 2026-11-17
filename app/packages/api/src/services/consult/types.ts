@@ -142,6 +142,7 @@ export interface ConsultRunInput {
   interactionRules: Array<{
     id: string
     drugIds: string[]
+    drugGroups?: string[][] | null
     level: InteractionLevel
     note: string
     source: string

@@ -186,6 +186,9 @@ export const interactionRules = pgTable('interaction_rules', {
   note: text('note').notNull(),                          // 相互作用说明（curated 时必须为 quote 的逐字子串）
   source: text('source').notNull(),                      // 来源描述（人读；演示条目须含「演示」）
 
+  // ── M10 概念组命中：每组 any-of（同通用名多产品），≥2 组全部命中才触发；null=旧 flat drugIds 全命中 ──
+  drugGroups: jsonb('drug_groups').$type<string[][]>(),
+
   // ── M8 正式化：来源分级 / 逐字引用 / 审核留痕（PRD §7.8.1 只许抄录）──
   status: varchar('status', { enum: ['demo', 'curated', 'retired'] })
     .notNull()

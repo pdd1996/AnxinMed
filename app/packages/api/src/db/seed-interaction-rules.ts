@@ -90,11 +90,12 @@ async function loadSeed(db: PostgresJsDatabase<any>): Promise<LoadedSeed> {
   }
 
   const existingRows = await db
-    .select({ id: interactionRules.id, drugIds: interactionRules.drugIds, status: interactionRules.status })
+    .select({ id: interactionRules.id, drugIds: interactionRules.drugIds, drugGroups: interactionRules.drugGroups, status: interactionRules.status })
     .from(interactionRules)
   const existingRules = existingRows.map((r) => ({
     id: r.id,
     drugIds: (r.drugIds as string[] | null) ?? [],
+    drugGroups: (r.drugGroups as string[][] | null) ?? null,
     status: r.status,
   }))
 
@@ -130,6 +131,7 @@ export async function seedInteractionRules(db: PostgresJsDatabase<any> = devDb):
     const values = {
       id: rule.id,
       drugIds: rule.drugIds,
+      drugGroups: rule.drugGroups ?? null,
       level: rule.level,
       note: rule.note,
       source: rule.source,

@@ -1,0 +1,1 @@
+ALTER TABLE "interaction_rules" ADD COLUMN "drug_groups" jsonb;

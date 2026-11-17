@@ -38,6 +38,8 @@ export type RuleSourceRef = z.infer<typeof RuleSourceRefSchema>
 export const RuleCurationInputSchema = z.object({
   id: z.string().min(1),
   drugIds: z.array(z.string().min(1)).min(2),
+  /** M10 概念组：每组 any-of；有值时 drugIds 必须等于其展开去重。 */
+  drugGroups: z.array(z.array(z.string().min(1)).min(1)).min(2).nullable().optional(),
   level: InteractionLevelSchema,
   note: z.string().min(1),
   source: z.string().min(1),
@@ -64,7 +66,7 @@ export interface RuleCurationContext {
   /** 被 sourceRef 引用的说明书行，按 insertId 索引。 */
   manualsByInsertId: Record<string, ManualSnapshot>
   /** 库内已有规则（用于跨批重复药对检查；同批重复由 validateRules 自身兜底）。 */
-  existingRules?: Array<{ id: string; drugIds: string[]; status: RuleStatus }>
+  existingRules?: Array<{ id: string; drugIds: string[]; drugGroups?: string[][] | null; status: RuleStatus }>
   /** 显式允许同一药对有多条规则（默认不允许；确需时在任务书登记理由）。 */
   allowDuplicatePairs?: boolean
 }
@@ -83,6 +85,17 @@ export function normalizeQuoteText(input: string): string {
 
 function pairKey(drugIds: string[]): string {
   return [...new Set(drugIds)].sort().join('|')
+}
+
+/** 药对归一：有概念组时按「组结构」比较（组顺序无关、组内顺序无关）；否则退回 flat。 */
+function rulePairKey(rule: { drugIds: string[]; drugGroups?: string[][] | null }): string {
+  if (rule.drugGroups && rule.drugGroups.length >= 2) {
+    return rule.drugGroups
+      .map((group) => [...new Set(group)].sort().join(','))
+      .sort()
+      .join('|')
+  }
+  return pairKey(rule.drugIds)
 }
 
 function isHttpUrl(value: string): boolean {
@@ -117,6 +130,29 @@ export function validateRule(rule: RuleCurationInput, ctx: RuleCurationContext):
     errors.push(`${label}：drug_master 不存在这些 ID：${missing.join('、')}`)
   }
 
+  // 1b. 概念组（M10）：每组 any-of；drugIds 必须等于展开去重；跨组不得重复
+  if (rule.drugGroups && rule.drugGroups.length > 0) {
+    if (rule.drugGroups.length < 2) {
+      errors.push(`${label}：drugGroups 至少 2 组（每组 any-of，全部组命中才触发）`)
+    }
+    const seen = new Set<string>()
+    for (const [i, group] of rule.drugGroups.entries()) {
+      if (group.length === 0) errors.push(`${label}：drugGroups[${i}] 为空组`)
+      for (const id of group) {
+        if (seen.has(id)) errors.push(`${label}：药品 ${id} 出现在多个概念组（会造成组间依赖混乱）`)
+        seen.add(id)
+      }
+    }
+    const expanded = [...seen].sort().join('|')
+    const declared = [...uniqueDrugIds].sort().join('|')
+    if (expanded !== declared) {
+      errors.push(`${label}：drugIds 与 drugGroups 展开不一致（drugIds 应为 drugGroups 去重后的并集）`)
+    }
+    const missingGroupIds = [...seen].filter((id) => !masters.has(id))
+    if (missingGroupIds.length > 0) {
+      errors.push(`${label}：drugGroups 引用了不存在的药品：${missingGroupIds.join('、')}`)
+    }
+  }
   // 2. 演示条目：必须自报「演示」，禁止冒充正式
   if (rule.status === 'demo') {
     if (!rule.source.includes('演示')) {
@@ -218,7 +254,7 @@ export function validateRules(
     const seen = new Map<string, string>()
     for (const rule of rules) {
       if (rule.status === 'retired') continue
-      const key = pairKey(rule.drugIds)
+      const key = rulePairKey(rule)
       const prior = seen.get(key)
       if (prior) {
         errors.push(`同一药品组合出现多条规则：${rule.id} 与 ${prior}（药对 ${key}）`)
@@ -228,9 +264,9 @@ export function validateRules(
     }
     for (const rule of rules) {
       if (rule.status === 'retired') continue
-      const key = pairKey(rule.drugIds)
+      const key = rulePairKey(rule)
       const clash = (ctx.existingRules ?? []).find(
-        (r) => r.status !== 'retired' && !idSeen.has(r.id) && pairKey(r.drugIds) === key,
+        (r) => r.status !== 'retired' && !idSeen.has(r.id) && rulePairKey(r) === key,
       )
       if (clash) {
         errors.push(`规则 ${rule.id} 与库内 ${clash.id} 是同一药品组合（药对 ${key}），重复入库需显式 allowDuplicatePairs`)
