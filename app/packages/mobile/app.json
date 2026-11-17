@@ -37,6 +37,7 @@
         }
       ],
       "./plugins/with-release-hardening",
+      "./plugins/with-release-signing",
       "expo-sharing",
       [
         "expo-notifications",

@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# 正式签名凭据（scripts/gen-release-keystore.mjs 生成；keystore 与密码绝不入库）
+.credentials/
+
 # Native
 .kotlin/
 *.orig.*
