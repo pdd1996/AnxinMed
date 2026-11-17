@@ -33,6 +33,7 @@
     "db:rule-signoff-import": "tsx src/scripts/rule-signoff-import.ts",
     "db:rule-signoff-import-batch2": "tsx src/scripts/rule-signoff-import-batch2.ts",
     "db:pharmacist-packet": "tsx src/scripts/pharmacist-packet.ts",
+    "db:pharmacist-review-import": "tsx src/scripts/pharmacist-review-import.ts",
     "db:repair-specs": "tsx src/scripts/repair-specs.ts",
     "db:repair-manuals": "tsx src/scripts/repair-manuals.ts",
     "db:audit": "tsx src/db/data-audit.ts",
