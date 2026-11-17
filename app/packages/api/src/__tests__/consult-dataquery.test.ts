@@ -285,7 +285,12 @@ describe('renderInteractionsSections · 相互作用模板（纯函数）', () =
     expect(s.summary).toContain('1 项相互作用提示')
     expect(s.keyPoints[0]).toContain('禁忌')
     expect(s.keyPoints[0]).toContain('华法林钠片 + 阿司匹林肠溶片')
-    expect(s.keyPoints[0]).toContain('测试规则库')
+    // M11-T2：短摘要不含逐字 note 与来源，二者收进 details 展开区
+    expect(s.keyPoints[0]).not.toContain('出血风险升高')
+    expect(s.keyPoints[0]).not.toContain('测试规则库')
+    expect(s.details?.[0]?.title).toContain('华法林钠片 + 阿司匹林肠溶片')
+    expect(s.details?.[0]?.body).toBe('出血风险升高')
+    expect(s.details?.[0]?.source).toBe('测试规则库')
     expect(s.risks.join('')).toContain('请勿自行停药')
   })
 

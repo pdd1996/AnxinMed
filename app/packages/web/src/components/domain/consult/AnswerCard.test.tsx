@@ -57,6 +57,27 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('1')).toBeTruthy()
   })
 
+  it('M11-T2：提示卡短摘要 + details 展开原文（逐字 note 不进摘要）', () => {
+    render(
+      <AnswerCard
+        riskLevel="L1"
+        status="data-answered"
+        answer="当前在服药品组合检出 1 项相互作用提示。"
+        sections={mkSections({
+          summary: '当前在服药品组合检出 1 项相互作用提示。',
+          keyPoints: ['[禁忌] 华法林钠片 + 阿司匹林肠溶片'],
+          details: [{ title: '[禁忌] 华法林钠片 + 阿司匹林肠溶片', body: '禁止同时使用华法林钠片与阿司匹林肠溶片。', source: '测试规则库' }],
+        })}
+        citations={[]}
+      />,
+    )
+    expect(screen.getByText('数据查询')).toBeTruthy()
+    expect(screen.getByText('[禁忌] 华法林钠片 + 阿司匹林肠溶片', { selector: 'span' })).toBeTruthy()
+    expect(screen.getByText('展开原文（1 条）')).toBeTruthy()
+    expect(screen.getByText('禁止同时使用华法林钠片与阿司匹林肠溶片。')).toBeTruthy()
+    expect(screen.getByText('来源：测试规则库')).toBeTruthy()
+  })
+
   it('L2 limited → RiskBadge L2 + notice "已过滤具体剂量建议"', () => {
     render(
       <AnswerCard

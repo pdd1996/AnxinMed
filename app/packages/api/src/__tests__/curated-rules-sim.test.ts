@@ -141,7 +141,10 @@ describe('M11 · curated 规则模拟患者（真实 consult 链路）', () => {
     expect(points).toContain('苯磺酸氨氯地平片 + 他克莫司胶囊')
     expect(points).toContain('布洛芬片 + 注射用甲氨蝶呤')
     expect(points).toContain('盐酸氟西汀胶囊 + 华法林钠片')
-    expect(points).toContain('来源：')
+    const details = sections.details ?? []
+    expect(details).toHaveLength(5)
+    expect(details.map((d) => d.source ?? '').join('')).toContain('说明书')
+    expect(details.map((d) => d.body).join('')).toContain('禁止同时使用克拉霉素和秋水仙碱')
   })
 
   it('局部制剂不误命中：布洛芬乳膏 + 地高辛 → 未检出（#14 只覆盖口服布洛芬）', async () => {

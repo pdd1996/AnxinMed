@@ -147,6 +147,24 @@ export function AnswerCard({
               </div>
             )}
 
+            {/* M11-T2：提示卡「短摘要 + 展开原文」——keyPoints 只放级别/药名/来源，逐字原文收进可展开区 */}
+            {sections.details && sections.details.length > 0 && (
+              <details className="rounded-md border border-border bg-muted/20 p-2.5">
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                  展开原文（{sections.details.length} 条）
+                </summary>
+                <ul className="mt-2 space-y-2 pl-1 text-sm text-foreground">
+                  {sections.details.map((d) => (
+                    <li key={`${d.title}-${d.body}`}>
+                      <p className="font-medium">{d.title}</p>
+                      <p className="mt-0.5 text-muted-foreground">{d.body}</p>
+                      {d.source && <p className="mt-0.5 text-xs text-muted-foreground">来源：{d.source}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
             {sections.risks.length > 0 && (
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-risk-l3">

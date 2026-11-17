@@ -359,9 +359,13 @@ export function renderInteractionsSections(
   if (result.hits.length > 0) {
     return {
       summary: `当前在服药品组合检出 ${result.hits.length} 项相互作用提示。`,
-      keyPoints: result.hits.map(
-        (h) => `[${h.level}] ${h.drugNames.join(' + ')}：${h.note}（来源：${h.source}）`,
-      ),
+      // M11-T2：列表只放「级别 + 药名」，逐字 note 与来源收进 details 展开看，避免长文案刷屏
+      keyPoints: result.hits.map((h) => `[${h.level}] ${h.drugNames.join(' + ')}`),
+      details: result.hits.map((h) => ({
+        title: `[${h.level}] ${h.drugNames.join(' + ')}`,
+        body: h.note,
+        source: h.source,
+      })),
       risks: ['存在相互作用提示时请勿自行停药或换药，请携带用药清单咨询医生或药师。'],
       nextAction: '请将上述提示告知医生或药师，由其评估是否调整方案。',
       warning: DATA_QUERY_WARNING,

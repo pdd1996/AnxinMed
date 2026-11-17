@@ -114,6 +114,8 @@ export interface NormalizedSections {
   risks: string[]
   nextAction: string
   warning: string
+  /** M11-T2：可展开原文（interaction-check 用；keyPoints 只放短摘要）。 */
+  details?: Array<{ title: string; body: string; source?: string }>
   /** true 表示 stripDosageAdvice 命中过（L2）；run.ts 据此决定 status/riskLevel。 */
   limited: boolean
 }

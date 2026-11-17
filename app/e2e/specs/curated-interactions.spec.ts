@@ -114,12 +114,16 @@ test.describe('curated 规则真实咨询 UI（模拟患者 · 0 次 LLM）', ()
     await expect(card.getByText('当前在服药品组合检出 5 项相互作用提示。')).toBeVisible()
 
     // 三级提示 + 具体药名（note 很长，只断言前缀与药名，避免把整段说明书原文写死）
-    await expect(card.getByText(/\[禁忌\].*克拉霉素缓释片 \+ 秋水仙碱片/)).toBeVisible()
-    await expect(card.getByText(/\[禁忌\].*盐酸帕罗西汀片 \+ 利奈唑胺葡萄糖注射液/)).toBeVisible()
-    await expect(card.getByText(/\[慎用\].*苯磺酸氨氯地平片 \+ 他克莫司胶囊/)).toBeVisible()
-    await expect(card.getByText(/\[慎用\].*布洛芬片 \+ 注射用甲氨蝶呤/)).toBeVisible()
-    await expect(card.getByText(/\[需监测\].*盐酸氟西汀胶囊 \+ 华法林钠片/)).toBeVisible()
+    await expect(card.getByText(/\[禁忌\].*克拉霉素缓释片 \+ 秋水仙碱片/).first()).toBeVisible()
+    await expect(card.getByText(/\[禁忌\].*盐酸帕罗西汀片 \+ 利奈唑胺葡萄糖注射液/).first()).toBeVisible()
+    await expect(card.getByText(/\[慎用\].*苯磺酸氨氯地平片 \+ 他克莫司胶囊/).first()).toBeVisible()
+    await expect(card.getByText(/\[慎用\].*布洛芬片 \+ 注射用甲氨蝶呤/).first()).toBeVisible()
+    await expect(card.getByText(/\[需监测\].*盐酸氟西汀胶囊 \+ 华法林钠片/).first()).toBeVisible()
     await expect(card.getByText('存在相互作用提示时请勿自行停药或换药，请携带用药清单咨询医生或药师。')).toBeVisible()
+
+    // M11-T2：摘要只放级别/药名/来源；逐字原文在「展开原文」里
+    await card.getByText('展开原文（5 条）').click()
+    await expect(card.getByText('禁止同时使用克拉霉素和秋水仙碱。')).toBeVisible()
 
     // 结构：0 次 LLM（数据直答不调模型）
     const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=${SCENARIO}`)
@@ -127,7 +131,8 @@ test.describe('curated 规则真实咨询 UI（模拟患者 · 0 次 LLM）', ()
     expect(body.calls.consultAnswer).toBe(0)
 
     mkdirSync('../../data/m11-reports', { recursive: true })
-    await page.screenshot({ path: '../../data/m11-reports/curated-interactions-ui.png', fullPage: true })
+    await card.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: '../../data/m11-reports/curated-interactions-ui.png', fullPage: false })
     await page.context().close()
   })
 })

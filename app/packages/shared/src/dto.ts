@@ -145,6 +145,12 @@ export const ConsultSectionsSchema = z.object({
   risks: z.array(z.string()),
   nextAction: z.string(),
   warning: z.string(),
+  /**
+   * 可展开的原文详情（M11-T2：提示卡「短摘要 + 展开原文」）。
+   * 目前 interaction-check 使用：keyPoints 只放级别/药名/来源，details 放逐字 note；
+   * 其他模板不填，旧客户端忽略该字段不受影响。
+   */
+  details: z.array(z.object({ title: z.string(), body: z.string(), source: z.string().optional() })).optional(),
 })
 export type ConsultSections = z.infer<typeof ConsultSectionsSchema>
 
