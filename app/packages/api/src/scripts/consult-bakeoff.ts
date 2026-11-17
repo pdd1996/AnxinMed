@@ -11,7 +11,7 @@
  * 空回率单列（DeepSeek 官方自认 JSON 模式偶发空回）/ 模型延迟 P50·P95（目标 ≤4s）。
  * 人工审维度（引文忠实 / 通俗质量 / 负例越权）需逐 case 看明细 JSON，不自动化断言。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'

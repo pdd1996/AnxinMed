@@ -8,7 +8,7 @@
  * 与第一批 importer 的差异：本批没有“按索引改药品组”的硬编码覆盖——最终 JSON 里
  * 已是修正后的 quote/drugGroups，直接走守门即可。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'

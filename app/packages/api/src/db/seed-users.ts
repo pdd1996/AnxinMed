@@ -9,7 +9,7 @@
  *       CI checkout 无该文件，故包内自持 fixture；demo 已冻结不再演进，无漂移风险。
  * 范围：8 名患者 → users（email/phone 为 null，源数据无此字段，不编造）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

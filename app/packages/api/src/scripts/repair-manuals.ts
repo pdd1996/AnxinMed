@@ -15,7 +15,7 @@
  * - 重提取后不再产出的旧行：非 reviewed 才删（reviewed 拒绝并报错）。
  * 新行与 source_documents 刷新交给 db:import-manuals（本脚本只打印提示）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { appendFileSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

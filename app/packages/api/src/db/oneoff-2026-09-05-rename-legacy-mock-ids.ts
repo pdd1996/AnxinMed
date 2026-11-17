@@ -12,7 +12,7 @@
  *
  * 幂等，可重复运行。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { eq } from 'drizzle-orm'
 import { db, client } from './client.js'
 import { drugMaster, packageInserts, interactionRules } from './schema.js'

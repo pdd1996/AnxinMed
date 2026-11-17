@@ -9,7 +9,7 @@
  * 纪律：不写 seed、不改库；proposedRule 只是草案（note=quote、status=curated、reviewedBy 留空），
  * 只有签核人逐条确认后才允许另起任务入库。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

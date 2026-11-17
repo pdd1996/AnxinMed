@@ -11,7 +11,7 @@
  * 前置：已备份（app/backups/anxin-local-20261024-before-mock-clean.dump）。
  * 保留：6 条真实 DXY 身份/说明书 + 2 条 PDF 身份/说明书。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { appendFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

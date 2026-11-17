@@ -19,7 +19,7 @@
  * 幂等：产出的草稿在 payload 打 demoSeed='M2-T7' 标记，基线用 demo- 前缀固定 id；重跑先删自己写的旧行，
  * 绝不碰用户真实草稿/药品。仅 dev 库使用（CLI：pnpm db:seed-drafts）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { todayStr, type LayerLabel } from '@anxin/shared'
 import { db, client } from './client.js'

@@ -2,7 +2,7 @@
  * 测试库 URL 工具 —— 从 dev DATABASE_URL 派生独立测试库 / 维护库连接串。
  * 不硬编码凭据：只替换库名段，其余（用户/密码/主机/端口）沿用 .env。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 
 export const TEST_DB_NAME = 'anxin_medication_test'
 

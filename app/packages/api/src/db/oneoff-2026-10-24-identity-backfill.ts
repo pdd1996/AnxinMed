@@ -7,7 +7,7 @@
  * 用法：tsx src/db/oneoff-2026-10-24-identity-backfill.ts
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

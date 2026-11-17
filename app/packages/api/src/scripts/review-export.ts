@@ -13,7 +13,7 @@
  *   npm run db:review-export -- --out ... --ids-file ids.txt --limit 30
  *   npm run db:review-export -- --out ... --ids-file ids.txt --status reviewed
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { and, eq, inArray, isNotNull, like } from 'drizzle-orm'

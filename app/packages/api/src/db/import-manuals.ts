@@ -13,7 +13,7 @@
  * - drug_master 已有行不动，缺失才自动建档；
  * - 完整原文分段写入 source_sections，source_file/source_record_ids/approval_numbers 留痕。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

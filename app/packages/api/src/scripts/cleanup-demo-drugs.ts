@@ -10,7 +10,7 @@
  *   pnpm --filter @anxin/api db:cleanup-demo-drugs -- --dry-run
  *   pnpm --filter @anxin/api db:cleanup-demo-drugs -- --apply
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

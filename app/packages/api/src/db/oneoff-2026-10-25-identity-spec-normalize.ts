@@ -8,7 +8,7 @@
  *   tsx src/db/oneoff-2026-10-25-identity-spec-normalize.ts          # dry-run
  *   tsx src/db/oneoff-2026-10-25-identity-spec-normalize.ts --apply  # 落库
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { eq } from 'drizzle-orm'
 import { db, client } from './client.js'
 import { makeIdentityKey } from './identity.js'

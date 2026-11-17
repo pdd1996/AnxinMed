@@ -6,7 +6,7 @@
  * 目标值：骨架 P95 ≤ 500ms（裁决 #5）。运行：cd app/packages/api && npm run perf:consult
  * 可调：PERF_N（次数，默认 50）。自清理：只删本次创建的会话/留痕/临时资产。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { inArray } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { consultLogs, consultSessions, consultSuggestions, drugMaster, drugs, packageInserts, plans, riskEvents } from '../db/schema.js'

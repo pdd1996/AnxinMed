@@ -13,7 +13,7 @@
  *
  * 防御：interaction_rules.drug_ids 若引用任一旧 ID 则整体中止（当前规则库只引用 seed 的 9 药，预期不触发）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { eq, inArray } from 'drizzle-orm'
 import { db, client } from './client.js'
 import { drugMaster, packageInserts, interactionRules } from './schema.js'

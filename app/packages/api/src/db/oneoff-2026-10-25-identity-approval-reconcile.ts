@@ -8,7 +8,7 @@
  *   tsx src/db/oneoff-2026-10-25-identity-approval-reconcile.ts          # dry-run
  *   tsx src/db/oneoff-2026-10-25-identity-approval-reconcile.ts --apply  # 落库
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

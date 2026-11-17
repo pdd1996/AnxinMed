@@ -40,6 +40,7 @@
     "perf:intake": "tsx src/scripts/perf-intake.ts",
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",
     "perf:consult": "tsx src/scripts/perf-consult.ts",
+    "perf:consult-live": "tsx src/scripts/perf-consult-live.ts",
     "db:studio": "drizzle-kit studio",
     "eval:record-consult-fixtures": "tsx src/scripts/record-consult-fixtures.ts",
     "eval:consult-bakeoff": "tsx src/scripts/consult-bakeoff.ts"

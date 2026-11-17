@@ -18,7 +18,7 @@
  * interaction_rules 演示条目不删——替换只能靠人工抄录真条目。
  * 注意：重跑 db:seed 会重新导入演示行；需要纯净库时 seed 后再执行一次 --purge-mock --confirm。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { appendFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

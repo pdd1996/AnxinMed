@@ -17,7 +17,7 @@
  * - interaction_rules 永不触碰（条目只能人工抄录，PRD §7.8.1）；
  * - 每次实跑向 data/import-log.jsonl 追加一行/药，记录动作与原因（入库台账）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

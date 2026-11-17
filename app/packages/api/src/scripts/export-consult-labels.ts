@@ -15,7 +15,7 @@
  * - 漏判 = label 为数据意图 且 (tool_used 为空 或 ≠ label)；误判 = tool_used 有值但 label = 说明书管线；
  * - 漏判率 = 漏判数 / 抽样总数，回填 docs/11 §2 表格。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { and, gte, lt, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { consultLogs } from '../db/schema.js'

@@ -4,7 +4,7 @@
  * 运行：npm run db:seed
  * 前提：docker compose up -d && npm run db:migrate
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

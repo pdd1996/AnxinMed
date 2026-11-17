@@ -12,7 +12,7 @@
  *
  * 安全：只动 crawled 的丁香园行；reviewed 行拒绝；已有非空 sections 且不一致 → 整批不落库。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

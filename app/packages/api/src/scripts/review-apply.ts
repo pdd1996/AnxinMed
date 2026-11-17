@@ -8,7 +8,7 @@
  *   npm run db:review-apply -- --decisions ../../data/review-batches/batch-01-decisions.json --dry-run
  *   npm run db:review-apply -- --decisions ... [--reviewer 覆盖]
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { client } from '../db/client.js'

@@ -15,7 +15,7 @@
  * 前置：drugIds 引用的 drug_master 行必须已存在（db:import-crawled 建），sourceRef 引用的
  *       说明书行必须已入库；缺失即抛错，不静默吞。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

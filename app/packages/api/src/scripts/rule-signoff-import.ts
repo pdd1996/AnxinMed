@@ -7,7 +7,7 @@
  * 只处理 pass / edit；reject 不进规则。所有规则必须过 rule-curation 守门
  * （逐字、来源 reviewed、概念组一致、reviewedBy 非空）。人工确认后才另跑 apply。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'

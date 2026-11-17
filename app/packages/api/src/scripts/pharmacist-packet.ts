@@ -6,7 +6,7 @@
  *
  * 只做材料整理：不改 seed、不改规则、不写库。药师判定由人工填写。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

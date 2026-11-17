@@ -12,7 +12,7 @@
  * 幂等：全部使用 demo- 前缀固定 id；重跑先删 demo- 前缀旧数据再插入，不影响用户自建数据（drug-/plan-/health- 前缀）。
  * 仅 dev 库使用（CLI：pnpm db:seed-demo）；测试库不跑（测试自建数据）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { inArray, like } from 'drizzle-orm'
 import { db as devDb, client } from './client.js'
 import { users, drugs, plans, records, healthProfiles, drugMaster, consultLogs, riskEvents } from './schema.js'

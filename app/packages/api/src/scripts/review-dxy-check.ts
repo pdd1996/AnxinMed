@@ -13,7 +13,7 @@
  *   npm run db:review-dxy-check -- --in ../../../data/m8-reports/dxy-15.json \
  *     --out ../../../data/m8-reports/dxy-decisions.json --reviewer "M8-自动核验"
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fallbackContentHash } from '../db/identity.js'

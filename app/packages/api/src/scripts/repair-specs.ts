@@ -11,7 +11,7 @@
  * 插入新行不归本脚本：修正草稿由 db:import-manuals 导入（按 (drugId, sourceDocumentId) 幂等，
  * reviewed 行 write-once 不覆盖）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { appendFileSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

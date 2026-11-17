@@ -8,7 +8,7 @@
  * 自清理：只删除本次运行创建的草稿，不触碰其它数据。运行：cd app/packages/api && npm run perf:intake
  * 可调：PERF_N（次数，默认 30）、PERF_USER（默认 p-001，dev 库已 seed 的演示用户）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { inArray } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { drafts } from '../db/schema.js'

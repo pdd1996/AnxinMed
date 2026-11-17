@@ -13,7 +13,7 @@
  *
  * 运行：cd app/packages/api && npm run eval:record-consult-fixtures
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'

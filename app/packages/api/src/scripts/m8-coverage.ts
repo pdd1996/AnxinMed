@@ -10,7 +10,7 @@
  *
  * 边界：本脚本只读库、只写本地报告；不升格、不改库。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

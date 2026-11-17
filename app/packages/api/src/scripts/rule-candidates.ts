@@ -11,7 +11,7 @@
  *
  * 纪律：候选必须逐字、分级只是建议；入库前必须人工逐条签核（PRD §7.8.1）。
  */
-import 'dotenv/config'
+import '../lib/env.js'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
