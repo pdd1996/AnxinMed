@@ -1,7 +1,10 @@
 [
   {
     "id": "ir-001",
-    "drugIds": ["drug-amlodipine-5", "drug-atorvastatin-20"],
+    "drugIds": [
+      "drug-amlodipine-5",
+      "drug-atorvastatin-20"
+    ],
     "level": "需监测",
     "note": "氨氯地平与阿托伐他汀联用时，少数患者可能出现肌痛或肝酶升高，需关注。",
     "source": "两药说明书相互作用段（演示抄录）",
@@ -9,7 +12,10 @@
   },
   {
     "id": "ir-002",
-    "drugIds": ["drug-metformin-500", "drug-glipizide-5"],
+    "drugIds": [
+      "drug-metformin-500",
+      "drug-glipizide-5"
+    ],
     "level": "需监测",
     "note": "二甲双胍与格列吡嗪联用可能增加低血糖风险，需关注血糖监测。",
     "source": "两药说明书注意事项段（演示抄录）",
@@ -17,10 +23,465 @@
   },
   {
     "id": "ir-003",
-    "drugIds": ["drug-hycosan-01", "drug-levofloxacin-eye-01"],
+    "drugIds": [
+      "drug-hycosan-01",
+      "drug-levofloxacin-eye-01"
+    ],
     "level": "需监测",
     "note": "两种滴眼液同时使用需间隔至少 30 分钟，先后顺序请咨询医生或药师。",
     "source": "海露说明书注意事项②（演示抄录，docs/data-curation/mock-hycosan-01-海露.md）",
     "status": "demo"
+  },
+  {
+    "id": "m10-cand-02",
+    "drugIds": [
+      "drug-kelameisu-huanshi-pian-0p5g",
+      "drug-kelameisu-pian-0p25g",
+      "drug-qiushuixianjian-pian-1mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-kelameisu-huanshi-pian-0p5g",
+        "drug-kelameisu-pian-0p25g"
+      ],
+      [
+        "drug-qiushuixianjian-pian-1mg"
+      ]
+    ],
+    "level": "禁忌",
+    "note": "禁止同时使用克拉霉素和秋水仙碱。",
+    "source": "克拉霉素说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-kelameisu-pian-0p25g@nmpa-YBH06492020-5cb42ee0\",\"drugId\":\"drug-kelameisu-pian-0p25g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06492020\"}",
+    "quote": "禁止同时使用克拉霉素和秋水仙碱。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-04",
+    "drugIds": [
+      "drug-yansuan-paluoxiting-pian-20mg-h20133084",
+      "drug-yansuan-paluoxiting-pian-20mg",
+      "drug-linaizuoan-pian-600mg",
+      "drug-yajialan-zhusheye-2ml",
+      "drug-linaizuoan-putaotang-zhusheye-300ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-paluoxiting-pian-20mg-h20133084",
+        "drug-yansuan-paluoxiting-pian-20mg"
+      ],
+      [
+        "drug-linaizuoan-pian-600mg",
+        "drug-yajialan-zhusheye-2ml",
+        "drug-linaizuoan-putaotang-zhusheye-300ml"
+      ]
+    ],
+    "level": "禁忌",
+    "note": "禁止同时使用盐酸帕罗西汀片与MAOI（包括利奈唑胺和静脉亚甲蓝）（参见[禁忌]）。",
+    "source": "帕罗西汀说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-paluoxiting-pian-20mg-h20133084@nmpa-YBH06662019-9e89d47d\",\"drugId\":\"drug-yansuan-paluoxiting-pian-20mg-h20133084\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06662019\"}",
+    "quote": "禁止同时使用盐酸帕罗西汀片与MAOI（包括利奈唑胺和静脉亚甲蓝）（参见[禁忌]）。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-07",
+    "drugIds": [
+      "drug-amlodipine-5",
+      "drug-benhuangsuan-anl-diping-pian-10mg",
+      "drug-benhuangsuan-anl-diping-pian-2p5mg",
+      "drug-benhuangsuan-anl-diping-pian-5mg-h2003108725mg",
+      "drug-benhuangsuan-anl-diping-pian-10mg-h20093660",
+      "drug-benhuangsuan-anl-diping-pian-5mg-h10950224",
+      "drug-benhuangsuan-anl-diping-pian-5mg",
+      "drug-men-dong-an-suan-an-lu-di-ping-plan-5mg",
+      "drug-bisuoluo-er-anliudiping-pian-5mg",
+      "drug-takemosi-jiaonang-1mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-amlodipine-5",
+        "drug-benhuangsuan-anl-diping-pian-10mg",
+        "drug-benhuangsuan-anl-diping-pian-2p5mg",
+        "drug-benhuangsuan-anl-diping-pian-5mg-h2003108725mg",
+        "drug-benhuangsuan-anl-diping-pian-10mg-h20093660",
+        "drug-benhuangsuan-anl-diping-pian-5mg-h10950224",
+        "drug-benhuangsuan-anl-diping-pian-5mg",
+        "drug-men-dong-an-suan-an-lu-di-ping-plan-5mg",
+        "drug-bisuoluo-er-anliudiping-pian-5mg"
+      ],
+      [
+        "drug-takemosi-jiaonang-1mg"
+      ]
+    ],
+    "level": "慎用",
+    "note": "为避免他克莫司的毒性，他克莫司治疗患者在安排氨氯地平治疗时要求对其他克莫司血药浓度进行检测，并且适时调整他克莫司的用量。",
+    "source": "比索洛尔氨氯地平说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-bisuoluo-er-anliudiping-pian-5mg@nmpa-JX20210038-b0f8a92b\",\"drugId\":\"drug-bisuoluo-er-anliudiping-pian-5mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20210038\"}",
+    "quote": "为避免他克莫司的毒性，他克莫司治疗患者在安排氨氯地平治疗时要求对其他克莫司血药浓度进行检测，并且适时调整他克莫司的用量。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-08",
+    "drugIds": [
+      "drug-yansuan-andiantong-zhusheye-3ml",
+      "drug-yansuan-andiantongpian-0p2g",
+      "drug-ynsun-andinton-zhusheye-3ml",
+      "drug-yansuan-punailuo-er-pian-10mg",
+      "drug-yansuan-weilapami-zhusheye-2ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-andiantong-zhusheye-3ml",
+        "drug-yansuan-andiantongpian-0p2g",
+        "drug-ynsun-andinton-zhusheye-3ml"
+      ],
+      [
+        "drug-yansuan-punailuo-er-pian-10mg",
+        "drug-yansuan-weilapami-zhusheye-2ml"
+      ]
+    ],
+    "level": "慎用",
+    "note": "在接受β受体阻滞剂(如普萘洛尔)或钙通道拮抗剂(如维拉帕米、地尔硫卓)治疗的患者中，应慎用胺碘酮，因为存在发生心动过缓、窦性停搏和AV阻滯的可能性；",
+    "source": "胺碘酮说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-andiantongpian-0p2g@nmpa-2020-18bbffeb\",\"drugId\":\"drug-yansuan-andiantongpian-0p2g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "在接受β受体阻滞剂(如普萘洛尔)或钙通道拮抗剂(如维拉帕米、地尔硫卓)治疗的患者中，应慎用胺碘酮，因为存在发生心动过缓、窦性停搏和AV阻滯的可能性；",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-09",
+    "drugIds": [
+      "drug-kelameisu-huanshi-pian-0p5g",
+      "drug-kelameisu-pian-0p25g",
+      "drug-xinfatating-pian-20mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-kelameisu-huanshi-pian-0p5g",
+        "drug-kelameisu-pian-0p25g"
+      ],
+      [
+        "drug-xinfatating-pian-20mg"
+      ]
+    ],
+    "level": "慎用",
+    "note": "如果克拉霉素的治疗是不可避免的，则在治疗期间应暂停使用洛伐他汀或辛伐他汀。",
+    "source": "克拉霉素说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-kelameisu-pian-0p25g@nmpa-YBH06492020-5cb42ee0\",\"drugId\":\"drug-kelameisu-pian-0p25g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06492020\"}",
+    "quote": "如果克拉霉素的治疗是不可避免的，则在治疗期间应暂停使用洛伐他汀或辛伐他汀。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-10",
+    "drugIds": [
+      "drug-kelameisu-huanshi-pian-0p5g",
+      "drug-kelameisu-pian-0p25g",
+      "drug-kamaxiping-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-kelameisu-huanshi-pian-0p5g",
+        "drug-kelameisu-pian-0p25g"
+      ],
+      [
+        "drug-kamaxiping-pian-0p1g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "服用其它已知的CYP3A酶底物时应慎用克拉霉素，特别是当该药物具有窄的安全范围（如卡马西平）和/或该药物通过此酶进行广泛代谢。",
+    "source": "克拉霉素说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-kelameisu-pian-0p25g@nmpa-YBH06492020-5cb42ee0\",\"drugId\":\"drug-kelameisu-pian-0p25g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06492020\"}",
+    "quote": "服用其它已知的CYP3A酶底物时应慎用克拉霉素，特别是当该药物具有窄的安全范围（如卡马西平）和/或该药物通过此酶进行广泛代谢。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-11",
+    "drugIds": [
+      "drug-duopanlitong-pian-10-h20123058",
+      "drug-duopanlitong-pian-10",
+      "drug-zhusheyong-rutangsuan-hongmeisu-0p25g",
+      "drug-zhusheyong-rutangsuan-hongmeisu-0p3g"
+    ],
+    "drugGroups": [
+      [
+        "drug-duopanlitong-pian-10-h20123058",
+        "drug-duopanlitong-pian-10"
+      ],
+      [
+        "drug-zhusheyong-rutangsuan-hongmeisu-0p25g",
+        "drug-zhusheyong-rutangsuan-hongmeisu-0p3g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "1.不宜与唑类抗真菌药如酮康唑、伊曲康唑，大环内酯类抗生素如红霉素，HIV蛋白酶抑制剂类抗艾滋病药物及奈法唑酮等合用。",
+    "source": "多潘立酮说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-duopanlitong-pian-10-h20123058@nmpa-YBH06512020-cc7f022a\",\"drugId\":\"drug-duopanlitong-pian-10-h20123058\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06512020\"}",
+    "quote": "1.不宜与唑类抗真菌药如酮康唑、伊曲康唑，大环内酯类抗生素如红霉素，HIV蛋白酶抑制剂类抗艾滋病药物及奈法唑酮等合用。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-12",
+    "drugIds": [
+      "drug-liusuan-qiangl-kui-pian-0p2g",
+      "drug-liusuan-qianglvkui-pian-0p2g",
+      "drug-liusuanqianglvkuipian-0p1g",
+      "drug-liusuanqianglvkuipian-0p2g",
+      "drug-yansuan-moxishaxing-pian-0p4g-h20193406",
+      "drug-yansuan-moxishaxing-pian-0p4g"
+    ],
+    "drugGroups": [
+      [
+        "drug-liusuan-qiangl-kui-pian-0p2g",
+        "drug-liusuan-qianglvkui-pian-0p2g",
+        "drug-liusuanqianglvkuipian-0p1g",
+        "drug-liusuanqianglvkuipian-0p2g"
+      ],
+      [
+        "drug-yansuan-moxishaxing-pian-0p4g-h20193406",
+        "drug-yansuan-moxishaxing-pian-0p4g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "已知可延长QT间期/可能诱导心律失常的药物：正在使用已知可延长QT间期的药物(例如，ⅠA和Ⅲ类抗心律失常药(例如，胺碘酮)、三环类抗抑郁药、抗精神病药物、部分抗感染药物(例如莫西沙星)的患者应慎用羟氯喹，因为合用时发生室性心律失常的风险可能增加(参见禁忌和药物过量)。",
+    "source": "羟氯喹说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-liusuanqianglvkuipian-0p1g@nmpa-YBH16622021-e9eb9ae9\",\"drugId\":\"drug-liusuanqianglvkuipian-0p1g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH16622021\"}",
+    "quote": "已知可延长QT间期/可能诱导心律失常的药物：正在使用已知可延长QT间期的药物(例如，ⅠA和Ⅲ类抗心律失常药(例如，胺碘酮)、三环类抗抑郁药、抗精神病药物、部分抗感染药物(例如莫西沙星)的患者应慎用羟氯喹，因为合用时发生室性心律失常的风险可能增加(参见禁忌和药物过量)。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-13",
+    "drugIds": [
+      "drug-omeprazole-20",
+      "drug-aomeilazuo-changrongjiaonang-10mg",
+      "drug-aomeilazuo-changrongjiaonang-20mg",
+      "drug-aomeilazuochangrongjiaonang-20mg",
+      "drug-boshakangzuo-changrongpian-100mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-omeprazole-20",
+        "drug-aomeilazuo-changrongjiaonang-10mg",
+        "drug-aomeilazuo-changrongjiaonang-20mg",
+        "drug-aomeilazuochangrongjiaonang-20mg"
+      ],
+      [
+        "drug-boshakangzuo-changrongpian-100mg"
+      ]
+    ],
+    "level": "慎用",
+    "note": "应避免本品联合使用泊沙康唑、厄洛替尼。",
+    "source": "奥美拉唑说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-aomeilazuo-changrongjiaonang-10mg@nmpa-YBH00352022-b435e201\",\"drugId\":\"drug-aomeilazuo-changrongjiaonang-10mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH00352022\"}",
+    "quote": "应避免本品联合使用泊沙康唑、厄洛替尼。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-14",
+    "drugIds": [
+      "drug-ibuprofen-300",
+      "drug-buluofen-huanshijiaonang-0p3-h20203355",
+      "drug-buluofen-huanshijiaonang-0p3",
+      "drug-buluofen-hunxuandiji-15ml",
+      "drug-buluofen-hunxuanye-100",
+      "drug-buluofen-hunxuanye-2pct",
+      "drug-buluofen-hunxuanye-30",
+      "drug-buluofen-pian-0p1",
+      "drug-buluofenkeli-0p2",
+      "drug-digaoxin-pian-0p25mg",
+      "drug-jia-andieling-pian-2p5mg",
+      "drug-zhusheyong-jia-an-dieling-0p1g",
+      "drug-zhusheyong-jia-an-dieling-1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-ibuprofen-300",
+        "drug-buluofen-huanshijiaonang-0p3-h20203355",
+        "drug-buluofen-huanshijiaonang-0p3",
+        "drug-buluofen-hunxuandiji-15ml",
+        "drug-buluofen-hunxuanye-100",
+        "drug-buluofen-hunxuanye-2pct",
+        "drug-buluofen-hunxuanye-30",
+        "drug-buluofen-pian-0p1",
+        "drug-buluofenkeli-0p2"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg",
+        "drug-jia-andieling-pian-2p5mg",
+        "drug-zhusheyong-jia-an-dieling-0p1g",
+        "drug-zhusheyong-jia-an-dieling-1g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "3.本品与地高辛、甲氨蝶呤、口服降血糖药物同用时，能使这些药物的血药浓度增高，不宜同用。",
+    "source": "布洛芬说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-buluofen-pian-0p1@nmpa-YBH07542019-2020-8abbf2d4\",\"drugId\":\"drug-buluofen-pian-0p1\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH07542019-2020\"}",
+    "quote": "3.本品与地高辛、甲氨蝶呤、口服降血糖药物同用时，能使这些药物的血药浓度增高，不宜同用。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-16",
+    "drugIds": [
+      "drug-midanping-pian-15mg",
+      "drug-midanping-pian-30mg",
+      "drug-dixipan-pian-2p5mg",
+      "drug-dixipan-zhusheye-2ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-midanping-pian-15mg",
+        "drug-midanping-pian-30mg"
+      ],
+      [
+        "drug-dixipan-pian-2p5mg",
+        "drug-dixipan-zhusheye-2ml"
+      ]
+    ],
+    "level": "慎用",
+    "note": "因此，应建议患者在服用本品期间避免使用地西泮以及其他类似药物。",
+    "source": "米氮平说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-midanping-pian-30mg@nmpa-JX20220099-9b0d644a\",\"drugId\":\"drug-midanping-pian-30mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20220099\"}",
+    "quote": "因此，应建议患者在服用本品期间避免使用地西泮以及其他类似药物。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-17",
+    "drugIds": [
+      "drug-yansuan-meijingang-pian-10mg",
+      "drug-yansuan-meijingang-pian-5mg",
+      "drug-yansuon-meijingang-pian-10mg",
+      "drug-yansuonmeijingangpian-10mg",
+      "drug-yansuan-jinggangwan-an-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-meijingang-pian-10mg",
+        "drug-yansuan-meijingang-pian-5mg",
+        "drug-yansuon-meijingang-pian-10mg",
+        "drug-yansuonmeijingangpian-10mg"
+      ],
+      [
+        "drug-yansuan-jinggangwan-an-pian-0p1g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "●因为美金刚与金刚烷胺在化学结构上都是NMDA拮抗剂，因此应避免合用，以免发生药物中毒性精神病。",
+    "source": "美金刚说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-meijingang-pian-10mg@nmpa-YBH07172021-2dc2ceee\",\"drugId\":\"drug-yansuan-meijingang-pian-10mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH07172021\"}",
+    "quote": "●因为美金刚与金刚烷胺在化学结构上都是NMDA拮抗剂，因此应避免合用，以免发生药物中毒性精神病。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-18",
+    "drugIds": [
+      "drug-yibasiting-pian-10mg",
+      "drug-zhusheyong-rutangsuan-hongmeisu-0p25g",
+      "drug-zhusheyong-rutangsuan-hongmeisu-0p3g"
+    ],
+    "drugGroups": [
+      [
+        "drug-yibasiting-pian-10mg"
+      ],
+      [
+        "drug-zhusheyong-rutangsuan-hongmeisu-0p25g",
+        "drug-zhusheyong-rutangsuan-hongmeisu-0p3g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "因此，对于同时服用酮康唑或伊曲康唑等唑类抗真菌药物和红霉素等大环内酯类抗生素的患者，应慎用依巴斯汀。",
+    "source": "依巴斯汀说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yibasiting-pian-10mg@nmpa-JX20030151-172f88db\",\"drugId\":\"drug-yibasiting-pian-10mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20030151\"}",
+    "quote": "因此，对于同时服用酮康唑或伊曲康唑等唑类抗真菌药物和红霉素等大环内酯类抗生素的患者，应慎用依巴斯汀。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-19",
+    "drugIds": [
+      "drug-liusuan-qingl-bigelei-pian-25mg",
+      "drug-liusuan-qinglbigelei-pian-75mg",
+      "drug-liusuanqinglbigelei-pian-75mg-h20056410",
+      "drug-liusuanqinglbigelei-pian-75mg",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-liusuan-qingl-bigelei-pian-25mg",
+        "drug-liusuan-qinglbigelei-pian-75mg",
+        "drug-liusuanqinglbigelei-pian-75mg-h20056410",
+        "drug-liusuanqinglbigelei-pian-75mg"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "口服抗凝剂：因能增加出血强度，不提倡氯吡格雷与华法林合用（见注意事项）。",
+    "source": "氢氯吡格雷说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-liusuan-qinglbigelei-pian-75mg@nmpa-YBH10782022-6aee33e8\",\"drugId\":\"drug-liusuan-qinglbigelei-pian-75mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH10782022\"}",
+    "quote": "口服抗凝剂：因能增加出血强度，不提倡氯吡格雷与华法林合用（见注意事项）。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
+  },
+  {
+    "id": "m10-cand-20",
+    "drugIds": [
+      "drug-yansuan-fuxiting-jiaonang-20mg",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-fuxiting-jiaonang-20mg"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "接受华法林治疗的患者在开始或终止氟西汀治疗时应当加以仔细监测(参见[注意事项]异常出血)。",
+    "source": "氟西汀说明书·药物相互作用（M10 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-fuxiting-jiaonang-20mg@nmpa-2020-YBH05962018-9f397823\",\"drugId\":\"drug-yansuan-fuxiting-jiaonang-20mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020-YBH05962018\"}",
+    "quote": "接受华法林治疗的患者在开始或终止氟西汀治疗时应当加以仔细监测(参见[注意事项]异常出血)。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-17T03:13:44.959Z"
   }
 ]

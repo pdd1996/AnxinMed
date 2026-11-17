@@ -79,6 +79,9 @@ data/m9-reports/
 # M10 规则归一与签核：基线 / 20 条签核清单（含说明书正文，不入库）
 data/m10-reports/
 
+# M10 人工签核记录（含说明书原文引用与签核人，只保留本地）
+data/review-manual/
+
 # ── 药方样张：处方笺图片一律不入库（2026-11-12 口径；图片留本地，脚本可重建）──
 # 生成方式：python app/fixtures/make-fixtures.py（带字，Pillow）/ python tools/ocr-bench/make_sample.py
 # CI 缺图由 e2e/scripts/make-sample-images.ts 在 globalSetup 补纯色占位图（回放不读像素）

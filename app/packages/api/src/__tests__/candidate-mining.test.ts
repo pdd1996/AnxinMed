@@ -4,6 +4,7 @@ import {
   aliasesForDrug,
   buildAliasIndex,
   classifySentence,
+  expandQuoteToSentence,
   findMentions,
   mineCandidates,
   splitSentences,
@@ -52,8 +53,18 @@ describe('candidate-mining · 药名归一与命中最长匹配', () => {
     expect(hits.filter((h) => h.alias.includes('他汀')).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('切句保留标点', () => {
-    expect(splitSentences('甲。乙；丙\n丁')).toEqual(['甲。', '乙；', '丙', '丁'])
+  it('切句保留标点；PDF 换行合并不切半句', () => {
+    expect(splitSentences('甲。乙；丙\n丁')).toEqual(['甲。', '乙；', '丙丁'])
+    expect(splitSentences('应慎用胺\n碘酮，因为存在心动过缓。')).toEqual(['应慎用胺碘酮，因为存在心动过缓。'])
+  })
+
+  it('引文扩展到完整句（OCR 换行截断修复）', () => {
+    const text = '在接受β受体阻滞剂(如普萘洛尔)或钙通道拮抗剂(如维拉帕米、地尔硫卓)治疗的患者中，应慎用胺\n碘酮，因为存在发生心动过缓、窦性停搏和AV阻滯的可能性；在重度心动过缓患者中可继续应用。'
+    const expanded = expandQuoteToSentence(text, '应慎用胺')
+    expect(expanded).toContain('应慎用胺碘酮')
+    expect(expanded).toContain('可能性')
+    expect(expanded?.endsWith('；')).toBe(true)
+    expect(expandQuoteToSentence(text, '不存在的引文')).toBeNull()
   })
 })
 

@@ -30,6 +30,7 @@
     "db:cleanup-demo-drugs": "tsx src/scripts/cleanup-demo-drugs.ts",
     "db:rule-candidates": "tsx src/scripts/rule-candidates.ts",
     "db:rule-signoff-sheet": "tsx src/scripts/rule-signoff-sheet.ts",
+    "db:rule-signoff-import": "tsx src/scripts/rule-signoff-import.ts",
     "db:repair-specs": "tsx src/scripts/repair-specs.ts",
     "db:repair-manuals": "tsx src/scripts/repair-manuals.ts",
     "db:audit": "tsx src/db/data-audit.ts",

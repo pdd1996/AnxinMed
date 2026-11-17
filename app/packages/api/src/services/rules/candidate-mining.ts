@@ -188,11 +188,30 @@ export function baseDrugName(name: string): string {
   return stripSalts(stripSuffixes(stripParens(String(name ?? '').trim()))).replace(/[钠钾钙镁铵]$/, '')
 }
 
-/** 按中文句号/分号/换行切句（保留标点，便于逐字 quote）。 */
+/** 按中文句号/分号/换行切句（保留标点，便于逐字 quote）；PDF 换行先合并，避免把一句话切成半句。 */
 export function splitSentences(text: string): string[] {
-  return (String(text ?? '').match(/[^。；;！？!?\n]+[。；;！？!?]?/g) ?? [])
+  return (String(text ?? '').replace(/[\r\n]+/g, '').match(/[^。；;！？!?]+[。；;！？!?]?/g) ?? [])
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+/**
+ * 把引文扩到完整句：从 quote 起点向后找最近句读（。；！？），并合并 PDF 换行。
+ * 只向后扩、不向前扩，避免把上一段/标题并进来；quote 已以句读结尾则原样返回。
+ * 找不到 quote 时返回 null。
+ */
+export function expandQuoteToSentence(text: string, quote: string): string | null {
+  const raw = String(text ?? '')
+  const pos = raw.indexOf(quote)
+  if (pos < 0) return null
+  const clean = (s: string) => s.replace(/[\r\n]+/g, '').trim()
+  if (/[。；;！？!?]$/.test(quote.trim())) return clean(quote)
+  let end = raw.length
+  for (const b of ['。', '；', ';', '！', '？', '!', '?']) {
+    const i = raw.indexOf(b, pos + quote.length)
+    if (i >= 0 && i + 1 < end) end = i + 1
+  }
+  return clean(raw.slice(pos, end)) || clean(quote)
 }
 
 /**
