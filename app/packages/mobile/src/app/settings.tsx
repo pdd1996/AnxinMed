@@ -1,7 +1,8 @@
 import { Pressable, ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
-import { Type, Bell, Wifi } from "lucide-react-native";
+import { Type, Bell, Wifi, KeyRound } from "lucide-react-native";
+import { useAuthStore } from "@anxin/core";
 import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Text 必须走 ui/text：09-30 深夜修过一条「settings.tsx 直引 react-native 的 Text，接不到
@@ -21,6 +22,9 @@ export default function Settings() {
   const scale = useFontScale((s) => s.scale);
   const setScale = useFontScale((s) => s.setScale);
   const reminderPermission = useReminderSync((s) => s.permission);
+  // P1：账号与安全（密码管理）——demo 模式没有真实账号，不显示入口。
+  const authMode = useAuthStore((s) => s.mode);
+  const hasPassword = useAuthStore((s) => s.user?.hasPassword === true);
   // 图标是 SVG，取 --primary 令牌而不是写死色值（深浅色都要对，05d §6 第 16 条）。
   const primary = useUnstableNativeVariable("--primary");
   return (
@@ -54,6 +58,27 @@ export default function Settings() {
           改变的是整页文字与间距一起缩放，从标题到按钮、卡片内边距都会跟着变。
         </Text>
       </View>
+
+      {/* P1：账号与安全——登录密码入口（密码是安全设置，不放进个人资料）。 */}
+      {authMode === "demo" ? null : (
+        <View className="mt-8 gap-2">
+          <Text className="text-lg font-semibold text-foreground">账号与安全</Text>
+          <Text className="text-sm leading-6 text-muted-foreground">
+            登录密码用于「密码登录」；手机号验证码登录不受影响。
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push("/password")}
+            className="mt-1 min-h-[52px] flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 active:opacity-80"
+          >
+            <KeyRound size={20} color={primary} importantForAccessibility="no" />
+            <Text className="flex-1 text-base font-medium text-card-foreground">登录密码</Text>
+            <Text className="text-sm text-muted-foreground">
+              {hasPassword ? "去修改 →" : "去设置 →"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <View className="mt-8 gap-3">
         <Text className="text-base font-bold text-foreground">风险语义色预览</Text>

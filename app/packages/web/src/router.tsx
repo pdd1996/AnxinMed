@@ -18,6 +18,7 @@ const Account = lazy(() => import('@/routes/patient/Account'))
 const HealthInfo = lazy(() => import('@/routes/patient/HealthInfo'))
 const Records = lazy(() => import('@/routes/patient/Records'))
 const Settings = lazy(() => import('@/routes/patient/Settings'))
+const PasswordSettings = lazy(() => import('@/routes/patient/PasswordSettings'))
 const NotFound = lazy(() => import('@/routes/patient/NotFound'))
 const Insight = lazy(() => import('@/routes/doctor/Insight'))
 
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
           { path: '/health-info', element: page(<HealthInfo />) },
           { path: '/records', element: page(<Records />) },
           { path: '/settings', element: page(<Settings />) },
+          { path: '/settings/password', element: page(<PasswordSettings />) },
           { path: '*', element: page(<NotFound />) },
         ],
       },
