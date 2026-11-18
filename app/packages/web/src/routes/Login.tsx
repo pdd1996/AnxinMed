@@ -213,10 +213,6 @@ export default function Login() {
               <Button type="submit" className="min-h-12 w-full text-base" disabled={passwordPending}>
                 {passwordPending ? '正在登录…' : '登录'}
               </Button>
-
-              <p className="text-sm leading-6 text-muted-foreground">
-                账号由管理员分配；忘记密码请联系管理员重置。本系统仅用于演示与受控验收，不接收真实患者数据。
-              </p>
             </form>
           ) : (
             <form className="space-y-5" onSubmit={handlePhoneSubmit} noValidate>
@@ -282,10 +278,6 @@ export default function Login() {
               <Button type="submit" className="min-h-12 w-full text-base" disabled={phonePending}>
                 {phonePending ? '正在登录…' : '登录 / 注册'}
               </Button>
-
-              <p className="text-sm leading-6 text-muted-foreground">
-                未注册的手机号验证通过后将自动创建账号。本系统仅用于演示与受控验收，不接收真实患者数据。
-              </p>
             </form>
           )}
         </CardContent>
