@@ -1,7 +1,7 @@
 /**
  * 登录页（G7 密码 · P1 手机号验证码）组件测试：
  * 密码：表单校验、提交 trim、失败文案内联、pending 防重复；
- * 手机号：tab 切换、发码校验/落款提示/倒计时禁用、提交 trim、验证码错误内联。
+ * 手机号：tab 切换、发码校验/倒计时禁用、提交 trim、验证码错误内联。
  * 只 mock core 的 signIn / requestPhoneCode / signInWithPhone，其余（ApiRequestError / store）走真代码。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -130,7 +130,7 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
     expect(mocks.requestPhoneCode).not.toHaveBeenCalled()
   })
 
-  it('获取验证码成功 → 展示短信落款提示并进入冷却（按钮禁用、显示倒计时）', async () => {
+  it('获取验证码成功 → 进入冷却（按钮禁用、显示倒计时）', async () => {
     mocks.requestPhoneCode.mockResolvedValue({
       ok: true,
       mode: 'password',
@@ -144,7 +144,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
     fireEvent.click(screen.getByRole('button', { name: '获取验证码' }))
 
     await waitFor(() => expect(mocks.requestPhoneCode).toHaveBeenCalledWith('13800138000'))
-    expect((await screen.findByText(/短信落款为「恒创联众」/)).textContent).toContain('请注意查收')
     const resend = screen.getByRole('button', { name: /秒后重发/ }) as HTMLButtonElement
     expect(resend.disabled).toBe(true)
 

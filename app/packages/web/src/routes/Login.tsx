@@ -24,7 +24,6 @@ type LoginTab = 'password' | 'phone'
  * - 两种方式并存：老账号继续用管理员分配的账号密码；手机号验证码为「验证码即注册」
  *   （未注册手机号验码通过后自动建号），成功/失败文案都由服务端中文 message 直接透传，
  *   网络/超时/服务异常统一经 core 的 toUserMessage 归成中文（G8，禁止 Failed to fetch 原样上屏）；
- * - 手机号 tab 显示短信落款签名（「短信落款为 XX，属正常」），减少老年用户把验证码短信误判为诈骗；
  * - 无自助改密/找回：密码账号由 CLI 开通，忘记密码走管理员重置（G7 已知边界）。
  */
 export default function Login() {
@@ -47,8 +46,6 @@ export default function Login() {
   const [phonePending, setPhonePending] = useState(false)
   /** 重发倒计时（秒），由服务端返回的 cooldownSec 初始化。 */
   const [cooldown, setCooldown] = useState(0)
-  /** 短信落款签名（服务端返回；用于「短信落款为 XX，请注意查收」提示）。 */
-  const [signName, setSignName] = useState<string | null>(null)
 
   // 倒计时：每秒减一（卸载自动清理，避免离开页面后 setState）。
   useEffect(() => {
@@ -104,7 +101,6 @@ export default function Login() {
     setError(null)
     try {
       const data = await requestPhoneCode(value)
-      setSignName(data.signName)
       setCooldown(data.cooldownSec)
     } catch (err) {
       // SMS_LIMITED / SMS_SEND_FAILED / SMS_NOT_CONFIGURED 的中文 message 原样透传。
@@ -263,9 +259,7 @@ export default function Login() {
                   </Button>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  {signName
-                    ? `短信落款为「${signName}」，请注意查收；验证码请勿告诉他人。`
-                    : '未注册的手机号验证通过后将自动创建账号。'}
+                  未注册的手机号验证通过后将自动创建账号。
                 </p>
               </div>
 
