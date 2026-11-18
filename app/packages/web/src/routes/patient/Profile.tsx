@@ -1,12 +1,11 @@
 import { Link } from 'react-router'
-import { AlertTriangle, ChevronRight, ClipboardList, Settings, UserRound, type LucideIcon } from 'lucide-react'
-import { HealthInfoCard } from '@/components/domain/profile/HealthInfoCard'
+import { ChevronRight, ClipboardList, Settings, UserRound, type LucideIcon } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
 /**
- * 我的页（任务书 T9）：健康信息两入口之一（手动填写）。视觉参照蚂蚁阿福「编辑家庭成员」：
- * 头像+账号头部、分组表单卡（HealthInfoCard 常驻字段+待补充+弹窗编辑）、列表式入口行。
- * 处方抄录·已确认入口在 M2 确认页（HealthCard 建议填入勾选区）。
+ * 我的页（任务书 T9）：账号头部 + 列表式入口行。
+ * 健康信息自 2026-11-18 起是独立一级页（/health-info，与 /records 同级），不再在本页内嵌表单卡；
+ * 两条入口共用 `HealthInfoCard` 组件与同一份 profile 数据。处方抄录·已确认入口在 M2 确认页。
  */
 export default function Profile() {
   return (
@@ -21,22 +20,17 @@ export default function Profile() {
         </div>
       </header>
 
-      <HealthInfoCard />
-
       <Card className="gap-0 py-0">
         <CardContent className="p-0">
           <nav aria-label="更多">
+            <EntryLink to="/health-info" icon={UserRound} label="健康信息" hint="七项健康档案" />
+            <div className="border-t" aria-hidden />
             <EntryLink to="/records" icon={ClipboardList} label="服药记录" hint="查询与导出" />
             <div className="border-t" aria-hidden />
             <EntryLink to="/settings" icon={Settings} label="设置" hint="字号等" />
           </nav>
         </CardContent>
       </Card>
-
-      <p className="flex items-start gap-2 rounded-xl border border-risk-l3/40 bg-risk-l3/10 p-3 text-xs text-risk-l3">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-        仅供产品测试：使用 Mock 药品与说明书数据（演示抄录，未经医学审核），不用于真实诊疗、处方或用药决策。
-      </p>
     </div>
   )
 }

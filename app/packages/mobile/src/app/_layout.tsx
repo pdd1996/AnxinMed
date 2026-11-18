@@ -53,6 +53,7 @@ export default function RootLayout() {
                 <Stack.Screen name="intake/drug" options={{ title: "拍照录入" }} />
                 <Stack.Screen name="drafts/[id]" options={{ title: "草稿确认" }} />
                 <Stack.Screen name="records" options={{ title: "服药记录" }} />
+                <Stack.Screen name="health-info" options={{ title: "健康信息" }} />
                 <Stack.Screen name="settings" options={{ title: "设置" }} />
                 <Stack.Screen name="notification-settings" options={{ title: "通知与提醒设置" }} />
                 <Stack.Screen name="probe" options={{ title: "网络探测" }} />

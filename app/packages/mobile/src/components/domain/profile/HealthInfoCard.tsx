@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
-import { Check, ChevronRight, Info, Trash2, UserRound } from "lucide-react-native";
+import { Check, ChevronRight, Trash2, UserRound } from "lucide-react-native";
 import { client, fetchProfile, unwrap } from "@anxin/core";
 import { HEALTH_FIELDS, type HealthField } from "@anxin/shared";
 import { Button } from "@/components/ui/button";
@@ -40,11 +40,13 @@ const pad2 = (value: string) => value.padStart(2, "0");
  * 删除走弹窗内二次确认（行上一键即删已移除，防误触）。
  * 写入一律 `PATCH /api/profile`，来源标注由服务端定（手动保存 = self_reported，见 profiles.service:32）。
  *
+ * `showHeader=false` 用于「健康信息」一级页：页头已给出标题与说明，卡内不再重复标题行。
+ *
  * 两处平台适配（语义不变，见 T5-真机验收.md §2.9 差异清单）：
  * ① web 的 `<input type="month">` → 「年 / 月」两个 number-pad 框，拼回 `YYYY-MM`；
  * ② web 的行 hover 底色在 RN 换成 `active:opacity-80`。
  */
-export function HealthInfoCard() {
+export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) {
   const queryClient = useQueryClient();
   const primary = useUnstableNativeVariable("--primary");
   const primaryForeground = useUnstableNativeVariable("--primary-foreground");
@@ -125,13 +127,15 @@ export function HealthInfoCard() {
 
   return (
     <Card className="gap-0 p-0">
-      <CardHeader className="border-b border-border">
-        <View className="flex-row items-center gap-2">
-          <Icon as={UserRound} size={20} color={primary} />
-          <CardTitle className="flex-1 text-base">健康信息</CardTitle>
-          <Text className="text-xs text-muted-foreground">点按行可补充或修改</Text>
-        </View>
-      </CardHeader>
+      {showHeader ? (
+        <CardHeader className="border-b border-border">
+          <View className="flex-row items-center gap-2">
+            <Icon as={UserRound} size={20} color={primary} />
+            <CardTitle className="flex-1 text-base">健康信息</CardTitle>
+            <Text className="text-xs text-muted-foreground">点按行可补充或修改</Text>
+          </View>
+        </CardHeader>
+      ) : null}
 
       <CardContent className="p-0">
         {isPending ? (
@@ -160,13 +164,13 @@ export function HealthInfoCard() {
                 key={field}
                 accessibilityRole="button"
                 onPress={() => openEditor(field, entry)}
-                className={`min-h-[64px] flex-row items-center justify-between gap-3 px-4 py-3 active:opacity-80 ${
+                className={`min-h-[64px] flex-row items-center gap-3 px-4 py-3 active:opacity-80 ${
                   index === HEALTH_FIELDS.length - 1 ? "" : "border-b border-border"
                 }`}
               >
-                <Text className="text-base font-semibold text-foreground">{field}</Text>
+                <Text className="shrink-0 text-base font-semibold text-foreground">{field}</Text>
                 {filled ? (
-                  <View className="flex-1 items-end">
+                  <View className="min-w-0 flex-1 items-end">
                     <Text
                       className="text-right text-sm font-medium text-card-foreground"
                       numberOfLines={2}
@@ -183,22 +187,13 @@ export function HealthInfoCard() {
                     </Text>
                   </View>
                 ) : (
-                  <View className="flex-row items-center gap-0.5">
-                    <Text className="text-sm text-muted-foreground">待补充</Text>
-                    <Icon as={ChevronRight} size={16} color={mutedForeground} />
-                  </View>
+                  <Text className="flex-1 text-right text-sm text-muted-foreground">待补充</Text>
                 )}
+                <Icon as={ChevronRight} size={18} color={mutedForeground} />
               </Pressable>
             );
           })
         )}
-
-        <View className="flex-row items-start gap-2 border-t border-border px-4 py-3">
-          <Icon as={Info} size={16} color={mutedForeground} />
-          <Text className="flex-1 text-xs leading-5 text-muted-foreground">
-            产品不做诊断：「诊断」字段语义永远为「用户报告的诊断」，AI 将其视为用户提供的、未经医学验证的信息。
-          </Text>
-        </View>
       </CardContent>
 
       <Dialog open={editing !== null} onOpenChange={(next) => !next && closeEditor()}>

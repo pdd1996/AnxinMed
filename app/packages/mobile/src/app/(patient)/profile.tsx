@@ -2,7 +2,6 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
 import {
-  AlertTriangle,
   ChevronRight,
   ClipboardList,
   Settings as SettingsIcon,
@@ -11,17 +10,16 @@ import {
 } from "lucide-react-native";
 import { Card, CardContent } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
-import { HealthInfoCard } from "@/components/domain/profile/HealthInfoCard";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 
 /**
- * 我的页（M5-T5e，照 web `routes/patient/Profile.tsx`）：账号头部 + 健康信息七字段卡 +
- * 列表式入口行（记录 / 设置）+ 测试数据免责条。处方抄录·已确认那一入口在草稿确认页（M2 线）。
+ * 我的页（M5-T5e）：账号头部 + 列表式入口行（健康信息 / 记录 / 设置）。
+ * 健康信息自 2026-11-18 起是独立一级页（与服药记录同级），不再在「我的」页内嵌表单卡。
+ * 处方抄录·已确认那一入口在草稿确认页（M2 线）。
  */
 export default function Profile() {
   const router = useRouter();
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
-  const riskL3 = useUnstableNativeVariable("--risk-l3");
 
   return (
     <ScrollView
@@ -44,12 +42,15 @@ export default function Profile() {
         </View>
       </View>
 
-      <View className="mt-5">
-        <HealthInfoCard />
-      </View>
-
       <Card className="mt-5 p-0">
         <CardContent className="p-0">
+          <EntryRow
+            icon={UserRound}
+            label="健康信息"
+            hint="七项健康档案"
+            onPress={() => router.push("/health-info")}
+          />
+          <View className="border-b border-border" />
           <EntryRow
             icon={ClipboardList}
             label="服药记录"
@@ -65,13 +66,6 @@ export default function Profile() {
           />
         </CardContent>
       </Card>
-
-      <View className="mt-5 flex-row items-start gap-2 rounded-xl border-2 border-risk-l3 bg-risk-l3-tint p-3">
-        <Icon as={AlertTriangle} size={18} color={riskL3} />
-        <Text className="flex-1 text-xs leading-5 text-risk-l3">
-          仅供产品测试：使用 Mock 药品与说明书数据（演示抄录，未经医学审核），不用于真实诊疗、处方或用药决策。
-        </Text>
-      </View>
     </ScrollView>
   );
 }

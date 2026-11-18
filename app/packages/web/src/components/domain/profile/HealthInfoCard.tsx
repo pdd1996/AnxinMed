@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronRight, Info, Trash2, UserRound } from 'lucide-react'
+import { Check, ChevronRight, Trash2, UserRound } from 'lucide-react'
 import { client, fetchProfile, unwrap } from '@anxin/core'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,8 +35,10 @@ const FIELD_PLACEHOLDER: Partial<Record<HealthField, string>> = {
  * 「用户自述」弱化灰字，「处方笺抄录 · 已确认」品牌色强调。
  * 编辑/补充共用一个弹窗；删除走弹窗内二次确认（行上一键即删已移除，防误触）。
  * 手动保存一律由服务端标 source='self_reported'（profiles.service）。
+ *
+ * `showHeader=false` 用于「健康信息」一级页：页头已给出标题与说明，卡内不再重复标题行。
  */
-export function HealthInfoCard() {
+export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) {
   const queryClient = useQueryClient()
   const { data } = useQuery({ queryKey: ['profile'], queryFn: fetchProfile })
   const entries = data?.items ?? []
@@ -83,15 +85,17 @@ export function HealthInfoCard() {
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="border-b px-4 py-4">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <UserRound className="size-5 text-primary" aria-hidden />
-          健康信息
-        </CardTitle>
-        <CardAction>
-          <span className="text-xs font-normal text-muted-foreground">点按行可补充或修改</span>
-        </CardAction>
-      </CardHeader>
+      {showHeader ? (
+        <CardHeader className="border-b px-4 py-4">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <UserRound className="size-5 text-primary" aria-hidden />
+            健康信息
+          </CardTitle>
+          <CardAction>
+            <span className="text-xs font-normal text-muted-foreground">点按行可补充或修改</span>
+          </CardAction>
+        </CardHeader>
+      ) : null}
       <CardContent className="p-0">
         <ul className="divide-y divide-border">
           {HEALTH_FIELDS.map((field) => {
@@ -102,12 +106,12 @@ export function HealthInfoCard() {
               <li key={field}>
                 <button
                   type="button"
-                  className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+                  className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
                   onClick={() => openEditor(field, entry ?? null)}
                 >
                   <span className="shrink-0 font-semibold">{field}</span>
                   {filled ? (
-                    <span className="min-w-0 text-right">
+                    <span className="min-w-0 flex-1 text-right">
                       <span className="block whitespace-pre-wrap break-words text-sm font-medium line-clamp-2">
                         {entry!.value ?? ''}
                       </span>
@@ -121,19 +125,14 @@ export function HealthInfoCard() {
                       </span>
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-0.5 text-sm text-muted-foreground">
-                      待补充 <ChevronRight className="size-4" aria-hidden />
-                    </span>
+                    <span className="flex-1 text-right text-sm text-muted-foreground">待补充</span>
                   )}
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 </button>
               </li>
             )
           })}
         </ul>
-        <p className="flex items-start gap-2 border-t px-4 py-3 text-xs text-muted-foreground">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          产品不做诊断：「诊断」字段语义永远为「用户报告的诊断」，AI 将其视为用户提供的、未经医学验证的信息。
-        </p>
       </CardContent>
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && closeEditor()}>
