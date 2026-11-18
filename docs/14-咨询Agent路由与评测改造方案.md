@@ -1,7 +1,7 @@
 # 安心用药 · 咨询 Agent 路由与评测改造方案（V0.1 待裁决）
 
 > 版本：V0.1（2026-11-18）
-> 状态：**提案，待用户裁决（§9 共 9 项）**。裁决前不改代码、不改 shared 契约、不改 PRD / docs/08 / docs/11 / docs/12；裁决后 §4 升格为任务书（拟 `docs/specs/16-M13-咨询Agent路由工程化.md`，里程碑编号待定）。
+> 状态：**提案；P0 已于 2026-11-18 开工并落地（见 §11 与 [specs/16](./specs/16-咨询Agent路由工程化.md)）**；§9 A1–A9 仍待用户裁决。裁决前不改 shared 契约、不改 PRD / docs/08 / docs/11 / docs/12；P1+ 升格为任务书（拟 specs/16 续篇，里程碑编号待定）。
 > 来源：用户 2026-11-18 命题——参考知乎文章《我做了一个旅行助手 Agent，聊聊意图识别》（作者 windliang，https://zhuanlan.zhihu.com/p/2076267775065170292），评估并改造当前「安心用药」咨询 Agent。
 > 上游真相源：PRD V2.2（06）· 技术方案 V1.1（08，附录 A 意图路由设计）· ADR（07）· docs/10（决策记录）· docs/11（指标口径）· docs/12（Agent 整体架构）· docs/13（模型选型）· specs/04-M4（已收口）。
 > 与上游冲突处理：本文不自行裁决，冲突集中在 §9 交用户裁决（执行总纲 §0.2）。
@@ -206,7 +206,7 @@ POST /api/consult
 
 **T3d 解释类 / 行动类仲裁扩展**
 
-- `EXPLAIN_INTENT_PATTERN` 增加行动/建议词：还能(吃|用|喝|贴) / 怎么办 / 要不要 / 该不该 / 正常吗 / 要紧吗 / 有没有事 / 可以吃吗 等 → 优先 S1（宁漏勿误）。
+- 新增咨询专用 `CONSULT_ADVICE_PATTERN`（落地时调整：**不并入** `EXPLAIN_INTENT_PATTERN`——后者被医生端 `insight/askIntent.ts` 复用，医生问「怎么办」仍应按队列/患者问法走数据路由）：还能(吃|用|喝|贴|服) / 怎么办 / 要不要 / 该不该 / 正常吗 / 要紧吗 / 有没有事 / 严重吗 / 危害 / 后果 / 要补 / 补服 等 → 优先 S1（宁漏勿误）。
 - 完成标准：评测集对应用例转绿；既有 `consult-intent-route` 测试语义不变；误路由零新增。
 
 ### T4 对象澄清 clarify（P1，需裁决 A1/A3）
@@ -427,3 +427,34 @@ POST /api/consult
 | `standard_chips` | 6 | 五条数据 chips + 一条说明书 chips |
 
 合成规则：LLM 只做候选生成，全部人工复核后入 git（对齐 fixtures synthetic 纪律）；每条注明 `source: hand | synthetic-reviewed`。
+
+---
+
+## 11. 落地记录
+
+### 11.1 P0（2026-11-18，用户「开工」后执行）
+
+| 任务 | commit | 内容 |
+|---|---|---|
+| T0 方案 + 执行书 | `8c93595` | 本文 V0.1 + [specs/16-咨询Agent路由工程化.md](./specs/16-咨询Agent路由工程化.md) |
+| T3 路由词表与仲裁 | `d755fcf` | L4 口语召回、SECTION_ROUTES 同义词、INTENT_ROUTES 同义词、咨询专用行动词仲裁 + 单测 |
+| T2 路由轨迹 | `bb4ccd7` | `resolveSkillRoute`（决策不变）+ `trace.ts` + service 接线（默认关闭）+ `.agent-debug/` gitignore + 单测 |
+| T1 评测集 | `409824f` | `consult-intent-eval.json`（134 条）+ `intent-eval.ts` + `eval:intent` + CI 测试 |
+
+**验证（2026-11-18，本机）**
+
+- `pnpm --filter @anxin/api typecheck`：通过；
+- 纯函数测试子集（无 DB）：6 文件 / 171 用例全绿；
+- `pnpm --filter @anxin/api eval:intent`：用例 134，通过 118 / 失败 0 / 待启用 16（P1 的 clarify / out-of-scope）；
+- `npx eslint`（改动文件）：0 error（1 条既有 warning 与本轮无关）。
+
+**限制**：本机无 PostgreSQL（localhost:5432 未监听），`pnpm --filter @anxin/api test` 的 globalSetup 因 ECONNREFUSED 无法执行——集成 / E2E 需在具备 PG 的环境复跑；纯函数子集已用临时 vitest 配置（不加载 globalSetup）验证。
+
+**实施偏差（相对 §4）**
+
+1. 行动词仲裁独立为 `CONSULT_ADVICE_PATTERN`，不并入 `EXPLAIN_INTENT_PATTERN`（避免改变医生端 askIntent 行为，见 T3d）。
+2. commit 顺序为 T3 → T2 → T1 而非任务编号顺序：T1 评测模块依赖 T2 的 `resolveSkillRoute`，T2 依赖 T3 的 `analyzeConsultIntent`；按依赖提交可保证每个 commit 独立可绿。
+3. T3a（L4 口语召回）与 T3b（SECTION_ROUTES）同在 `patterns.ts`，未拆独立 commit；回滚可按 hunk 处理（如产品要求）。
+4. L4 扩召回后，裸「误服」会命中历史陈述（「上次误服过」）；按安全优先接受，已用单测固化该取舍，产品 / 医学如要求收敛另开任务。
+5. 新增 status（clarify / out-of-scope）未实施，A1/A2 仍待裁决；评测集中 16 条 P1 用例已先行声明期望并 `pendingUntil` 跳过。
+

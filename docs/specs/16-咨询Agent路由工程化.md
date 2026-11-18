@@ -110,6 +110,28 @@ pnpm --filter @anxin/api test        # 需本机 PostgreSQL（globalSetup 建测
 
 > 本机无 PostgreSQL 时：`test` 的纯函数子集可用临时 vitest 配置（不加载 globalSetup）验证；集成/E2E 需在具备 PG 的环境复跑，交付说明中注明。
 
-## 落地记录
+## 落地记录（2026-11-18）
 
-（完成后回填 commit 与验证结果）
+| 任务 | commit | 内容 |
+|---|---|---|
+| T0 方案 + 执行书 | `8c93595` | docs/14 V0.1 + 本任务书 |
+| T3 路由词表与仲裁 | `d755fcf` | `EMERGENCY_PATTERN` 口语召回；SECTION_ROUTES 同义词；INTENT_ROUTES 库存变体；`CONSULT_ADVICE_PATTERN`；`analyzeConsultIntent`；单测更新 |
+| T2 路由轨迹 | `bb4ccd7` | `resolveSkillRoute` + `trace.ts` + `consult.service.ts` 接线（默认关闭）+ `.agent-debug/` gitignore + 单测 |
+| T1 评测集 | `409824f` | `app/fixtures/consult-intent-eval.json`（134 条）+ `intent-eval.ts` + `eval:intent` 脚本 + CI 测试 |
+
+**验证结果（本机 2026-11-18）**
+
+- `pnpm --filter @anxin/api typecheck`：通过；
+- 纯函数子集（临时 vitest 配置，不加载 globalSetup）：6 文件 / **171 用例全绿**；
+- `pnpm --filter @anxin/api eval:intent`：**134 用例 / 通过 118 / 失败 0 / 待启用 16**（P1 clarify/out-of-scope）；
+- 改动文件 `eslint`：0 error。
+
+**限制**：本机无 PostgreSQL（localhost:5432 未监听），`pnpm --filter @anxin/api test` 的 globalSetup 报 ECONNREFUSED，集成 / E2E 未跑；需在具备 PG 的环境复跑全量后再算 P0 收口。
+
+**实施偏差**
+
+1. T3a（L4 口语召回）与 T3b 同在 `patterns.ts`，未拆独立 commit（回滚可按 hunk）。
+2. 行动词仲裁独立为 `CONSULT_ADVICE_PATTERN`，不并入共享的 `EXPLAIN_INTENT_PATTERN`（医生端 askIntent 复用后者，行为不变）。
+3. 提交顺序 T3 → T2 → T1（依赖倒置）：T1 评测模块依赖 T2 的 `resolveSkillRoute`、T2 依赖 T3 的 `analyzeConsultIntent`；保证每个 commit 独立可绿。
+4. 新增 status（clarify/out-of-scope）未实施，仍待 docs/14 §9 A1/A2 裁决。
+
