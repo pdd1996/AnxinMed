@@ -50,6 +50,7 @@
 | **意图评测集通过率**（M13） | `eval:intent` 通过数 / 总用例 | 100%（2026-11-18：134/134，0 失败、0 待启用）；改动路由词表必须保绿 | `app/fixtures/consult-intent-eval.json` | CI：`pnpm --filter @anxin/api eval:intent` |
 | **clarify 率**（M13-P1） | `status='clarify'` / 全部咨询 | 观测（无阈值）；过高说明对象入口不足或澄清信号过宽 | `consult_logs.status` | 上线后按月聚合 |
 | **out-of-scope 率**（M13-P1） | `status='out-of-scope'` / 全部咨询 | 观测（无阈值）；用于产品边界与拒答文案评估 | `consult_logs.status` | 上线后按月聚合 |
+| **低置信路由占比**（M13-P2） | 低置信路由数 / 自由文本路由数（S1+S2） | 观测（无阈值）；评测集基线 **52/88（59.1%，2026-11-18）**；定向抽检优先「S2 且 top-low」样本 | route trace `intentCandidates` / `lowConfidence`；`eval:intent` | 上线后按月聚合 |
 | **规则路由延迟**（M13） | 骨架 P95（守门 + 意图 + 范围/对象 + 留痕，不含 LLM） | 不劣于既有 ≤500ms 口径；trace 默认关闭零 I/O | `perf:consult` / trace | 每次发布前复测 |
 
 ### 2.1 意图漏判率抽检 · 操作细则（月度）

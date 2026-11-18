@@ -1,7 +1,7 @@
 # 安心用药 · 咨询 Agent 路由与评测改造方案（V0.1 待裁决）
 
 > 版本：V0.1（2026-11-18）
-> 状态：**提案；P0 已落地、P1 已按 A1–A9 批复开工并落地（见 §11、[specs/16](./specs/16-咨询Agent路由工程化.md)、[specs/18](./specs/18-咨询Agent-P1-对象澄清与范围层.md)）**；P2/P3（候选打分/归一化/小模型兜底）待评测数据，暂不启动。
+> 状态：**提案；P0、P1 已落地；P2-T6（候选打分与低置信观测，零行为变更）已落地（见 §11 与 [specs/16](./specs/16-咨询Agent路由工程化.md)、[specs/18](./specs/18-咨询Agent-P1-对象澄清与范围层.md)、[specs/19](./specs/19-咨询Agent-P2-T6-候选打分与低置信观测.md)）**；P2-T7（语义归一化）/ P3（小模型兜底）待评测与线上数据，暂不启动。
 > 来源：用户 2026-11-18 命题——参考知乎文章《我做了一个旅行助手 Agent，聊聊意图识别》（作者 windliang，https://zhuanlan.zhihu.com/p/2076267775065170292），评估并改造当前「安心用药」咨询 Agent。
 > 上游真相源：PRD V2.2（06）· 技术方案 V1.1（08，附录 A 意图路由设计）· ADR（07）· docs/10（决策记录）· docs/11（指标口径）· docs/12（Agent 整体架构）· docs/13（模型选型）· specs/04-M4（已收口）。
 > 与上游冲突处理：本文不自行裁决，冲突集中在 §9 交用户裁决（执行总纲 §0.2）。
@@ -483,4 +483,14 @@ POST /api/consult
 3. `ENABLE_SCOPE_GATE` / `ENABLE_OBJECT_CLARIFY` 两个 kill switch（默认开），各自集成用例覆盖回滚。
 4. 旧客户端兼容（A1）：请求新增可选 `consultStatusVersion`——旧 APK 不带 → 服务端把 `clarify`/`out-of-scope` 降级映射为 `no-source`（固定 sections 可正常渲染；G8 版 `STATUS_META[status]` 查表遇未知 status 会渲染崩溃，故必须服务端降级）；新 Web/Mobile 经 core 自动带 `2` 原样收到新状态。`consult_logs`/trace 仍记真实状态，指标不变。兼容层合入后 E2E 全量复跑 21/21 绿。**2026-11-18 staging 部署 + 三种验收通过**：API 新旧状态映射、H5 clarify/out-of-scope、模拟器 G8 旧包两问无白屏（见 specs/18 §6.4）。
 5. E2E：2026-11-18 全量 Playwright **21 条**（新增 consult-clarify golden）；其中 3 条失败为 `consult-llm.spec.ts` 里 G8 移除状态徽章后未同步的过期断言（与 P1 无关），修复后 **21/21 全绿**。
+
+### 11.3 P2-T6 意图候选打分（2026-11-18，零行为变更）
+
+| 任务 | commit | 内容 |
+|---|---|---|
+| T6 候选打分 + 低置信观测 | `32dfddb` | `intent.ts` 候选打分/低置信纯函数；`resolveSkillRoute` 增观测字段；trace v2；service 接线；`eval:intent` 低置信报告；10 例单测 + 评测汇总测试（见 [specs/19](./specs/19-咨询Agent-P2-T6-候选打分与低置信观测.md)） |
+
+**验证**：`eval:intent` 134/134（逐条与 T6 前一致，决策零变更）；低置信 52/88（59.1%，S1 39/39 + S2 13/49；原因 explain×13/advice×14/top-low×25/margin×0）；API 69 文件 / 873 用例全绿；`typecheck` 通过。
+
+> 说明：低置信包含 S1 正常的解释/行动类仲裁路径，故 S1 全部低置信属预期；定向抽检优先看 **S2 且 top-low** 的 25 条。
 
