@@ -198,3 +198,26 @@ curl.exe -s http://118.196.82.13:8787/api/health
 **H5（Playwright 打 staging）**：登录 p-001 → clarify 卡出现「你想问药箱里的哪种药？」+ 5 个药名按钮；诊断问题出现「我不能做诊断…」；截图 `h5-*.png` 同目录。
 
 **结论**：P1 在 staging 的真实链路、旧客户端兼容、H5 三路验收通过；剩余仅为试点期指标观察（docs/11 的 clarify 率 / out-of-scope 率）。
+
+### 6.5 第二轮部署：T6/T7 上线（2026-11-18，待用户执行）
+
+> staging 仍运行 `8c10a6e`（P0/P1）；T6（候选打分，trace 默认关）与 T7（语义归一化，行为变更、开关可回滚）已合入 main 但未部署。
+
+- 目标提交：`510cb8b`（含 T6/T7 + 并发线已提交内容）
+- 源码包：`app/backups/anxin-src-510cb8b.tar.gz`（3.52 MB，704 条；`backup.sh` CR=0）
+- SHA256：`492CEA71CB51684BF45291BCEF48B7AB9780CD6EE56F817349DC491AA40B91E3`
+- 迁移：**无**（`8c10a6e→510cb8b` 的 drizzle 目录无变化），部署脚本不含 SQL 步骤；`.env` 不需要改（P1 两个开关已 true，`ENABLE_ROUTE_NORMALIZE` 默认开）
+
+```powershell
+cd C:\Users\Paddy\Desktop\AnxinMed
+scp app\backups\anxin-src-510cb8b.tar.gz root@118.196.82.13:/tmp/
+scp app\backups\deploy-latest.sh root@118.196.82.13:/tmp/deploy-latest.sh
+ssh root@118.196.82.13 'bash /tmp/deploy-latest.sh'
+```
+
+> 脚本自动定位 `/root/anxin/app`、备份源码 + 数据库、解包、重建镜像、起服务并打 health；看到 `DEPLOY_OK` 即完成。回滚用脚本打印的 `app.bak-<时间戳>` 目录 + `backups/` dump。
+
+**部署后验收（我执行并回填）**：
+1. API T7 抽检：「药快吃没了」→ `data-answered` + `toolUsed=expiry-stock`；「我现在都吃哪些药」→ `data-answered` + `toolUsed=medication-list`；T6/T7 不改变 clarify/out-of-scope 与旧客户端 legacy 映射；
+2. 模拟器 G8 旧包快速回归（两个既有问题不白屏）；
+3. 若发现某条口语被误归一 → 先 `ENABLE_ROUTE_NORMALIZE=false` 回滚，再补评测用例/改规则。
