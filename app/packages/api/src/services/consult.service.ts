@@ -45,6 +45,7 @@ import {
 } from './consult/trace.js'
 import { buildClarifyOptions, buildClarifyResult, shouldClarifyObject } from './consult/clarify.js'
 import { buildOutOfScopeResult, classifyConsultScope } from './consult/scope.js'
+import { normalizeRoutingText } from './consult/normalize.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
 import { validateCitationCoverage } from './consult/coverage.js'
@@ -312,7 +313,7 @@ export async function consult(
       result = buildOutOfScopeResult(scope)
     } else if (drugs.length > 0) {
       gateSteps.push({ layer: 'object', outcome: 'bound', detail: { drugCount: drugs.length } })
-    } else if (isObjectClarifyEnabled() && shouldClarifyObject(questionRedacted)) {
+    } else if (isObjectClarifyEnabled() && shouldClarifyObject(normalizeRoutingText(questionRedacted))) {
       // 只在药箱非空时澄清；空药箱回退既有 no-source（引导去录入）。
       const boxRows = await drugsRepo.listDrugs(userId)
       const clarifyOptions = buildClarifyOptions(boxRows)

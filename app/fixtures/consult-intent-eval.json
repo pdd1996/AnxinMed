@@ -132,5 +132,15 @@
   {"id":"CHIP-003","question":"我的依从性怎么样？","drugContext":"none","expectedRoute":"S2/adherence","tags":["standard_chips"]},
   {"id":"CHIP-004","question":"有什么药快过期或快用完了？","drugContext":"none","expectedRoute":"S2/expiry-stock","tags":["standard_chips"]},
   {"id":"CHIP-005","question":"我的药一起吃有冲突吗？","drugContext":"none","expectedRoute":"S2/interaction-check","tags":["standard_chips"]},
-  {"id":"CHIP-006","question":"这个药通常用于什么？","drugContext":"bound","expectedRoute":"S1","expectedSection":"indication","tags":["standard_chips"]}
+  {"id":"CHIP-006","question":"这个药通常用于什么？","drugContext":"bound","expectedRoute":"S1","expectedSection":"indication","tags":["standard_chips"]},
+  {"id":"NORM-001","question":"药快吃没了","drugContext":"bound","expectedRoute":"S2/expiry-stock","tags":["normalize"]},
+  {"id":"NORM-002","question":"药快见底了","drugContext":"bound","expectedRoute":"S2/expiry-stock","tags":["normalize"]},
+  {"id":"NORM-003","question":"还剩几天的药","drugContext":"bound","expectedRoute":"S2/expiry-stock","tags":["normalize"]},
+  {"id":"NORM-004","question":"药剩不多了","drugContext":"bound","expectedRoute":"S2/expiry-stock","tags":["normalize"]},
+  {"id":"NORM-005","question":"老是忘吃药","drugContext":"bound","expectedRoute":"S2/adherence","tags":["normalize"]},
+  {"id":"NORM-006","question":"漏吃药了","drugContext":"bound","expectedRoute":"S2/adherence","tags":["normalize"]},
+  {"id":"NORM-007","question":"我都有哪些药","drugContext":"bound","expectedRoute":"S2/medication-list","tags":["normalize"]},
+  {"id":"NORM-008","question":"吃的药有哪些","drugContext":"bound","expectedRoute":"S2/medication-list","tags":["normalize"]},
+  {"id":"NORM-009","question":"这药有什么副作用","drugContext":"none","expectedRoute":"clarify","tags":["normalize","missing_object"]},
+  {"id":"NORM-010","question":"此药怎么吃","drugContext":"none","expectedRoute":"clarify","tags":["normalize","missing_object"]}
 ]

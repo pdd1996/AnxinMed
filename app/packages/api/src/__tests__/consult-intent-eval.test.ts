@@ -76,4 +76,23 @@ describe('consult-intent-eval · 意图评测集回归', () => {
     expect(routeSum).toBe(confidence.evaluated)
     expect(routeLowSum).toBe(confidence.lowConfidence)
   })
+
+  it('T7 归一化：normalize 用例在开关开时通过、关时失败（行为变化可复现/可回滚）', () => {
+    const normalizeCases = cases.filter((c) => c.tags.includes('normalize'))
+    expect(normalizeCases.length).toBeGreaterThanOrEqual(10)
+
+    const prev = process.env.ENABLE_ROUTE_NORMALIZE
+    try {
+      delete process.env.ENABLE_ROUTE_NORMALIZE
+      const on = evaluateIntentCases(normalizeCases)
+      expect(on.summary.failures.map((f) => `${f.id} ${f.failure ?? ''}`)).toEqual([])
+
+      process.env.ENABLE_ROUTE_NORMALIZE = 'false'
+      const off = evaluateIntentCases(normalizeCases)
+      expect(off.summary.failed).toBeGreaterThan(0)
+    } finally {
+      if (prev === undefined) delete process.env.ENABLE_ROUTE_NORMALIZE
+      else process.env.ENABLE_ROUTE_NORMALIZE = prev
+    }
+  })
 })

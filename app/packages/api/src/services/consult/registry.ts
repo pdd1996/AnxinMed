@@ -31,6 +31,7 @@ import {
   type IntentConfidenceReason,
   type QueryIntent,
 } from './intent.js'
+import { normalizeRoutingText } from './normalize.js'
 import type { RouteTraceStep } from './trace.js'
 
 /** 技能 ID（注册表行键；docs/10 §5 的 S0–S3 编号）。 */
@@ -156,6 +157,10 @@ export const SKILL_REGISTRY: readonly SkillRow[] = [
 export function resolveSkillRoute(input: SkillRouteInput): SkillRouteResolution {
   const steps: RouteTraceStep[] = []
 
+  // T7：归一化只生成「路由视图」——守门仍在原始文本上判定（不得被归一化绕过红线）；
+  // 意图/候选打分使用归一化视图；送模型原文由 service 层保持 questionRedacted 不变。
+  const routingQuestion = normalizeRoutingText(input.question)
+
   // 1. S0 红线：守门优先于意图路由与快路径（混合句用例见 consult-registry.test.ts）
   const emergency = detectEmergency(input.question)
   if (emergency) {
@@ -194,8 +199,8 @@ export function resolveSkillRoute(input: SkillRouteInput): SkillRouteResolution 
   // 3. S2 数据直答：开关开 + 正则命中（解释/行动类词仲裁在 analyzeConsultIntent 内）
   let observation = EMPTY_OBSERVATION
   if (input.intentRouteEnabled) {
-    const analysis = analyzeConsultIntent(input.question)
-    observation = observeIntent(input.question, analysis.veto)
+    const analysis = analyzeConsultIntent(routingQuestion)
+    observation = observeIntent(routingQuestion, analysis.veto)
     if (analysis.intent) {
       steps.push({
         layer: 'intent',

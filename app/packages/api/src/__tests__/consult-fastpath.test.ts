@@ -96,7 +96,7 @@ async function seedPlan() {
 describe('skillId 快路径（M4-T7）', () => {
   it('正则不命中的自由写法 + skillId → 与正则命中走同一路径（data-answered + toolUsed）', async () => {
     const res = await req('POST', '/api/consult', {
-      question: '帮我看看我现在都吃哪些药哦',
+      question: '帮我看看我目前的用药情况哦',
       drugIds: [],
       skillId: 's2-medication-list',
     })
@@ -108,8 +108,8 @@ describe('skillId 快路径（M4-T7）', () => {
     expect(logs[0].intent).toBe('medication-list') // 落解析后的意图名（快路径与正则同构，供漏判统计）
   })
 
-  it('对照组：同句无 skillId → 正则不命中 → 走 S1（自由文本正则路径逐字不变）', async () => {
-    const res = await req('POST', '/api/consult', { question: '帮我看看我现在都吃哪些药哦', drugIds: [] })
+  it('对照组：同句无 skillId → 正则不命中 → 走 S1（该句归一化也不改写，快路径对照成立）', async () => {
+    const res = await req('POST', '/api/consult', { question: '帮我看看我目前的用药情况哦', drugIds: [] })
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('no-source')
     const logs = await db.select().from(consultLogs).where(eq(consultLogs.userId, USER))

@@ -15,6 +15,7 @@ import { z } from 'zod'
 import type { ClarifyDrugCandidate } from './clarify.js'
 import { shouldClarifyObject } from './clarify.js'
 import type { IntentConfidenceReason } from './intent.js'
+import { normalizeRoutingText } from './normalize.js'
 import { classifyConsultScope } from './scope.js'
 import type { InsertSlice } from './types.js'
 import { pickInsertSections } from './sections.js'
@@ -98,10 +99,10 @@ function isP1Layer(c: IntentEvalCase): boolean {
   return c.expectedRoute === 'clarify' || c.expectedRoute === 'out-of-scope'
 }
 
-/** 评测 P1 层（范围优先于对象，与 service 层顺序一致）。 */
+/** 评测 P1 层（范围优先于对象，与 service 层顺序一致；对象判定使用归一化路由视图，与线上一致）。 */
 function evaluateP1Layer(question: string): string {
   if (classifyConsultScope(question) !== 'medication') return 'out-of-scope'
-  if (shouldClarifyObject(question) && PROBE_BOX.length > 0) return 'clarify'
+  if (shouldClarifyObject(normalizeRoutingText(question)) && PROBE_BOX.length > 0) return 'clarify'
   return 'S1'
 }
 

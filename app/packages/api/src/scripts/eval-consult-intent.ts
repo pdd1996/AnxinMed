@@ -13,6 +13,7 @@ import {
   evaluateIntentCases,
   summarizeIntentConfidence,
 } from '../services/consult/intent-eval.js'
+import { isRouteNormalizeEnabled, ROUTE_NORMALIZE_FLAG } from '../services/consult/normalize.js'
 
 const FIXTURE_PATH = fileURLToPath(new URL('../../../../fixtures/consult-intent-eval.json', import.meta.url))
 
@@ -23,6 +24,9 @@ async function main() {
 
   console.log(
     `[eval:intent] 用例 ${summary.total}：通过 ${summary.passed} / 失败 ${summary.failed} / 待启用 ${summary.pending}`,
+  )
+  console.log(
+    `[eval:intent] 语义归一化：${isRouteNormalizeEnabled() ? '开' : '关'}（${ROUTE_NORMALIZE_FLAG}）`,
   )
   console.log('[eval:intent] 混淆矩阵（期望 → 实际）：')
   for (const expected of Object.keys(summary.confusion).sort()) {

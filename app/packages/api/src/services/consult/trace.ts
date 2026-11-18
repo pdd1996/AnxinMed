@@ -16,8 +16,8 @@ import { z } from 'zod'
 
 /** trace 结构版本（字段变更时 +1；消费方按版本解析）。v2 = M13-P2 T6 增意图候选/低置信。 */
 export const ROUTE_TRACE_VERSION = 2 as const
-/** 路由实现版本（改路由规则时 +1，便于回看旧 trace；T6 只观测未改决策，保持 r1）。 */
-export const ROUTE_VERSION = 'r1'
+/** 路由实现版本（改路由规则时 +1，便于回看旧 trace；r2 = M13-P2 T7 语义归一化路由视图）。 */
+export const ROUTE_VERSION = 'r2'
 
 export const ROUTE_TRACE_FLAG = 'CONSULT_ROUTE_TRACE'
 export const ROUTE_TRACE_DIR_ENV = 'CONSULT_ROUTE_TRACE_DIR'
