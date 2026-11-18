@@ -109,7 +109,7 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 
 **E2E**：2026-11-18 执行全量 Playwright（**21 条**，含新增 `consult-clarify` golden）：修复 3 条 G8 遗留徽章断言（`consult-llm.spec.ts` 仍断言已移除的「已回答」/「已过滤剂量」徽章）后 **21/21 全绿**；新增用例覆盖「无绑定药 → clarify 卡 → 点选药名 → 带 drugId 重问 + 0 次 LLM + consult_logs.status=clarify」。
 
-**旧客户端兼容补丁（2026-11-18，A1 落实）**：请求新增可选 `consultStatusVersion`；旧 APK 不带 → `toLegacyConsultStatus` 把 `clarify` / `out-of-scope` 降级映射为 `no-source`（`consult_logs`/trace 仍记真实状态）。依据：G8 v1.0.0 APK（模拟器实装）的 `AnswerCard` 以 `STATUS_META[status]` 查表，未知 status 会 `undefined.icon` 渲染崩溃——仅靠「响应带固定 sections」兜底不够。新增 3 例纯函数 + 2 例集成（legacy 映射/落库真实状态），API 全量回归绿；新 Web/Mobile 经 core 自动带 `2`。E2E 复核因并发认证线迁移/环境改动（测试库 `users.phone_verified_at` 不一致）本轮未能稳定复跑，需在该线收口后重跑全量 E2E；兼容层本身由 API 集成测试覆盖。
+**旧客户端兼容补丁（2026-11-18，A1 落实）**：请求新增可选 `consultStatusVersion`；旧 APK 不带 → `toLegacyConsultStatus` 把 `clarify` / `out-of-scope` 降级映射为 `no-source`（`consult_logs`/trace 仍记真实状态）。依据：G8 v1.0.0 APK（模拟器实装）的 `AnswerCard` 以 `STATUS_META[status]` 查表，未知 status 会 `undefined.icon` 渲染崩溃——仅靠「响应带固定 sections」兜底不够。新增 3 例纯函数 + 2 例集成（legacy 映射/落库真实状态），API 全量回归绿；新 Web/Mobile 经 core 自动带 `2`。兼容层合入后 **E2E 全量复跑 21/21 绿**（web 经 core 真实带 v2），确认新客户端收新状态、旧式请求走降级映射均正常。
 
 **偏差**
 
