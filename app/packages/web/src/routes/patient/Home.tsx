@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { Bell, Camera, Check, ChevronRight, Clock3, Info, PackageCheck, Pause, Pill, Sparkles } from 'lucide-react'
+import { Bell, Camera, Check, ChevronRight, Clock3, PackageCheck, Pause, Pill, Sparkles } from 'lucide-react'
 import {
   client,
   duePendingSlots,
@@ -235,11 +235,6 @@ export default function Home() {
           </Link>
         </Button>
       </div>
-
-      <p className="flex items-start gap-2 rounded-xl border bg-card p-3 text-xs text-muted-foreground">
-        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-        网页提醒说明：仅在页面打开时提醒，关闭页面后不会发送系统通知。漏服不会自动建议补服。
-      </p>
 
       {reminderGroup && (
         <ReminderModal

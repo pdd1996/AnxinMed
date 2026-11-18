@@ -64,7 +64,6 @@ export function HealthCard({
         })}
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          产品不做诊断：「诊断」字段语义永远为「用户报告的诊断」，AI 将其视为用户提供的、未经医学验证的信息。
           不勾选即不写入，随时可在「我的 · 健康信息」手动补。
         </p>
       </CardContent>

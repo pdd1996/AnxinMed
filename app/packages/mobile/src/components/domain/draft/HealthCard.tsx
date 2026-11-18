@@ -86,7 +86,6 @@ export function HealthCard({
         <View className="flex-row items-start gap-2">
           <Icon as={Info} size={16} color={muted} style={{ marginTop: 2 }} />
           <Text className="flex-1 text-xs leading-5 text-muted-foreground">
-            产品不做诊断：「诊断」字段语义永远为「用户报告的诊断」，AI 将其视为用户提供的、未经医学验证的信息。
             不勾选即不写入，随时可在「我的 · 健康信息」手动补。
           </Text>
         </View>

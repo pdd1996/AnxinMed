@@ -223,10 +223,6 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
                   e.target.value = ''
                 }}
               />
-              <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
-                上传即表示你了解图片可能包含个人健康信息。原图只在本次会话的浏览器内存中使用；服务端只取与用药有关的字段，姓名、门诊号这类信息在发送前就被去掉，原文用完即弃、不存图片字节。
-              </p>
             </CardContent>
           </Card>
         </>

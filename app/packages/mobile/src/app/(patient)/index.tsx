@@ -14,7 +14,7 @@ import {
 } from "@anxin/core";
 import { todayStr, type RecordStatus } from "@anxin/shared";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
-import { apiBaseUrl, API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
+import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 import { ConfirmRecordDialog, type PendingRecord } from "@/components/domain/ConfirmRecordDialog";
 import { ReminderModal } from "@/components/domain/ReminderModal";
 import { TaskSlotChip } from "@/components/domain/task-slot";
@@ -174,16 +174,15 @@ export default function Today() {
         把一个人的药放进同一个药箱：先能拍照建档，再管依从、冲突与效期。
       </Text>
 
-      <View
-        className={`mt-5 rounded-2xl border p-4 ${
-          configured ? "border-border bg-card" : "border-risk-l4 bg-risk-l4-tint"
-        }`}
-      >
-        <Text className="text-sm text-muted-foreground">服务器地址</Text>
-        <Text className={`mt-1 text-base ${configured ? "text-card-foreground" : "text-risk-l4"}`}>
-          {configured ? apiBaseUrl() : API_URL_MISSING_HINT}
-        </Text>
-      </View>
+      {/* 服务器地址诊断卡（M5-T4）自 G8 交付起从患者可见界面移除：
+          正式包地址在构建期内联、用户改不了，展示内网 IP 只会造成困惑。
+          未配置仍然必须可见（禁静默失败）——保留红字提示分支。 */}
+      {configured ? null : (
+        <View className="mt-5 rounded-2xl border border-risk-l4 bg-risk-l4-tint p-4">
+          <Text className="text-base font-semibold text-risk-l4">还没配好服务器地址</Text>
+          <Text className="mt-1 text-sm leading-5 text-risk-l4">{API_URL_MISSING_HINT}</Text>
+        </View>
+      )}
 
       {!configured ? null : isPending ? (
         <Text className="mt-6 text-base text-muted-foreground">正在读取今日任务…</Text>
@@ -336,13 +335,6 @@ export default function Today() {
           )}
         </>
       )}
-
-      <View className="mt-6 rounded-xl border border-border bg-card p-3">
-        <Text className="text-xs leading-5 text-muted-foreground">
-          提醒说明：应用在前台时用页内弹窗；退到后台或关闭后由系统通知（需在「设置 →
-          通知与提醒设置」里允许通知与后台运行）。漏服不会自动建议补服。
-        </Text>
-      </View>
 
       {reminderGroup ? (
         <ReminderModal

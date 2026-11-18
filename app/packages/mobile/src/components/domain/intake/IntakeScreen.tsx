@@ -329,9 +329,6 @@ export default function IntakeScreen({
           >
             <Text className="text-lg font-medium text-card-foreground">从相册选一张</Text>
           </Pressable>
-          <Text className="mt-1 text-xs leading-5 text-muted-foreground">
-            上传即表示你了解图片可能包含个人健康信息。原图只存在本机会话内存里；服务端只取与用药有关的字段，姓名、门诊号这类信息在发送前就被去掉，原文用完即弃、不存图片字节。
-          </Text>
         </View>
       )}
 
