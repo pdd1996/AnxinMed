@@ -178,7 +178,15 @@ describe('不变量 ② 守门行为（口语变体）', () => {
     prevClients = setAiClients(mockClients({}))
   })
 
-  const L4_VARIANTS = ['我胸痛怎么办', '现在呼吸困难', '孩子大量误服了药片']
+  // M13-T3a：L4 口语变体扩到 ≥6（旧模式只认「儿童误服 / 大量误服」字面）
+  const L4_VARIANTS = [
+    '我胸痛怎么办',
+    '现在呼吸困难',
+    '孩子大量误服了药片',
+    '孩子误服了药片',
+    '宝宝吞了药',
+    '老人误服了降糖药',
+  ]
   const L3_VARIANTS = ['这个药能不能停', '我想换药', '能不能减量']
 
   for (const q of L4_VARIANTS) {

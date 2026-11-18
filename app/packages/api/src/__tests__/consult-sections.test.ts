@@ -177,6 +177,46 @@ describe('pickInsertSections · 孕妇/儿童/老年/过量（sourceSections 路
 })
 
 // ---------------------------------------------------------------------------
+// 口语同义词路由（M13-T3b · docs/14 §4 T3b）
+// ---------------------------------------------------------------------------
+
+describe('pickInsertSections · 口语同义词（M13-T3b）', () => {
+  const insert = mkInsert()
+
+  it('"这个药吃了犯困正常吗" → 不良反应段（犯困）', () => {
+    expect(pickInsertSections('这个药吃了犯困正常吗', insert).key).toBe('adverse')
+  })
+
+  it('"这个药伤肝吗" → 不良反应段（伤肝）', () => {
+    expect(pickInsertSections('这个药伤肝吗', insert).key).toBe('adverse')
+  })
+
+  it('"这个药对肝功能有影响吗" → 不良反应段（肝功能）', () => {
+    expect(pickInsertSections('这个药对肝功能有影响吗', insert).key).toBe('adverse')
+  })
+
+  it('"这个药能喝酒吗" → 相互作用段（喝酒）', () => {
+    expect(pickInsertSections('这个药能喝酒吗', insert).key).toBe('interactions')
+  })
+
+  it('"这个药能长期吃吗" → 注意事项段（长期）', () => {
+    expect(pickInsertSections('这个药能长期吃吗', insert).key).toBe('precautions')
+  })
+
+  it('"漏服了怎么办" → 注意事项段（漏服）', () => {
+    expect(pickInsertSections('漏服了怎么办', insert).key).toBe('precautions')
+  })
+
+  it('"药过期了还能吃吗" → 注意事项段（过期）', () => {
+    expect(pickInsertSections('药过期了还能吃吗', insert).key).toBe('precautions')
+  })
+
+  it('"这个药饭前吃还是饭后吃" → 医嘱提示（饭前/饭后）', () => {
+    expect(pickInsertSections('这个药饭前吃还是饭后吃', insert).key).toBe('dosage')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // L2 剂量过滤（PRD §7.5.3）
 // ---------------------------------------------------------------------------
 

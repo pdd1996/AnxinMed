@@ -80,6 +80,31 @@ describe('detectEmergency · L4 紧急信号（PRD §7.5.1）', () => {
     expect(detectEmergency('我想自杀')).toBe('自杀')
   })
 
+  // M13-T3a（docs/14 §4 T3a）：真实口语变体——旧模式只认「儿童误服 / 大量误服」字面
+  it('"孩子误服了药片" → 命中「孩子误服」（口语变体）', () => {
+    expect(detectEmergency('孩子误服了药片')).toBe('孩子误服')
+  })
+
+  it('"小孩误吃了几粒药" → 命中「小孩误吃」（口语变体）', () => {
+    expect(detectEmergency('小孩误吃了几粒药')).toBe('小孩误吃')
+  })
+
+  it('"宝宝吞了药" → 命中「宝宝吞了」（口语变体）', () => {
+    expect(detectEmergency('宝宝吞了药')).toBe('宝宝吞了')
+  })
+
+  it('"老人误服了降糖药" → 命中「老人误服」（口语变体）', () => {
+    expect(detectEmergency('老人误服了降糖药')).toBe('老人误服')
+  })
+
+  it('"药物过量了" → 命中「药物过量」', () => {
+    expect(detectEmergency('药物过量了')).toBe('药物过量')
+  })
+
+  it('已知取舍：历史陈述「上次误服过一次」也命中 L4（安全优先，见 docs/14 T3a）', () => {
+    expect(detectEmergency('上次误服过一次，已经没事了')).toBe('误服')
+  })
+
   it('正常咨询 "这个药通常用于什么" → 不命中（返回 null）', () => {
     expect(detectEmergency('这个药通常用于什么')).toBeNull()
   })

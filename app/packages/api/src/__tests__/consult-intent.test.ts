@@ -1,18 +1,19 @@
 /**
- * AI 药师意图路由 · 意图分类纯函数单测（计划 T2）。
+ * AI 药师意图路由 · 意图分类纯函数单测（计划 T2；M13-T3 增补口语变体与行动词仲裁）。
  *
  * 覆盖：
- * - classifyConsultIntent 正例 × 4 意图（每意图 ≥5 口语变体，逐条与 intent.ts 正则自验匹配）
+ * - classifyConsultIntent 正例（每意图 ≥5 口语变体，逐条与 intent.ts 正则自验匹配）
  * - 负例回归：现有测试文件（consult-api / consult-guards / consult-sections / degradation /
  *   insight-api）出现的全部问题文本逐一断言 null（不命中任何查询意图）
  * - 歧义句 × 3（说明书问题不得误路由）
  * - 仲裁行为固化：解释词优先（「药箱里有什么注意事项」→ null）、「相互作用」走说明书管线
+ * - 行动/建议词仲裁（M13-T3d）：「还能吃吗 / 怎么办 / 要不要」→ null（走 S1）
  * - 混合句：「我还有多少药，想把 XX 停了」→ medication-list（函数只管意图，守门在 service 层）
  *
- * = 55 case（正例 22 + 负例回归 27 + 歧义/仲裁/混合 6）。
+ * case 数随变体增补，见各 describe；新增词条必须先在此加口语变体（intent.ts 纪律）。
  */
 import { describe, it, expect } from 'vitest'
-import { classifyConsultIntent } from '../services/consult/intent.js'
+import { analyzeConsultIntent, classifyConsultIntent } from '../services/consult/intent.js'
 
 // ---------------------------------------------------------------------------
 // 正例：每意图 ≥5 口语变体（逐条与 INTENT_ROUTES 正则自验匹配）
@@ -37,7 +38,7 @@ describe('classifyConsultIntent · medication-list 正例', () => {
 describe('classifyConsultIntent · adherence 正例', () => {
   const cases = [
     '我的依从性怎么样', // 依从
-    '最近老漏服怎么办的记录', // 漏服
+    '最近漏服了几次', // 漏服（纯数据问法；「漏服怎么办」属行动词仲裁，见下）
     '我按时吃药了吗', // 按时吃
     '这个月执行率多少', // 执行率（adherence 先于 medication-list，「多少」句尾无「药」不截胡）
     '我最近总忘记按时吃药', // 按时吃
@@ -56,6 +57,9 @@ describe('classifyConsultIntent · expiry-stock 正例', () => {
     '阿司匹林还剩多少', // 还剩多少
     '帮我看看药品库存', // 库存（单字「存」已从仲裁表裁剪，不误杀）
     '哪些药快临期了', // 临期
+    '这个药还剩几片', // 还剩几片（M13-T3c 口语变体）
+    '这盒药快吃完了', // 快吃完（M13-T3c 口语变体）
+    '我的药还有几颗', // 还有几颗（M13-T3c 口语变体）
   ]
   for (const q of cases) {
     it(`「${q}」→ expiry-stock`, () => {
@@ -154,5 +158,31 @@ describe('classifyConsultIntent · 歧义句与仲裁优先级', () => {
 
   it('混合句「我还有多少药，想把阿司匹林停了」→ medication-list（函数只管意图；L3「想停」守门在 service 层先于意图，实际运行走 refused）', () => {
     expect(classifyConsultIntent('我还有多少药，想把阿司匹林停了')).toBe('medication-list')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 行动 / 建议词仲裁（M13-T3d · docs/14 §4 T3d）
+// ---------------------------------------------------------------------------
+
+describe('classifyConsultIntent · 行动/建议词仲裁（M13-T3d）', () => {
+  const cases = [
+    '我最近老漏服怎么办', // 怎么办
+    '药过期了还能吃吗', // 还能吃
+    '过期的药有什么危害', // 危害
+    '漏服一次要补吗', // 要补
+    '这个药吃了犯困正常吗', // 正常吗
+    '我的药一起吃有冲突吗，严重吗', // 严重吗（即使含 interaction-check 关键词也优先走 S1）
+  ]
+  for (const q of cases) {
+    it(`「${q}」→ null（行动词仲裁 → S1）`, () => {
+      expect(classifyConsultIntent(q)).toBeNull()
+    })
+  }
+
+  it('analyzeConsultIntent 区分 explain / advice 仲裁原因（供路由轨迹使用）', () => {
+    expect(analyzeConsultIntent('这个药有副作用吗')).toMatchObject({ intent: null, veto: 'explain' })
+    expect(analyzeConsultIntent('药过期了还能吃吗')).toMatchObject({ intent: null, veto: 'advice' })
+    expect(analyzeConsultIntent('我现在有多少药物')).toMatchObject({ intent: 'medication-list', veto: null })
   })
 })
