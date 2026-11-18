@@ -61,7 +61,9 @@ export const DISPLAY_NAME_MAX_LENGTH = 20
  */
 export const UpdateMeRequestSchema = z.object({
   name: z
-    .string()
+    // 缺字段时 zod 默认文案是英文 "Required"，会经 vJson 原样进错误响应（「name: Required」）——
+    // min(1) 只覆盖「传了但为空」，覆盖不到「压根没传」，故必须单独给 required_error 中文兜底。
+    .string({ required_error: '请输入姓名' })
     .trim()
     .min(1, '请输入姓名')
     .max(DISPLAY_NAME_MAX_LENGTH, `姓名最多 ${DISPLAY_NAME_MAX_LENGTH} 个字`)

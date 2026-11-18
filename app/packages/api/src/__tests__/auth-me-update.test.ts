@@ -124,10 +124,13 @@ describe('PATCH /api/auth/me · demo 路径（作用域 = p-001）', () => {
     expect(((await res.json()) as Envelope).code).toBe('VALIDATION')
   })
 
-  it('缺 name 字段 → 400 VALIDATION', async () => {
+  it('缺 name 字段 → 400 VALIDATION，且文案是中文（不把 zod 的英文 Required 抛给用户）', async () => {
     const res = await patchMe({})
     expect(res.status).toBe(400)
-    expect(((await res.json()) as Envelope).code).toBe('VALIDATION')
+    const body = (await res.json()) as Envelope
+    expect(body.code).toBe('VALIDATION')
+    expect(body.message).toContain('请输入姓名')
+    expect(body.message).not.toContain('Required')
   })
 })
 
