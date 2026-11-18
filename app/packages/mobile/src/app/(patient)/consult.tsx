@@ -326,7 +326,9 @@ export default function Consult() {
           </View>
         ) : null}
 
-        {messages.length === 0 && !drugsQuery.isPending ? (
+        {messages.length === 0 &&
+        !drugsQuery.isPending &&
+        (drugs.length === 0 || selectedDrug !== null || invalidDrugLink) ? (
           <Text className="text-base leading-6 text-muted-foreground">
             {drugs.length === 0 ? (
               <>
@@ -347,10 +349,8 @@ export default function Consult() {
                 </Text>
                 」：说明书类问题围绕它回答，药箱数据也可直接问。
               </>
-            ) : invalidDrugLink ? (
-              "未找到要咨询的药品，请回到药箱从该药的「问这个药」重新进入。"
             ) : (
-              "可直接问药箱数据；要咨询某支药的说明书，请到药箱点该药的「问这个药」。"
+              "未找到要咨询的药品，请回到药箱从该药的「问这个药」重新进入。"
             )}
           </Text>
         ) : null}

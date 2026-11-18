@@ -36,9 +36,6 @@ export default function Profile() {
         </View>
         <View className="min-w-0 flex-1">
           <Text className="text-xl font-bold text-foreground">演示用户 · 张某某</Text>
-          <Text className="mt-0.5 text-sm text-muted-foreground">
-            本地演示账号 · 数据仅保存在演示库
-          </Text>
         </View>
       </View>
 
@@ -47,21 +44,18 @@ export default function Profile() {
           <EntryRow
             icon={UserRound}
             label="健康信息"
-            hint="七项健康档案"
             onPress={() => router.push("/health-info")}
           />
           <View className="border-b border-border" />
           <EntryRow
             icon={ClipboardList}
             label="服药记录"
-            hint="查询与导出"
             onPress={() => router.push("/records")}
           />
           <View className="border-b border-border" />
           <EntryRow
             icon={SettingsIcon}
             label="设置"
-            hint="字号与界面"
             onPress={() => router.push("/settings")}
           />
         </CardContent>
@@ -70,16 +64,14 @@ export default function Profile() {
   );
 }
 
-/** 列表入口行（web 的 EntryLink）：图标 tile + 标签/副文案 + 右箭头，整行可点、触控 ≥44px。 */
+/** 列表入口行（web 的 EntryLink）：图标 tile + 标签 + 右箭头，整行可点、触控 ≥44px。 */
 function EntryRow({
   icon,
   label,
-  hint,
   onPress,
 }: {
   icon: LucideIcon;
   label: string;
-  hint: string;
   onPress: () => void;
 }) {
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
@@ -94,7 +86,6 @@ function EntryRow({
       </View>
       <View className="min-w-0 flex-1">
         <Text className="text-base font-semibold text-card-foreground">{label}</Text>
-        <Text className="text-xs text-muted-foreground">{hint}</Text>
       </View>
       <Icon as={ChevronRight} size={20} color={mutedForeground} />
     </Pressable>

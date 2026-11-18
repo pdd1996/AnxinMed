@@ -52,7 +52,6 @@ export interface IntakeCopy {
   entry: Entry
   pageTitle: string
   uploadTitle: string
-  uploadHint: string
   otherEntryLabel: string
   otherEntryPath: string
 }
@@ -206,7 +205,6 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
                   <ImagePlus className="size-8" aria-hidden />
                 </span>
                 <strong className="text-lg">{copy.uploadTitle}</strong>
-                <span className="text-sm text-muted-foreground">{copy.uploadHint}</span>
                 <span className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
                   <Camera className="size-4" aria-hidden /> 拍摄 / 选择照片
                 </span>

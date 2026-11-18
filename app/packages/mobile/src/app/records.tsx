@@ -224,12 +224,6 @@ export default function Records() {
           ))}
         </View>
       )}
-
-      <View className="mt-5 rounded-xl border border-border bg-card p-3">
-        <Text className="text-xs leading-5 text-muted-foreground">
-          记录为你亲自操作的留痕，非系统医学验证；库存按次扣减。如与实际用药有出入，请以医嘱为准。
-        </Text>
-      </View>
     </ScrollView>
   );
 }

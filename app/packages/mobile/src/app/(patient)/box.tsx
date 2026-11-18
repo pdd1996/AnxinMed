@@ -221,7 +221,6 @@ export default function Box() {
       }
     >
       <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">我的药箱</Text>
-      <Text className="mt-1 text-2xl font-bold text-foreground">所有来源的药，同一个药箱</Text>
 
       <View className="mt-4 flex-row gap-3">
         <Pressable

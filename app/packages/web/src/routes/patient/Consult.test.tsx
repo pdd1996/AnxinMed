@@ -110,8 +110,6 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
     // 等 mutation 完成
     await waitFor(() => {
       expect(screen.getByText('该药用于缓解干眼症状')).toBeTruthy()
-      // citations 折叠（文本被 <strong> 分割，用正则匹配）
-      expect(screen.getByText(/来源/)).toBeTruthy()
     })
   })
 
@@ -304,7 +302,7 @@ describe('Consult 页 · 深链对象药', () => {
       consultLogId: 'clog-7',
     })
     renderConsult('/consult')
-    await screen.findByText(/可直接问药箱数据/) // 药箱加载完成、无对象问候语出现
+    await screen.findByText('我现在有多少药物？') // 药箱加载完成（无对象药时不再显示引导问候语）
     expect(screen.queryByText('这个药通常用于什么？')).toBeNull()
     fireEvent.click(screen.getByText('我现在有多少药物？').closest('button')!)
     await waitFor(() => {

@@ -24,9 +24,6 @@ export default function HealthInfoPage() {
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 }}
     >
       <Text className="text-2xl font-bold text-foreground">七项健康档案</Text>
-      <Text className="mt-1 text-base leading-6 text-muted-foreground">
-        点按任意一行补充或修改；保存后按来源标注「用户自述」或「处方笺抄录 · 已确认」。
-      </Text>
 
       {data ? (
         <View

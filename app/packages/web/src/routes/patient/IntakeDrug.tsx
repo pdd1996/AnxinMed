@@ -4,7 +4,6 @@ const COPY: IntakeCopy = {
   entry: 'B',
   pageTitle: '拍药品建档',
   uploadTitle: '上传正面清晰的药盒照片',
-  uploadHint: '药盒正面拍清楚；散装药片拍不了',
   otherEntryLabel: '拍处方笺',
   otherEntryPath: '/intake/rx',
 }

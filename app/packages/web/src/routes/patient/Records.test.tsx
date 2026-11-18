@@ -88,10 +88,4 @@ describe('Records 页 · 导出与空态', () => {
     const btn = screen.getByRole('button', { name: /导出 CSV/ }) as HTMLButtonElement
     expect(btn.disabled).toBe(true)
   })
-
-  it('留痕文案：明确「非系统医学验证」', async () => {
-    renderRecords()
-    await screen.findByText('玻璃酸钠滴眼液')
-    expect(screen.getByText(/非系统医学验证/)).toBeTruthy()
-  })
 })

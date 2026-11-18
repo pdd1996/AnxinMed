@@ -170,9 +170,6 @@ export default function Today() {
     >
       <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">今日</Text>
       <Text className="mt-1 text-2xl font-bold text-foreground">安心用药</Text>
-      <Text className="mt-1 text-base leading-6 text-muted-foreground">
-        把一个人的药放进同一个药箱：先能拍照建档，再管依从、冲突与效期。
-      </Text>
 
       {/* 服务器地址诊断卡（M5-T4）自 G8 交付起从患者可见界面移除：
           正式包地址在构建期内联、用户改不了，展示内网 IP 只会造成困惑。

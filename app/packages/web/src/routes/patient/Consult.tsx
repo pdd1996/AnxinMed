@@ -242,32 +242,32 @@ export default function Consult() {
 
             {/* 消息历史；空会话时只有一句问候语（无框、无底色） */}
             <div className="space-y-4">
-              {messages.length === 0 && !drugsQuery.isLoading && (
-                <p className="text-sm text-muted-foreground">
-                  {drugs.length === 0 ? (
-                    <>
-                      药箱为空：去
-                      <Link
-                        to="/intake/rx"
-                        className="font-medium text-primary underline underline-offset-2"
-                      >
-                        录入
-                      </Link>
-                      添加药品后可咨询说明书；现在也能直接查药箱数据。
-                    </>
-                  ) : selectedDrug ? (
-                    <>
-                      正在咨询「
-                      <span className="font-medium text-foreground">{selectedDrug.genericName}</span>
-                      」：说明书类问题围绕它回答，药箱数据也可直接问。
-                    </>
-                  ) : invalidDrugLink ? (
-                    '未找到要咨询的药品，请回到药箱从该药的「问这个药」重新进入。'
-                  ) : (
-                    '可直接问药箱数据；要咨询某支药的说明书，请到药箱点该药的「问这个药」。'
-                  )}
-                </p>
-              )}
+              {messages.length === 0 &&
+                !drugsQuery.isLoading &&
+                (drugs.length === 0 || selectedDrug || invalidDrugLink) && (
+                  <p className="text-sm text-muted-foreground">
+                    {drugs.length === 0 ? (
+                      <>
+                        药箱为空：去
+                        <Link
+                          to="/intake/rx"
+                          className="font-medium text-primary underline underline-offset-2"
+                        >
+                          录入
+                        </Link>
+                        添加药品后可咨询说明书；现在也能直接查药箱数据。
+                      </>
+                    ) : selectedDrug ? (
+                      <>
+                        正在咨询「
+                        <span className="font-medium text-foreground">{selectedDrug.genericName}</span>
+                        」：说明书类问题围绕它回答，药箱数据也可直接问。
+                      </>
+                    ) : (
+                      '未找到要咨询的药品，请回到药箱从该药的「问这个药」重新进入。'
+                    )}
+                  </p>
+                )}
 
               {messages.map((msg) =>
                 msg.role === 'user' ? (

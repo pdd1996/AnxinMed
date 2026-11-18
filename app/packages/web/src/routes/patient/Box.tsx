@@ -138,7 +138,6 @@ export default function Box() {
       <header className="space-y-3 md:flex md:items-end md:justify-between md:gap-3 md:space-y-0">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">我的药箱</p>
-          <h1 className="text-2xl font-bold text-balance">所有来源的药，同一个药箱</h1>
         </div>
         <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
           <Button variant="outline" className="min-h-11" onClick={() => setShowManual(true)}>

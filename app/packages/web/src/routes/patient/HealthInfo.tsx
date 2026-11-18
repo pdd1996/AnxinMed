@@ -22,9 +22,6 @@ export default function HealthInfo() {
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">健康信息</p>
       <div>
         <h1 className="text-2xl font-bold">七项健康档案</h1>
-        <p className="mt-1 text-base text-muted-foreground">
-          点按任意一行补充或修改；保存后按来源标注「用户自述」或「处方笺抄录 · 已确认」。
-        </p>
       </div>
 
       {data && (

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, Download, Info, LoaderCircle } from 'lucide-react'
+import { CalendarDays, Download, LoaderCircle } from 'lucide-react'
 import {
   computeRange,
   fetchRecords,
@@ -122,11 +122,6 @@ export default function Records() {
           )}
         </CardContent>
       </Card>
-
-      <p className="flex items-start gap-2 rounded-xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-        记录为你亲自操作的留痕，非系统医学验证；库存按次扣减。如与实际用药有出入，请以医嘱为准。
-      </p>
     </div>
   )
 }

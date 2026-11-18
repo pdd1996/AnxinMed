@@ -46,7 +46,6 @@ interface IntakeCopy {
   entry: IntakeEntry;
   pageTitle: string;
   uploadTitle: string;
-  uploadHint: string;
   otherEntryLabel: string;
   otherEntryPath: string;
 }
@@ -57,7 +56,6 @@ const COPY: Record<IntakeEntry, IntakeCopy> = {
     entry: "A",
     pageTitle: "拍处方笺录入",
     uploadTitle: "上传平铺完整的处方笺照片",
-    uploadHint: "单子摊平拍全，光线足、别反光",
     otherEntryLabel: "拍药品",
     otherEntryPath: "/intake/drug",
   },
@@ -65,7 +63,6 @@ const COPY: Record<IntakeEntry, IntakeCopy> = {
     entry: "B",
     pageTitle: "拍药品建档",
     uploadTitle: "上传正面清晰的药盒照片",
-    uploadHint: "药盒正面拍清楚；散装药片拍不了",
     otherEntryLabel: "拍处方笺",
     otherEntryPath: "/intake/rx",
   },
@@ -305,9 +302,6 @@ export default function IntakeScreen({
           </View>
           <View className="items-center rounded-2xl border-2 border-dashed border-border bg-muted p-6">
             <Text className="text-lg font-semibold text-foreground">{copy.uploadTitle}</Text>
-            <Text className="mt-2 text-center text-sm leading-5 text-muted-foreground">
-              {copy.uploadHint}
-            </Text>
           </View>
           <Pressable
             accessibilityRole="button"

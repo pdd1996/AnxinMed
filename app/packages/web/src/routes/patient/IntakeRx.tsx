@@ -4,7 +4,6 @@ const COPY: IntakeCopy = {
   entry: 'A',
   pageTitle: '拍处方笺录入',
   uploadTitle: '上传平铺完整的处方笺照片',
-  uploadHint: '单子摊平拍全，光线足、别反光',
   otherEntryLabel: '拍药品',
   otherEntryPath: '/intake/drug',
 }
