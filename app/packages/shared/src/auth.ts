@@ -45,6 +45,35 @@ export const AuthMeSchema = z.object({
 })
 export type AuthMe = z.infer<typeof AuthMeSchema>
 
+/**
+ * 显示名长度上限（G8 增补 · 个人资料）。中文姓名远短于此；上限只用于防长串撑破
+ * 「我的」页头部与医生端患者列表的列宽，不做业务意义解释。
+ */
+export const DISPLAY_NAME_MAX_LENGTH = 20
+
+/**
+ * PATCH /api/auth/me 入参 —— 当前只开放「姓名」一项（头像涉及存储选型，另行立项）。
+ *
+ * 约束与理由：
+ * - trim 后必须非空：清空会让「我的」页与医生端列表退化成无名患者；
+ * - 拒绝换行/控制字符：姓名是单行展示文本，可换行会撑破布局（前端不转义也不会执行，故不额外禁符号）；
+ * - 上限与 `DISPLAY_NAME_MAX_LENGTH` 同源，前端输入框 maxLength 复用同一常量。
+ */
+export const UpdateMeRequestSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, '请输入姓名')
+    .max(DISPLAY_NAME_MAX_LENGTH, `姓名最多 ${DISPLAY_NAME_MAX_LENGTH} 个字`)
+    // 不用 \u0000-\u001f 正则：eslint no-control-regex 会拦「刻意匹配控制字符」，
+    // 逐字符判码点更直白（控制字符都在 BMP，charCodeAt 足够）。
+    .refine(
+      (value) => !Array.from(value).some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f),
+      '姓名不能包含换行或控制字符',
+    ),
+})
+export type UpdateMeRequest = z.infer<typeof UpdateMeRequestSchema>
+
 /** 登录/改密失败统一文案：不区分「账号不存在」与「密码错误」（防账号枚举）。 */
 export const LOGIN_FAILED_MESSAGE = '账号或密码错误'
 /** 限流命中文案（5 次/15 分钟，G7 单实例内存实现）。 */

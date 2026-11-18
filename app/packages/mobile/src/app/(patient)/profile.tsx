@@ -5,6 +5,7 @@ import { useUnstableNativeVariable } from "nativewind";
 import {
   ChevronRight,
   ClipboardList,
+  IdCard,
   Settings as SettingsIcon,
   UserRound,
   type LucideIcon,
@@ -25,7 +26,13 @@ export default function Profile() {
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   // 登录态（G7）：demo 模式免登录，账号区不出现。账号串是内部演示 ID，患者端不展示，只保留退出动作。
   const authMode = useAuthStore((s) => s.mode);
+  // 头部姓名读登录态（G8 增补）：不再是写死的「演示用户 · 张某某」，改完返回本页即见新名。
+  // demo 模式保留「演示用户 · 」作模式标记；password 模式只显示姓名（真实账号不该标成演示用户）。
+  const user = useAuthStore((s) => s.user);
   const [signingOut, setSigningOut] = useState(false);
+
+  const displayName = user?.name?.trim() || "未设置姓名";
+  const title = authMode === "demo" ? `演示用户 · ${displayName}` : displayName;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -58,12 +65,20 @@ export default function Profile() {
           <Icon as={UserRound} size={30} color={mutedForeground} />
         </View>
         <View className="min-w-0 flex-1">
-          <Text className="text-xl font-bold text-foreground">演示用户 · 张某某</Text>
+          <Text className="text-xl font-bold text-foreground" numberOfLines={1}>
+            {title}
+          </Text>
         </View>
       </View>
 
       <Card className="mt-5 p-0">
         <CardContent className="p-0">
+          <EntryRow
+            icon={IdCard}
+            label="个人资料"
+            onPress={() => router.push("/account")}
+          />
+          <View className="border-b border-border" />
           <EntryRow
             icon={UserRound}
             label="健康信息"

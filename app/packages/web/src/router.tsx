@@ -14,6 +14,7 @@ const IntakeDrug = lazy(() => import('@/routes/patient/IntakeDrug'))
 const Draft = lazy(() => import('@/routes/patient/Draft'))
 const Consult = lazy(() => import('@/routes/patient/Consult'))
 const Profile = lazy(() => import('@/routes/patient/Profile'))
+const Account = lazy(() => import('@/routes/patient/Account'))
 const HealthInfo = lazy(() => import('@/routes/patient/HealthInfo'))
 const Records = lazy(() => import('@/routes/patient/Records'))
 const Settings = lazy(() => import('@/routes/patient/Settings'))
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
           { path: '/drafts/:id', element: page(<Draft />) },
           { path: '/consult', element: page(<Consult />) },
           { path: '/profile', element: page(<Profile />) },
+          { path: '/account', element: page(<Account />) },
           { path: '/health-info', element: page(<HealthInfo />) },
           { path: '/records', element: page(<Records />) },
           { path: '/settings', element: page(<Settings />) },

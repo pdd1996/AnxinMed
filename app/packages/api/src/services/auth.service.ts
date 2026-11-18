@@ -164,6 +164,25 @@ export async function resolveSessionUser(token: string): Promise<User | null> {
 }
 
 /**
+ * 改显示名（PATCH /api/auth/me 的唯一字段）。返回更新后的用户行；调用方仍必须过 publicUser。
+ *
+ * 空名/超长由契约层（shared UpdateMeRequestSchema）拦；此处再兜一次是因为本函数也可能被
+ * CLI 或后续路由直接调用，service 不能假设入参已经校验（防御性，不是重复校验业务规则）。
+ */
+export async function updateUserName(userId: string, name: string): Promise<User> {
+  const trimmed = name.trim()
+  if (!trimmed) throw new ApiError(400, ERR_CODES.VALIDATION, '请输入姓名')
+  const [updated] = await db
+    .update(users)
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning()
+  // 会话有效但用户行消失（外部清理）：报 404 而不是静默返回旧值。
+  if (!updated) throw new ApiError(404, ERR_CODES.NOT_FOUND, '用户不存在')
+  return updated
+}
+
+/**
  * CLI：开通账号（id 已存在则更新凭据；否则新建用户）。不开放 HTTP 自助注册。
  * 用户名冲突由 DB 唯一约束兜底（CLI 捕获并报错可见）。
  */

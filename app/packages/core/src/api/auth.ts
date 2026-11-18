@@ -24,6 +24,17 @@ export async function fetchAuthMe() {
 }
 
 /**
+ * 改姓名（G8 增补）：成功返回与 GET /me 同形的 { mode, user }，调用方可整块替换登录态。
+ *
+ * silent：个人资料页在表单里自己渲染失败文案（「姓名最多 20 个字」这类逐字段提示），
+ * 再叠一个全局 toast 就成了同一错误说两遍。失败仍抛出，页面必须展示。
+ */
+export async function updateMeName(name: string) {
+  const res = await client.api.auth.me.$patch({ json: { name } })
+  return unwrap(res, { silent: true })
+}
+
+/**
  * 登出：服务端删 session；无论网络是否成功，本地 token 一定清掉（用户意图是退出）。
  * 返回 void；失败细节不打扰用户（路由守卫会把界面切回登录页）。
  */

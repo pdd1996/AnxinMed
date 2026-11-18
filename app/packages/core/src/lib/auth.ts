@@ -10,7 +10,7 @@
  */
 import { ERR_CODES } from '@anxin/shared'
 import { ApiRequestError, setAuthToken } from '../api/client'
-import { fetchAuthMe, loginWithPassword, logoutSession } from '../api/auth'
+import { fetchAuthMe, loginWithPassword, logoutSession, updateMeName } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
 import { toUserMessage } from './errors'
 
@@ -106,6 +106,17 @@ export async function signOut(): Promise<void> {
   await clearLocalSession()
 }
 
+/**
+ * 改姓名（G8 增补 · 个人资料）：调 PATCH /api/auth/me → 用返回的 user 覆盖登录态。
+ *
+ * 用 setAuthenticated 而不是重建会话：token 不变、路由守卫不会闪一下登录检查；
+ * 各端页面保存成功后直接返回「我的」，头部即读 store 里的新名字。
+ * 失败原样抛给页面（core 层不吞错、不假装成功）；错误文案已是服务端中文。
+ */
+export async function updateDisplayName(name: string): Promise<void> {
+  const data = await updateMeName(name)
+  authStore().setAuthenticated(data.mode, data.user)
+}
 /**
  * 401 统一处理入口（由各端 wiring 包一层接到 setUnauthorizedHandler）：
  * 清登录态 → 路由守卫看到 anonymous 后跳登录页。
