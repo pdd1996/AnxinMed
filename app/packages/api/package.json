@@ -39,6 +39,7 @@
     "db:audit": "tsx src/db/data-audit.ts",
     "perf:intake": "tsx src/scripts/perf-intake.ts",
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",
+    "eval:intent": "tsx src/scripts/eval-consult-intent.ts",
     "perf:consult": "tsx src/scripts/perf-consult.ts",
     "perf:consult-live": "tsx src/scripts/perf-consult-live.ts",
     "db:studio": "drizzle-kit studio",
