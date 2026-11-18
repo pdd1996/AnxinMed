@@ -4,7 +4,8 @@
  */
 import '../lib/env.js'
 
-export const TEST_DB_NAME = 'anxin_medication_test'
+// 可用 TEST_DB_NAME 覆盖（并行/多会话跑测试时避免共用固定库名互相 drop）
+export const TEST_DB_NAME = process.env.TEST_DB_NAME || 'anxin_medication_test'
 
 /** 把连接串末尾的库名替换为 db（保留可能的 ?query）。 */
 export function withDb(url: string, db: string): string {

@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url'
 // 显式加载 api 包的 .env（e2e 进程 cwd 不在 api，dotenv/config 默认找不到）
 config({ path: fileURLToPath(new URL('../../packages/api/.env', import.meta.url)) })
 
-export const TEST_DB_NAME = 'anxin_medication_test'
+// 可用 TEST_DB_NAME 覆盖（并行/多会话跑测试时避免共用固定库名互相 drop）
+export const TEST_DB_NAME = process.env.TEST_DB_NAME || 'anxin_medication_test'
 
 export const REMOTE_DB_URL = process.env.E2E_DB_URL || undefined
 /** 远端模式下 e2e 读写的是部署自身的库——必须显式授权，避免误把本地串填进去跑坏云端数据。 */
