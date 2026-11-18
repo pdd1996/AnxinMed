@@ -239,8 +239,8 @@ export function AdherenceCharts() {
           </View>
 
           <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-            柱子是打卡记录（已服/漏服/延后），虚线是当天应服的次数。近 {days} 天执行率{" "}
-            {data.adherence.rate}%（已服 {data.adherence.taken}/{data.adherence.total}）。
+            近 {days} 天执行率 {data.adherence.rate}%（已服 {data.adherence.taken}/
+            {data.adherence.total}）
           </Text>
 
           {charts.perDrug.length > 0 ? (

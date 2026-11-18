@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
 import { Type, Bell, Wifi, KeyRound } from "lucide-react-native";
 import { useAuthStore } from "@anxin/core";
-import { RiskBadge } from "@/components/domain/RiskBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Text 必须走 ui/text：09-30 深夜修过一条「settings.tsx 直引 react-native 的 Text，接不到
 // TextClassContext 下发的颜色」（commit 7b35934），T5-e 重写本页时又退回去了——深色下选中档
@@ -14,8 +13,9 @@ import { useFontScale, type FontScale } from "@/stores/fontScale";
 import { useReminderSync } from "@/stores/reminderSync";
 
 /**
- * 设置页（M5-T5e 起为真实页）：字号两档 = 全局缩放的验证入口，风险语义色预览 = §6 第 4 条的色板自检。
+ * 设置页（M5-T5e 起为真实页）：字号两档 = 全局缩放的验证入口。
  * 档位经 core 的 store + AsyncStorage 持久化，切换即时写入 NativeWind 的 rem 根（见 FontScaleSync）。
+ * 「风险语义色预览」是设计自检项、不是用户设置，已从患者界面移除。
  */
 export default function Settings() {
   const router = useRouter();
@@ -36,17 +36,13 @@ export default function Settings() {
         paddingTop: 16,
       }}
     >
-      {/* 页面标题由根 stack 头部给（「设置」），页内小标题只负责本页的主张。 */}
-      <Text className="text-2xl font-bold text-foreground">看得清，才用得住</Text>
-
-      <View className="mt-6 gap-3">
+      <View className="gap-3">
         <View className="flex-row items-center gap-2">
           <Type size={20} color={primary} importantForAccessibility="no" />
           <Text className="text-base font-bold text-foreground">字号大小</Text>
         </View>
         <Text className="text-sm leading-6 text-muted-foreground">
-          两档切换，即时生效并记住你的选择（退出应用重开保持）。当前：
-          <Text className="font-bold text-foreground">{scale === "large" ? "大字" : "标准"}</Text>
+          切换后立即生效，重新打开应用仍保持。
         </Text>
         <Tabs value={scale} onValueChange={(v) => setScale(v as FontScale)}>
           <TabsList className="h-auto w-full flex-row gap-1">
@@ -54,9 +50,6 @@ export default function Settings() {
             <TabOption value="large" label="大字" active={scale === "large"} />
           </TabsList>
         </Tabs>
-        <Text className="text-sm leading-6 text-muted-foreground">
-          改变的是整页文字与间距一起缩放，从标题到按钮、卡片内边距都会跟着变。
-        </Text>
       </View>
 
       {/* P1：账号与安全——登录密码入口（密码是安全设置，不放进个人资料）。 */}
@@ -80,22 +73,9 @@ export default function Settings() {
         </View>
       )}
 
-      <View className="mt-8 gap-3">
-        <Text className="text-base font-bold text-foreground">风险语义色预览</Text>
-        <Text className="text-sm leading-6 text-muted-foreground">
-          图标 + 文字并用，不单靠颜色（守门 L1–L4，L4 最高）。
-        </Text>
-        <View className="flex-row flex-wrap gap-2">
-          <RiskBadge level="L1" />
-          <RiskBadge level="L2" />
-          <RiskBadge level="L3" />
-          <RiskBadge level="L4" />
-        </View>
-      </View>
-
       {/*
         「账号」区（原 M5-T5e 在这里）已按信息层级上移到「我的」页底部：
-        退出登录是账号级动作，与字号/风险色这类设置项不同层。
+        退出登录是账号级动作，与字号这类设置项不同层。
       */}
 
       <View className="mt-8 gap-2">
