@@ -179,7 +179,7 @@ export const CitationSchema = z.object({
 export type Citation = z.infer<typeof CitationSchema>
 
 /**
- * 咨询对象澄清选项（M13-P1 · specs/17 T1/T3）：
+ * 咨询对象澄清选项（M13-P1 · specs/18 T1/T3）：
  * status='clarify' 时回给药箱内药品（≤6，新建档在前），前端点选后带该 drugId 重发原问题。
  */
 export const ConsultClarifyOptionSchema = z.object({

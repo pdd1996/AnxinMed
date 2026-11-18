@@ -1,7 +1,7 @@
 # 安心用药 · 咨询 Agent 路由与评测改造方案（V0.1 待裁决）
 
 > 版本：V0.1（2026-11-18）
-> 状态：**提案；P0 已于 2026-11-18 开工并落地（见 §11 与 [specs/16](./specs/16-咨询Agent路由工程化.md)）**；§9 A1–A9 仍待用户裁决。裁决前不改 shared 契约、不改 PRD / docs/08 / docs/11 / docs/12；P1+ 升格为任务书（拟 specs/16 续篇，里程碑编号待定）。
+> 状态：**提案；P0 已落地、P1 已按 A1–A9 批复开工并落地（见 §11、[specs/16](./specs/16-咨询Agent路由工程化.md)、[specs/18](./specs/18-咨询Agent-P1-对象澄清与范围层.md)）**；P2/P3（候选打分/归一化/小模型兜底）待评测数据，暂不启动。
 > 来源：用户 2026-11-18 命题——参考知乎文章《我做了一个旅行助手 Agent，聊聊意图识别》（作者 windliang，https://zhuanlan.zhihu.com/p/2076267775065170292），评估并改造当前「安心用药」咨询 Agent。
 > 上游真相源：PRD V2.2（06）· 技术方案 V1.1（08，附录 A 意图路由设计）· ADR（07）· docs/10（决策记录）· docs/11（指标口径）· docs/12（Agent 整体架构）· docs/13（模型选型）· specs/04-M4（已收口）。
 > 与上游冲突处理：本文不自行裁决，冲突集中在 §9 交用户裁决（执行总纲 §0.2）。
@@ -350,6 +350,8 @@ POST /api/consult
 
 ## 9. 需用户裁决项（A1–A9）
 
+> **2026-11-18 用户批复：A1–A9 全按建议**（执行书 [specs/18-咨询Agent-P1-对象澄清与范围层.md](./specs/18-咨询Agent-P1-对象澄清与范围层.md)）。下表保留原建议供追溯。
+
 | # | 裁决项 | 选项 | 本方案建议 |
 |---|---|---|---|
 | A1 | 是否新增 `clarify` / `out-of-scope` 两个咨询状态？ | a. 新增 + 客户端未知枚举容错 + 灰度；b. 复用 `no-source`/`refused` + notice；c. 只在内部用、前端映射 | **a**：语义清晰、可统计、无需 SQL 迁移；先做旧客户端容错。若不愿动契约，退 b（指标会脏） |
@@ -457,4 +459,28 @@ POST /api/consult
 3. T3a（L4 口语召回）与 T3b（SECTION_ROUTES）同在 `patterns.ts`，未拆独立 commit；回滚可按 hunk 处理（如产品要求）。
 4. L4 扩召回后，裸「误服」会命中历史陈述（「上次误服过」）；按安全优先接受，已用单测固化该取舍，产品 / 医学如要求收敛另开任务。
 5. 新增 status（clarify / out-of-scope）未实施，A1/A2 仍待裁决；评测集中 16 条 P1 用例已先行声明期望并 `pendingUntil` 跳过。
+
+**后续更新**：2026-11-18 PostgreSQL 就绪后复跑全量 API 测试（62 文件 / 772 用例）全绿，P0 的「集成/E2E 未跑」限制解除（E2E 仍待单独执行）。
+
+### 11.2 P1 对象澄清与范围层（2026-11-18，A1–A9 批复后执行）
+
+| 任务 | commit | 内容 |
+|---|---|---|
+| T1–T3 契约/纯函数/接线 | `a0f0a7c` | `ConsultStatusSchema` + `clarify`/`out-of-scope` + `clarifyOptions`；`scope.ts`/`clarify.ts` 纯函数；service「范围 → 对象 → S1」接线；两个 kill switch；纯函数 + 集成测试；评测 16 条 P1 用例转绿 |
+| T4 Web/Mobile UI | `76932a9` | AnswerCard 药名选项（≥44px）；点选后带所选 drugId 重发原问题；旧客户端未知 status 走通用卡 |
+
+**验证（2026-11-18，PostgreSQL 就绪后）**
+
+- `pnpm --filter @anxin/api test`：**67 文件 / 844 用例全绿**（含 P1 新增 50 用例；P0 全量回归亦复跑通过）；
+- `pnpm --filter @anxin/api eval:intent`：**134 / 134 通过，0 失败、0 待启用**（clarify 8 + out-of-scope 8 已计入混淆矩阵）；
+- `pnpm --filter @anxin/web test`：18 文件 / 119 用例全绿；`pnpm --filter @anxin/mobile test`：6 套件 / 38 用例全绿；
+- `pnpm --filter @anxin/{api,web,mobile,core,shared} typecheck`：通过。
+
+**实施说明**
+
+1. 范围层保守白名单（诊断/看报告 + 明显非用药），不确定默认放行；诊断请求归 out-of-scope、不进 risk_events（A2）。
+2. clarify 只做对象缺失，且仅在药箱非空时触发；空药箱回退 no-source（A3）。
+3. `ENABLE_SCOPE_GATE` / `ENABLE_OBJECT_CLARIFY` 两个 kill switch（默认开），各自集成用例覆盖回滚。
+4. 旧客户端兼容策略：响应仍带固定 sections，未知 status 走通用回答卡；新客户端按 status 渲染药名选项（A1 的「客户端容错」以最低改动实现，不做版本协商）。
+5. E2E 未在本轮执行（需浏览器环境），需另跑 `pnpm test:e2e`；本轮以集成测试 + 组件测试覆盖。
 
