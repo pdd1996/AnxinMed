@@ -1,6 +1,7 @@
 /**
- * 技能注册表（M4-T3 · specs/04-T3）——「注册表 + 分发」，把 consult.service.ts 的 if-else
- * 编排显式化为纯函数路由。**零行为变更**：判定正则、优先级顺序、开关语义与 M3 验收实现逐字一致。
+ * 技能注册表（M4-T3 · specs/04-T3；M13-T2 增补 route trace）——「注册表 + 分发」，
+ * 把 consult.service.ts 的 if-else 编排显式化为纯函数路由。**零行为变更**：
+ * 判定正则、优先级顺序、开关语义与 M3 验收实现逐字一致。
  *
  * 四个技能（docs/10 §5 注册表单 · 08 附录 A 意图路由）：
  *   S0 红线        guardConsult 的 L4 emergency / L3 refused（守门优先于意图路由——
@@ -17,9 +18,13 @@
  * ⚠️ 顺序即语义（与 service 层既有注释一致）：L4 > L3 > S2 > S1{manual-gate > no-source(+S3) > proceed}；
  *    数据查询是 L0 以下的事实读取（读本库 drugs/plans/records），不受 manual-gate 限制，
  *    故 S2 先于 S1 内部的 manual-gate 判定。
+ *
+ * M13-T2：`resolveSkillRoute` 在**决策不变**的前提下同时产出路由轨迹 steps，
+ * `routeSkill` 退化为薄包装（既有调用与测试语义不变）；trace 默认不落盘（见 trace.ts）。
  */
 import { detectEmergency, detectProhibited } from './guards.js'
-import { classifyConsultIntent, type QueryIntent } from './intent.js'
+import { analyzeConsultIntent, type QueryIntent } from './intent.js'
+import type { RouteTraceStep } from './trace.js'
 
 /** 技能 ID（注册表行键；docs/10 §5 的 S0–S3 编号）。 */
 export type SkillId = 'S0' | 'S1' | 'S2' | 'S3'
@@ -38,6 +43,19 @@ export interface SkillRouteInput {
   /** 技能快路径（M4-T7）：chips/深链显式携带，直达对应技能（跳过正则与解释类仲裁）。
    *  合法性由 shared ConsultSkillIdSchema 在 HTTP 边界校验（未知值 400），此处只做形状分发。 */
   skillId?: string | null
+}
+
+/** 路由解析产物：决策 + 轨迹（M13-T2）。 */
+export interface SkillRouteResolution {
+  decision: SkillRouteDecision
+  steps: RouteTraceStep[]
+}
+
+/** 决策 → trace / 日志用的稳定字符串（如 `S2/expiry-stock`、`S0/emergency`、`S1`）。 */
+export function formatSkillRoute(decision: SkillRouteDecision): string {
+  if (decision.skill === 'S0') return `S0/${decision.kind}`
+  if (decision.skill === 'S2') return `S2/${decision.intent}`
+  return decision.skill
 }
 
 /**
@@ -66,7 +84,7 @@ export const SKILL_REGISTRY: readonly SkillRow[] = [
   {
     id: 'S2',
     label: '数据直答（只读工具）',
-    trigger: '开关开 + 无守门命中 + classifyConsultIntent 命中（解释类词仲裁：EXPLAIN_INTENT_PATTERN）',
+    trigger: '开关开 + 无守门命中 + classifyConsultIntent 命中（解释/行动类词仲裁）',
     executor: 'runDataQuery',
     degrade: '无降级：DB 异常显式 500（失败可见不静默，不降级 LLM）',
   },
@@ -87,35 +105,76 @@ export const SKILL_REGISTRY: readonly SkillRow[] = [
 ]
 
 /**
- * 技能路由（纯函数，零 I/O、确定性）：按优先级短路判定。
+ * 技能路由解析（纯函数，零 I/O、确定性）：按优先级短路判定，并产出 trace steps。
  * 顺序 = specs/04-T7 的完整分发契约：
  *   1. S0：detectEmergency → detectProhibited（**守门优先于一切，含快路径**——混合句
  *      「我胸痛」即使带 skillId 也必须走 L4）；
  *   2. skillId 快路径：s1-insert → S1；s2-<intent> → S2/<intent>（不受 intentRouteEnabled
  *      影响——开关管的是「从自由文本猜意图」，快路径是客户端显式指定）；
- *   3. S2 正则：开关开 + classifyConsultIntent 命中（宁漏勿误：漏判 = 走 S1 = 行为与无路由一致）；
+ *   3. S2 正则：开关开 + analyzeConsultIntent 命中（宁漏勿误：漏判 = 走 S1 = 行为与无路由一致）；
  *   4. S1：兜底（manual-gate / no-source / proceed 由 runConsult 内部 guardConsult 全量决策）。
+ *
+ * @remarks trace steps 只含规则/枚举/计数，不含问题原文（隐私红线，见 trace.ts）。
  */
-export function routeSkill(input: SkillRouteInput): SkillRouteDecision {
+export function resolveSkillRoute(input: SkillRouteInput): SkillRouteResolution {
+  const steps: RouteTraceStep[] = []
+
   // 1. S0 红线：守门优先于意图路由与快路径（混合句用例见 consult-registry.test.ts）
   const emergency = detectEmergency(input.question)
-  if (emergency) return { skill: 'S0', kind: 'emergency', matched: emergency }
+  if (emergency) {
+    steps.push({ layer: 'guard', outcome: 'emergency', detail: { matched: emergency } })
+    steps.push({ layer: 'route', outcome: 'S0/emergency' })
+    return { decision: { skill: 'S0', kind: 'emergency', matched: emergency }, steps }
+  }
   const prohibited = detectProhibited(input.question)
-  if (prohibited) return { skill: 'S0', kind: 'refused', matched: prohibited }
+  if (prohibited) {
+    steps.push({ layer: 'guard', outcome: 'refused', detail: { matched: prohibited } })
+    steps.push({ layer: 'route', outcome: 'S0/refused' })
+    return { decision: { skill: 'S0', kind: 'refused', matched: prohibited }, steps }
+  }
+  steps.push({ layer: 'guard', outcome: 'proceed' })
 
   // 2. skillId 快路径（M4-T7）：跳过正则与解释类仲裁
   if (input.skillId) {
-    if (input.skillId === 's1-insert') return { skill: 'S1' }
+    steps.push({ layer: 'intent', outcome: 'skillId', detail: { skillId: input.skillId } })
+    if (input.skillId === 's1-insert') {
+      steps.push({ layer: 'route', outcome: 'S1' })
+      return { decision: { skill: 'S1' }, steps }
+    }
     const intent = input.skillId.replace(/^s2-/, '') as QueryIntent
-    return { skill: 'S2', intent }
+    steps.push({ layer: 'route', outcome: `S2/${intent}` })
+    return { decision: { skill: 'S2', intent }, steps }
   }
 
-  // 3. S2 数据直答：开关开 + 正则命中（解释类词仲裁在 classifyConsultIntent 内）
+  // 3. S2 数据直答：开关开 + 正则命中（解释/行动类词仲裁在 analyzeConsultIntent 内）
   if (input.intentRouteEnabled) {
-    const intent = classifyConsultIntent(input.question)
-    if (intent) return { skill: 'S2', intent }
+    const analysis = analyzeConsultIntent(input.question)
+    if (analysis.intent) {
+      steps.push({
+        layer: 'intent',
+        outcome: 'S2-hit',
+        detail: {
+          intent: analysis.intent,
+          matchedRule: analysis.matchedRule ?? '',
+        },
+      })
+      steps.push({ layer: 'route', outcome: `S2/${analysis.intent}` })
+      return { decision: { skill: 'S2', intent: analysis.intent }, steps }
+    }
+    steps.push({
+      layer: 'intent',
+      outcome: analysis.veto ? `veto:${analysis.veto}` : 'no-match',
+    })
+  } else {
+    steps.push({ layer: 'intent', outcome: 'disabled' })
   }
 
   // 4. S1 说明书问答（兜底）
-  return { skill: 'S1' }
+  steps.push({ layer: 'route', outcome: 'S1' })
+  return { decision: { skill: 'S1' }, steps }
+}
+
+/** 技能路由（既有 API，语义不变）：只返回决策；需要轨迹时用 resolveSkillRoute。 */
+export function routeSkill(input: SkillRouteInput): SkillRouteDecision {
+  return resolveSkillRoute(input).decision
 }

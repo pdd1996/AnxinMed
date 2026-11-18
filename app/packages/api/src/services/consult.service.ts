@@ -35,7 +35,8 @@ import { nameMatches } from './identity/normalize.js'
 import * as profilesRepo from '../repositories/profiles.repo.js'
 import { runConsult } from './consult/run.js'
 import { runDataQuery } from './consult/dataquery.js'
-import { routeSkill } from './consult/registry.js'
+import { formatSkillRoute, resolveSkillRoute } from './consult/registry.js'
+import { ROUTE_TRACE_VERSION, ROUTE_VERSION, writeRouteTrace, type RouteTrace } from './consult/trace.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
 import { validateCitationCoverage } from './consult/coverage.js'
@@ -231,7 +232,9 @@ export async function consult(
   // - 语义边界：manual-gate 只限「个体化解释」（S1 内部门禁）；数据查询是 L0 以下的事实读取
   //   （读本库 drugs/plans/records），不受 manual-gate 限制，故 S2 先于 runConsult 内部
   //   manual-gate 判定。env 开关注释见 isIntentRouteEnabled。
-  const route = routeSkill({
+  // M13-T2：resolveSkillRoute 与 routeSkill 决策完全一致，额外返回路由轨迹 steps
+  //（trace 只含规则/枚举，不含问题原文；默认不落盘，见 consult/trace.ts）。
+  const { decision: route, steps: routeSteps } = resolveSkillRoute({
     question: questionRedacted,
     intentRouteEnabled: isIntentRouteEnabled(),
     skillId: opts.skillId ?? null,
@@ -375,7 +378,41 @@ export async function consult(
     })
   }
 
-  // 8. 返回前端（shared ConsultResponse 契约 + consultLogId 供"这次咨询"详情展开
+  // 8. 开发期路由轨迹（M13-T2 · docs/14 §4 T2）：默认关闭时零 I/O；
+  //    写入失败 console.error 可见，但不阻塞主回答（失败方向：回答优先）。
+  const trace: RouteTrace = {
+    v: ROUTE_TRACE_VERSION,
+    routeVersion: ROUTE_VERSION,
+    consultLogId,
+    createdAt: new Date().toISOString(),
+    steps: [
+      {
+        layer: 'input',
+        outcome: 'scrubbed',
+        detail: {
+          drugCount: drugIds.length,
+          conditionsCount: profileContext.conditions.length,
+        },
+      },
+      ...routeSteps,
+      {
+        layer: 'execute',
+        outcome: result.status,
+        detail: { skill: route.skill, llmPath: route.skill === 'S1' },
+      },
+    ],
+    finalRoute: formatSkillRoute(route),
+    llmPath: route.skill === 'S1',
+    status: result.status,
+    intent: intent ?? null,
+  }
+  try {
+    await writeRouteTrace(trace)
+  } catch (e) {
+    console.error('[consult] 路由轨迹写入失败：', e)
+  }
+
+  // 9. 返回前端（shared ConsultResponse 契约 + consultLogId 供"这次咨询"详情展开
   //    + sessionId 供前端续问带入（M4-T5 首答回传）+ suggestion 建议卡（M4-T6））
   return {
     riskLevel: result.riskLevel,

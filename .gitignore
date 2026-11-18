@@ -29,6 +29,9 @@ Thumbs.db
 # 本地默认 app/packages/api/logs；部署为宿主机 app/logs（container /app/logs）。
 logs/
 
+# ── 咨询路由轨迹（M13-T2：CONSULT_ROUTE_TRACE=1 开发期产物，永不入库）──
+.agent-debug/
+
 # ── Playwright E2E 产物（M2-T10）──
 test-results/
 playwright-report/
