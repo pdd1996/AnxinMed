@@ -221,3 +221,22 @@ ssh root@118.196.82.13 'bash /tmp/deploy-latest.sh'
 1. API T7 抽检：「药快吃没了」→ `data-answered` + `toolUsed=expiry-stock`；「我现在都吃哪些药」→ `data-answered` + `toolUsed=medication-list`；T6/T7 不改变 clarify/out-of-scope 与旧客户端 legacy 映射；
 2. 模拟器 G8 旧包快速回归（两个既有问题不白屏）；
 3. 若发现某条口语被误归一 → 先 `ENABLE_ROUTE_NORMALIZE=false` 回滚，再补评测用例/改规则。
+
+**2026-11-19 磁盘满事故与恢复**：首次执行上述部署时，Docker 在 export 阶段报 `no space left on device`（staging 根分区满），`up -d` 未执行；随后 API `/api/health` 返回 500（磁盘满影响 DB/写盘），静态页仍可访问。处理顺序：
+
+1）上传并执行清理/恢复脚本（只清构建缓存、悬空镜像、旧源码备份、旧 dump、系统日志；**不动 docker volume 与运行镜像**），脚本会 `docker compose up -d`、必要时重启 db/api 并检查 health：
+
+```powershell
+scp app\backups\cleanup-staging.sh root@118.196.82.13:/tmp/
+ssh root@118.196.82.13 'bash /tmp/cleanup-staging.sh'
+```
+
+看到 `SERVICE_RECOVERY_OK` 且 `CLEANUP_OK`（可用 ≥4GB）后，重新上传**新版**部署脚本与源码包再重试（新版脚本已加 ≥4GB 磁盘预检）：
+
+```powershell
+scp app\backups\anxin-src-510cb8b.tar.gz root@118.196.82.13:/tmp/
+scp app\backups\deploy-latest.sh root@118.196.82.13:/tmp/deploy-latest.sh
+ssh root@118.196.82.13 'bash /tmp/deploy-latest.sh'
+```
+
+2）若清理后 health 仍失败：贴 `docker compose ps` / `logs --tail=60 db` / `logs --tail=60 api`；必要时用 `app/backups` 最新 dump 恢复数据库（deploy/README §9.1 的 drop/create + pg_restore），再重启 api。清理脚本保留最新 3 份 dump（含部署前 07:27 那份）。
