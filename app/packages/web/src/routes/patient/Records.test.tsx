@@ -1,4 +1,4 @@
-﻿/**
+/**
  * M3-T6 · Records 页组件断言：按日/周/月查询接线 + 列表 + 导出按钮态。
  * 只 mock 传输层 fetchRecords，页面/纯函数走真代码；CSV 文本正确性由 core 的 lib/records.test.ts 覆盖。
  */
@@ -42,6 +42,11 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Records 页 · 按日/周/月查询', () => {
+  it('页头有返回「我的」入口（二级页不在底部 tab 的 active 前缀内）', async () => {
+    renderRecords()
+    expect(screen.getByRole('link', { name: /返回/ }).getAttribute('href')).toBe('/profile')
+  })
+
   it('默认按周 → 用本周区间查询并渲染记录（药名）', async () => {
     renderRecords()
     const { from, to } = computeRange('week')

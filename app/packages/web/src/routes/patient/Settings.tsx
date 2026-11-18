@@ -16,7 +16,7 @@ export default function Settings() {
   const toggle = useFontScale((s) => s.toggle)
 
   return (
-    <PlaceholderPage title="设置" route="/settings" milestone="M1-T8（字号档已可用）">
+    <PlaceholderPage title="设置" route="/settings" milestone="M1-T8（字号档已可用）" backTo="/profile">
       <div className="space-y-7">
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-base font-bold text-foreground">

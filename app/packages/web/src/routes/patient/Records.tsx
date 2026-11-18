@@ -9,6 +9,7 @@ import {
   type RangeMode,
 } from '@anxin/core'
 import { Button } from '@/components/ui/button'
+import { BackLink } from '@/components/layout/BackLink'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -56,6 +57,7 @@ export default function Records() {
 
   return (
     <div className="space-y-5">
+      <BackLink />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">服药记录</p>
 
       {/* 粒度切换（老年向：大按钮 + 文字） */}

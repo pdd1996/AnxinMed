@@ -51,6 +51,11 @@ afterEach(() => {
 })
 
 describe('Account 页 · 改姓名', () => {
+  it('页头有返回「我的」入口（二级页不在底部 tab 的 active 前缀内）', () => {
+    renderAccount()
+    expect(screen.getByRole('link', { name: /返回/ }).getAttribute('href')).toBe('/profile')
+  })
+
   it('初始显示当前姓名；未改动时保存按钮禁用', () => {
     renderAccount()
     expect((screen.getByLabelText('姓名') as HTMLInputElement).value).toBe('张某某')

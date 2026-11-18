@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchProfile } from '@anxin/core'
 import { HEALTH_FIELDS } from '@anxin/shared'
 import { HealthInfoCard } from '@/components/domain/profile/HealthInfoCard'
+import { BackLink } from '@/components/layout/BackLink'
 
 /**
  * 健康信息一级页（2026-11-18 UI 调整）：从「我的」页内嵌卡升级为与「服药记录」同级的独立页。
@@ -19,6 +20,7 @@ export default function HealthInfo() {
 
   return (
     <div className="space-y-4">
+      <BackLink />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">健康信息</p>
       <div>
         <h1 className="text-2xl font-bold">七项健康档案</h1>

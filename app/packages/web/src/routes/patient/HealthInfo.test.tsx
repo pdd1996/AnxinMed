@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import HealthInfo from './HealthInfo'
 
@@ -31,9 +32,12 @@ const ITEMS = [
 function renderHealthInfo() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
-    <QueryClientProvider client={qc}>
-      <HealthInfo />
-    </QueryClientProvider>,
+    // MemoryRouter：页头有返回入口（BackLink → /profile），Link 需要路由上下文。
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <HealthInfo />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -46,6 +50,11 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('健康信息页 · 字段常驻', () => {
+  it('页头有返回「我的」入口（二级页不在底部 tab 的 active 前缀内）', async () => {
+    renderHealthInfo()
+    expect(screen.getByRole('link', { name: /返回/ }).getAttribute('href')).toBe('/profile')
+  })
+
   it('七字段全部展示：已填显示值，缺失字段显示「待补充」，并给出补充进度', async () => {
     renderHealthInfo()
     for (const field of ['性别', '年龄', '出生年月', '过敏史', '特殊状态', '紧急联系人', '诊断']) {

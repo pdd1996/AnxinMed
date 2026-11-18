@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { toUserMessage, updateDisplayName, useAuthStore } from '@anxin/core'
 import { DISPLAY_NAME_MAX_LENGTH, UpdateMeRequestSchema } from '@anxin/shared'
+import { BackLink } from '@/components/layout/BackLink'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -49,9 +50,10 @@ export default function Account() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">个人资料</p>
+      <BackLink />
       <div>
-        <h1 className="text-2xl font-bold">姓名</h1>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">个人资料</p>
+        <h1 className="mt-2 text-2xl font-bold">姓名</h1>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           「我的」页和医生端都显示这个名字，随时可以改。
         </p>
