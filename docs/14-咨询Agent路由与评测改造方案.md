@@ -482,5 +482,5 @@ POST /api/consult
 2. clarify 只做对象缺失，且仅在药箱非空时触发；空药箱回退 no-source（A3）。
 3. `ENABLE_SCOPE_GATE` / `ENABLE_OBJECT_CLARIFY` 两个 kill switch（默认开），各自集成用例覆盖回滚。
 4. 旧客户端兼容策略：响应仍带固定 sections，未知 status 走通用回答卡；新客户端按 status 渲染药名选项（A1 的「客户端容错」以最低改动实现，不做版本协商）。
-5. E2E 未在本轮执行（需浏览器环境），需另跑 `pnpm test:e2e`；本轮以集成测试 + 组件测试覆盖。
+5. E2E：2026-11-18 全量 Playwright **21 条**（新增 consult-clarify golden）；其中 3 条失败为 `consult-llm.spec.ts` 里 G8 移除状态徽章后未同步的过期断言（与 P1 无关），修复后 **21/21 全绿**。
 

@@ -106,7 +106,7 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 
 **验证**：`pnpm --filter @anxin/api test` 67 文件 / 844 用例全绿；`eval:intent` 134/134；web 18 文件 / 119 用例、mobile 6 套件 / 38 用例全绿；api/web/mobile/core/shared `typecheck` 通过。
 
-**未覆盖**：Playwright E2E（clarify golden）本轮未跑，需在有浏览器环境执行 `pnpm test:e2e`；旧 APK 的未知 status 兼容以「响应仍带固定 sections + 通用卡」兜底，未做版本协商。
+**E2E**：2026-11-18 执行全量 Playwright（**21 条**，含新增 `consult-clarify` golden）：修复 3 条 G8 遗留徽章断言（`consult-llm.spec.ts` 仍断言已移除的「已回答」/「已过滤剂量」徽章）后 **21/21 全绿**；新增用例覆盖「无绑定药 → clarify 卡 → 点选药名 → 带 drugId 重问 + 0 次 LLM + consult_logs.status=clarify」。
 
 **偏差**
 

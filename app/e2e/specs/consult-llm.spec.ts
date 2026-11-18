@@ -91,10 +91,9 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
     // 深链对象药 + 快捷问题（S1 说明书类 chip）
     await page.getByRole('button', { name: '这个药通常用于什么？' }).click()
 
-    // UI：回答卡渲染 fixture 录制的 summary + 「已回答」徽章
+    // UI：回答卡渲染 fixture 录制的 summary（状态徽章已按 G8 口径移除，不再断言「已回答」）
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('已回答')).toBeVisible()
     await expect(card.getByText('当前本地资料库未收录该药品的适应症信息，无法直接回答其通常用途。')).toBeVisible()
 
     // 结构（评估安全网）：consult LLM 恰被调用 1 次
@@ -120,10 +119,9 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
 
     await page.getByRole('button', { name: '常见不良反应有哪些？' }).click()
 
-    // UI：L2 徽章「已过滤剂量」+ notice 固定提示 + 剂量句被切除后的 nextAction 兜底文案
+    // UI：notice 固定提示 + 剂量句被切除后的 nextAction 兜底文案（状态徽章已按 G8 口径移除，不再断言「已过滤剂量」）
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('已过滤剂量')).toBeVisible()
     await expect(card.getByText('已过滤具体剂量建议。用量请按医生处方或说明书执行。')).toBeVisible()
 
     // 结构：consult LLM 恰被调用 1 次（过滤发生在输出侧，不减少也不增加模型调用）
@@ -154,10 +152,9 @@ test.describe('咨询 LLM 路径 E2E（fixture 回放 · specs/04-T2）', () => 
     await page.goto(`/consult?drugId=${DRUG_ALLERGY}`)
     await page.getByRole('button', { name: '这个药通常用于什么？' }).click()
 
-    // UI：fixture 回答正常渲染 + risks 追加过敏警示条目（确定性固定文案，非 LLM 生成）
+    // UI：fixture 回答正常渲染 + risks 追加过敏警示条目（状态徽章已按 G8 口径移除；警示为确定性固定文案，非 LLM 生成）
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('已回答')).toBeVisible()
     await expect(card.getByText('该药主要用于治疗由敏感细菌引起的各类感染。')).toBeVisible()
     await expect(card.getByText(/过敏警示：你的档案过敏信息（磺胺）与该药禁忌相关/)).toBeVisible()
 
