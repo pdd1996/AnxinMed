@@ -17,6 +17,7 @@ export const ERR_CODES = {
   AUTH_INVALID: 'AUTH_INVALID',             // 登录凭据错误 / token 失效 → 401（统一措辞，不泄漏账号是否存在）
   AUTH_LOCKED: 'AUTH_LOCKED',               // 登录失败次数过多 → 429（G7 限流）
   AUTH_CODE_INVALID: 'AUTH_CODE_INVALID',   // 短信验证码错误/过期 → 401（P1 手机号登录）
+  AUTH_PASSWORD_INVALID: 'AUTH_PASSWORD_INVALID', // 设密/改密时当前密码不正确 → 400（不能与登录 401 混用，避免前端误清登录态）
   SMS_NOT_CONFIGURED: 'SMS_NOT_CONFIGURED', // 部署未配置短信认证（缺 DYPNS_*）→ 503，失败可见
   SMS_SEND_FAILED: 'SMS_SEND_FAILED',       // 短信服务商发送失败/不可用 → 503
   SMS_LIMITED: 'SMS_LIMITED',               // 发码频控（同号冷却/同 IP 小时配额）→ 429

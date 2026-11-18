@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   loginWithPhone: vi.fn(),
   logoutSession: vi.fn(),
   requestPhoneLoginCode: vi.fn(),
+  setAccountPassword: vi.fn(),
   setAuthToken: vi.fn(),
 }))
 
@@ -19,6 +20,7 @@ vi.mock('../api/auth', () => ({
   loginWithPhone: mocks.loginWithPhone,
   logoutSession: mocks.logoutSession,
   requestPhoneLoginCode: mocks.requestPhoneLoginCode,
+  setAccountPassword: mocks.setAccountPassword,
 }))
 
 vi.mock('../api/client', () => {
@@ -36,7 +38,15 @@ vi.mock('../api/client', () => {
 })
 
 import { ApiRequestError } from '../api/client'
-import { bootstrapAuth, requestPhoneCode, setAuthTokenStorage, signIn, signInWithPhone, signOut } from './auth'
+import {
+  bootstrapAuth,
+  requestPhoneCode,
+  setAuthTokenStorage,
+  signIn,
+  signInWithPhone,
+  signOut,
+  updatePassword,
+} from './auth'
 import { useAuthStore } from '../stores/auth'
 
 const DEMO_USER = { id: 'p-001', name: '张某某', username: null }
@@ -187,5 +197,42 @@ describe('手机号验证码登录（P1）', () => {
     await expect(signInWithPhone('13800138000', '000000')).rejects.toThrow('验证码错误或已过期')
     expect(storage.save).not.toHaveBeenCalled()
     expect(useAuthStore.getState().status).toBe('idle')
+  })
+})
+
+describe('设置 / 修改密码（P1 增补）', () => {
+  it('无密码账号设置成功 → 用返回 user 覆盖登录态（hasPassword 变 true）', async () => {
+    mocks.setAccountPassword.mockResolvedValue({
+      ok: true,
+      mode: 'password',
+      user: { ...REAL_USER, hasPassword: true },
+    })
+
+    await updatePassword(undefined, 'newpass123')
+
+    expect(mocks.setAccountPassword).toHaveBeenCalledWith({ password: 'newpass123' })
+    expect(useAuthStore.getState().user?.hasPassword).toBe(true)
+    expect(useAuthStore.getState().status).toBe('authenticated')
+  })
+
+  it('已有密码改密 → 带 oldPassword；当前密码错误原样抛给页面（不清登录态）', async () => {
+    mocks.setAccountPassword.mockResolvedValue({
+      ok: true,
+      mode: 'password',
+      user: { ...REAL_USER, hasPassword: true },
+    })
+    await updatePassword('old-pass', 'newpass123')
+    expect(mocks.setAccountPassword).toHaveBeenCalledWith({
+      oldPassword: 'old-pass',
+      password: 'newpass123',
+    })
+
+    useAuthStore.setState({ status: 'authenticated', mode: 'password', user: REAL_USER, error: null })
+    mocks.setAccountPassword.mockRejectedValue(
+      new ApiRequestError('当前密码不正确', 'AUTH_PASSWORD_INVALID', 400),
+    )
+    await expect(updatePassword('wrong-pass', 'newpass456')).rejects.toThrow('当前密码不正确')
+    // 400 不是 401：登录态保持不变（页面内联提示即可）
+    expect(useAuthStore.getState().status).toBe('authenticated')
   })
 })

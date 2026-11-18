@@ -13,7 +13,7 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { eq, lt } from 'drizzle-orm'
-import { ERR_CODES, LOGIN_FAILED_MESSAGE, LOGIN_LOCKED_MESSAGE, type AuthUser } from '@anxin/shared'
+import { ERR_CODES, LOGIN_FAILED_MESSAGE, LOGIN_LOCKED_MESSAGE, PASSWORD_INVALID_MESSAGE, PASSWORD_NOT_SUPPORTED_MESSAGE, PASSWORD_USERNAME_CONFLICT_MESSAGE, type AuthUser } from '@anxin/shared'
 import { db } from '../db/client.js'
 import { sessions, users } from '../db/schema.js'
 import { hashPassword, verifyPassword } from '../lib/auth/password.js'
@@ -67,9 +67,14 @@ function clearFailures(key: string): void {
   attempts.delete(key)
 }
 
-/** 对外安全用户对象（绝不带 password_hash / email / phone）。 */
+/** 对外安全用户对象（绝不带 password_hash / email / phone；hasPassword 只暴露布尔）。 */
 export function publicUser(user: User): AuthUser {
-  return { id: user.id, name: user.name, username: user.username }
+  return {
+    id: user.id,
+    name: user.name,
+    username: user.username,
+    hasPassword: Boolean(user.passwordHash),
+  }
 }
 
 /** 从 Authorization 头取 Bearer token（大小写不敏感）。 */
@@ -244,4 +249,54 @@ export async function resetPassword(username: string, password: string): Promise
     .where(eq(users.username, username))
     .returning()
   return updated ?? null
+}
+
+/**
+ * 设置 / 修改密码（P1 增补）——登录态下调用，调用方已解析出当前用户。
+ *
+ * 分支：
+ * - 已有密码：必须校验 oldPassword（防会话被劫持后直接改密）；不匹配 → 400 AUTH_PASSWORD_INVALID
+ *   （**刻意不用 401**：前端把 401 当登录失效会清登录态，当前密码错不该被当成掉线）。
+ * - 无密码（手机号验证码注册的账号）：登录态本身已证明手机号归属，直接设置；账号名自动取手机号，
+ *   之后「账号=手机号 + 密码」也可登录（users.username 唯一冲突 → 409 可见报错）。
+ * - 无手机号且无账号名（如 seed 演示用户）：不支持自助设密，400 明确提示走管理员。
+ *
+ * 已知边界：改密不撤销既有 session（与 G7 同口径，见 specs/17 §8）。
+ */
+export async function setUserPassword(
+  user: User,
+  input: { oldPassword?: string; password: string },
+): Promise<User> {
+  if (user.passwordHash) {
+    if (!input.oldPassword) {
+      throw new ApiError(400, ERR_CODES.AUTH_PASSWORD_INVALID, PASSWORD_INVALID_MESSAGE)
+    }
+    const matched = await verifyPassword(input.oldPassword, user.passwordHash)
+    if (!matched) {
+      throw new ApiError(400, ERR_CODES.AUTH_PASSWORD_INVALID, PASSWORD_INVALID_MESSAGE)
+    }
+  } else if (!user.phone && !user.username) {
+    throw new ApiError(400, ERR_CODES.VALIDATION, PASSWORD_NOT_SUPPORTED_MESSAGE)
+  }
+
+  const passwordHash = await hashPassword(input.password)
+  const now = new Date()
+  // 手机号账号从「无账号名」升级：账号名取手机号（密码登录入口的「账号」即手机号）。
+  const username = user.username ?? user.phone ?? null
+
+  try {
+    const [updated] = await db
+      .update(users)
+      .set({ username, passwordHash, passwordUpdatedAt: now, updatedAt: now })
+      .where(eq(users.id, user.id))
+      .returning()
+    if (!updated) throw new ApiError(500, 'INTERNAL', '账号不存在，密码未更新')
+    return updated
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? (err as { cause?: { code?: string } }).cause?.code
+    if (code === '23505') {
+      throw new ApiError(409, ERR_CODES.CONFLICT, PASSWORD_USERNAME_CONFLICT_MESSAGE)
+    }
+    throw err
+  }
 }

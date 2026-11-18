@@ -16,6 +16,7 @@ import {
   loginWithPhone,
   logoutSession,
   requestPhoneLoginCode,
+  setAccountPassword,
   updateMeName,
 } from '../api/auth'
 import { useAuthStore } from '../stores/auth'
@@ -147,6 +148,19 @@ export async function signOut(): Promise<void> {
  */
 export async function updateDisplayName(name: string): Promise<void> {
   const data = await updateMeName(name)
+  authStore().setAuthenticated(data.mode, data.user)
+}
+
+/**
+ * 设置 / 修改密码（P1 增补）：成功后用返回的 user 覆盖登录态（hasPassword 变 true，
+ * 个人资料页的「设置密码 / 修改密码」文案随之切换）。
+ *
+ * @param oldPassword 已有密码的账号必填；无密码账号（手机号注册）传 undefined。
+ * 失败原样抛给页面（当前密码不正确 400 AUTH_PASSWORD_INVALID / 密码长度 400 VALIDATION /
+ * 冲突 409），文案已是服务端中文；页面内联展示，不静默当成功。
+ */
+export async function updatePassword(oldPassword: string | undefined, password: string): Promise<void> {
+  const data = await setAccountPassword(oldPassword ? { oldPassword, password } : { password })
   authStore().setAuthenticated(data.mode, data.user)
 }
 /**

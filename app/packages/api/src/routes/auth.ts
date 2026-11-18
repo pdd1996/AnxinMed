@@ -17,11 +17,13 @@ import {
   AUTH_REQUIRED_MESSAGE,
   ERR_CODES,
   LoginRequestSchema,
+  PasswordSetRequestSchema,
   PhoneLoginRequestSchema,
   SendPhoneCodeRequestSchema,
   UpdateMeRequestSchema,
   type AuthMode,
   type AuthUser,
+  type PasswordSetResponse,
   type PhoneLoginResponse,
   type SendPhoneCodeResponse,
 } from '@anxin/shared'
@@ -36,6 +38,7 @@ import {
   publicUser,
   readBearer,
   resolveSessionUser,
+  setUserPassword,
   updateUserName,
 } from '../services/auth.service.js'
 import { loginWithPhoneCode, sendLoginCode } from '../services/phone-auth.service.js'
@@ -101,6 +104,21 @@ export const authRoute = new Hono<AppEnv>()
     const { phone, code } = c.req.valid('json')
     const { token, user, created } = await loginWithPhoneCode(phone, code)
     const payload: PhoneLoginResponse = { mode, token, user: publicUser(user), created }
+    return okJson(c, payload)
+  })
+  // P1 增补：设置 / 修改密码（登录态下调用；手机号账号补密码后可用「手机号 + 密码」登录）。
+  // 当前密码不正确返回 400 AUTH_PASSWORD_INVALID（不用 401，避免前端误清登录态）。
+  .post('/password', vJson(PasswordSetRequestSchema), async (c) => {
+    const mode = readAuthMode()
+    if (mode === 'demo') {
+      throw new ApiError(400, ERR_CODES.VALIDATION, '演示模式无需设置密码')
+    }
+    const token = readBearer(c.req.header('authorization'))
+    if (!token) throw new ApiError(401, ERR_CODES.AUTH_REQUIRED, AUTH_REQUIRED_MESSAGE)
+    const user = await resolveSessionUser(token)
+    if (!user) throw new ApiError(401, ERR_CODES.AUTH_INVALID, AUTH_INVALID_MESSAGE)
+    const updated = await setUserPassword(user, c.req.valid('json'))
+    const payload: PasswordSetResponse = { mode, user: publicUser(updated) }
     return okJson(c, payload)
   })
   .post('/logout', async (c) => {

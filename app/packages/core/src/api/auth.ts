@@ -39,6 +39,18 @@ export async function loginWithPhone(phone: string, code: string) {
   return data
 }
 
+/**
+ * 设置 / 修改密码（P1）：
+ * - 手机号验证码注册的账号（无密码）：只传 password，服务端把账号名设为手机号；
+ * - 已有密码账号：必须同时传 oldPassword。
+ * 成功返回与 GET /me 同形（user.hasPassword=true），调用方整块替换登录态。
+ * silent：个人资料页自己在表单里渲染失败文案（当前密码不正确 / 两次输入不一致等）。
+ */
+export async function setAccountPassword(input: { oldPassword?: string; password: string }) {
+  const res = await client.api.auth.password.$post({ json: input })
+  return unwrap(res, { silent: true })
+}
+
 /** 当前登录态（demo 模式返回 mode='demo' + p-001，不出现登录页）。 */
 export async function fetchAuthMe() {
   const res = await client.api.auth.me.$get()

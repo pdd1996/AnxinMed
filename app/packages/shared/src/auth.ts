@@ -27,6 +27,12 @@ export const AuthUserSchema = z.object({
   id: z.string(),
   name: z.string().nullable(),
   username: z.string().nullable(),
+  /**
+   * 该账号是否已设置密码（P1 增补）。
+   * 手机号验证码注册的账号初始无密码；「我的 → 个人资料」据此显示「设置密码 / 修改密码」。
+   * 可选：兼容既有测试夹具/旧响应（缺省按「未设置」处理）。
+   */
+  hasPassword: z.boolean().optional(),
 })
 export type AuthUser = z.infer<typeof AuthUserSchema>
 
@@ -134,3 +140,43 @@ export const SMS_SEND_FAILED_MESSAGE = '短信发送失败，请稍后重试'
 export const SMS_NOT_CONFIGURED_MESSAGE = '短信服务未配置，暂不能用手机号登录'
 /** 发码频控文案（同号冷却 / 同 IP 小时配额）。 */
 export const SMS_TOO_FREQUENT_MESSAGE = '验证码发送太频繁，请稍后再试'
+
+// ---------------------------------------------------------------------------
+// P1 增补 · 登录后设置 / 修改密码（手机号账号补密码，老账号改密码）
+//
+// 语义：手机号验证码注册的账号默认无密码；登录态下可补设密码（账号名自动取手机号），
+// 之后「手机号 + 密码」也可以登录。已有密码的账号改密必须校验当前密码。
+// 注意：改密不使既有 session 失效（G7 已知边界，与 specs/17 §8 一致）。
+// ---------------------------------------------------------------------------
+
+/** 密码长度区间（与服务端 hashPassword 输入上限一致；scrypt 无 72 字节限制，这里按输入体验取 72）。 */
+export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MAX_LENGTH = 72
+export const PASSWORD_MIN_LENGTH_MESSAGE = `密码至少 ${PASSWORD_MIN_LENGTH} 位`
+export const PASSWORD_MAX_LENGTH_MESSAGE = `密码最多 ${PASSWORD_MAX_LENGTH} 位`
+
+/**
+ * 设置/修改密码入参：
+ * - 无密码账号（手机号注册）：只传 password（登录态已证明手机号归属，无需旧密码）；
+ * - 已有密码账号：必须传 oldPassword，服务端 scrypt 校验。
+ * 是否必填 oldPassword 由服务端按账号状态裁决（契约只做格式约束）。
+ */
+export const PasswordSetRequestSchema = z.object({
+  oldPassword: z.string().min(1, '请输入当前密码').max(128).optional(),
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, PASSWORD_MIN_LENGTH_MESSAGE)
+    .max(PASSWORD_MAX_LENGTH, PASSWORD_MAX_LENGTH_MESSAGE),
+})
+export type PasswordSetRequest = z.infer<typeof PasswordSetRequestSchema>
+
+/** 设置/修改密码成功：与 GET /me 同形（前端可整块替换登录态，hasPassword 随之更新）。 */
+export const PasswordSetResponseSchema = AuthMeSchema
+export type PasswordSetResponse = z.infer<typeof PasswordSetResponseSchema>
+
+/** 当前密码不正确文案（400 AUTH_PASSWORD_INVALID，故意不用 401：401 会触发前端统一清登录态）。 */
+export const PASSWORD_INVALID_MESSAGE = '当前密码不正确'
+/** 无手机号也无账号名的账号（如 seed 演示用户）不支持自助设密，只能管理员 CLI 处理。 */
+export const PASSWORD_NOT_SUPPORTED_MESSAGE = '该账号暂不支持设置密码，请联系管理员'
+/** 手机号账号补密码时用户名冲突（极端情况：管理员建过同号账号名）。 */
+export const PASSWORD_USERNAME_CONFLICT_MESSAGE = '该手机号对应的账号名已被占用，请联系管理员'

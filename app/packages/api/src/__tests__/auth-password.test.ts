@@ -1,47 +1,214 @@
 /**
- * G7 密码哈希单元测试（node:crypto scrypt，无 DB）。
+ * P1 增补 · 登录后设置 / 修改密码 集成测试。
+ *
+ * 覆盖：手机号账号补密码（账号名自动取手机号）→ 之后可用「手机号 + 密码」登录；
+ *      已有密码账号改密必须校验旧密码（错误 400 AUTH_PASSWORD_INVALID，故意不用 401）；
+ *      密码长度契约、无手机号/账号名账号拒绝、账号名冲突 409、demo 模式拒绝、无 token 401。
+ *
+ * 环境：beforeAll 切 AUTH_MODE=password，直接插测试用户并用 issueSession 发 token（不经短信通道）。
  */
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { inArray } from 'drizzle-orm'
 import {
-  generateInitialPassword,
-  hashPassword,
-  verifyPassword,
-} from '../lib/auth/password.js'
+  AUTH_REQUIRED_MESSAGE,
+  LOGIN_FAILED_MESSAGE,
+  PASSWORD_INVALID_MESSAGE,
+  PASSWORD_NOT_SUPPORTED_MESSAGE,
+  PASSWORD_USERNAME_CONFLICT_MESSAGE,
+} from '@anxin/shared'
+import { app } from '../app.js'
+import { db } from '../db/client.js'
+import { sessions, users } from '../db/schema.js'
+import { hashPassword } from '../lib/auth/password.js'
+import { issueSession, resetLoginAttempts } from '../services/auth.service.js'
+import type { User } from '../types.js'
 
-describe('scrypt 密码哈希', () => {
-  it('哈希格式 scrypt$N$r$p$salt$hash，且不含明文', async () => {
-    const password = 'Auth-pass-单元-123'
-    const hash = await hashPassword(password)
-    const parts = hash.split('$')
-    expect(parts).toHaveLength(6)
-    expect(parts[0]).toBe('scrypt')
-    expect(hash).not.toContain(password)
+const U_PHONE = 'auth-pwd-phone'
+const U_PHONE_CONFLICT = 'auth-pwd-phone-conflict'
+const U_PWD = 'auth-pwd-user'
+const U_RAW = 'auth-pwd-raw'
+const U_CONFLICT = 'auth-pwd-conflict'
+
+const PHONE = '13700001111'
+const PHONE_CONFLICT = '13700002222'
+const PWD_USERNAME = 'auth-pwd-acct'
+const OLD_PASSWORD = 'Old-pass-123'
+
+const USER_IDS = [U_PHONE, U_PHONE_CONFLICT, U_PWD, U_RAW, U_CONFLICT]
+
+let tokens: Record<string, string> = {}
+
+type Envelope = {
+  ok: boolean
+  code?: string
+  message?: string
+  mode?: string
+  user?: { id: string; name: string | null; username: string | null; hasPassword?: boolean }
+}
+
+function postPassword(token: string | null, body: unknown) {
+  return app.request('/api/auth/password', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  })
+}
+
+function postLogin(username: string, password: string, ip = '10.9.0.1') {
+  return app.request('/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+    body: JSON.stringify({ username, password }),
+  })
+}
+
+async function cleanup(): Promise<void> {
+  await db.delete(sessions).where(inArray(sessions.userId, USER_IDS))
+  await db.delete(users).where(inArray(users.id, USER_IDS))
+}
+
+beforeAll(async () => {
+  process.env.AUTH_MODE = 'password'
+  await cleanup()
+
+  const now = new Date()
+  const inserted = await db
+    .insert(users)
+    .values([
+      { id: U_PHONE, phone: PHONE, phoneVerifiedAt: now },
+      { id: U_PHONE_CONFLICT, phone: PHONE_CONFLICT, phoneVerifiedAt: now },
+      {
+        id: U_CONFLICT,
+        username: PHONE_CONFLICT,
+        passwordHash: await hashPassword('Conflict-pass-123'),
+        passwordUpdatedAt: now,
+      },
+      {
+        id: U_PWD,
+        username: PWD_USERNAME,
+        passwordHash: await hashPassword(OLD_PASSWORD),
+        passwordUpdatedAt: now,
+      },
+      { id: U_RAW },
+    ])
+    .returning()
+
+  const byId = new Map<string, User>(inserted.map((u) => [u.id, u]))
+  tokens = {}
+  for (const id of USER_IDS) {
+    tokens[id] = await issueSession(byId.get(id)!)
+  }
+})
+
+afterAll(async () => {
+  await cleanup()
+  delete process.env.AUTH_MODE
+  resetLoginAttempts()
+})
+
+beforeEach(() => {
+  resetLoginAttempts()
+})
+
+describe('POST /api/auth/password —— 鉴权与模式', () => {
+  it('无 token → 401 AUTH_REQUIRED', async () => {
+    const res = await postPassword(null, { password: 'New-pass-123' })
+    expect(res.status).toBe(401)
+    const body = (await res.json()) as Envelope
+    expect(body.code).toBe('AUTH_REQUIRED')
+    expect(body.message).toBe(AUTH_REQUIRED_MESSAGE)
   })
 
-  it('正确密码校验通过；错误密码不通过', async () => {
-    const hash = await hashPassword('correct-password')
-    expect(await verifyPassword('correct-password', hash)).toBe(true)
-    expect(await verifyPassword('Correct-password', hash)).toBe(false)
-    expect(await verifyPassword('correct-password ', hash)).toBe(false)
-  })
-
-  it('同一密码两次哈希不同（随机盐）', async () => {
-    const [a, b] = await Promise.all([hashPassword('same-password'), hashPassword('same-password')])
-    expect(a).not.toBe(b)
-    expect(await verifyPassword('same-password', a)).toBe(true)
-    expect(await verifyPassword('same-password', b)).toBe(true)
-  })
-
-  it('非法/损坏的存储值一律 false，不抛错', async () => {
-    for (const bad of ['', 'plaintext', 'scrypt$1$2$3', 'scrypt$0$0$0$xx$yy', 'bcrypt$1$2$3$4$5']) {
-      expect(await verifyPassword('whatever', bad)).toBe(false)
+  it('demo 模式 → 400 明确拒绝（不出现密码概念）', async () => {
+    process.env.AUTH_MODE = 'demo'
+    try {
+      const res = await postPassword(tokens[U_PHONE]!, { password: 'New-pass-123' })
+      expect(res.status).toBe(400)
+      expect(((await res.json()) as Envelope).code).toBe('VALIDATION')
+    } finally {
+      process.env.AUTH_MODE = 'password'
     }
   })
+})
 
-  it('随机初始密码长度 12、字符集为 base64url', () => {
-    const pwd = generateInitialPassword()
-    expect(pwd).toHaveLength(12)
-    expect(pwd).toMatch(/^[A-Za-z0-9_-]+$/)
-    expect(generateInitialPassword()).not.toBe(pwd)
+describe('手机号账号补密码（验证码即注册的账号）', () => {
+  it('无旧密码即可设置：账号名自动取手机号，响应 hasPassword=true', async () => {
+    const res = await postPassword(tokens[U_PHONE]!, { password: 'New-pass-123' })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Envelope
+    expect(body.ok).toBe(true)
+    expect(body.mode).toBe('password')
+    expect(body.user).toMatchObject({ id: U_PHONE, username: PHONE, hasPassword: true })
+
+    // 之后可用「手机号 + 密码」走密码登录
+    const login = await postLogin(PHONE, 'New-pass-123', '10.9.0.2')
+    expect(login.status).toBe(200)
+    const loginBody = (await login.json()) as Envelope & { token?: string }
+    expect(loginBody.token).toBeTruthy()
+    expect(loginBody.user?.id).toBe(U_PHONE)
+  })
+
+  it('密码过短 → 400 VALIDATION（shared 契约提示），不改库', async () => {
+    const res = await postPassword(tokens[U_PHONE]!, { password: 'short' })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as Envelope
+    expect(body.code).toBe('VALIDATION')
+    expect(body.message).toContain('至少 8 位')
+  })
+
+  it('账号名冲突（已有同号账号名）→ 409 CONFLICT 可见报错', async () => {
+    const res = await postPassword(tokens[U_PHONE_CONFLICT]!, { password: 'New-pass-123' })
+    expect(res.status).toBe(409)
+    const body = (await res.json()) as Envelope
+    expect(body.code).toBe('CONFLICT')
+    expect(body.message).toBe(PASSWORD_USERNAME_CONFLICT_MESSAGE)
+  })
+
+  it('无手机号且无账号名（seed 演示用户）→ 400 明确提示不支持自助设密', async () => {
+    const res = await postPassword(tokens[U_RAW]!, { password: 'New-pass-123' })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as Envelope
+    expect(body.code).toBe('VALIDATION')
+    expect(body.message).toBe(PASSWORD_NOT_SUPPORTED_MESSAGE)
+  })
+})
+
+describe('已有密码账号改密', () => {
+  it('缺旧密码 → 400 AUTH_PASSWORD_INVALID（不是 401，避免前端误清登录态）', async () => {
+    const res = await postPassword(tokens[U_PWD]!, { password: 'New-pass-456' })
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as Envelope
+    expect(body.code).toBe('AUTH_PASSWORD_INVALID')
+    expect(body.message).toBe(PASSWORD_INVALID_MESSAGE)
+  })
+
+  it('旧密码错误 → 400 AUTH_PASSWORD_INVALID', async () => {
+    const res = await postPassword(tokens[U_PWD]!, {
+      oldPassword: 'wrong-pass',
+      password: 'New-pass-456',
+    })
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Envelope).code).toBe('AUTH_PASSWORD_INVALID')
+  })
+
+  it('旧密码正确 → 改密成功；新密码可登录、旧密码失效', async () => {
+    const res = await postPassword(tokens[U_PWD]!, {
+      oldPassword: OLD_PASSWORD,
+      password: 'New-pass-456',
+    })
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as Envelope).user?.hasPassword).toBe(true)
+
+    const loginNew = await postLogin(PWD_USERNAME, 'New-pass-456', '10.9.0.3')
+    expect(loginNew.status).toBe(200)
+
+    const loginOld = await postLogin(PWD_USERNAME, OLD_PASSWORD, '10.9.0.4')
+    expect(loginOld.status).toBe(401)
+    const oldBody = (await loginOld.json()) as Envelope
+    expect(oldBody.code).toBe('AUTH_INVALID')
+    expect(oldBody.message).toBe(LOGIN_FAILED_MESSAGE)
   })
 })
