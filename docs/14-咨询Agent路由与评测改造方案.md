@@ -481,6 +481,6 @@ POST /api/consult
 1. 范围层保守白名单（诊断/看报告 + 明显非用药），不确定默认放行；诊断请求归 out-of-scope、不进 risk_events（A2）。
 2. clarify 只做对象缺失，且仅在药箱非空时触发；空药箱回退 no-source（A3）。
 3. `ENABLE_SCOPE_GATE` / `ENABLE_OBJECT_CLARIFY` 两个 kill switch（默认开），各自集成用例覆盖回滚。
-4. 旧客户端兼容（A1）：请求新增可选 `consultStatusVersion`——旧 APK 不带 → 服务端把 `clarify`/`out-of-scope` 降级映射为 `no-source`（固定 sections 可正常渲染；G8 版 `STATUS_META[status]` 查表遇未知 status 会渲染崩溃，故必须服务端降级）；新 Web/Mobile 经 core 自动带 `2` 原样收到新状态。`consult_logs`/trace 仍记真实状态，指标不变。兼容层合入后 E2E 全量复跑 21/21 绿。
+4. 旧客户端兼容（A1）：请求新增可选 `consultStatusVersion`——旧 APK 不带 → 服务端把 `clarify`/`out-of-scope` 降级映射为 `no-source`（固定 sections 可正常渲染；G8 版 `STATUS_META[status]` 查表遇未知 status 会渲染崩溃，故必须服务端降级）；新 Web/Mobile 经 core 自动带 `2` 原样收到新状态。`consult_logs`/trace 仍记真实状态，指标不变。兼容层合入后 E2E 全量复跑 21/21 绿。**2026-11-18 staging 部署 + 三种验收通过**：API 新旧状态映射、H5 clarify/out-of-scope、模拟器 G8 旧包两问无白屏（见 specs/18 §6.4）。
 5. E2E：2026-11-18 全量 Playwright **21 条**（新增 consult-clarify golden）；其中 3 条失败为 `consult-llm.spec.ts` 里 G8 移除状态徽章后未同步的过期断言（与 P1 无关），修复后 **21/21 全绿**。
 

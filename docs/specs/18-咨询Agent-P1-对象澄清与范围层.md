@@ -118,7 +118,7 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 3. `docs/06 PRD` 与 `docs/08` 附录 A 的增量已随本轮补齐（见各文档 M13 增量小节）。
 4. E2E 复核记录：`8c10a6e`。
 
-## 6. staging 部署交接（2026-11-18，待用户/运维执行）
+## 6. staging 部署与验收（2026-11-18，已完成）
 
 构建机到 staging 的 SSH 凭据仍不可用（`g7_deploy` / `id_rsa` 试 root/ubuntu/anxin 均 `Permission denied`，与 [specs/15](./15-G10-最小可观测性.md) §5.1 同因），部署动作需用户执行；源码包已按 `deploy/README.md` §3b 备好。
 
@@ -170,9 +170,31 @@ curl.exe -s http://118.196.82.13:8787/api/health
 > 第 2 步的 ALTER 写成 `IF NOT EXISTS`，可安全重跑；若 phone 有重复行，唯一索引会失败（整条 -c 回滚），先清理重复再重跑。
 > 回滚：`ssh root@118.196.82.13 'cd /opt/AnxinMed && rm -rf app && mv app.bak-<时间戳> app && cd app && docker compose build && docker compose up -d'`；数据库恢复用 `app/backups/` 里第 1 步生成的 dump（README §9.1）。
 
-### 6.4 部署后验收（我执行并回填）
+### 6.4 部署与验收结果（已完成，2026-11-18）
 
-1. H5 `http://118.196.82.13:8787/` 登录 p-001 →「这个药有什么副作用」应出现药名选项卡片（clarify）；
-2. 直连 API：不带 `consultStatusVersion` → `no-source`（legacy 降级）；带 `2` → `clarify` / `out-of-scope`（新状态）；
-3. 模拟器 G8 v1.0.0 旧包（已登录 staging）→ 同样两个问题：**不白屏**、显示通用卡固定文案；截图/UiAutomator 留证；
-4. 回填本节与 docs/11 观测项。
+**部署**：用户在 staging 执行 `enable-p1.sh` 打开两个开关并重启；`app-api` 镜像构建于 15:23，`anxin-api` 容器 18:51 重建；容器内 `ENABLE_SCOPE_GATE=true` / `ENABLE_OBJECT_CLARIFY=true`；staging 运行提交 `8c10a6e`（P1 全量 + 旧客户端兼容）。`.env` 原值已备份为 `.env.bak-20261118-185103` / `-185140`。
+
+> 说明：首轮验收脚本用 ASCII 写请求体，中文被替换成 `?`，导致误判「P1 未生效」；换 UTF-8 后全部通过（部署本身无问题）。
+
+**API（公网直连，UTF-8）**
+
+| 请求 | status | 结果 |
+|---|---|---|
+| 诊断问题（不带版本） | `no-source` | 旧客户端降级，固定文案「我不能做诊断…」 |
+| 诊断问题（带 `consultStatusVersion:2`） | `out-of-scope` | 范围层命中 |
+| 「这个药有什么副作用」（v2，无绑定药） | `clarify` + 5 个选项 | 对象澄清命中 |
+| 同一问题（不带版本） | `no-source` + 仍带 `clarifyOptions` | 兼容层降级 |
+| 诊断问题（有绑定药，v2） | `out-of-scope` | 范围层优先于绑定药 |
+
+**旧 APK 实机（模拟器 G8 v1.0.0，已登录 staging）**
+
+| 场景 | 结果 |
+|---|---|
+| 「这个药有什么副作用」（无绑定药） | 正常渲染固定文案 + 5 个药名，**无白屏**、无 JS 错误、Activity 存活 |
+| 「我是不是得了糖尿病」 | 正常渲染 out-of-scope 固定文案，同上 |
+
+证据截图：`app/backups/g8-compat-evidence/oldapk-*.png`（gitignore，不入库）。
+
+**H5（Playwright 打 staging）**：登录 p-001 → clarify 卡出现「你想问药箱里的哪种药？」+ 5 个药名按钮；诊断问题出现「我不能做诊断…」；截图 `h5-*.png` 同目录。
+
+**结论**：P1 在 staging 的真实链路、旧客户端兼容、H5 三路验收通过；剩余仅为试点期指标观察（docs/11 的 clarify 率 / out-of-scope 率）。
