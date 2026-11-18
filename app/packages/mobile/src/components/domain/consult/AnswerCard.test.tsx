@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import type { ConsultSections } from "@anxin/shared";
 import { AnswerCard } from "./AnswerCard";
 
@@ -96,5 +96,30 @@ describe("AnswerCard · 状态分支", () => {
     expect(view.queryByText("数据查询")).toBeNull();
     expect(view.queryByText("来源：药箱清单")).toBeNull();
     expect(view.getByText("你的药箱有 5 种药。")).toBeTruthy();
+  });
+
+  it("clarify 渲染药名选项，点选回传 drugId（M13-P1）", async () => {
+    const picked: string[] = [];
+    const view = await render(
+      <AnswerCard
+        riskLevel="L1"
+        status="clarify"
+        answer="你想问药箱里的哪种药？"
+        sections={{
+          summary: "你想问药箱里的哪种药？",
+          keyPoints: ["点选下面的药名，我会按该药的说明书回答。"],
+          risks: [],
+          nextAction: "点选一种药继续提问。",
+          warning: "我只基于本地说明书库解释已确认药品的资料。",
+        }}
+        citations={[]}
+        clarifyOptions={[{ drugId: "drug-1", drugName: "玻璃酸钠滴眼液（海露）" }]}
+        onPickDrug={(drugId) => picked.push(drugId)}
+      />,
+    );
+
+    expect(view.getByText("选择一种药继续：")).toBeTruthy();
+    fireEvent.press(view.getByText("玻璃酸钠滴眼液（海露）"));
+    expect(picked).toEqual(["drug-1"]);
   });
 });

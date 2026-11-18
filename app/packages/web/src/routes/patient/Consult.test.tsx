@@ -444,4 +444,44 @@ describe('Consult 页 · 会话层（M4-T5 sessionId 续问 + 历史回放）', 
       expect(mocks.postConsult).toHaveBeenLastCalledWith('新会话的问题', ['drug-1'])
     })
   })
+
+  it('对象澄清（M13-P1）：无对象药提问 → 药名点选 → 带所选 drugId 重发原问题', async () => {
+    const clarifyResponse: ConsultResponseDto = {
+      riskLevel: 'L1',
+      status: 'clarify',
+      answer: '你想问药箱里的哪种药？',
+      sections: {
+        summary: '你想问药箱里的哪种药？',
+        keyPoints: ['点选下面的药名，我会按该药的说明书回答。'],
+        risks: [],
+        nextAction: '点选一种药继续提问。',
+        warning: '我只基于本地说明书库解释已确认药品的资料。',
+      },
+      citations: [],
+      notice: null,
+      l0Notice: null,
+      blocked: false,
+      clarifyOptions: [{ drugId: 'drug-1', drugName: '玻璃酸钠滴眼液（海露）' }],
+      consultLogId: 'clog-clarify',
+      sessionId: 'csess-clarify',
+      suggestion: null,
+    }
+    mocks.postConsult
+      .mockResolvedValueOnce(clarifyResponse)
+      .mockResolvedValueOnce(answeredResponse('csess-clarify', '选药后的回答'))
+    renderConsult('/consult')
+
+    // 无对象药入口：placeholder 即无药文案（页面不渲染药名列表）
+    const textarea = await screen.findByPlaceholderText(/想问什么/)
+    fireEvent.change(textarea, { target: { value: '这个药有什么副作用' } })
+    fireEvent.click(screen.getByLabelText('发送'))
+    await waitFor(() => expect(screen.getByText('你想问药箱里的哪种药？')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: '玻璃酸钠滴眼液（海露）' }))
+    await waitFor(() => {
+      expect(mocks.postConsult).toHaveBeenLastCalledWith('这个药有什么副作用', ['drug-1'], {
+        sessionId: 'csess-clarify',
+      })
+    })
+  })
 })

@@ -120,8 +120,9 @@ export default function Consult() {
 
   const consultMutation = useMutation({
     // 无可选字段时保持两参调用（M3 形态）；sessionId 续问（M4-T5）/ skillId 快路径（M4-T7，chips 带入）
-    mutationFn: (input: { text: string; skillId?: ConsultSkillId }) => {
-      const drugIds = effectiveDrugId ? [effectiveDrugId] : []
+    mutationFn: (input: { text: string; skillId?: ConsultSkillId; drugIds?: string[] }) => {
+      // 默认对象药 = 深链 drugId；对象澄清点选后由 input.drugIds 显式覆盖（M13-P1）
+      const drugIds = input.drugIds ?? (effectiveDrugId ? [effectiveDrugId] : [])
       const opts = {
         ...(sessionId ? { sessionId } : {}),
         ...(input.skillId ? { skillId: input.skillId } : {}),
@@ -144,6 +145,13 @@ export default function Consult() {
     const text = (q ?? question).trim()
     if (!text || consultMutation.isPending) return
     consultMutation.mutate({ text, skillId })
+  }
+
+  /** 对象澄清点选（M13-P1）：带所选 drugId 重发原问题（同会话续问；clarify 不写库，只是入口）。 */
+  const handleClarifyPick = (text: string | undefined, drugId: string) => {
+    const q = (text ?? '').trim()
+    if (!q || consultMutation.isPending) return
+    consultMutation.mutate({ text: q, drugIds: [drugId] })
   }
 
   /** 回放历史会话：拉详情 → 映射消息 → 会话续接到当前窗口。 */
@@ -269,7 +277,7 @@ export default function Consult() {
                   </p>
                 )}
 
-              {messages.map((msg) =>
+              {messages.map((msg, idx) =>
                 msg.role === 'user' ? (
                   <div key={msg.id} className="flex justify-end">
                     <div className="max-w-[85%] rounded-2xl rounded-br-none bg-primary p-3 text-primary-foreground">
@@ -291,6 +299,8 @@ export default function Consult() {
                         l0Notice={msg.response.l0Notice}
                         blocked={msg.response.blocked}
                         toolUsed={msg.response.toolUsed}
+                        clarifyOptions={msg.response.clarifyOptions ?? null}
+                        onPickDrug={(drugId) => handleClarifyPick(messages[idx - 1]?.question, drugId)}
                       />
                     ) : null}
                   </div>

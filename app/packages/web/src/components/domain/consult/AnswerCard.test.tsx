@@ -5,8 +5,8 @@
  * 风险等级/状态/来源徽章、以及底部 citations 折叠区已按产品新口径移除，
  * 测试改为断言「这些元素不出现、正文仍完整」。
  */
-import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import type { ConsultSections } from '@anxin/shared'
 import { AnswerCard } from './AnswerCard'
 
@@ -150,5 +150,33 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     // status 仍为 answered（降级路径也返回 L1 正常回答）
     expect(screen.queryByText('已回答')).toBeNull()
     expect(screen.getByText(/百川服务不可用/)).toBeTruthy()
+  })
+})
+
+describe('AnswerCard · 对象澄清（M13-P1）', () => {
+  it('clarify → 渲染药名选项；点选回传 drugId（≥44px 触控目标由类名保证）', () => {
+    const onPickDrug = vi.fn()
+    render(
+      <AnswerCard
+        riskLevel="L1"
+        status="clarify"
+        answer="你想问药箱里的哪种药？"
+        sections={mkSections({
+          summary: '你想问药箱里的哪种药？',
+          keyPoints: ['点选下面的药名，我会按该药的说明书回答。'],
+          risks: [],
+          nextAction: '点选一种药继续提问。',
+          warning: '我只基于本地说明书库解释已确认药品的资料。',
+        })}
+        citations={[]}
+        clarifyOptions={[{ drugId: 'drug-1', drugName: '玻璃酸钠滴眼液（海露）' }]}
+        onPickDrug={onPickDrug}
+      />,
+    )
+    expect(screen.getByText('选择一种药继续：')).toBeTruthy()
+    const option = screen.getByRole('button', { name: '玻璃酸钠滴眼液（海露）' })
+    expect(option.className).toContain('min-h-11')
+    fireEvent.click(option)
+    expect(onPickDrug).toHaveBeenCalledWith('drug-1')
   })
 })

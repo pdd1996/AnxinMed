@@ -1,7 +1,13 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { AlertTriangle, ChevronRight, Info, ShieldCheck } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
-import type { Citation, ConsultSections, ConsultStatus, RiskLevel } from "@anxin/shared";
+import type {
+  Citation,
+  ConsultClarifyOption,
+  ConsultSections,
+  ConsultStatus,
+  RiskLevel,
+} from "@anxin/shared";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
@@ -26,6 +32,9 @@ export interface AnswerCardProps {
   l0Notice?: string | null;
   blocked?: boolean;
   toolUsed?: string | null;
+  /** 对象澄清选项（仅 status='clarify'，M13-P1）：点选后由页面带 drugId 重发原问题。 */
+  clarifyOptions?: ConsultClarifyOption[] | null;
+  onPickDrug?: (drugId: string) => void;
 }
 
 /** 组装中文播报文本（照 web `buildSpeakText`，web 冻结不抽公共，05f §0-6）。 */
@@ -58,6 +67,8 @@ export function AnswerCard({
   notice,
   l0Notice,
   blocked,
+  clarifyOptions,
+  onPickDrug,
 }: AnswerCardProps) {
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const riskL2 = useUnstableNativeVariable("--risk-l2");
@@ -145,6 +156,24 @@ export function AnswerCard({
         <View className="mt-3 flex-row items-start gap-1.5 rounded-xl border border-muted-foreground bg-muted p-2.5">
           <Icon as={ShieldCheck} size={16} color={mutedForeground} />
           <Text className="flex-1 text-sm leading-5 text-muted-foreground">{l0Notice}</Text>
+        </View>
+      ) : null}
+
+      {clarifyOptions && clarifyOptions.length > 0 ? (
+        <View className="mt-3 gap-2">
+          <Text className="text-sm font-medium text-muted-foreground">选择一种药继续：</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {clarifyOptions.map((option) => (
+              <Pressable
+                key={option.drugId}
+                accessibilityRole="button"
+                onPress={() => onPickDrug?.(option.drugId)}
+                className="min-h-[44px] justify-center rounded-full border-2 border-primary px-4 active:opacity-80"
+              >
+                <Text className="text-base text-primary">{option.drugName}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       ) : null}
     </View>

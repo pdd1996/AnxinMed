@@ -136,9 +136,10 @@ export default function Consult() {
   });
 
   const consultMutation = useMutation({
-    mutationFn: (input: { text: string; skillId?: ConsultSkillId }) =>
+    mutationFn: (input: { text: string; skillId?: ConsultSkillId; drugIds?: string[] }) =>
       guardRequest(() => {
-        const drugIds = effectiveDrugId ? [effectiveDrugId] : [];
+        // 默认对象药 = 深链 drugId；对象澄清点选后由 input.drugIds 显式覆盖（M13-P1）
+        const drugIds = input.drugIds ?? (effectiveDrugId ? [effectiveDrugId] : []);
         const opts = {
           ...(sessionId ? { sessionId } : {}),
           ...(input.skillId ? { skillId: input.skillId } : {}),
@@ -175,6 +176,14 @@ export default function Consult() {
     if (!text || consultMutation.isPending) return;
     setError(null);
     consultMutation.mutate({ text, skillId });
+  };
+
+  /** 对象澄清点选（M13-P1）：带所选 drugId 重发原问题（同会话续问；clarify 不写库，只是入口）。 */
+  const handleClarifyPick = (text: string | undefined, drugId: string) => {
+    const q = (text ?? "").trim();
+    if (!q || consultMutation.isPending) return;
+    setError(null);
+    consultMutation.mutate({ text: q, drugIds: [drugId] });
   };
 
   const retry = () => {
@@ -356,7 +365,7 @@ export default function Consult() {
         ) : null}
 
         <View className="mt-4 gap-4">
-          {messages.map((msg) =>
+          {messages.map((msg, idx) =>
             msg.role === "user" ? (
               <View key={msg.id} className="items-end">
                 <View className="max-w-[85%] rounded-2xl rounded-br-none bg-primary px-4 py-3">
@@ -379,6 +388,8 @@ export default function Consult() {
                 l0Notice={msg.response.l0Notice}
                 blocked={msg.response.blocked}
                 toolUsed={msg.response.toolUsed}
+                clarifyOptions={msg.response.clarifyOptions ?? null}
+                onPickDrug={(drugId) => handleClarifyPick(messages[idx - 1]?.question, drugId)}
               />
             ) : null,
           )}

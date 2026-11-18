@@ -1,6 +1,7 @@
 import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
-import type { ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
+import type { ConsultClarifyOption, ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import type { Citation } from '@anxin/shared'
 
 /**
@@ -30,6 +31,9 @@ export interface AnswerCardProps {
   blocked?: boolean
   /** 数据查询命中的只读工具名（仅 status='data-answered' 时有值，hc<AppType> 推导自 shared toolUsed）。 */
   toolUsed?: string | null
+  /** 对象澄清选项（仅 status='clarify' 时非空，M13-P1）：点选后由页面带 drugId 重发原问题。 */
+  clarifyOptions?: ConsultClarifyOption[] | null
+  onPickDrug?: (drugId: string) => void
 }
 
 /**
@@ -63,6 +67,8 @@ export function AnswerCard({
   notice,
   l0Notice,
   blocked,
+  clarifyOptions,
+  onPickDrug,
 }: AnswerCardProps) {
   return (
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
@@ -159,6 +165,27 @@ export function AnswerCard({
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             {l0Notice}
           </p>
+        )}
+
+        {/* 对象澄清（M13-P1）：药名点选 ≥44px，点选后由页面带 drugId 重发原问题 */}
+        {clarifyOptions && clarifyOptions.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">选择一种药继续：</p>
+            <div className="flex flex-wrap gap-2">
+              {clarifyOptions.map((option) => (
+                <Button
+                  key={option.drugId}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-11 whitespace-normal border-primary/30 text-xs text-primary"
+                  onClick={() => onPickDrug?.(option.drugId)}
+                >
+                  {option.drugName}
+                </Button>
+              ))}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
