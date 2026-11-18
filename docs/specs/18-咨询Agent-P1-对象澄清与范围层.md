@@ -103,7 +103,7 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 |---|---|---|
 | T1–T3 契约/纯函数/接线 | `a0f0a7c` | `ConsultStatusSchema` + `clarify`/`out-of-scope` + `clarifyOptions`；`scope.ts`/`clarify.ts` 纯函数；service「范围 → 对象 → S1」接线；两个 kill switch；纯函数 + 集成测试；评测 16 条 P1 用例转绿 |
 | T4 Web/Mobile UI | `76932a9` | AnswerCard 药名选项（≥44px）；点选带 drugId 重发原问题 |
-| 兼容层补充（A1） | 本轮补丁 | `consultStatusVersion` 协商 + `toLegacyConsultStatus`（旧 APK 收 `no-source`，落库/trace 记真实状态）+ 纯函数/集成用例 |
+| 兼容层补充（A1） | `738993a` | `consultStatusVersion` 协商 + `toLegacyConsultStatus`（旧 APK 收 `no-source`，落库/trace 记真实状态）+ 纯函数/集成用例 |
 
 **验证**：`pnpm --filter @anxin/api test` 全量绿（含 P1 新增用例与兼容层 5 例；当时工作区并发认证线用例一并计入）；`eval:intent` 134/134；web 18 文件 / 119 用例、mobile 6 套件 / 38 用例、core 12 文件 / 148 用例全绿；shared/core/api/web/mobile `typecheck` 通过。
 
@@ -116,3 +116,60 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 1. 新增 status 未做 SQL 迁移（`consult_logs.status` 为 varchar 无 CHECK，仅同步 `schema.ts` 类型/注释与 shared 契约）。
 2. `consult_logs.route_trace` 列未做（A6 暂不做；P0 开发期文件 trace 已可用）。
 3. `docs/06 PRD` 与 `docs/08` 附录 A 的增量已随本轮补齐（见各文档 M13 增量小节）。
+4. E2E 复核记录：`8c10a6e`。
+
+## 6. staging 部署交接（2026-11-18，待用户/运维执行）
+
+构建机到 staging 的 SSH 凭据仍不可用（`g7_deploy` / `id_rsa` 试 root/ubuntu/anxin 均 `Permission denied`，与 [specs/15](./15-G10-最小可观测性.md) §5.1 同因），部署动作需用户执行；源码包已按 `deploy/README.md` §3b 备好。
+
+### 6.1 当前 staging 实测状态（2026-11-18 15:08）
+
+用 G7 测试账号 `p-001` 登录后直连 API 实测：
+
+| 请求 | 响应 | 判定 |
+|---|---|---|
+| `GET /api/health` | `{"ok":true,"db":"up"}` | 服务存活 |
+| consult「我是不是得了糖尿病」（无版本 / 带 `consultStatusVersion:2`） | 均 `status=no-source` | **API 仍是旧版**（无范围层） |
+| consult「这个药有什么副作用」（药箱 5 支、未绑定药） | `status=no-source` | **API 仍是旧版**（无对象澄清） |
+| `GET /assets/index-CpmdLENu.js` | 含 `clarify`/`out-of-scope`/`clarifyOptions` DTO，但**不含** `consultStatusVersion` | 静态资源疑似来自 P1 某次部署残留，与 API 版本不一致 |
+
+结论：staging 需要整体重建镜像部署，不能只更新静态资源。
+
+### 6.2 部署物
+
+- 目标提交：`8c10a6e`（P1 全量 + 旧客户端兼容 + E2E 记录；含并发手机号登录线已提交代码）
+- 源码包：`app/backups/anxin-src-8c10a6e.tar.gz`（3.48 MB，`git -c core.autocrlf=false archive 8c10a6e app`）
+- SHA256：`AD18A4DF8546B13A165BB12CBD746065B753B89EB09072D8F1CD89E00898A4A3`
+- 自检：条目 694；`app/deploy/backup.sh` CR 字节 0；不含 `.env` / node_modules / android / dist
+- 迁移：**需要**执行 `0013_powerful_talon.sql`（`users.phone_verified_at` + `phone` 唯一索引；并发手机号登录线所带）。P1 自身无新增 SQL（`consult_logs.status` 为 varchar）。
+
+### 6.3 部署命令（用户执行）
+
+```bash
+# 0) 本机校验包
+Get-FileHash app/backups/anxin-src-8c10a6e.tar.gz -Algorithm SHA256   # 应为 AD18...A4A3
+
+# 1) 上传 + 备份旧源码 + 备份数据库
+scp app/backups/anxin-src-8c10a6e.tar.gz root@118.196.82.13:/tmp/
+ssh root@118.196.82.13 'set -e; cd /opt/AnxinMed; cp -a app app.bak-$(date +%F-%H%M); cd app; docker compose exec -T db pg_dump -U anxin anxin_medication > /opt/AnxinMed/anxin-pre-p1-$(date +%F-%H%M).sql; echo backup-done'
+
+# 2) 迁移 0013（先查 phone 重复；无输出=可执行）
+ssh root@118.196.82.13 'cd /opt/AnxinMed; tar xzf /tmp/anxin-src-8c10a6e.tar.gz -C /opt/AnxinMed; cd app; docker compose exec -T db psql -U anxin -d anxin_medication -c "select phone,count(*) from users where phone is not null group by phone having count(*)>1;"'
+ssh root@118.196.82.13 'cd /opt/AnxinMed/app; docker compose exec -T db psql -U anxin -d anxin_medication -v ON_ERROR_STOP=1 < packages/api/drizzle/0013_powerful_talon.sql'
+
+# 3) 整体重建 + 起服务
+ssh root@118.196.82.13 'cd /opt/AnxinMed/app && docker compose config --quiet && docker compose build && docker compose up -d && docker compose ps && docker compose logs --tail=30 api'
+
+# 4) 冒烟
+curl -s http://118.196.82.13:8787/api/health    # {"ok":true,...}
+```
+
+> 若第 2 步 `phone_verified_at` 已存在（信息架构列），跳过该条 ALTER 只补唯一索引即可；唯一索引已存在则整条 SQL 可跳过。
+> 回滚：`ssh root@118.196.82.13 'cd /opt/AnxinMed && rm -rf app && mv app.bak-<时间戳> app && cd app && docker compose build && docker compose up -d'`；必要时用第 1 步 SQL 备份恢复数据库。
+
+### 6.4 部署后验收（我执行并回填）
+
+1. H5 `http://118.196.82.13:8787/` 登录 p-001 →「这个药有什么副作用」应出现药名选项卡片（clarify）；
+2. 直连 API：不带 `consultStatusVersion` → `no-source`（legacy 降级）；带 `2` → `clarify` / `out-of-scope`（新状态）；
+3. 模拟器 G8 v1.0.0 旧包（已登录 staging）→ 同样两个问题：**不白屏**、显示通用卡固定文案；截图/UiAutomator 留证；
+4. 回填本节与 docs/11 观测项。
