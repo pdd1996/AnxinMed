@@ -1,14 +1,30 @@
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { ChevronRight, ClipboardList, Settings, UserRound, type LucideIcon } from 'lucide-react'
+import { ChevronRight, ClipboardList, LogOut, Settings, UserRound, type LucideIcon } from 'lucide-react'
+import { signOut, useAuthStore } from '@anxin/core'
 import { Card, CardContent } from '@/components/ui/card'
 
 /**
- * 我的页（任务书 T9）：账号头部 + 列表式入口行。
+ * 我的页（任务书 T9）：账号头部 + 列表式入口行 + 底部账号区（退出登录）。
  * 健康信息自 2026-11-18 起是独立一级页（/health-info，与 /records 同级），不再在本页内嵌表单卡；
  * 两条入口共用 `HealthInfoCard` 组件与同一份 profile 数据。处方抄录·已确认入口在 M2 确认页。
- * 入口行只保留标签 + 箭头（副文案已按产品口径移除，减少视觉噪音）。
+ * 入口行只保留标签 + 箭头；退出登录是账号级动作，按层级归到本页底部（password 模式才显示）。
  */
 export default function Profile() {
+  const authMode = useAuthStore((s) => s.mode)
+  const user = useAuthStore((s) => s.user)
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await signOut()
+      // 退出后 status=anonymous，RequireAuth 自动跳 /login。
+    } finally {
+      setSigningOut(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex items-center gap-3">
@@ -31,6 +47,28 @@ export default function Profile() {
           </nav>
         </CardContent>
       </Card>
+
+      {authMode !== 'demo' && (
+        <Card className="gap-0 py-0">
+          <div className="px-4 py-3">
+            <p className="text-xs text-muted-foreground">当前登录</p>
+            <p className="mt-0.5 text-base font-semibold">
+              {user?.name ?? user?.username ?? '—'}
+              {user?.name && user?.username ? `（${user.username}）` : ''}
+            </p>
+          </div>
+          <div className="border-t" aria-hidden />
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            disabled={signingOut}
+            className="flex min-h-14 items-center gap-3 px-4 py-2 text-left text-risk-l4 transition-colors hover:bg-muted/50 disabled:opacity-60"
+          >
+            <LogOut className="size-5 shrink-0" aria-hidden />
+            <span className="font-medium">{signingOut ? '正在退出…' : '退出登录'}</span>
+          </button>
+        </Card>
+      )}
     </div>
   )
 }
