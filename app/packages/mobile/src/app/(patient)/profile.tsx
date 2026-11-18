@@ -25,9 +25,8 @@ export default function Profile() {
   const router = useRouter();
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const riskL4 = useUnstableNativeVariable("--risk-l4");
-  // 登录态（G7）：demo 模式免登录，账号区不出现。
+  // 登录态（G7）：demo 模式免登录，账号区不出现。账号串是内部演示 ID，患者端不展示，只保留退出动作。
   const authMode = useAuthStore((s) => s.mode);
-  const authUser = useAuthStore((s) => s.user);
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -90,14 +89,6 @@ export default function Profile() {
       {authMode === "demo" ? null : (
         <Card className="mt-5 p-0">
           <CardContent className="p-0">
-            <View className="px-4 py-3">
-              <Text className="text-xs text-muted-foreground">当前登录</Text>
-              <Text className="mt-0.5 text-base font-semibold text-card-foreground">
-                {authUser?.name ?? authUser?.username ?? "—"}
-                {authUser?.name && authUser.username ? `（${authUser.username}）` : null}
-              </Text>
-            </View>
-            <View className="border-b border-border" />
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ disabled: signingOut }}

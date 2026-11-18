@@ -12,7 +12,6 @@ import { Card, CardContent } from '@/components/ui/card'
  */
 export default function Profile() {
   const authMode = useAuthStore((s) => s.mode)
-  const user = useAuthStore((s) => s.user)
   const [signingOut, setSigningOut] = useState(false)
 
   async function handleSignOut() {
@@ -50,14 +49,6 @@ export default function Profile() {
 
       {authMode !== 'demo' && (
         <Card className="gap-0 py-0">
-          <div className="px-4 py-3">
-            <p className="text-xs text-muted-foreground">当前登录</p>
-            <p className="mt-0.5 text-base font-semibold">
-              {user?.name ?? user?.username ?? '—'}
-              {user?.name && user?.username ? `（${user.username}）` : ''}
-            </p>
-          </div>
-          <div className="border-t" aria-hidden />
           <button
             type="button"
             onClick={() => void handleSignOut()}
