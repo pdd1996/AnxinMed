@@ -39,8 +39,7 @@ type LoginMode = "password" | "phone";
  * error 在 core/bootstrapAuth 写入 store 前已归成中文（G8）；这里再过一次 toUserMessage
  * 只作兜底，保证任何来源的技术英文都不会直接上屏。
  *
- * 手机号方式为「验证码即注册」：未注册手机号验码通过后由服务端自动建号并发会话；
- * 短信落款签名由服务端返回并展示，减少老年用户把验证码短信误判为诈骗。
+ * 手机号方式为「验证码即注册」：未注册手机号验码通过后由服务端自动建号并发会话。
  *
  * 登录成功后 store 变 authenticated，本组件自然重渲染为 children —— 不做任何手动跳转。
  * 退出登录（我的页）把 store 切回 anonymous，本组件同样自动切回登录界面。
@@ -109,7 +108,6 @@ function LoginScreen() {
   const [phonePending, setPhonePending] = useState(false);
   /** 重发倒计时（秒），由服务端返回的 cooldownSec 初始化。 */
   const [cooldown, setCooldown] = useState(0);
-  const [signName, setSignName] = useState<string | null>(null);
 
   // 倒计时：每秒减一（卸载自动清理，避免离开登录页后 setState）。
   useEffect(() => {
@@ -154,7 +152,6 @@ function LoginScreen() {
     setFailure(null);
     try {
       const data = await requestPhoneCode(value);
-      setSignName(data.signName);
       setCooldown(data.cooldownSec);
     } catch (err) {
       // SMS_LIMITED / SMS_SEND_FAILED / SMS_NOT_CONFIGURED 的中文 message 原样透传。
@@ -291,10 +288,6 @@ function LoginScreen() {
                 >
                   <Text className="text-lg">{pending ? "正在登录…" : "登录"}</Text>
                 </Button>
-
-                <Text className="text-sm leading-6 text-muted-foreground">
-                  账号由管理员分配；忘记密码请联系管理员重置。
-                </Text>
               </>
             ) : (
               <>
@@ -341,9 +334,7 @@ function LoginScreen() {
                     </Button>
                   </View>
                   <Text className="text-sm leading-6 text-muted-foreground">
-                    {signName
-                      ? `短信落款为「${signName}」，请注意查收；验证码请勿告诉他人。`
-                      : "未注册的手机号验证通过后将自动创建账号。"}
+                    未注册的手机号验证通过后将自动创建账号。
                   </Text>
                 </View>
 
@@ -356,10 +347,6 @@ function LoginScreen() {
                 >
                   <Text className="text-lg">{phonePending ? "正在登录…" : "登录 / 注册"}</Text>
                 </Button>
-
-                <Text className="text-sm leading-6 text-muted-foreground">
-                  本系统仅用于演示与受控验收，不接收真实患者数据。
-                </Text>
               </>
             )}
           </CardContent>

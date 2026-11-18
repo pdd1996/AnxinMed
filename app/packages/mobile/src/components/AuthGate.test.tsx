@@ -98,12 +98,11 @@ describe("AuthGate · 登录门", () => {
     expect(view.getByRole("button")).toBeTruthy();
   });
 
-  it("anonymous 渲染登录界面与底部说明，不渲染受保护内容", async () => {
+  it("anonymous 渲染登录界面，不渲染受保护内容", async () => {
     useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
     const view = await renderGate();
 
     expect(view.getByText("登录安心用药")).toBeTruthy();
-    expect(view.getByText("账号由管理员分配；忘记密码请联系管理员重置。")).toBeTruthy();
     expect(view.queryByText("受保护内容")).toBeNull();
   });
 
@@ -193,7 +192,7 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
     expect(mockRequestPhoneCode).not.toHaveBeenCalled();
   });
 
-  it("获取验证码成功 → 展示短信落款并进入冷却（按钮禁用、显示倒计时）", async () => {
+  it("获取验证码成功 → 进入冷却（按钮禁用、显示倒计时）", async () => {
     mockRequestPhoneCode.mockResolvedValue({
       ok: true,
       mode: "password",
@@ -208,9 +207,6 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
     await fireEvent.press(view.getByRole("button", { name: "获取验证码" }));
 
     await waitFor(() => expect(mockRequestPhoneCode).toHaveBeenCalledWith("13800138000"));
-    expect(
-      await view.findByText("短信落款为「恒创联众」，请注意查收；验证码请勿告诉他人。"),
-    ).toBeTruthy();
     const resend = view.getByText(/秒后重发/);
     expect(resend).toBeTruthy();
     // 冷却中再点不会重复请求
