@@ -89,6 +89,32 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
     await page.context().close()
   })
 
+  test('T7 归一化：口语「药快吃没了」→ data-answered + expiry-stock + 0 次 LLM（路由视图生效）', async ({
+    browser,
+  }) => {
+    const page = await openConsult(browser)
+
+    // 口语说法：规则原文正则不含「快吃没了」，依赖 normalize.ts 的「耗尽口语→快用完」映射
+    await page.locator('textarea').fill('药快吃没了')
+    await page.getByRole('button', { name: '发送' }).click()
+
+    // UI：数据直答卡正常渲染（不为空、不白屏）
+    const card = page.getByTestId('consult-answer-card')
+    await expect(card).toBeVisible()
+
+    // 结构：0 次 LLM（data-answered 路径红线）
+    const res = await fetch(`${API_BASE}/api/_e2e/ai-calls?scenario=${SCENARIO}`)
+    const body = (await res.json()) as { calls: { consultAnswer: number } }
+    expect(body.calls.consultAnswer).toBe(0)
+
+    // DB：落 data-answered + intent=expiry-stock（证明走的是归一化后的正则路由）
+    const [log] = await sql`select status, intent from consult_logs where user_id='p-001' order by created_at desc limit 1`
+    expect(log.status).toBe('data-answered')
+    expect(log.intent).toBe('expiry-stock')
+
+    await page.context().close()
+  })
+
   test('adherence：快捷问题「我的依从性怎么样？」→ data-answered 模板渲染（空数据友好文案）', async ({ browser }) => {
     const page = await openConsult(browser)
 

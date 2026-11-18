@@ -32,7 +32,7 @@
 | 结论 | recall 提升 10 条，**既有 134 条零回归** | 行为可一键回滚到旧路由 |
 
 - 低置信观测（开）：56/96（58.3%）；S1 39/39、S2 17/57（adherence 4/11、expiry-stock 5/17、interaction-check 1/9、medication-list 7/11、next-dose 0/9）。
-- API 全量：**70 文件 / 884 用例全绿**；`pnpm --filter @anxin/api typecheck` 通过。
+- API 全量：**71 文件 / 889 用例全绿**（新增 T7 真实链路集成 5 例）；E2E **22/22 全绿**（新增「药快吃没了」归一化 case）；`pnpm --filter @anxin/api typecheck` 通过。
 - fixture 未重录（prompt/模型输入未变，零字节改动）。
 
 > 既有测试调整：`consult-fastpath.test.ts` 的对照组原用「帮我看看我现在都吃哪些药哦」断言 S1；T7 后该句被正确归一为清单查询（S2），故对照组改用归一化不改写的「帮我看看我目前的用药情况哦」，保留「同句快路径 vs 自由文本」原意。
@@ -48,7 +48,7 @@
 | 角色 | commit | 内容 |
 |---|---|---|
 | 代码 | `8c9b116` | normalize.ts + registry/service/eval 接线 + fixture 10 条 + 测试（含 fastpath 对照组调整） |
-| 文档 | 本 commit | 本文 + docs/14 §11.4 + docs/11 指标 + AGENTS |
+| 测试补强 | `见 git log（M13-P2-T7 集成/E2E）` | `consult-normalize-routing.test.ts`（API 真实链路 3 例）+ 指代澄清集成 2 例 + E2E「药快吃没了」1 例 |\n| 文档 | 本 commit | 本文 + docs/14 §11.4 + docs/11 指标 + AGENTS |
 
 **偏差**
 

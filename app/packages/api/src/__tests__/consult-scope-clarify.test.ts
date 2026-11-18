@@ -42,7 +42,7 @@ const DM = 'dm-p1-clarify'
 const PI = 'pi-p1-clarify'
 const DRUG_A = 'drug-p1-clarify-a'
 const DRUG_B = 'drug-p1-clarify-b'
-const ENV_KEYS = ['ENABLE_SCOPE_GATE', 'ENABLE_OBJECT_CLARIFY'] as const
+const ENV_KEYS = ['ENABLE_SCOPE_GATE', 'ENABLE_OBJECT_CLARIFY', 'ENABLE_ROUTE_NORMALIZE'] as const
 
 const MOCK_ANSWER = {
   summary: '按说明书，这个药请在医生指导下使用。',
@@ -199,6 +199,37 @@ describe('对象澄清（status=clarify）', () => {
 
     expect(res.body.status).toBe('no-source')
     expect(res.body.clarifyOptions ?? null).toBeNull()
+    expect(calls.consultAnswer).toBe(0)
+  })
+
+  it('T7 归一化：「这药有什么副作用」（指代变体）→ clarify；0 次 LLM', async () => {
+    const calls = newCalls()
+    prevClients = setAiClients(mockClients({ calls }))
+
+    const res = await req('POST', '/api/consult', {
+      question: '这药有什么副作用',
+      drugIds: [],
+      consultStatusVersion: 2,
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('clarify')
+    expect(res.body.clarifyOptions?.length).toBeGreaterThan(0)
+    expect(calls.consultAnswer).toBe(0)
+  })
+
+  it('T7 归一化关闭：「这药有什么副作用」不再命中指代信号 → 回退 no-source', async () => {
+    process.env.ENABLE_ROUTE_NORMALIZE = 'false'
+    const calls = newCalls()
+    prevClients = setAiClients(mockClients({ calls }))
+
+    const res = await req('POST', '/api/consult', {
+      question: '这药有什么副作用',
+      drugIds: [],
+      consultStatusVersion: 2,
+    })
+
+    expect(res.body.status).toBe('no-source')
     expect(calls.consultAnswer).toBe(0)
   })
 

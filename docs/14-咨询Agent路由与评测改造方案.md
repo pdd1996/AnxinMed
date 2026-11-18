@@ -500,7 +500,7 @@ POST /api/consult
 |---|---|---|
 | T7 归一化路由视图 | `8c9b116` | `normalize.ts`（字符级 + 同义词 + 指代变体，仅路由/对象判定）；registry 意图与候选打分改用路由视图；service/eval 对象判定同步；`ENABLE_ROUTE_NORMALIZE` 回滚；新增 10 条评测用例（见 [specs/20](./specs/20-咨询Agent-P2-T7-语义归一化路由视图.md)） |
 
-**验证**：`eval:intent` 归一化开 **144/144**；关 **134/144**（恰好 10 条 normalize 用例失败）→ recall 提升且既有 134 条零回归；API **70 文件 / 884 用例全绿**、`typecheck` 通过；fixture 未重录（模型输入不变）。
+**验证**：`eval:intent` 归一化开 **144/144**；关 **134/144**（恰好 10 条 normalize 用例失败）→ recall 提升且既有 134 条零回归；API **71 文件 / 889 用例全绿**、E2E **22/22 全绿**、`typecheck` 通过；fixture 未重录（模型输入不变）。
 
 > 行为变化说明：自由文本如「我现在都吃哪些药」由 S1 变为 S2/medication-list（归一化预期收益）；`consult-fastpath` 对照组已改用归一化不改写的问法，保留「同句快路径 vs 自由文本」测试原意。
 
