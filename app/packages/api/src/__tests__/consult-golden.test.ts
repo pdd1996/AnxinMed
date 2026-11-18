@@ -132,7 +132,8 @@ describe('不变量 ① 响应结构', () => {
 
     expect(res.status).toBe(200)
     // 响应体字段面：{ ok } 包装 + shared ConsultResponseSchema 全字段 + api 扩展的
-    // consultLogId + sessionId（M4-T5 会话化首答回传）+ suggestion（M4-T6 建议卡），不多不少
+    // consultLogId + sessionId（M4-T5 会话化首答回传）+ suggestion（M4-T6 建议卡）
+    // + clarifyOptions（M13-P1 对象澄清选项；非 clarify 路径为 null），不多不少
     expect(Object.keys(res.body).sort()).toEqual(
       [
         'ok',
@@ -145,6 +146,7 @@ describe('不变量 ① 响应结构', () => {
         'l0Notice',
         'blocked',
         'toolUsed',
+        'clarifyOptions',
         'consultLogId',
         'sessionId',
         'suggestion',

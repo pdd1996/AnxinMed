@@ -3,14 +3,18 @@
  *
  * 定位：把「意图漏判率」从每月 30 条人工抽检，升级为可回归的评测资产。
  * - route 级：`resolveSkillRoute`（纯函数）对比期望路由；
+ * - P1 层（clarify / out-of-scope）：用 `classifyConsultScope` / `shouldClarifyObject` 纯函数
+ *   与探针药箱验证（M13-P1 起启用，不再 pending）；
  * - section 级：S1 用例可用探针说明书切片验证 `pickInsertSections` 的段落键；
- * - P1 行为（clarify / out-of-scope）先以 `pendingUntil` 声明期望，不参与通过率；
  * - 输出逐条结果 + 混淆矩阵 + 按 tag 失败清单（供 `eval:intent` 与 CI 复用）。
  *
  * ⚠️ 纪律：fixture 每条 case 必须有期望；新增词表/仲裁必须先加 case（与 patterns.ts 同款纪律）。
  */
 
 import { z } from 'zod'
+import type { ClarifyDrugCandidate } from './clarify.js'
+import { shouldClarifyObject } from './clarify.js'
+import { classifyConsultScope } from './scope.js'
 import type { InsertSlice } from './types.js'
 import { pickInsertSections } from './sections.js'
 import { formatSkillRoute, resolveSkillRoute } from './registry.js'
@@ -82,6 +86,24 @@ const PROBE_INSERT: InsertSlice = {
   curationStatus: 'reviewed',
 }
 
+/** 对象澄清探针药箱（P1 层评测用：只要非空即可触发 clarify 分支）。 */
+const PROBE_BOX: ClarifyDrugCandidate[] = [
+  { id: 'drug-eval-probe-a', genericName: '评测探针药A', brandName: '探针' },
+  { id: 'drug-eval-probe-b', genericName: '评测探针药B', brandName: null },
+]
+
+/** P1 层用例（clarify / out-of-scope）由范围/对象纯函数评测，不走 routeSkill。 */
+function isP1Layer(c: IntentEvalCase): boolean {
+  return c.expectedRoute === 'clarify' || c.expectedRoute === 'out-of-scope'
+}
+
+/** 评测 P1 层（范围优先于对象，与 service 层顺序一致）。 */
+function evaluateP1Layer(question: string): string {
+  if (classifyConsultScope(question) !== 'medication') return 'out-of-scope'
+  if (shouldClarifyObject(question) && PROBE_BOX.length > 0) return 'clarify'
+  return 'S1'
+}
+
 /** 单条评测结果。 */
 export interface IntentEvalResult {
   id: string
@@ -109,8 +131,7 @@ export interface IntentEvalSummary {
   failures: IntentEvalResult[]
 }
 
-/** 评测全部用例（纯函数：不读文件、不打日志，供 test/script 复用）。 */
-export function evaluateIntentCases(cases: IntentEvalCase[]): {
+/** 评测全部用例（纯函数：不读文件、不打日志，供 test/script 复用）。 */export function evaluateIntentCases(cases: IntentEvalCase[]): {
   results: IntentEvalResult[]
   summary: IntentEvalSummary
 } {
@@ -133,12 +154,14 @@ export function evaluateIntentCases(cases: IntentEvalCase[]): {
       continue
     }
 
-    const resolution = resolveSkillRoute({
-      question: c.question,
-      intentRouteEnabled: true,
-      skillId: null,
-    })
-    const actualRoute = formatSkillRoute(resolution.decision)
+    const resolution = isP1Layer(c)
+      ? null
+      : resolveSkillRoute({
+          question: c.question,
+          intentRouteEnabled: true,
+          skillId: null,
+        })
+    const actualRoute = resolution ? formatSkillRoute(resolution.decision) : evaluateP1Layer(c.question)
     const routeOk = actualRoute === c.expectedRoute
 
     let actualSection: string | undefined

@@ -25,7 +25,7 @@ describe('consult-intent-eval · 意图评测集回归', () => {
     }
   })
 
-  it('覆盖守门 / S2 五意图 / S1 / 待启用 P1 用例', () => {
+  it('覆盖守门 / S2 五意图 / S1 / P1 clarify + out-of-scope（无 pending）', () => {
     const routes = new Set(cases.map((c) => c.expectedRoute))
     for (const expected of [
       'S0/emergency',
@@ -36,17 +36,21 @@ describe('consult-intent-eval · 意图评测集回归', () => {
       'S2/interaction-check',
       'S2/next-dose',
       'S1',
+      'clarify',
+      'out-of-scope',
     ]) {
       expect(routes.has(expected as never), `缺少 ${expected} 用例`).toBe(true)
     }
-    expect(cases.filter((c) => c.pendingUntil === 'P1').length).toBeGreaterThanOrEqual(10)
+    expect(cases.filter((c) => c.pendingUntil).length).toBe(0)
   })
 
-  it('全部已实现用例通过（pendingUntil 除外）', () => {
+  it('全部用例通过（P1 层已启用，0 失败 / 0 待启用）', () => {
     const { summary } = evaluateIntentCases(cases)
     const failures = summary.failures.map((f) => `${f.id}「${f.question}」${f.failure ?? ''}`)
     expect(failures).toEqual([])
-    expect(summary.passed).toBeGreaterThanOrEqual(100)
+    expect(summary.failed).toBe(0)
+    expect(summary.pending).toBe(0)
+    expect(summary.passed).toBe(cases.length)
   })
 
   it('守门用例（S0）全部被拦截且优先于意图路由', () => {

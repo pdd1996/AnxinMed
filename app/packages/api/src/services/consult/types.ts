@@ -10,7 +10,7 @@
  * ⚠️ LLM 边界类型（ConsultRawSections / ConsultPromptPayload / AiClients）统一由 lib/ai/types.ts 提供，
  *    本文件仅 re-export，避免重复定义导致类型不兼容。
  */
-import type { ConfirmStatus, InteractionLevel, RiskLevel } from '@anxin/shared'
+import type { ConfirmStatus, ConsultClarifyOption, InteractionLevel, RiskLevel } from '@anxin/shared'
 import type { AiClients, ConsultPromptPayload, ConsultRawSections } from '../../lib/ai/types.js'
 import type { RuleStatus } from '../rules/rule-curation.js'
 
@@ -170,6 +170,10 @@ export interface ConsultRunResult {
     | 'no-source'
     | 'ai-unavailable'
     | 'data-answered'
+    /** M13-P1：对象缺失澄清（固定追问，零 LLM）。 */
+    | 'clarify'
+    /** M13-P1：范围外（诊断/非用药，固定文案，零 LLM，不进 risk_events）。 */
+    | 'out-of-scope'
   answer: string
   sections: NormalizedSections | null
   citations: Citation[]
@@ -190,4 +194,9 @@ export interface ConsultRunResult {
    * 'medication-list'）；其余回答路径缺省。可选——run.ts 现有返回路径不含此字段亦合法。
    */
   toolUsed?: string | null
+  /**
+   * 对象澄清选项（M13-P1 · status='clarify' 时非空）：药箱内药名 ≤6，点选后带 drugId 重问。
+   * 其余路径缺省；service 层透传到响应 `clarifyOptions`。
+   */
+  clarifyOptions?: ConsultClarifyOption[] | null
 }

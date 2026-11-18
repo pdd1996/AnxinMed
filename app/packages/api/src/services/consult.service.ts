@@ -36,7 +36,15 @@ import * as profilesRepo from '../repositories/profiles.repo.js'
 import { runConsult } from './consult/run.js'
 import { runDataQuery } from './consult/dataquery.js'
 import { formatSkillRoute, resolveSkillRoute } from './consult/registry.js'
-import { ROUTE_TRACE_VERSION, ROUTE_VERSION, writeRouteTrace, type RouteTrace } from './consult/trace.js'
+import {
+  ROUTE_TRACE_VERSION,
+  ROUTE_VERSION,
+  writeRouteTrace,
+  type RouteTrace,
+  type RouteTraceStep,
+} from './consult/trace.js'
+import { buildClarifyOptions, buildClarifyResult, shouldClarifyObject } from './consult/clarify.js'
+import { buildOutOfScopeResult, classifyConsultScope } from './consult/scope.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
 import { validateCitationCoverage } from './consult/coverage.js'
@@ -53,6 +61,22 @@ import { ERR_CODES } from '@anxin/shared'
  */
 function isIntentRouteEnabled(): boolean {
   return String(process.env.ENABLE_INTENT_ROUTE ?? '').toLowerCase() !== 'false'
+}
+
+/**
+ * env 开关：范围层灰度（M13-P1，默认开；仅显式 ENABLE_SCOPE_GATE=false 才关）。
+ * 关闭即跳过诊断/非用药范围判定（问题回到既有 S1 管线）——一行整体回滚。
+ */
+function isScopeGateEnabled(): boolean {
+  return String(process.env.ENABLE_SCOPE_GATE ?? '').toLowerCase() !== 'false'
+}
+
+/**
+ * env 开关：对象澄清灰度（M13-P1，默认开；仅显式 ENABLE_OBJECT_CLARIFY=false 才关）。
+ * 关闭即无对象药问题回到既有 no-source 固定文案。
+ */
+function isObjectClarifyEnabled(): boolean {
+  return String(process.env.ENABLE_OBJECT_CLARIFY ?? '').toLowerCase() !== 'false'
 }
 
 /** package_inserts 行 → InsertSlice（裁剪到按键取数所需列）。 */
@@ -241,6 +265,8 @@ export async function consult(
   })
 
   let result: ConsultRunResult | null = null
+  /** M13-P1 范围/对象层产物（供 trace；不影响既有路由决策）。 */
+  const gateSteps: RouteTraceStep[] = []
   if (route.skill === 'S2') {
     result = await runDataQuery({
       userId,
@@ -252,7 +278,32 @@ export async function consult(
     })
   }
 
-  // S0 / S1（以及开关关 / 意图未命中）：原样走 run.ts 说明书管线
+  // 5a'. M13-P1：范围层 + 对象澄清（只作用于 S1；S2 数据问题与对象无关，不经过本层）。
+  //   顺序：S0 守门（上方）→ 范围（诊断/非用药）→ 对象（缺对象澄清）→ S1。
+  //   两者都是纯规则 + 固定文案，0 次 LLM、0 写业务表；默认开，env 可整体回滚。
+  if (!result && route.skill === 'S1') {
+    const scope = isScopeGateEnabled() ? classifyConsultScope(questionRedacted) : 'medication'
+    gateSteps.push({ layer: 'scope', outcome: scope === 'medication' ? 'medication' : scope })
+    if (scope !== 'medication') {
+      result = buildOutOfScopeResult(scope)
+    } else if (drugs.length > 0) {
+      gateSteps.push({ layer: 'object', outcome: 'bound', detail: { drugCount: drugs.length } })
+    } else if (isObjectClarifyEnabled() && shouldClarifyObject(questionRedacted)) {
+      // 只在药箱非空时澄清；空药箱回退既有 no-source（引导去录入）。
+      const boxRows = await drugsRepo.listDrugs(userId)
+      const clarifyOptions = buildClarifyOptions(boxRows)
+      if (clarifyOptions.length > 0) {
+        result = buildClarifyResult(clarifyOptions)
+        gateSteps.push({ layer: 'object', outcome: 'clarify', detail: { optionCount: clarifyOptions.length } })
+      } else {
+        gateSteps.push({ layer: 'object', outcome: 'missing', detail: { optionCount: 0 } })
+      }
+    } else {
+      gateSteps.push({ layer: 'object', outcome: 'missing' })
+    }
+  }
+
+  // S0 / S1（以及开关关 / 意图未命中 / 澄清与范围层未接管）：走既有说明书管线
   if (!result) {
     result = await runConsult({
       question: questionRedacted,
@@ -355,7 +406,12 @@ export async function consult(
   //     dismissed 不复弹。卡片只是入口引导：accept 仅置状态并返回建档入口目标，
   //     实际写库必经既有确认页（无用户确认零写入红线，裁决 #4/#7）。
   let suggestion: ConsultSuggestion | null = null
-  if (result.status !== 'emergency' && result.status !== 'refused') {
+  if (
+    result.status !== 'emergency' &&
+    result.status !== 'refused' &&
+    result.status !== 'clarify' &&
+    result.status !== 'out-of-scope'
+  ) {
     suggestion = await buildSuggestion(userId, session.id, consultLogId, questionRedacted)
   }
 
@@ -380,6 +436,9 @@ export async function consult(
 
   // 8. 开发期路由轨迹（M13-T2 · docs/14 §4 T2）：默认关闭时零 I/O；
   //    写入失败 console.error 可见，但不阻塞主回答（失败方向：回答优先）。
+  //    M13-P1：范围/对象层也已接入，澄清与范围外回答均标记 llmPath=false。
+  const deterministicGate = result.status === 'clarify' || result.status === 'out-of-scope'
+  const llmPath = route.skill === 'S1' && !deterministicGate
   const trace: RouteTrace = {
     v: ROUTE_TRACE_VERSION,
     routeVersion: ROUTE_VERSION,
@@ -395,14 +454,15 @@ export async function consult(
         },
       },
       ...routeSteps,
+      ...gateSteps,
       {
         layer: 'execute',
         outcome: result.status,
-        detail: { skill: route.skill, llmPath: route.skill === 'S1' },
+        detail: { skill: route.skill, llmPath },
       },
     ],
-    finalRoute: formatSkillRoute(route),
-    llmPath: route.skill === 'S1',
+    finalRoute: deterministicGate ? result.status : formatSkillRoute(route),
+    llmPath,
     status: result.status,
     intent: intent ?? null,
   }
@@ -424,6 +484,7 @@ export async function consult(
     l0Notice: result.l0Notice,
     blocked: result.blocked,
     toolUsed: result.toolUsed ?? null,
+    clarifyOptions: result.clarifyOptions ?? null,
     consultLogId,
     sessionId: session.id,
     suggestion,

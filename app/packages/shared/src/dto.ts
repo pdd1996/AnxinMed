@@ -125,6 +125,8 @@ export type SourceDTOType = z.infer<typeof SourceDTO>
  *   no-source       本地说明书库未命中（且医疗搜索默认关）
  *   ai-unavailable  Baichuan 不可用 → 降级
  *   data-answered   患者数据查询，L1，未调 LLM（意图路由命中只读工具直查库）
+ *   clarify         M13-P1 对象缺失澄清：不调 LLM，回固定追问 + clarifyOptions 药名选项
+ *   out-of-scope    M13-P1 范围外（诊断/看报告/明显非用药话题）：不调 LLM、不进 risk_events
  */
 export const ConsultStatusSchema = z.enum([
   'answered',
@@ -135,6 +137,8 @@ export const ConsultStatusSchema = z.enum([
   'no-source',
   'ai-unavailable',
   'data-answered',
+  'clarify',
+  'out-of-scope',
 ])
 export type ConsultStatus = z.infer<typeof ConsultStatusSchema>
 
@@ -175,11 +179,24 @@ export const CitationSchema = z.object({
 export type Citation = z.infer<typeof CitationSchema>
 
 /**
+ * 咨询对象澄清选项（M13-P1 · specs/17 T1/T3）：
+ * status='clarify' 时回给药箱内药品（≤6，新建档在前），前端点选后带该 drugId 重发原问题。
+ */
+export const ConsultClarifyOptionSchema = z.object({
+  drugId: z.string(),
+  /** 展示名（通用名，有商品名时附「（商品名）」）。 */
+  drugName: z.string(),
+})
+export type ConsultClarifyOption = z.infer<typeof ConsultClarifyOptionSchema>
+
+/**
  * POST /api/consult 响应体。
  * - `answer` 为 `sections.summary` 的别名（方便前端直接取一句话）；
  * - `blocked=true` 时 `sections` 仅包含守门固定文案（不是 LLM 生成），前端可隐藏「下一步」以外的建议内容；
  * - `toolUsed` 本次回答使用的工具（status='data-answered' 时为只读查询工具名，如
- *   'medication-list'；其余回答路径缺省），供前端徽章与审计区分「模板查库」与「LLM 生成」。
+ *   'medication-list'；其余回答路径缺省），供前端徽章与审计区分「模板查库」与「LLM 生成」；
+ * - `clarifyOptions` 仅 status='clarify' 时非空（M13-P1 对象澄清的药名选项）；
+ *   旧客户端忽略该字段时仍按通用回答卡渲染 sections 固定文案（未知 status 不崩）。
  */
 export const ConsultResponseSchema = z.object({
   riskLevel: RiskLevelSchema,
@@ -191,6 +208,7 @@ export const ConsultResponseSchema = z.object({
   l0Notice: z.string().nullish(),
   blocked: z.boolean().default(false),
   toolUsed: z.string().nullish(),
+  clarifyOptions: z.array(ConsultClarifyOptionSchema).nullish(),
 })
 export type ConsultResponse = z.infer<typeof ConsultResponseSchema>
 
