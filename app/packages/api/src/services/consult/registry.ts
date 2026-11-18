@@ -23,7 +23,14 @@
  * `routeSkill` 退化为薄包装（既有调用与测试语义不变）；trace 默认不落盘（见 trace.ts）。
  */
 import { detectEmergency, detectProhibited } from './guards.js'
-import { analyzeConsultIntent, type QueryIntent } from './intent.js'
+import {
+  analyzeConsultIntent,
+  classifyIntentConfidence,
+  scoreIntentCandidates,
+  type ConsultIntentCandidate,
+  type IntentConfidenceReason,
+  type QueryIntent,
+} from './intent.js'
 import type { RouteTraceStep } from './trace.js'
 
 /** 技能 ID（注册表行键；docs/10 §5 的 S0–S3 编号）。 */
@@ -45,10 +52,40 @@ export interface SkillRouteInput {
   skillId?: string | null
 }
 
-/** 路由解析产物：决策 + 轨迹（M13-T2）。 */
+/** 路由解析产物：决策 + 轨迹（M13-T2）+ 意图候选观测（M13-P2 T6，零行为变更）。 */
 export interface SkillRouteResolution {
   decision: SkillRouteDecision
   steps: RouteTraceStep[]
+  /** T6 观测：5 个数据意图的候选分数（不参与决策；S0 / skillId 快路径为空）。 */
+  intentCandidates: ConsultIntentCandidate[]
+  /** T6 观测：低置信（top<80 / top2 差≤8 / 仲裁触发）；S0 / skillId 快路径恒 false。 */
+  lowConfidence: boolean
+  /** T6 观测：低置信原因（定向抽检分组用）。 */
+  lowConfidenceReason: IntentConfidenceReason
+}
+
+/** T6 观测的「无候选」占位（S0 守门 / skillId 快路径 / 意图开关关闭）。 */
+const EMPTY_OBSERVATION: Pick<
+  SkillRouteResolution,
+  'intentCandidates' | 'lowConfidence' | 'lowConfidenceReason'
+> = {
+  intentCandidates: [],
+  lowConfidence: false,
+  lowConfidenceReason: null,
+}
+
+/** T6：对脱敏问题打分并判定低置信（纯观测，不参与决策）。 */
+function observeIntent(
+  question: string,
+  veto: 'explain' | 'advice' | null,
+): Pick<SkillRouteResolution, 'intentCandidates' | 'lowConfidence' | 'lowConfidenceReason'> {
+  const candidates = scoreIntentCandidates(question)
+  const confidence = classifyIntentConfidence(candidates, veto)
+  return {
+    intentCandidates: candidates,
+    lowConfidence: confidence.lowConfidence,
+    lowConfidenceReason: confidence.reason,
+  }
 }
 
 /** 决策 → trace / 日志用的稳定字符串（如 `S2/expiry-stock`、`S0/emergency`、`S1`）。 */
@@ -124,31 +161,41 @@ export function resolveSkillRoute(input: SkillRouteInput): SkillRouteResolution 
   if (emergency) {
     steps.push({ layer: 'guard', outcome: 'emergency', detail: { matched: emergency } })
     steps.push({ layer: 'route', outcome: 'S0/emergency' })
-    return { decision: { skill: 'S0', kind: 'emergency', matched: emergency }, steps }
+    return {
+      decision: { skill: 'S0', kind: 'emergency', matched: emergency },
+      steps,
+      ...EMPTY_OBSERVATION,
+    }
   }
   const prohibited = detectProhibited(input.question)
   if (prohibited) {
     steps.push({ layer: 'guard', outcome: 'refused', detail: { matched: prohibited } })
     steps.push({ layer: 'route', outcome: 'S0/refused' })
-    return { decision: { skill: 'S0', kind: 'refused', matched: prohibited }, steps }
+    return {
+      decision: { skill: 'S0', kind: 'refused', matched: prohibited },
+      steps,
+      ...EMPTY_OBSERVATION,
+    }
   }
   steps.push({ layer: 'guard', outcome: 'proceed' })
 
-  // 2. skillId 快路径（M4-T7）：跳过正则与解释类仲裁
+  // 2. skillId 快路径（M4-T7）：跳过正则与解释类仲裁（显式指定 → 不做低置信判定）
   if (input.skillId) {
     steps.push({ layer: 'intent', outcome: 'skillId', detail: { skillId: input.skillId } })
     if (input.skillId === 's1-insert') {
       steps.push({ layer: 'route', outcome: 'S1' })
-      return { decision: { skill: 'S1' }, steps }
+      return { decision: { skill: 'S1' }, steps, ...EMPTY_OBSERVATION }
     }
     const intent = input.skillId.replace(/^s2-/, '') as QueryIntent
     steps.push({ layer: 'route', outcome: `S2/${intent}` })
-    return { decision: { skill: 'S2', intent }, steps }
+    return { decision: { skill: 'S2', intent }, steps, ...EMPTY_OBSERVATION }
   }
 
   // 3. S2 数据直答：开关开 + 正则命中（解释/行动类词仲裁在 analyzeConsultIntent 内）
+  let observation = EMPTY_OBSERVATION
   if (input.intentRouteEnabled) {
     const analysis = analyzeConsultIntent(input.question)
+    observation = observeIntent(input.question, analysis.veto)
     if (analysis.intent) {
       steps.push({
         layer: 'intent',
@@ -159,7 +206,7 @@ export function resolveSkillRoute(input: SkillRouteInput): SkillRouteResolution 
         },
       })
       steps.push({ layer: 'route', outcome: `S2/${analysis.intent}` })
-      return { decision: { skill: 'S2', intent: analysis.intent }, steps }
+      return { decision: { skill: 'S2', intent: analysis.intent }, steps, ...observation }
     }
     steps.push({
       layer: 'intent',
@@ -171,7 +218,7 @@ export function resolveSkillRoute(input: SkillRouteInput): SkillRouteResolution 
 
   // 4. S1 说明书问答（兜底）
   steps.push({ layer: 'route', outcome: 'S1' })
-  return { decision: { skill: 'S1' }, steps }
+  return { decision: { skill: 'S1' }, steps, ...observation }
 }
 
 /** 技能路由（既有 API，语义不变）：只返回决策；需要轨迹时用 resolveSkillRoute。 */

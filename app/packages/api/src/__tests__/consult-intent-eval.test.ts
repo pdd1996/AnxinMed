@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { IntentEvalFileSchema, evaluateIntentCases } from '../services/consult/intent-eval.js'
+import { IntentEvalFileSchema, evaluateIntentCases, summarizeIntentConfidence } from '../services/consult/intent-eval.js'
 
 const FIXTURE_PATH = fileURLToPath(new URL('../../../../fixtures/consult-intent-eval.json', import.meta.url))
 const cases = IntentEvalFileSchema.parse(JSON.parse(readFileSync(FIXTURE_PATH, 'utf8')) as unknown)
@@ -58,5 +58,22 @@ describe('consult-intent-eval · 意图评测集回归', () => {
     expect(guardCases.length).toBeGreaterThanOrEqual(20)
     const { results } = evaluateIntentCases(guardCases)
     expect(results.filter((r) => !r.ok).map((r) => r.id)).toEqual([])
+  })
+
+  it('T6 低置信汇总：范围 = 自由文本路由用例（S1 + S2/*），原因计数自洽', () => {
+    const confidence = summarizeIntentConfidence(cases)
+    const evaluated = cases.filter(
+      (c) => !c.pendingUntil && (c.expectedRoute === 'S1' || c.expectedRoute.startsWith('S2/')),
+    ).length
+    expect(confidence.evaluated).toBe(evaluated)
+    expect(confidence.lowConfidence + confidence.highConfidence).toBe(confidence.evaluated)
+    const reasonSum = Object.values(confidence.reasons).reduce((sum, n) => sum + n, 0)
+    expect(reasonSum).toBe(confidence.lowConfidence)
+    expect(confidence.lowConfidenceRatio).toBeGreaterThanOrEqual(0)
+    expect(confidence.lowConfidenceRatio).toBeLessThanOrEqual(1)
+    const routeSum = Object.values(confidence.byExpectedRoute).reduce((sum, b) => sum + b.evaluated, 0)
+    const routeLowSum = Object.values(confidence.byExpectedRoute).reduce((sum, b) => sum + b.lowConfidence, 0)
+    expect(routeSum).toBe(confidence.evaluated)
+    expect(routeLowSum).toBe(confidence.lowConfidence)
   })
 })

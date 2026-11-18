@@ -14,9 +14,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 
-/** trace 结构版本（字段变更时 +1；消费方按版本解析）。 */
-export const ROUTE_TRACE_VERSION = 1 as const
-/** 路由实现版本（改路由规则时 +1，便于回看旧 trace）。 */
+/** trace 结构版本（字段变更时 +1；消费方按版本解析）。v2 = M13-P2 T6 增意图候选/低置信。 */
+export const ROUTE_TRACE_VERSION = 2 as const
+/** 路由实现版本（改路由规则时 +1，便于回看旧 trace；T6 只观测未改决策，保持 r1）。 */
 export const ROUTE_VERSION = 'r1'
 
 export const ROUTE_TRACE_FLAG = 'CONSULT_ROUTE_TRACE'
@@ -51,6 +51,18 @@ export const RouteTraceSchema = z.object({
   llmPath: z.boolean(),
   status: z.string().nullable(),
   intent: z.string().nullable(),
+  /** T6 观测：5 个数据意图的候选分数（空数组 = 守门/快路径/开关关闭；不参与决策）。 */
+  intentCandidates: z.array(
+    z.object({
+      intent: z.string().min(1),
+      score: z.number().min(0).max(100),
+      reason: z.string(),
+    }),
+  ),
+  /** T6 观测：低置信（top<80 / top2 差≤8 / 解释或行动类仲裁触发）。 */
+  lowConfidence: z.boolean(),
+  /** T6 观测：低置信原因（定向抽检分组）。 */
+  lowConfidenceReason: z.enum(['veto:explain', 'veto:advice', 'top-low', 'margin']).nullable(),
 })
 
 export type RouteTraceStep = z.infer<typeof RouteTraceStepSchema>

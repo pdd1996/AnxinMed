@@ -124,3 +124,100 @@ export function analyzeConsultIntent(question: string): ConsultIntentAnalysis {
 export function classifyConsultIntent(question: string): QueryIntent | null {
   return analyzeConsultIntent(question).intent
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T6 意图候选打分（M13-P2 · docs/14 §4 T6）——**只观测，不参与决策**
+//
+// 决策仍由 analyzeConsultIntent 的「短路 + 解释/行动词仲裁」决定（逐字 parity）；
+// 本段只产出候选 `{ intent, score, reason }` 与低置信标记，供 trace / 定向抽检使用。
+// 打分尺度 0–100：规则命中给基础分 55，命中该意图的线索词再加权（25/15/5），封顶 100。
+// 「低置信」= top < 80 或 top2 差 ≤ 8，或解释/行动类仲裁触发（这些样本最适合人工复看）。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 低置信阈值（top 分低于此 → 低置信；对应 docs/14 §4 T6）。 */
+export const LOW_CONFIDENCE_TOP_THRESHOLD = 80
+/** 低置信阈值（top1 与 top2 分差 ≤ 此值 → 低置信）。 */
+export const LOW_CONFIDENCE_MARGIN_THRESHOLD = 8
+
+/** 单条候选（trace 落盘用；reason 只含记分项标签，不含问题原文）。 */
+export interface ConsultIntentCandidate {
+  intent: QueryIntent
+  /** 0–100；只用于观测。 */
+  score: number
+  /** 命中线索标签（+ 连接）；未命中为「无命中」。 */
+  reason: string
+}
+
+/** 低置信原因（定向抽检分组用）。 */
+export type IntentConfidenceReason = 'veto:explain' | 'veto:advice' | 'top-low' | 'margin' | null
+
+/**
+ * 打分线索表：与 INTENT_ROUTES 同源但拆成加权线索。
+ * 权重口径：规则命中基础 55；线索依次 25 / 15 / 5（合计 ≤45）。
+ * 只用于候选分数，不参与路由决策。
+ */
+const INTENT_SCORE_CUES: Record<QueryIntent, ReadonlyArray<{ re: RegExp; weight: number; label: string }>> = {
+  'interaction-check': [
+    { re: /冲突|相互作用|相克/, weight: 25, label: '冲突/相互作用' },
+    { re: /一起|同吃|同服|同时|搭配|联用/, weight: 15, label: '共现语境' },
+    { re: /哪些药|这些药|多种药|在服|长期吃/, weight: 5, label: '多药语境' },
+  ],
+  'expiry-stock': [
+    { re: /过期|临期|快用完|快吃完/, weight: 25, label: '效期/耗尽' },
+    { re: /还剩|剩多少|还有几/, weight: 15, label: '剩余量问法' },
+    { re: /库存|存药|囤药/, weight: 5, label: '库存语境' },
+  ],
+  adherence: [
+    { re: /依从|按时吃|执行率/, weight: 25, label: '依从性术语' },
+    { re: /漏服|漏吃|忘吃|没吃/, weight: 15, label: '漏服语境' },
+    { re: /记录|统计|近期/, weight: 5, label: '统计语境' },
+  ],
+  'next-dose': [
+    { re: /今天.{0,6}(该吃|要吃|吃什么|还吃)|今日待服/, weight: 25, label: '今日待服问法' },
+    { re: /几点|什么时候吃|待服/, weight: 15, label: '时点问法' },
+    { re: /吃药|服药/, weight: 5, label: '服药语境' },
+  ],
+  'medication-list': [
+    { re: /多少.{0,4}(种)?药|几种药/, weight: 25, label: '数量问法' },
+    { re: /药箱.{0,6}(有|剩|还有)|还有什么药|用药清单|正在吃?哪些?药/, weight: 15, label: '清单问法' },
+    { re: /药物|药品|哪些药|什么药/, weight: 5, label: '泛指药物' },
+  ],
+}
+
+/**
+ * 意图候选打分（纯函数，零 I/O）：对 5 个数据意图各自打分，按 INTENT_ROUTES 顺序返回。
+ * @param question 脱敏后文本
+ * @remarks 决策不消费本函数（parity 由 analyzeConsultIntent 保证）；仅在 trace / 评测报告中使用。
+ */
+export function scoreIntentCandidates(question: string): ConsultIntentCandidate[] {
+  const q = String(question ?? '')
+  return INTENT_ROUTES.map((route) => {
+    const base = route.re.test(q) ? 55 : 0
+    const hits = INTENT_SCORE_CUES[route.intent].filter((cue) => cue.re.test(q))
+    const bonus = Math.min(45, hits.reduce((sum, cue) => sum + cue.weight, 0))
+    const reason = hits.length > 0 ? hits.map((hit) => hit.label).join('+') : base > 0 ? '规则命中' : '无命中'
+    return { intent: route.intent, score: Math.min(100, base + bonus), reason }
+  })
+}
+
+/**
+ * 低置信判定（纯函数）：top < 80 / top2 差 ≤ 8 / 解释或行动类仲裁触发。
+ * @param candidates scoreIntentCandidates 产物（可为空数组）
+ * @param veto analyzeConsultIntent 的仲裁结果
+ */
+export function classifyIntentConfidence(
+  candidates: ConsultIntentCandidate[],
+  veto: 'explain' | 'advice' | null,
+): { lowConfidence: boolean; reason: IntentConfidenceReason; top: number; second: number } {
+  const sorted = [...candidates].sort((a, b) => b.score - a.score)
+  const top = sorted[0]?.score ?? 0
+  const second = sorted[1]?.score ?? 0
+  if (veto === 'explain') return { lowConfidence: true, reason: 'veto:explain', top, second }
+  if (veto === 'advice') return { lowConfidence: true, reason: 'veto:advice', top, second }
+  // top2 接近优先归类为 margin（比 top-low 更有指导性）；second=0 时归 top-low（无竞争候选）
+  if (second > 0 && top - second <= LOW_CONFIDENCE_MARGIN_THRESHOLD) {
+    return { lowConfidence: true, reason: 'margin', top, second }
+  }
+  if (top < LOW_CONFIDENCE_TOP_THRESHOLD) return { lowConfidence: true, reason: 'top-low', top, second }
+  return { lowConfidence: false, reason: null, top, second }
+}

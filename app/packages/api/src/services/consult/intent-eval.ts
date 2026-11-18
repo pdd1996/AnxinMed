@@ -14,6 +14,7 @@
 import { z } from 'zod'
 import type { ClarifyDrugCandidate } from './clarify.js'
 import { shouldClarifyObject } from './clarify.js'
+import type { IntentConfidenceReason } from './intent.js'
 import { classifyConsultScope } from './scope.js'
 import type { InsertSlice } from './types.js'
 import { pickInsertSections } from './sections.js'
@@ -204,5 +205,65 @@ export interface IntentEvalSummary {
       confusion,
       failures,
     },
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T6 低置信观测汇总（M13-P2 · docs/14 §4 T6）——只观测，不影响通过率。
+// 统计范围：自由文本路由用例（期望 S1 或 S2/*）；S0 守门与 P1 clarify/out-of-scope 不参与。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 低置信原因计数（不含 null）。 */
+export type IntentLowConfidenceReasonCount = Record<NonNullable<IntentConfidenceReason>, number>
+
+export interface IntentConfidenceSummary {
+  /** 参与统计的用例数（期望 S1 或 S2/*，且非 pending）。 */
+  evaluated: number
+  lowConfidence: number
+  highConfidence: number
+  lowConfidenceRatio: number
+  /** 低置信按原因拆分。 */
+  reasons: IntentLowConfidenceReasonCount
+  /** 按期望路由拆分（S1 / S2/*）：{ evaluated, lowConfidence }。 */
+  byExpectedRoute: Record<string, { evaluated: number; lowConfidence: number }>
+}
+
+/**
+ * 汇总评测集上的低置信分布（纯函数）：定向抽检与「规则缺口」判断的输入。
+ * @remarks 用与线上完全相同的 resolveSkillRoute 观测字段；不做任何决策断言。
+ */
+export function summarizeIntentConfidence(cases: IntentEvalCase[]): IntentConfidenceSummary {
+  const reasons: IntentLowConfidenceReasonCount = {
+    'veto:explain': 0,
+    'veto:advice': 0,
+    'top-low': 0,
+    margin: 0,
+  }
+  let evaluated = 0
+  let lowConfidence = 0
+  const byExpectedRoute: Record<string, { evaluated: number; lowConfidence: number }> = {}
+  for (const c of cases) {
+    if (c.pendingUntil) continue
+    if (c.expectedRoute !== 'S1' && !c.expectedRoute.startsWith('S2/')) continue
+    const resolution = resolveSkillRoute({
+      question: c.question,
+      intentRouteEnabled: true,
+      skillId: null,
+    })
+    evaluated += 1
+    const bucket = (byExpectedRoute[c.expectedRoute] ??= { evaluated: 0, lowConfidence: 0 })
+    bucket.evaluated += 1
+    if (!resolution.lowConfidence) continue
+    lowConfidence += 1
+    bucket.lowConfidence += 1
+    if (resolution.lowConfidenceReason) reasons[resolution.lowConfidenceReason] += 1
+  }
+  return {
+    evaluated,
+    lowConfidence,
+    highConfidence: evaluated - lowConfidence,
+    lowConfidenceRatio: evaluated === 0 ? 0 : lowConfidence / evaluated,
+    reasons,
+    byExpectedRoute,
   }
 }

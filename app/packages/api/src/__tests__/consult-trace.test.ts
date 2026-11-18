@@ -30,7 +30,7 @@ afterEach(() => {
 
 /** 用真实路由结果构造一轮 trace（与 consult.service.ts 同款组装）。 */
 function buildTrace(question: string): RouteTrace {
-  const { decision, steps } = resolveSkillRoute({
+  const { decision, steps, intentCandidates, lowConfidence, lowConfidenceReason } = resolveSkillRoute({
     question,
     intentRouteEnabled: true,
     skillId: null,
@@ -49,6 +49,9 @@ function buildTrace(question: string): RouteTrace {
     llmPath: true,
     status: 'answered',
     intent: null,
+    intentCandidates,
+    lowConfidence,
+    lowConfidenceReason,
   }
 }
 
@@ -74,13 +77,27 @@ describe('resolveSkillRoute · trace steps', () => {
   })
 
   it('S2 命中「我现在有多少药物」→ intent S2-hit（含意图与规则 label）', () => {
-    const { decision, steps } = resolveSkillRoute({
+    const { decision, steps, intentCandidates, lowConfidence } = resolveSkillRoute({
       question: '我现在有多少药物',
       intentRouteEnabled: true,
     })
     expect(decision).toEqual({ skill: 'S2', intent: 'medication-list' })
     const hit = steps.find((s) => s.outcome === 'S2-hit')
     expect(hit?.detail).toMatchObject({ intent: 'medication-list' })
+    // T6 观测：候选固定 5 个、强问法不低置信
+    expect(intentCandidates).toHaveLength(5)
+    expect(intentCandidates.find((c) => c.intent === 'medication-list')?.score).toBeGreaterThanOrEqual(80)
+    expect(lowConfidence).toBe(false)
+  })
+
+  it('T6：解释类仲裁样本 → S1 且低置信（veto:explain）', () => {
+    const { decision, lowConfidence, lowConfidenceReason } = resolveSkillRoute({
+      question: '这个药有什么副作用',
+      intentRouteEnabled: true,
+    })
+    expect(decision).toEqual({ skill: 'S1' })
+    expect(lowConfidence).toBe(true)
+    expect(lowConfidenceReason).toBe('veto:explain')
   })
 
   it('skillId 快路径 → intent skillId 步骤（不受开关影响）', () => {

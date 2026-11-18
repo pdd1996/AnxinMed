@@ -275,7 +275,14 @@ export async function consult(
   //   manual-gate 判定。env 开关注释见 isIntentRouteEnabled。
   // M13-T2：resolveSkillRoute 与 routeSkill 决策完全一致，额外返回路由轨迹 steps
   //（trace 只含规则/枚举，不含问题原文；默认不落盘，见 consult/trace.ts）。
-  const { decision: route, steps: routeSteps } = resolveSkillRoute({
+  // M13-P2 T6：另外返回意图候选与低置信标记（只观测，不参与决策）。
+  const {
+    decision: route,
+    steps: routeSteps,
+    intentCandidates,
+    lowConfidence,
+    lowConfidenceReason,
+  } = resolveSkillRoute({
     question: questionRedacted,
     intentRouteEnabled: isIntentRouteEnabled(),
     skillId: opts.skillId ?? null,
@@ -488,6 +495,9 @@ export async function consult(
     llmPath,
     status: result.status,
     intent: intent ?? null,
+    intentCandidates,
+    lowConfidence,
+    lowConfidenceReason,
   }
   try {
     await writeRouteTrace(trace)

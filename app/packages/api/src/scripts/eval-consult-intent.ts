@@ -8,7 +8,11 @@
  */
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { IntentEvalFileSchema, evaluateIntentCases } from '../services/consult/intent-eval.js'
+import {
+  IntentEvalFileSchema,
+  evaluateIntentCases,
+  summarizeIntentConfidence,
+} from '../services/consult/intent-eval.js'
 
 const FIXTURE_PATH = fileURLToPath(new URL('../../../../fixtures/consult-intent-eval.json', import.meta.url))
 
@@ -28,6 +32,22 @@ async function main() {
       .map((actual) => `${actual}×${bucket[actual]}`)
     console.log(`  ${expected} → ${parts.join('，')}`)
   }
+
+  // T6 低置信观测（只报告，不影响退出码）：候选打分覆盖自由文本路由用例（S1 / S2）
+  const confidence = summarizeIntentConfidence(cases)
+  const pct = (confidence.lowConfidenceRatio * 100).toFixed(1)
+  console.log(
+    `[eval:intent] 低置信观测：${confidence.lowConfidence}/${confidence.evaluated}（${pct}%）；` +
+      `原因 veto:explain×${confidence.reasons['veto:explain']} / veto:advice×${confidence.reasons['veto:advice']} / ` +
+      `top-low×${confidence.reasons['top-low']} / margin×${confidence.reasons.margin}`,
+  )
+  const routeParts = Object.keys(confidence.byExpectedRoute)
+    .sort()
+    .map((route) => {
+      const b = confidence.byExpectedRoute[route]
+      return `${route} ${b.lowConfidence}/${b.evaluated}`
+    })
+  console.log(`[eval:intent] 低置信按路由：${routeParts.join('；')}`)
 
   if (summary.failures.length > 0) {
     console.error('[eval:intent] 失败用例：')
