@@ -2,8 +2,8 @@
   {
     "id": "ir-001",
     "drugIds": [
-      "drug-amlodipine-5",
-      "drug-atorvastatin-20"
+      "drug-benhuangsuan-anl-diping-pian-10mg-h20093660",
+      "drug-atuofatatinggai-pian-20mg-h20163270"
     ],
     "level": "需监测",
     "note": "氨氯地平与阿托伐他汀联用时，少数患者可能出现肌痛或肝酶升高，需关注。",
@@ -13,23 +13,12 @@
   {
     "id": "ir-002",
     "drugIds": [
-      "drug-metformin-500",
-      "drug-glipizide-5"
+      "drug-yansuan-erjiashuanggua-pian-0p5g",
+      "drug-geliebiqin-kongshi-pian-5mg"
     ],
     "level": "需监测",
     "note": "二甲双胍与格列吡嗪联用可能增加低血糖风险，需关注血糖监测。",
     "source": "两药说明书注意事项段（演示抄录）",
-    "status": "demo"
-  },
-  {
-    "id": "ir-003",
-    "drugIds": [
-      "drug-hycosan-01",
-      "drug-levofloxacin-eye-01"
-    ],
-    "level": "需监测",
-    "note": "两种滴眼液同时使用需间隔至少 30 分钟，先后顺序请咨询医生或药师。",
-    "source": "海露说明书注意事项②（演示抄录，docs/data-curation/mock-hycosan-01-海露.md）",
     "status": "demo"
   },
   {
@@ -91,7 +80,6 @@
   {
     "id": "m10-cand-07",
     "drugIds": [
-      "drug-amlodipine-5",
       "drug-benhuangsuan-anl-diping-pian-10mg",
       "drug-benhuangsuan-anl-diping-pian-2p5mg",
       "drug-benhuangsuan-anl-diping-pian-5mg-h2003108725mg",
@@ -104,7 +92,6 @@
     ],
     "drugGroups": [
       [
-        "drug-amlodipine-5",
         "drug-benhuangsuan-anl-diping-pian-10mg",
         "drug-benhuangsuan-anl-diping-pian-2p5mg",
         "drug-benhuangsuan-anl-diping-pian-5mg-h2003108725mg",
@@ -273,7 +260,6 @@
   {
     "id": "m10-cand-13",
     "drugIds": [
-      "drug-omeprazole-20",
       "drug-aomeilazuo-changrongjiaonang-10mg",
       "drug-aomeilazuo-changrongjiaonang-20mg",
       "drug-aomeilazuochangrongjiaonang-20mg",
@@ -281,7 +267,6 @@
     ],
     "drugGroups": [
       [
-        "drug-omeprazole-20",
         "drug-aomeilazuo-changrongjiaonang-10mg",
         "drug-aomeilazuo-changrongjiaonang-20mg",
         "drug-aomeilazuochangrongjiaonang-20mg"
@@ -303,7 +288,6 @@
   {
     "id": "m10-cand-14",
     "drugIds": [
-      "drug-ibuprofen-300",
       "drug-buluofen-huanshijiaonang-0p3-h20203355",
       "drug-buluofen-huanshijiaonang-0p3",
       "drug-buluofen-hunxuandiji-15ml",
@@ -319,7 +303,6 @@
     ],
     "drugGroups": [
       [
-        "drug-ibuprofen-300",
         "drug-buluofen-huanshijiaonang-0p3-h20203355",
         "drug-buluofen-huanshijiaonang-0p3",
         "drug-buluofen-hunxuandiji-15ml",
@@ -653,7 +636,6 @@
   {
     "id": "m11-b2-cand-07",
     "drugIds": [
-      "drug-omeprazole-20",
       "drug-aomeilazuo-changrongjiaonang-10mg",
       "drug-aomeilazuo-changrongjiaonang-20mg",
       "drug-aomeilazuochangrongjiaonang-20mg",
@@ -661,7 +643,6 @@
     ],
     "drugGroups": [
       [
-        "drug-omeprazole-20",
         "drug-aomeilazuo-changrongjiaonang-10mg",
         "drug-aomeilazuo-changrongjiaonang-20mg",
         "drug-aomeilazuochangrongjiaonang-20mg"
@@ -683,7 +664,6 @@
   {
     "id": "m11-b2-cand-08",
     "drugIds": [
-      "drug-atorvastatin-20",
       "drug-atuofatatinggai-pian-10mg-h20133127",
       "drug-atuofatatinggai-pian-10mg",
       "drug-atuofatatinggai-pian-20mg-h20163270",
@@ -693,7 +673,6 @@
     ],
     "drugGroups": [
       [
-        "drug-atorvastatin-20",
         "drug-atuofatatinggai-pian-10mg-h20133127",
         "drug-atuofatatinggai-pian-10mg",
         "drug-atuofatatinggai-pian-20mg-h20163270",
@@ -849,7 +828,6 @@
     "drugIds": [
       "drug-kelameisu-huanshi-pian-0p5g",
       "drug-kelameisu-pian-0p25g",
-      "drug-omeprazole-20",
       "drug-aomeilazuo-changrongjiaonang-10mg",
       "drug-aomeilazuo-changrongjiaonang-20mg",
       "drug-aomeilazuochangrongjiaonang-20mg"
@@ -860,7 +838,6 @@
         "drug-kelameisu-pian-0p25g"
       ],
       [
-        "drug-omeprazole-20",
         "drug-aomeilazuo-changrongjiaonang-10mg",
         "drug-aomeilazuo-changrongjiaonang-20mg",
         "drug-aomeilazuochangrongjiaonang-20mg"
@@ -1077,7 +1054,6 @@
   {
     "id": "m12-b3-cand-02",
     "drugIds": [
-      "drug-glipizide-5",
       "drug-geliebiqin-huanshi-jiaonang-10mg",
       "drug-geliebiqin-kongshi-pian-5mg",
       "drug-fukangzuo-jiaonang-150mg",
@@ -1085,7 +1061,6 @@
     ],
     "drugGroups": [
       [
-        "drug-glipizide-5",
         "drug-geliebiqin-huanshi-jiaonang-10mg",
         "drug-geliebiqin-kongshi-pian-5mg"
       ],
@@ -1157,7 +1132,6 @@
   {
     "id": "m12-b3-cand-05",
     "drugIds": [
-      "drug-nifedipine-30",
       "drug-xiaobendiping-huanshi-pian-20mg",
       "drug-xiaobendiping-huanshipian-20mg",
       "drug-xiaobendiping-pian-10mg",
@@ -1165,7 +1139,6 @@
     ],
     "drugGroups": [
       [
-        "drug-nifedipine-30",
         "drug-xiaobendiping-huanshi-pian-20mg",
         "drug-xiaobendiping-huanshipian-20mg",
         "drug-xiaobendiping-pian-10mg"
@@ -1243,7 +1216,6 @@
   {
     "id": "m12-b3-cand-08",
     "drugIds": [
-      "drug-omeprazole-20",
       "drug-aomeilazuo-changrongjiaonang-10mg",
       "drug-aomeilazuo-changrongjiaonang-20mg",
       "drug-aomeilazuochangrongjiaonang-20mg",
@@ -1251,7 +1223,6 @@
     ],
     "drugGroups": [
       [
-        "drug-omeprazole-20",
         "drug-aomeilazuo-changrongjiaonang-10mg",
         "drug-aomeilazuo-changrongjiaonang-20mg",
         "drug-aomeilazuochangrongjiaonang-20mg"
@@ -1353,7 +1324,6 @@
       "drug-liusuan-qinglbigelei-pian-75mg",
       "drug-liusuanqinglbigelei-pian-75mg-h20056410",
       "drug-liusuanqinglbigelei-pian-75mg",
-      "drug-omeprazole-20",
       "drug-aomeilazuo-changrongjiaonang-10mg",
       "drug-aomeilazuo-changrongjiaonang-20mg",
       "drug-aomeilazuochangrongjiaonang-20mg",
@@ -1369,7 +1339,6 @@
         "drug-liusuanqinglbigelei-pian-75mg"
       ],
       [
-        "drug-omeprazole-20",
         "drug-aomeilazuo-changrongjiaonang-10mg",
         "drug-aomeilazuo-changrongjiaonang-20mg",
         "drug-aomeilazuochangrongjiaonang-20mg",
@@ -1433,7 +1402,6 @@
   {
     "id": "m12-b3-cand-14",
     "drugIds": [
-      "drug-ibuprofen-300",
       "drug-buluofen-huanshijiaonang-0p3-h20203355",
       "drug-buluofen-huanshijiaonang-0p3",
       "drug-buluofen-hunxuanye-100",
@@ -1449,7 +1417,6 @@
     ],
     "drugGroups": [
       [
-        "drug-ibuprofen-300",
         "drug-buluofen-huanshijiaonang-0p3-h20203355",
         "drug-buluofen-huanshijiaonang-0p3",
         "drug-buluofen-hunxuanye-100",

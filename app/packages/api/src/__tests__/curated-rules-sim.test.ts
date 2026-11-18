@@ -22,7 +22,7 @@ const RULE_IDS = ['m10-cand-02', 'm10-cand-04', 'm10-cand-07', 'm10-cand-14', 'm
 const SCENARIOS: Array<{ ruleId: string; left: string; right: string; level: string }> = [
   { ruleId: 'm10-cand-02', left: 'drug-kelameisu-huanshi-pian-0p5g', right: 'drug-qiushuixianjian-pian-1mg', level: '禁忌' },
   { ruleId: 'm10-cand-04', left: 'drug-yansuan-paluoxiting-pian-20mg-h20133084', right: 'drug-linaizuoan-putaotang-zhusheye-300ml', level: '禁忌' },
-  { ruleId: 'm10-cand-07', left: 'drug-amlodipine-5', right: 'drug-takemosi-jiaonang-1mg', level: '慎用' },
+  { ruleId: 'm10-cand-07', left: 'drug-benhuangsuan-anl-diping-pian-10mg-h20093660', right: 'drug-takemosi-jiaonang-1mg', level: '慎用' },
   { ruleId: 'm10-cand-14', left: 'drug-buluofen-pian-0p1', right: 'drug-zhusheyong-jia-an-dieling-0p1g', level: '慎用' },
   { ruleId: 'm10-cand-20', left: 'drug-yansuan-fuxiting-jiaonang-20mg', right: 'drug-huafalinna-pian-2p5mg', level: '需监测' },
 ]
@@ -85,7 +85,7 @@ beforeAll(async () => {
     'drug-qiushuixianjian-pian-1mg': '秋水仙碱片',
     'drug-yansuan-paluoxiting-pian-20mg-h20133084': '盐酸帕罗西汀片',
     'drug-linaizuoan-putaotang-zhusheye-300ml': '利奈唑胺葡萄糖注射液',
-    'drug-amlodipine-5': '苯磺酸氨氯地平片',
+    'drug-benhuangsuan-anl-diping-pian-10mg-h20093660': '苯磺酸氨氯地平片',
     'drug-takemosi-jiaonang-1mg': '他克莫司胶囊',
     'drug-buluofen-pian-0p1': '布洛芬片',
     'drug-zhusheyong-jia-an-dieling-0p1g': '注射用甲氨蝶呤',
@@ -97,7 +97,7 @@ beforeAll(async () => {
     'drug-qiushuixianjian-pian-1mg': '片',
     'drug-yansuan-paluoxiting-pian-20mg-h20133084': '片',
     'drug-linaizuoan-putaotang-zhusheye-300ml': '注射液',
-    'drug-amlodipine-5': '片',
+    'drug-benhuangsuan-anl-diping-pian-10mg-h20093660': '片',
     'drug-takemosi-jiaonang-1mg': '胶囊',
     'drug-buluofen-pian-0p1': '片',
     'drug-zhusheyong-jia-an-dieling-0p1g': '注射用',

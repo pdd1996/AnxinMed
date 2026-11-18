@@ -31,7 +31,7 @@ const PRODUCTS: Array<{ masterId: string; name: string; form: string }> = [
   { masterId: 'drug-qiushuixianjian-pian-1mg', name: '秋水仙碱片', form: '片' },
   { masterId: 'drug-yansuan-paluoxiting-pian-20mg-h20133084', name: '盐酸帕罗西汀片', form: '片' },
   { masterId: 'drug-linaizuoan-putaotang-zhusheye-300ml', name: '利奈唑胺葡萄糖注射液', form: '注射液' },
-  { masterId: 'drug-amlodipine-5', name: '苯磺酸氨氯地平片', form: '片' },
+  { masterId: 'drug-benhuangsuan-anl-diping-pian-10mg-h20093660', name: '苯磺酸氨氯地平片', form: '片' },
   { masterId: 'drug-takemosi-jiaonang-1mg', name: '他克莫司胶囊', form: '胶囊' },
   { masterId: 'drug-buluofen-pian-0p1', name: '布洛芬片', form: '片' },
   { masterId: 'drug-zhusheyong-jia-an-dieling-0p1g', name: '注射用甲氨蝶呤', form: '注射用' },

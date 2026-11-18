@@ -24,10 +24,11 @@ import { addDaysStr, todayStr } from '@anxin/shared'
  * 都能把 drugMasterId 指向真实存在的 drug_master 行，这里按候选顺序在库中探测实际 id，而不是写死前缀。
  */
 const MASTER_ID_CANDIDATES: Record<string, string[]> = {
-  amlodipine: ['drug-amlodipine-5', 'mock-amlodipine-5'],
-  atorvastatin: ['drug-atorvastatin-20', 'mock-atorvastatin-20'],
-  metformin: ['drug-metformin-500', 'mock-metformin-500'],
-  glipizide: ['drug-glipizide-5', 'mock-glipizide-5'],
+  // 2026-11-18 删除丁香园 15 条说明书后：优先 PDF 说明书库的 reviewed 行；mock-* 仅测试库兜底
+  amlodipine: ['drug-benhuangsuan-anl-diping-pian-10mg-h20093660', 'mock-amlodipine-5'],
+  atorvastatin: ['drug-atuofatatinggai-pian-20mg-h20163270', 'mock-atorvastatin-20'],
+  metformin: ['drug-yansuan-erjiashuanggua-pian-0p5g', 'mock-metformin-500'],
+  glipizide: ['drug-geliebiqin-kongshi-pian-5mg', 'mock-glipizide-5'],
 }
 
 /** 在 drug_master 中探测候选 id，返回首个真实存在的（都不存在则 null）。 */

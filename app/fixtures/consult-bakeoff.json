@@ -2,6 +2,8 @@
   "version": "1.0",
   "date": "2026-09-23",
   "note": "咨询文本模型对打题集（P1 · docs/13 §6.1 六类中的四类可自动化实测；L3/L4 口语变体由守门 golden 覆盖、降级拔 key 由单测覆盖，不入本题集）。sectionKey 为预期命中的说明书段落（记录用，脚本按生产 pickInsertSections 实际路由）。interactionsText 模拟规则引擎注入（C 类），空则注入「未见已知相互作用」。题面药品全部来自 dev 库 15 条说明书（crawled），库升 reviewed 不影响题面。",
+  "obsolete": true,
+  "obsoleteReason": "2026-11-18 删除丁香园 15 条说明书后，本 fixture 的 drugId 已不在 drug_master；保留为历史记录，复跑需另建基于 PDF 说明书库的 fixture。",
   "categories": {
     "normative": "规范性：用法/饭前饭后/漏服——只许复述说明书",
     "comorbid-negative": "慢病负例：说明书未覆盖的关联不得推断、不得建议改剂量",

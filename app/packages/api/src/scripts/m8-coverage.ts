@@ -163,7 +163,7 @@ async function main(): Promise<number> {
   writeFileSync(join(outDir, 'coverage.json'), `${JSON.stringify(coverage, null, 2)}\n`)
 
   const md: string[] = []
-  md.push('# M8-T4 · 上线覆盖指标（2026-11-16）')
+  md.push(`# M8-T4 · 上线覆盖指标（复跑快照 ${new Date().toISOString().slice(0, 10)}）`)
   md.push('')
   md.push('| 指标 | 数值 |')
   md.push('|---|---|')
@@ -172,15 +172,15 @@ async function main(): Promise<number> {
   md.push(`| 药箱相关 drug_master | ${boxMasterIds.size} 个，reviewed **${boxReviewed}/${boxMasterIds.size}** |`)
   md.push(`| manual 建档药（门禁） | ${boxManual} 个（即使 reviewed 仍 L0） |`)
   md.push(`| 规则库 | ${rules.length} 条：${JSON.stringify(ruleStatus)} |`)
-  md.push(`| demo 15 对规则覆盖 | ${pairCoverage ? `${pairCoverage.covered}/${pairCoverage.total}（demo ${pairCoverage.demoCovered} / curated ${pairCoverage.curatedCovered}）` : '账本缺失'} |`)
+  md.push(`| demo 15 对规则覆盖（历史指标） | ${pairCoverage ? `${pairCoverage.covered}/${pairCoverage.total}（demo ${pairCoverage.demoCovered} / curated ${pairCoverage.curatedCovered}）` : '账本缺失'} |`)
   md.push(`| 相互作用段可得率 | PDF ${(coverage.interactionSections.pdf.rate * 100).toFixed(1)}%（${coverage.interactionSections.pdf.available}/${coverage.interactionSections.pdf.rows}）/ DXY ${(coverage.interactionSections.dxy.rate * 100).toFixed(1)}%（${coverage.interactionSections.dxy.available}/${coverage.interactionSections.dxy.rows}） |`)
   md.push('')
   md.push('## 解读')
   md.push('')
-  md.push('- reviewed 覆盖仍是瓶颈：245/1603（15.3%），绝大多数说明书未核验 → 咨询只走 L0；')
-  md.push('- demo 药箱 5 药的说明书行已全部 reviewed，但 4 个演示药 `confirm_status=manual`，个体化咨询仍被 manual 门禁挡住；')
-  md.push('- 规则库 3 条 demo / 0 curated，15 对组合仅 3 对命中（且均为 demo），未覆盖 ≠ 无风险；')
-  md.push('- 相互作用段可得率约九成，但 demo 6 药里 4 个 DXY 条目无该段——规则库扩面不能只靠“有没有说明书”。')
+  md.push(`- reviewed 覆盖仍是瓶颈：**${reviewed}/${total}（${(coverage.database.reviewedCoverage * 100).toFixed(1)}%）**，绝大多数说明书未核验 → 咨询只走 L0；`)
+  md.push(`- 药箱相关 ${boxMasterIds.size} 药说明书行 reviewed ${boxReviewed}/${boxMasterIds.size}，但 ${boxManual} 个演示药 \`confirm_status=manual\`，个体化咨询仍被 manual 门禁挡住；`)
+  md.push(`- 规则库 ${rules.length} 条（${Object.entries(ruleStatus).map(([k, v]) => `${k} ${v}`).join(' / ')}）：demo 条目不计正式覆盖；「demo 15 对账本」基于已删除的丁香园 15 药（2026-11-18），保留为历史指标、不再作为当前口径；`)
+  md.push(`- 相互作用段可得率 PDF 约 ${(coverage.interactionSections.pdf.rate * 100).toFixed(0)}%；规则库扩面仍需以 reviewed 说明书 + 真实组合评估为准。`)
   writeFileSync(join(outDir, 'coverage.md'), md.join('\n') + '\n')
 
   // ── 5. reviewed 扩面队列（只排队）────────────────────────────────────────
