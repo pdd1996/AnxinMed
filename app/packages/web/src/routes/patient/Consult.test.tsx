@@ -109,8 +109,6 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
 
     // 等 mutation 完成
     await waitFor(() => {
-      expect(screen.getByText('低风险')).toBeTruthy() // RiskBadge L1
-      expect(screen.getByText('已回答')).toBeTruthy() // status 徽章
       expect(screen.getByText('该药用于缓解干眼症状')).toBeTruthy()
       // citations 折叠（文本被 <strong> 分割，用正则匹配）
       expect(screen.getByText(/来源/)).toBeTruthy()
@@ -181,8 +179,6 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
     fireEvent.click(screen.getByLabelText('发送'))
 
     await waitFor(() => {
-      expect(screen.getByText('注意')).toBeTruthy() // RiskBadge L3
-      expect(screen.getByText('已拒答')).toBeTruthy()
       expect(screen.getByText(/请联系开具处方的医生或药师/)).toBeTruthy()
     })
   })
@@ -216,8 +212,8 @@ describe('Consult 页 · 四风险等级 UI 状态全部可达（spec §T2 完�
     fireEvent.click(screen.getByLabelText('发送'))
 
     await waitFor(() => {
-      expect(screen.getByText('提示')).toBeTruthy() // RiskBadge L2
-      expect(screen.getByText('已过滤剂量')).toBeTruthy() // status 徽章
+      expect(screen.queryByText('提示')).toBeNull() // RiskBadge 已移除
+      expect(screen.queryByText('已过滤剂量')).toBeNull() // status 徽章已移除
       expect(screen.getByText(/已过滤具体剂量建议/)).toBeTruthy()
     })
   })
@@ -279,10 +275,10 @@ describe('Consult 页 · 快捷问题 + 输入框交互', () => {
     await waitFor(() => {
       expect(mocks.postConsult).toHaveBeenCalledWith('我现在有多少药物？', [], { skillId: 's2-medication-list' })
     })
-    // data-answered 渲染：「数据查询」徽章 + toolUsed 小字徽章
+    // data-answered 渲染：正文（「数据查询」/toolUsed 徽章已按新口径移除）
     await waitFor(() => {
-      expect(screen.getByText('数据查询')).toBeTruthy()
-      expect(screen.getByText('来源：药箱清单')).toBeTruthy()
+      expect(screen.queryByText('数据查询')).toBeNull()
+      expect(screen.queryByText('来源：药箱清单')).toBeNull()
     })
   })
 })

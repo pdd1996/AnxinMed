@@ -2,6 +2,7 @@
  * M3-T2 · AnswerCard 组件断言（spec §T2 完成标准：四风险等级 UI 状态全部可达 + citations 透传无丢失）。
  *
  * 纯 props 驱动（不 mock API）：断言各 riskLevel/status 分支的渲染产物。
+ * 风险等级/状态/来源徽章已按产品新口径移除，测试改为断言「徽章不出现、正文仍完整」。
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
@@ -28,7 +29,7 @@ const mkCitation = (overrides: Partial<Citation> = {}): Citation => ({
 })
 
 describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', () => {
-  it('L1 answered → RiskBadge L1 + sections 结构化 + citations 三件套', () => {
+  it('L1 answered → 结构化 sections + citations 三件套', () => {
     render(
       <AnswerCard
         riskLevel="L1"
@@ -38,11 +39,10 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         citations={[mkCitation()]}
       />,
     )
-    // RiskBadge L1（语义色+文字）
-    expect(screen.getByText('低风险')).toBeTruthy()
-    expect(screen.getByText('可参考说明书')).toBeTruthy()
-    // status 徽章
-    expect(screen.getByText('已回答')).toBeTruthy()
+    // 风险/状态徽章已移除
+    expect(screen.queryByText('低风险')).toBeNull()
+    expect(screen.queryByText('可参考说明书')).toBeNull()
+    expect(screen.queryByText('已回答')).toBeNull()
     // sections 结构化
     expect(screen.getByText('简明结论')).toBeTruthy()
     expect(screen.getByText('该药用于缓解干眼症状')).toBeTruthy()
@@ -71,14 +71,14 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         citations={[]}
       />,
     )
-    expect(screen.getByText('数据查询')).toBeTruthy()
+    expect(screen.queryByText('数据查询')).toBeNull()
     expect(screen.getByText('[禁忌] 华法林钠片 + 阿司匹林肠溶片', { selector: 'span' })).toBeTruthy()
     expect(screen.getByText('展开原文（1 条）')).toBeTruthy()
     expect(screen.getByText('禁止同时使用华法林钠片与阿司匹林肠溶片。')).toBeTruthy()
     expect(screen.getByText('来源：测试规则库')).toBeTruthy()
   })
 
-  it('L2 limited → RiskBadge L2 + notice "已过滤具体剂量建议"', () => {
+  it('L2 limited → notice "已过滤具体剂量建议"（徽章已移除）', () => {
     render(
       <AnswerCard
         riskLevel="L2"
@@ -89,12 +89,12 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         notice="已过滤具体剂量建议。用量请按医生处方或说明书执行。"
       />,
     )
-    expect(screen.getByText('提示')).toBeTruthy() // RiskBadge L2
-    expect(screen.getByText('已过滤剂量')).toBeTruthy() // status 徽章
+    expect(screen.queryByText('提示')).toBeNull()
+    expect(screen.queryByText('已过滤剂量')).toBeNull()
     expect(screen.getByText('已过滤具体剂量建议。用量请按医生处方或说明书执行。')).toBeTruthy()
   })
 
-  it('L3 refused → RiskBadge L3 + blocked 边框 + sections 固定文案', () => {
+  it('L3 refused → blocked 边框 + sections 固定文案（徽章已移除）', () => {
     render(
       <AnswerCard
         riskLevel="L3"
@@ -108,12 +108,12 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         blocked
       />,
     )
-    expect(screen.getByText('注意')).toBeTruthy() // RiskBadge L3
-    expect(screen.getByText('已拒答')).toBeTruthy() // status 徽章
+    expect(screen.queryByText('注意')).toBeNull()
+    expect(screen.queryByText('已拒答')).toBeNull()
     expect(screen.getByText('请联系开具处方的医生或药师')).toBeTruthy()
   })
 
-  it('manual-gate → status 徽章 "仅资料查询" + l0Notice', () => {
+  it('manual-gate → l0Notice（状态徽章已移除）', () => {
     render(
       <AnswerCard
         riskLevel="L1"
@@ -125,11 +125,11 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         blocked
       />,
     )
-    expect(screen.getByText('仅资料查询')).toBeTruthy()
+    expect(screen.queryByText('仅资料查询')).toBeNull()
     expect(screen.getByText(/未经 OCR 确认/)).toBeTruthy()
   })
 
-  it('no-source → status 徽章 "本地未收录" + notice 兜底提示', () => {
+  it('no-source → notice 兜底提示（状态徽章已移除）', () => {
     render(
       <AnswerCard
         riskLevel="L1"
@@ -140,11 +140,11 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         notice="正式版在本地说明书库未命中时会开启医疗搜索兜底，且回答标注「基于网络检索，未经本库核实」。"
       />,
     )
-    expect(screen.getByText('本地未收录')).toBeTruthy()
+    expect(screen.queryByText('本地未收录')).toBeNull()
     expect(screen.getByText(/医疗搜索兜底/)).toBeTruthy()
   })
 
-  it('ai-unavailable → status 徽章 "AI 降级" + notice 降级说明', () => {
+  it('ai-unavailable → notice 降级说明（状态徽章已移除）', () => {
     render(
       <AnswerCard
         riskLevel="L1"
@@ -156,7 +156,7 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
       />,
     )
     // status 仍为 answered（降级路径也返回 L1 正常回答）
-    expect(screen.getByText('已回答')).toBeTruthy()
+    expect(screen.queryByText('已回答')).toBeNull()
     expect(screen.getByText(/百川服务不可用/)).toBeTruthy()
   })
 })

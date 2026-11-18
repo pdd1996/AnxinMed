@@ -1,6 +1,5 @@
-import { AlertTriangle, ChevronRight, Database, Info, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
 import type { ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
-import { RiskBadge } from '@/components/domain/RiskBadge'
 import { Card, CardContent } from '@/components/ui/card'
 import { CitationsList } from './CitationsList'
 import type { Citation } from '@anxin/shared'
@@ -9,42 +8,17 @@ import type { Citation } from '@anxin/shared'
  * 常规回答卡（M3-T2 · PRD §7.5）——L1/L2/L3/manual-gate/no-source/ai-unavailable 各分支的统一渲染。
  *
  * 结构（照搬 demo/src/pages/Consult.tsx 的 answer-structured 模式）：
- * - 顶部：RiskBadge（语义色+文字）+ status 徽章（中文 label）
  * - 中部：sections 结构化（简明结论 / 需要知道 / 注意风险 / 下一步 / 提示）
  * - 底部：notice（L2 过滤提示 / no-source 兜底 / ai-unavailable 降级）+ l0Notice（manual 档）+ CitationsList
+ *
+ * 风险等级 / 状态 / 来源徽章按产品新口径从患者界面移除（仅保留正文与 citations）。
  *
  * ⚠️ L4 走 EmergencyCard（不走本卡）；本卡渲染时 blocked 可能为 true（L3/manual-gate），
  *    此时 sections 为守门固定文案（不是 LLM 生成），前端仍全量渲染（用户需看到拒答原因）。
  *
- * 意图路由 T5：新增 data-answered 分支（药箱数据查询，后端模板直查库，0 LLM）——
- *    status 徽章「数据查询」+ toolUsed 小字徽章（如「来源：药箱清单」）；
+ * 意图路由 T5：data-answered 分支（药箱数据查询，后端模板直查库，0 LLM）——
  *    citations 为 DB 来源（drugName='我的用药数据'），CitationsList 自然渲染无需特处理。
  */
-
-/** status → 中文 label（老年向：文字说明，不单靠颜色；icon 可选，仅 data-answered 用）。 */
-const STATUS_META: Record<
-  ConsultStatus,
-  { label: string; className: string; icon?: typeof Database }
-> = {
-  answered: { label: '已回答', className: 'border-risk-l1/30 bg-risk-l1/10 text-risk-l1' },
-  limited: { label: '已过滤剂量', className: 'border-risk-l2/30 bg-risk-l2/10 text-risk-l2' },
-  refused: { label: '已拒答', className: 'border-risk-l3/35 bg-risk-l3/15 text-risk-l3' },
-  emergency: { label: '紧急', className: 'border-risk-l4/35 bg-risk-l4/15 text-risk-l4' },
-  'manual-gate': { label: '仅资料查询', className: 'border-muted-foreground/30 bg-muted text-muted-foreground' },
-  'no-source': { label: '本地未收录', className: 'border-muted-foreground/30 bg-muted text-muted-foreground' },
-  'ai-unavailable': { label: 'AI 降级', className: 'border-muted-foreground/30 bg-muted text-muted-foreground' },
-  // 数据查询（意图路由 T5）：非 LLM 生成，用主题色与「已回答」区分；徽章带 Database 图标强化「查库」语义。
-  'data-answered': { label: '数据查询', className: 'border-primary/30 bg-primary/10 text-primary', icon: Database },
-}
-
-/** toolUsed → 中文徽章名（意图路由 T5；值与后端 intent.ts QueryIntent 五值对齐，未知值不渲染）。 */
-const TOOL_LABELS: Record<string, string> = {
-  'medication-list': '药箱清单',
-  adherence: '依从性统计',
-  'expiry-stock': '效期与库存',
-  'interaction-check': '相互作用检查',
-  'next-dose': '今日待服',
-}
 
 export interface AnswerCardProps {
   riskLevel: RiskLevel
@@ -85,43 +59,17 @@ export function buildSpeakText(sections: ConsultSections | null, answer: string,
 }
 
 export function AnswerCard({
-  riskLevel,
-  status,
   answer,
   sections,
   citations,
   notice,
   l0Notice,
   blocked,
-  toolUsed,
 }: AnswerCardProps) {
-  const statusMeta = STATUS_META[status]
-  const StatusIcon = statusMeta.icon
-  // toolUsed 小字徽章（仅映射表内的已知工具渲染；老年向：文字说明，不单靠颜色/图标）。
-  const toolLabel = toolUsed ? TOOL_LABELS[toolUsed] : undefined
-
   return (
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
       <CardContent className="space-y-3 p-4">
-        {/* 顶部：RiskBadge + status 徽章 + toolUsed 小字徽章（播放入口已移到页头部，见 Consult.tsx）；
-            no-source 不渲染 RiskBadge——后端 no-source 固定为 L1（无个体化建议=低风险），但
-            「低风险」与正文"无法回答"语义打架，状态徽章「本地未收录」已足够表意 */}
-        <div className="flex flex-wrap items-center gap-2">
-          {status !== 'no-source' && <RiskBadge level={riskLevel} showHint />}
-          <span
-            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusMeta.className}`}
-          >
-            {StatusIcon && <StatusIcon className="size-3.5 shrink-0" aria-hidden />}
-            {statusMeta.label}
-          </span>
-          {toolLabel && (
-            <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
-              来源：{toolLabel}
-            </span>
-          )}
-        </div>
-
         {/* 中部：sections 结构化（如有）；否则仅 answer 一句话 */}
         {sections ? (
           <div className="space-y-3">

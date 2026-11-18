@@ -109,8 +109,6 @@ test.describe('curated 规则真实咨询 UI（模拟患者 · 0 次 LLM）', ()
 
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('数据查询')).toBeVisible()
-    await expect(card.getByText('来源：相互作用检查')).toBeVisible()
     await expect(card.getByText('当前在服药品组合检出 5 项相互作用提示。')).toBeVisible()
 
     // 三级提示 + 具体药名（note 很长，只断言前缀与药名，避免把整段说明书原文写死）

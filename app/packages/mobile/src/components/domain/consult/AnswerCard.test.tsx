@@ -47,7 +47,7 @@ describe("AnswerCard · 状态分支", () => {
     expect(view.getByText(/版本：2025-01/)).toBeTruthy();
   });
 
-  it("L2 limited 显示已过滤剂量与 notice", async () => {
+  it("L2 limited 显示 notice（状态徽章已移除）", async () => {
     const view = await render(
       <AnswerCard
         riskLevel="L2"
@@ -59,11 +59,11 @@ describe("AnswerCard · 状态分支", () => {
       />,
     );
 
-    expect(view.getByText("已过滤剂量")).toBeTruthy();
+    expect(view.queryByText("已过滤剂量")).toBeNull();
     expect(view.getByText("已过滤具体剂量建议。")).toBeTruthy();
   });
 
-  it("L3 refused 显示已拒答与 blocked 文案", async () => {
+  it("L3 refused 渲染拒答文案与 blocked 边框", async () => {
     const view = await render(
       <AnswerCard
         riskLevel="L3"
@@ -75,11 +75,11 @@ describe("AnswerCard · 状态分支", () => {
       />,
     );
 
-    expect(view.getByText("已拒答")).toBeTruthy();
+    expect(view.queryByText("已拒答")).toBeNull();
     expect(view.getByText("我不能建议你自行增减剂量、停药或换药。")).toBeTruthy();
   });
 
-  it("manual-gate 显示仅资料查询与 l0Notice", async () => {
+  it("manual-gate 渲染 l0Notice（状态徽章已移除）", async () => {
     const view = await render(
       <AnswerCard
         riskLevel="L1"
@@ -91,11 +91,11 @@ describe("AnswerCard · 状态分支", () => {
       />,
     );
 
-    expect(view.getByText("仅资料查询")).toBeTruthy();
+    expect(view.queryByText("仅资料查询")).toBeNull();
     expect(view.getByText("仅可查询药品资料。")).toBeTruthy();
   });
 
-  it("data-answered 显示数据查询徽章与来源工具", async () => {
+  it("data-answered 渲染纯文本回答（数据查询/来源徽章已移除）", async () => {
     const view = await render(
       <AnswerCard
         riskLevel="L1"
@@ -107,7 +107,8 @@ describe("AnswerCard · 状态分支", () => {
       />,
     );
 
-    expect(view.getByText("数据查询")).toBeTruthy();
-    expect(view.getByText("来源：药箱清单")).toBeTruthy();
+    expect(view.queryByText("数据查询")).toBeNull();
+    expect(view.queryByText("来源：药箱清单")).toBeNull();
+    expect(view.getByText("你的药箱有 5 种药。")).toBeTruthy();
   });
 });

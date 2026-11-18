@@ -70,11 +70,9 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
     await page.locator('textarea').fill('我现在有多少药物')
     await page.getByRole('button', { name: '发送' }).click()
 
-    // UI：回答卡（scoped 避开 DrugSelector 中同名药 chip）—— data-answered 徽章 + toolUsed 小字 + 两支自建药名
+    // UI：回答卡（scoped 避开 DrugSelector 中同名药 chip）—— 两支自建药名（风险/状态/来源徽章已按新口径移除）
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('数据查询')).toBeVisible()
-    await expect(card.getByText('来源：药箱清单')).toBeVisible()
     await expect(card.getByText(DRUG_A)).toBeVisible()
     await expect(card.getByText(DRUG_B)).toBeVisible()
 
@@ -97,11 +95,9 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
     // 点击数据查询类快捷问题（始终可点，无需选药）
     await page.getByRole('button', { name: '我的依从性怎么样？' }).click()
 
-    // UI：data-answered 徽章 + adherence toolUsed 小字 + 空数据友好文案（新库无 records → total=0）
+    // UI：空数据友好文案（新库无 records → total=0；徽章已按新口径移除）
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('数据查询')).toBeVisible()
-    await expect(card.getByText('来源：依从性统计')).toBeVisible()
     await expect(card.getByText(/还没有服药打卡记录/)).toBeVisible()
 
     // 结构：adherence 路径同样 0 次 LLM 调用
@@ -130,8 +126,6 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
 
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('数据查询')).toBeVisible()
-    await expect(card.getByText('来源：效期与库存')).toBeVisible()
     // 先答所问（空桶明说），库存以「另外发现」附带——不得只报库存
     await expect(card.getByText(/你的药箱里没有过期或 30 天内到期的药品/)).toBeVisible()
     await expect(card.getByText(/另外发现库存不足：E2E库存不足药（库存剩余 1 支）/)).toBeVisible()
@@ -178,8 +172,6 @@ test.describe('数据查询咨询 E2E（意图路由 · 0 次 LLM）', () => {
 
     const card = page.getByTestId('consult-answer-card')
     await expect(card).toBeVisible()
-    await expect(card.getByText('数据查询')).toBeVisible()
-    await expect(card.getByText('来源：今日待服')).toBeVisible()
     await expect(card.getByText(/今天共 2 次服药安排：已完成 1 次、待处理 1 次/)).toBeVisible()
     await expect(card.getByText(/08:00 E2E今日药 · 已服/)).toBeVisible()
     await expect(card.getByText(/20:00 E2E今日药 · 待服/)).toBeVisible()
