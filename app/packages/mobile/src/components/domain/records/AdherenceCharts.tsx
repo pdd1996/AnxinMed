@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import { BarChart } from "react-native-gifted-charts";
 import { fetchMyAdherenceSeries, type MyAdherenceSeriesDto } from "@anxin/core";
+import Svg, { Rect } from "react-native-svg";
 import { useFontScale } from "@/stores/fontScale";
 
 const DAY_OPTIONS = [7, 30] as const;
@@ -18,11 +19,15 @@ type Palette = { taken: string; skipped: string; later: string; muted: string };
 /** 图例与堆叠顺序（照 web：已服/漏服/延后，顺序即堆叠顺序）。 */
 const KINDS = ["已服", "漏服", "延后"] as const;
 
-/** 堆叠柱：空值补 0，跨天标签每 7 天一个（30 天全标会糊成一片）。 */
+/**
+ * 堆叠柱：空值补 0；长窗口（>10 天）每 7 天标一个日期，且**最后两个点位不标**——
+ * 末点标签会在图表右边界被裁成「11-1」，留着反而误导；7 天窗口每点都标（间距足够）。
+ */
 export function buildDailyStackData(series: Series, palette: Palette, labelFontSize: number) {
   const step = series.length > 10 ? 7 : 1;
   return series.map((d, i) => ({
-    label: i % step === 0 || i === series.length - 1 ? d.date.slice(5) : "",
+    label:
+      step === 1 || (i % step === 0 && i <= series.length - 3) ? d.date.slice(5) : "",
     labelWidth: 32,
     labelsDistanceFromXaxis: 6,
     labelTextStyle: { fontSize: labelFontSize, color: palette.muted },
@@ -40,11 +45,14 @@ export function buildExpectedLine(series: Series) {
   return series.map((d) => ({ value: d.expected }));
 }
 
-/** 按药品水平堆叠：药名过长时截断（图表区只有 ~96dp 给标签）。 */
+/**
+ * 按药品水平堆叠：药名**不再按 6 字截断**（之前截成「苯磺酸氨氯地…」读不出是哪个药）；
+ * 改为自绘横向比例条（不再用 gifted-charts 的 horizontal 模式——该模式在本库对堆叠支持不稳，
+ * 图上只剩网格、柱子不出现）。这里只做数据映射，渲染在组件里用 View 拼。
+ */
 export function buildByDrugStackData(byDrug: ByDrug, palette: Palette, labelFontSize: number) {
   return byDrug.map((d) => ({
-    label: d.genericName.length > 6 ? `${d.genericName.slice(0, 6)}…` : d.genericName,
-    labelWidth: 92,
+    label: d.genericName,
     labelTextStyle: { fontSize: labelFontSize, color: palette.muted },
     stacks: [
       { value: d.taken, color: palette.taken },
@@ -137,8 +145,7 @@ export function AdherenceCharts() {
     const expected = buildExpectedLine(series);
     const perDrug = buildByDrugStackData(byDrug, palette, labelFontSize);
     const dailyLayout = layoutBars(plotWidth, daily.length);
-    const drugLayout = layoutBars(Math.max(90, plotWidth - 96), Math.max(1, perDrug.length));
-    return { daily, expected, perDrug, dailyLayout, drugLayout, maxValue: niceMax(series, byDrug) };
+    return { daily, expected, perDrug, dailyLayout, maxValue: niceMax(series, byDrug) };
   }, [series, byDrug, palette, labelFontSize, plotWidth]);
 
   return (
@@ -200,12 +207,13 @@ export function AdherenceCharts() {
             accessibilityLabel={`近 ${days} 天按日打卡堆叠柱状图，虚线为当日应服次数`}
           >
             <BarChart
-              data={charts.daily}
+              stackData={charts.daily}
               {...charts.dailyLayout}
               width={plotWidth}
               height={200}
-              initialSpacing={12}
-              endSpacing={12}
+              initialSpacing={16}
+              endSpacing={32}
+              autoShiftLabels
               barBorderTopLeftRadius={2}
               barBorderTopRightRadius={2}
               noOfSections={3}
@@ -236,31 +244,46 @@ export function AdherenceCharts() {
           </Text>
 
           {charts.perDrug.length > 0 ? (
-            <View
-              className="mt-4"
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel={`近 ${days} 天按药品打卡数量水平条形图`}
-            >
-              <Text className="mb-1 text-base font-semibold text-card-foreground">按药品看</Text>
-              <BarChart
-                data={charts.perDrug}
-                {...charts.drugLayout}
-                horizontal
-                width={plotWidth}
-                height={Math.max(140, charts.perDrug.length * 56)}
-                initialSpacing={10}
-                endSpacing={10}
-                barBorderTopRightRadius={2}
-                barBorderBottomRightRadius={2}
-                noOfSections={3}
-                maxValue={charts.maxValue}
-                yAxisLabelWidth={96}
-                yAxisTextStyle={{ fontSize: tickFontSize, color: palette.muted }}
-                rulesColor={palette.muted}
-                rulesType="dotted"
-                allowFontScaling={false}
-              />
+            <View className="mt-4 gap-3">
+              <Text className="text-base font-semibold text-card-foreground">按药品看</Text>
+              {/* 自绘横向堆叠条：药名完整展示（换行），条长按最大刻度归一。不用 gifted-charts 的
+                  horizontal 模式——该模式在本库对堆叠支持不稳（图上只剩网格、没有柱子）。 */}
+              {charts.perDrug.map((row) => {
+                const total = row.stacks.reduce((sum, seg) => sum + seg.value, 0);
+                return (
+                  <View key={row.label} className="gap-1">
+                    <View className="flex-row items-center justify-between gap-3">
+                      <Text className="min-w-0 flex-1 text-sm font-medium text-card-foreground">
+                        {row.label}
+                      </Text>
+                      <Text className="shrink-0 text-xs text-muted-foreground">{total} 次</Text>
+                    </View>
+                    <View className="h-3 overflow-hidden rounded-full bg-muted">
+                      <Svg width={plotWidth} height={12}>
+                        {(() => {
+                          let cursor = 0;
+                          return row.stacks.map((seg, index) => {
+                            if (seg.value <= 0) return null;
+                            const x = (cursor / charts.maxValue) * plotWidth;
+                            const width = (seg.value / charts.maxValue) * plotWidth;
+                            cursor += seg.value;
+                            return (
+                              <Rect
+                                key={index}
+                                x={x}
+                                y={0}
+                                width={width}
+                                height={12}
+                                fill={[palette.taken, palette.skipped, palette.later][index]}
+                              />
+                            );
+                          });
+                        })()}
+                      </Svg>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <Text className="mt-4 rounded-xl border border-dashed border-border p-3 text-sm leading-5 text-muted-foreground">

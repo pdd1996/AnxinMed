@@ -5,11 +5,10 @@ import type { Citation, ConsultSections, ConsultStatus, RiskLevel } from "@anxin
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
-import { CitationsList } from "./CitationsList";
 
 /**
  * 常规回答卡（照 web `components/domain/consult/AnswerCard.tsx` 重写渲染层）。
- * 结构：sections 五段 → notice/l0Notice → citations 折叠。
+ * 结构：sections 五段 → notice/l0Notice。
  * L4 不走本卡（EmergencyCard）；blocked=true 时仍全量渲染守门固定文案（用户需要看到拒答原因）。
  *
  * 风险等级/状态/来源徽章按产品新口径从患者界面移除（仅保留正文与 citations）。
@@ -56,7 +55,6 @@ export function buildSpeakText(
 export function AnswerCard({
   answer,
   sections,
-  citations,
   notice,
   l0Notice,
   blocked,
@@ -149,8 +147,6 @@ export function AnswerCard({
           <Text className="flex-1 text-sm leading-5 text-muted-foreground">{l0Notice}</Text>
         </View>
       ) : null}
-
-      <CitationsList citations={citations} />
     </View>
   );
 }

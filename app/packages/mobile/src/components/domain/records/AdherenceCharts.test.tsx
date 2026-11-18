@@ -80,7 +80,10 @@ describe("AdherenceCharts · 数据映射（纯函数）", () => {
     expect(stack[0].label).toBe("10-01");
     expect(stack[1].label).toBe("");
     expect(stack[7].label).toBe("10-08");
-    expect(stack[29].label).toBe("10-30");
+    // 长窗口每 7 天标一个，末两个点位不标（避免右边界把「11-17」裁成「11-1」）
+    expect(stack[21].label).toBe("10-22");
+    expect(stack[28].label).toBe("");
+    expect(stack[29].label).toBe("");
   });
 
   it("按日堆叠：7 天窗口每天都有标签", () => {
@@ -94,9 +97,9 @@ describe("AdherenceCharts · 数据映射（纯函数）", () => {
     expect(buildExpectedLine(zero)).toBeNull();
   });
 
-  it("按药品水平堆叠：药名超 6 字截断，三态保留", () => {
+  it("按药品水平堆叠：药名完整展示（不再 6 字截断），三态保留", () => {
     const rows = buildByDrugStackData(makeData(7).byDrug, palette, 10);
-    expect(rows[0].label).toBe("玻璃酸钠滴眼…");
+    expect(rows[0].label).toBe("玻璃酸钠滴眼液");
     expect(rows[0].stacks.map((s) => s.value)).toEqual([7, 3, 2]);
   });
 
@@ -124,7 +127,7 @@ describe("AdherenceCharts · 三态", () => {
     expect(view.getByText("正在加载打卡数据…")).toBeTruthy();
   });
 
-  it("成功：默认 30 天，两张图与执行率脚注齐出", async () => {
+  it("成功：默认 30 天，趋势图 + 按药品比例条 + 执行率脚注齐出", async () => {
     mockedFetch.mockResolvedValue(makeData(30));
     const view = await renderWithQuery(<AdherenceCharts />);
 
@@ -134,14 +137,15 @@ describe("AdherenceCharts · 三态", () => {
     expect(view.getByText("打卡趋势")).toBeTruthy();
 
     const daily = chartProps[0];
-    expect((daily.data as unknown[]).length).toBe(30);
+    expect((daily.stackData as unknown[]).length).toBe(30);
     expect(daily.showLine).toBe(true);
     expect((daily.lineConfig as { strokeDashArray: number[] }).strokeDashArray).toEqual([4, 4]);
     expect((daily.lineData as unknown[]).length).toBe(30);
 
-    const byDrug = chartProps[1];
-    expect(byDrug.horizontal).toBe(true);
-    expect((byDrug.data as unknown[]).length).toBe(1);
+    // 按药品看：自绘比例条（不再用 BarChart 的 horizontal 模式），药名完整可读
+    expect(chartProps).toHaveLength(1);
+    expect(view.getByText("按药品看")).toBeTruthy();
+    expect(view.getByText("玻璃酸钠滴眼液")).toBeTruthy();
   });
 
   it("无任何打卡：显示引导空态，不画图", async () => {

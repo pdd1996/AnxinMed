@@ -1,12 +1,13 @@
 /**
- * M3-T2 · AnswerCard 组件断言（spec §T2 完成标准：四风险等级 UI 状态全部可达 + citations 透传无丢失）。
+ * M3-T2 · AnswerCard 组件断言（spec §T2 完成标准：四风险等级 UI 状态全部可达）。
  *
  * 纯 props 驱动（不 mock API）：断言各 riskLevel/status 分支的渲染产物。
- * 风险等级/状态/来源徽章已按产品新口径移除，测试改为断言「徽章不出现、正文仍完整」。
+ * 风险等级/状态/来源徽章、以及底部 citations 折叠区已按产品新口径移除，
+ * 测试改为断言「这些元素不出现、正文仍完整」。
  */
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import type { Citation, ConsultSections } from '@anxin/shared'
+import { render, screen, cleanup } from '@testing-library/react'
+import type { ConsultSections } from '@anxin/shared'
 import { AnswerCard } from './AnswerCard'
 
 afterEach(cleanup)
@@ -20,29 +21,23 @@ const mkSections = (overrides: Partial<ConsultSections> = {}): ConsultSections =
   ...overrides,
 })
 
-const mkCitation = (overrides: Partial<Citation> = {}): Citation => ({
-  drugName: '玻璃酸钠滴眼液',
-  source: '丁香园用药助手',
-  version: '2024-01',
-  unverified: false,
-  ...overrides,
-})
-
 describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', () => {
-  it('L1 answered → 结构化 sections + citations 三件套', () => {
+  it('L1 answered → 结构化 sections（徽章与 citations 已移除）', () => {
     render(
       <AnswerCard
         riskLevel="L1"
         status="answered"
         answer="该药用于缓解干眼症状"
         sections={mkSections()}
-        citations={[mkCitation()]}
+        citations={[]}
       />,
     )
     // 风险/状态徽章已移除
     expect(screen.queryByText('低风险')).toBeNull()
     expect(screen.queryByText('可参考说明书')).toBeNull()
     expect(screen.queryByText('已回答')).toBeNull()
+    // citations 折叠区已移除
+    expect(screen.queryByText(/来源 1 条/)).toBeNull()
     // sections 结构化
     expect(screen.getByText('简明结论')).toBeTruthy()
     expect(screen.getByText('该药用于缓解干眼症状')).toBeTruthy()
@@ -52,9 +47,6 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('偶见眼部刺激感')).toBeTruthy()
     expect(screen.getByText('下一步')).toBeTruthy()
     expect(screen.getByText('如症状持续请咨询眼科医生')).toBeTruthy()
-    // citations 折叠（默认收起，仅显示"来源 1 条"；文本被 <strong> 分割，用正则匹配）
-    expect(screen.getByText(/来源/)).toBeTruthy()
-    expect(screen.getByText('1')).toBeTruthy()
   })
 
   it('M11-T2：提示卡短摘要 + details 展开原文（逐字 note 不进摘要）', () => {
@@ -85,7 +77,7 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         status="limited"
         answer="已过滤剂量"
         sections={mkSections({ summary: '已过滤具体剂量建议', nextAction: '具体用量和疗程请按医生处方或说明书执行。' })}
-        citations={[mkCitation()]}
+        citations={[]}
         notice="已过滤具体剂量建议。用量请按医生处方或说明书执行。"
       />,
     )
@@ -120,7 +112,7 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         status="manual-gate"
         answer="手动建档药仅可 L0 资料查询"
         sections={mkSections({ summary: '手动建档药仅可 L0 资料查询' })}
-        citations={[mkCitation()]}
+        citations={[]}
         l0Notice="该药品为用户手动建档（未经 OCR 确认），AI 个性化咨询不可用，仅可查询药品资料（L0）。"
         blocked
       />,
@@ -151,67 +143,12 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         status="answered"
         answer="降级回答"
         sections={mkSections({ summary: '降级回答' })}
-        citations={[mkCitation()]}
+        citations={[]}
         notice="百川服务不可用，回答由本地说明书库规则拼装（演示降级）。"
       />,
     )
     // status 仍为 answered（降级路径也返回 L1 正常回答）
     expect(screen.queryByText('已回答')).toBeNull()
     expect(screen.getByText(/百川服务不可用/)).toBeTruthy()
-  })
-})
-
-describe('AnswerCard · citations 透传无丢失（spec §T2 完成标准）', () => {
-  it('citations 三件套（药名 + source + version）全量渲染', () => {
-    render(
-      <AnswerCard
-        riskLevel="L1"
-        status="answered"
-        answer="回答"
-        sections={mkSections()}
-        citations={[
-          mkCitation({ drugName: '药A', source: '来源A', version: 'v1' }),
-          mkCitation({ drugName: '药B', source: '来源B', version: 'v2' }),
-        ]}
-      />,
-    )
-    // 默认收起，点击展开
-    const toggle = screen.getByRole('button', { name: /来源/ })
-    fireEvent.click(toggle)
-    // 两条 citation 全量渲染（无丢失）
-    expect(screen.getByText('药A')).toBeTruthy()
-    expect(screen.getByText('来源A')).toBeTruthy()
-    expect(screen.getByText('v1')).toBeTruthy()
-    expect(screen.getByText('药B')).toBeTruthy()
-    expect(screen.getByText('来源B')).toBeTruthy()
-    expect(screen.getByText('v2')).toBeTruthy()
-  })
-
-  it('unverified=true → 渲染 "未经本库核实" 徽章（网络检索兜底）', () => {
-    render(
-      <AnswerCard
-        riskLevel="L1"
-        status="answered"
-        answer="回答"
-        sections={mkSections()}
-        citations={[mkCitation({ source: 'Baichuan 医疗搜索（网络检索）', unverified: true })]}
-      />,
-    )
-    const toggle = screen.getByRole('button', { name: /来源/ })
-    fireEvent.click(toggle)
-    expect(screen.getByText('未经本库核实')).toBeTruthy()
-  })
-
-  it('citations 空数组 → 不渲染折叠区（不占空间）', () => {
-    render(
-      <AnswerCard
-        riskLevel="L1"
-        status="answered"
-        answer="回答"
-        sections={mkSections()}
-        citations={[]}
-      />,
-    )
-    expect(screen.queryByRole('button', { name: /来源/ })).toBeNull()
   })
 })

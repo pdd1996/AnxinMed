@@ -1,7 +1,6 @@
 import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
 import type { ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { Card, CardContent } from '@/components/ui/card'
-import { CitationsList } from './CitationsList'
 import type { Citation } from '@anxin/shared'
 
 /**
@@ -61,7 +60,6 @@ export function buildSpeakText(sections: ConsultSections | null, answer: string,
 export function AnswerCard({
   answer,
   sections,
-  citations,
   notice,
   l0Notice,
   blocked,
@@ -162,9 +160,6 @@ export function AnswerCard({
             {l0Notice}
           </p>
         )}
-
-        {/* 底部：citations 折叠（三件套：药名 + source + version） */}
-        <CitationsList citations={citations} />
       </CardContent>
     </Card>
   )

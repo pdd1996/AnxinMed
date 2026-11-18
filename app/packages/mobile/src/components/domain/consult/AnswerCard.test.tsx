@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { fireEvent, render } from "@testing-library/react-native";
+import { render } from "@testing-library/react-native";
 import type { ConsultSections } from "@anxin/shared";
 import { AnswerCard } from "./AnswerCard";
 
@@ -11,24 +11,15 @@ const sections: ConsultSections = {
   warning: "警示语",
 };
 
-const citations = [
-  {
-    drugName: "玻璃酸钠滴眼液",
-    source: "说明书",
-    version: "2025-01",
-    sectionKey: "indication",
-  },
-];
-
 describe("AnswerCard · 状态分支", () => {
-  it("L1 answered 渲染五段与 citations 折叠", async () => {
+  it("L1 answered 渲染五段", async () => {
     const view = await render(
       <AnswerCard
         riskLevel="L1"
         status="answered"
         answer="回答"
         sections={sections}
-        citations={citations}
+        citations={[]}
       />,
     );
 
@@ -40,11 +31,6 @@ describe("AnswerCard · 状态分支", () => {
     expect(view.getByText("风险一")).toBeTruthy();
     expect(view.getByText("下一步")).toBeTruthy();
     expect(view.getByText("警示语")).toBeTruthy();
-
-    expect(view.queryByText("玻璃酸钠滴眼液")).toBeNull();
-    await fireEvent.press(view.getByRole("button"));
-    expect(view.getByText("玻璃酸钠滴眼液")).toBeTruthy();
-    expect(view.getByText(/版本：2025-01/)).toBeTruthy();
   });
 
   it("L2 limited 显示 notice（状态徽章已移除）", async () => {
