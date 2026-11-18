@@ -220,15 +220,19 @@ export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name'),                                    // 姓名
   email: text('email').unique(),                         // 邮箱（唯一，Better Auth 兼容）
-  phone: text('phone'),                                  // 手机号（P1 验证码登录预留）
+  phone: text('phone'),                                  // 手机号（P1 验证码登录/注册唯一标识；null = 未绑定）
 
   username: text('username').unique(),                   // G7 登录账号（唯一；null = 未开通登录）
   passwordHash: text('password_hash'),                   // G7 密码哈希（scrypt$N$r$p$salt$hash；null = 未开通）
   passwordUpdatedAt: timestamp('password_updated_at'),   // G7 上次设密时间（审计/重置留痕）
+  phoneVerifiedAt: timestamp('phone_verified_at'),       // P1 手机号最近一次验证通过时间（短信核验成功）
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (table) => [
+  // 手机号登录标识唯一（PG 默认 NULLS DISTINCT：多行 null 不冲突，兼容既有未绑定用户）。
+  uniqueIndex('users_phone_uq').on(table.phone),
+])
 
 // ---------------------------------------------------------------------------
 // sessions · 登录会话（G7 · ADR #20 增补）

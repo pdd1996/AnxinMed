@@ -7,14 +7,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   fetchAuthMe: vi.fn(),
   loginWithPassword: vi.fn(),
+  loginWithPhone: vi.fn(),
   logoutSession: vi.fn(),
+  requestPhoneLoginCode: vi.fn(),
   setAuthToken: vi.fn(),
 }))
 
 vi.mock('../api/auth', () => ({
   fetchAuthMe: mocks.fetchAuthMe,
   loginWithPassword: mocks.loginWithPassword,
+  loginWithPhone: mocks.loginWithPhone,
   logoutSession: mocks.logoutSession,
+  requestPhoneLoginCode: mocks.requestPhoneLoginCode,
 }))
 
 vi.mock('../api/client', () => {
@@ -32,7 +36,7 @@ vi.mock('../api/client', () => {
 })
 
 import { ApiRequestError } from '../api/client'
-import { bootstrapAuth, setAuthTokenStorage, signIn, signOut } from './auth'
+import { bootstrapAuth, requestPhoneCode, setAuthTokenStorage, signIn, signInWithPhone, signOut } from './auth'
 import { useAuthStore } from '../stores/auth'
 
 const DEMO_USER = { id: 'p-001', name: '张某某', username: null }
@@ -141,5 +145,47 @@ describe('signIn / signOut', () => {
     expect(storage.clear).toHaveBeenCalled()
     expect(mocks.setAuthToken).toHaveBeenLastCalledWith(null)
     expect(useAuthStore.getState().status).toBe('anonymous')
+  })
+})
+
+describe('手机号验证码登录（P1）', () => {
+  it('requestPhoneCode → 透传发码结果（冷却/有效期/短信落款），供登录页倒计时与防诈骗提示', async () => {
+    const payload = {
+      ok: true,
+      mode: 'password',
+      cooldownSec: 60,
+      expiresInSec: 300,
+      signName: '恒创联众',
+    }
+    mocks.requestPhoneLoginCode.mockResolvedValue(payload)
+
+    await expect(requestPhoneCode('13800138000')).resolves.toEqual(payload)
+    expect(mocks.requestPhoneLoginCode).toHaveBeenCalledWith('13800138000')
+  })
+
+  it('signInWithPhone 成功 → 持久化 token + authenticated，返回 created（是否自动注册）', async () => {
+    mocks.loginWithPhone.mockResolvedValue({
+      ok: true,
+      mode: 'password',
+      token: 'phone-token',
+      user: REAL_USER,
+      created: true,
+    })
+
+    await expect(signInWithPhone('13800138000', '123456')).resolves.toEqual({ created: true })
+    expect(mocks.loginWithPhone).toHaveBeenCalledWith('13800138000', '123456')
+    expect(storage.save).toHaveBeenCalledWith('phone-token')
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().user).toEqual(REAL_USER)
+  })
+
+  it('验证码错误 → 状态不变、错误原样抛给登录页（不吞错、不假装登录成功）', async () => {
+    mocks.loginWithPhone.mockRejectedValue(
+      new ApiRequestError('验证码错误或已过期，请重新获取', 'AUTH_CODE_INVALID', 401),
+    )
+
+    await expect(signInWithPhone('13800138000', '000000')).rejects.toThrow('验证码错误或已过期')
+    expect(storage.save).not.toHaveBeenCalled()
+    expect(useAuthStore.getState().status).toBe('idle')
   })
 })

@@ -92,6 +92,13 @@
       "when": 1794925371244,
       "tag": "0012_g7_auth_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794979049741,
+      "tag": "0013_powerful_talon",
+      "breakpoints": true
     }
   ]
 }

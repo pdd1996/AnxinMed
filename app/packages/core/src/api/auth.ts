@@ -17,6 +17,28 @@ export async function loginWithPassword(username: string, password: string) {
   return data
 }
 
+/**
+ * 发送手机号登录/注册验证码（P1）。
+ * 成功返回 { cooldownSec, expiresInSec, signName }——登录页用倒计时与「短信落款为 XX」提示。
+ * 失败抛 ApiRequestError（SMS_LIMITED / SMS_SEND_FAILED / SMS_NOT_CONFIGURED / VALIDATION），
+ * 页面自己渲染可读文案（silent：不叠全局 toast，避免同一条错误说两遍）。
+ */
+export async function requestPhoneLoginCode(phone: string) {
+  const res = await client.api.auth.phone['send-code'].$post({ json: { phone } })
+  return unwrap(res, { silent: true })
+}
+
+/**
+ * 手机号 + 验证码登录/注册（P1，验证码即注册）：成功等同密码登录——
+ * 写 Bearer、返回 { mode, token, user, created }；created=true 表示本次自动建号。
+ */
+export async function loginWithPhone(phone: string, code: string) {
+  const res = await client.api.auth.phone.login.$post({ json: { phone, code } })
+  const data = await unwrap(res, { silent: true })
+  setAuthToken(data.token)
+  return data
+}
+
 /** 当前登录态（demo 模式返回 mode='demo' + p-001，不出现登录页）。 */
 export async function fetchAuthMe() {
   const res = await client.api.auth.me.$get()

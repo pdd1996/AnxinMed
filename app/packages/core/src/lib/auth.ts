@@ -10,7 +10,14 @@
  */
 import { ERR_CODES } from '@anxin/shared'
 import { ApiRequestError, setAuthToken } from '../api/client'
-import { fetchAuthMe, loginWithPassword, logoutSession, updateMeName } from '../api/auth'
+import {
+  fetchAuthMe,
+  loginWithPassword,
+  loginWithPhone,
+  logoutSession,
+  requestPhoneLoginCode,
+  updateMeName,
+} from '../api/auth'
 import { useAuthStore } from '../stores/auth'
 import { toUserMessage } from './errors'
 
@@ -98,6 +105,31 @@ export async function signIn(username: string, password: string): Promise<void> 
     // 持久化失败仍保留内存登录态（本机临时可用），下次启动需重新登录。
   }
   authStore().setAuthenticated(data.mode, data.user)
+}
+
+/**
+ * 发送手机号验证码（P1 登录页「获取验证码」）。
+ * 成功返回 { cooldownSec, expiresInSec, signName }（页面倒计时 + 落款提示）；
+ * 失败原样抛（SMS_LIMITED / SMS_SEND_FAILED / SMS_NOT_CONFIGURED 的 message 已是中文可读）。
+ */
+export async function requestPhoneCode(phone: string) {
+  return requestPhoneLoginCode(phone)
+}
+
+/**
+ * 手机号 + 验证码登录/注册（P1，验证码即注册）：成功后写 token 持久化并切 authenticated。
+ * 返回 { created }：true = 本次自动创建了新账号（页面可提示「注册成功」）。
+ * 失败原样抛给登录页（AUTH_CODE_INVALID / SMS_* / 校验文案）。
+ */
+export async function signInWithPhone(phone: string, code: string): Promise<{ created: boolean }> {
+  const data = await loginWithPhone(phone, code)
+  try {
+    await tokenStorage?.save(data.token)
+  } catch {
+    // 同 signIn：持久化失败不阻断本次登录。
+  }
+  authStore().setAuthenticated(data.mode, data.user)
+  return { created: data.created }
 }
 
 /** 退出登录：服务端删 session（失败也继续），本地 token/状态一并清空。 */

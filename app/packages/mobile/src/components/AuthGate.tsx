@@ -1,9 +1,17 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
-import { ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { ShieldAlert } from "lucide-react-native";
-import { bootstrapAuth, signIn, toUserMessage, useAuthStore } from "@anxin/core";
+import { PHONE_PATTERN } from "@anxin/shared";
+import {
+  bootstrapAuth,
+  requestPhoneCode,
+  signIn,
+  signInWithPhone,
+  toUserMessage,
+  useAuthStore,
+} from "@anxin/core";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,22 +24,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Text } from "@/components/ui/text";
 
+type LoginMode = "password" | "phone";
+
 /**
- * 登录门（G7）：在首用声明卡之后、路由之前确认登录态，取代 web 的「RequireAuth + /login 路由」。
+ * 登录门（G7 密码 · P1 手机号验证码）：在首用声明卡之后、路由之前确认登录态，
+ * 取代 web 的「RequireAuth + /login 路由」。
  *
  * 状态机在 @anxin/core 的 useAuthStore + bootstrapAuth，本组件只做渲染分支：
  * - idle/loading：启动恢复中 → 全屏「正在检查登录状态」，避免先闪一下业务页再弹登录；
  * - error：检查本身失败（网络/服务异常）→ 说明 + 重试，不静默当作未登录；
- * - anonymous：password 模式的登录界面（就渲染在本组件里，不新增登录路由）；
+ * - anonymous：password 模式的登录界面（密码 / 手机号验证码两种方式，渲染在本组件里，不新增路由）；
  * - authenticated：直接渲染 children（demo 模式自动通过，既有本地开发行为不变）。
  *
  * error 在 core/bootstrapAuth 写入 store 前已归成中文（G8）；这里再过一次 toUserMessage
- * 只作兜底，保证任何来源的技术英文都不会直接上屏（G7 真机验收 §9.8 的返工点）。
+ * 只作兜底，保证任何来源的技术英文都不会直接上屏。
+ *
+ * 手机号方式为「验证码即注册」：未注册手机号验码通过后由服务端自动建号并发会话；
+ * 短信落款签名由服务端返回并展示，减少老年用户把验证码短信误判为诈骗。
  *
  * 登录成功后 store 变 authenticated，本组件自然重渲染为 children —— 不做任何手动跳转。
- * 退出登录（设置页）把 store 切回 anonymous，本组件同样自动切回登录界面。
+ * 退出登录（我的页）把 store 切回 anonymous，本组件同样自动切回登录界面。
  */
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({ children }: { children: React.ReactNode }) {
   const status = useAuthStore((s) => s.status);
   const error = useAuthStore((s) => s.error);
 
@@ -80,12 +94,36 @@ export function AuthGate({ children }: { children: ReactNode }) {
 function LoginScreen() {
   // 品牌色圆底上的图标色：图标是 SVG，套不了 class，直接取 --primary-foreground（随深浅色翻转）。
   const iconOnPrimary = useUnstableNativeVariable("--primary-foreground");
+  const [mode, setMode] = useState<LoginMode>("password");
+  const [failure, setFailure] = useState<string | null>(null);
+
+  // 密码登录
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  async function handleSubmit() {
+  // 手机号验证码登录（验证码即注册）
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [sending, setSending] = useState(false);
+  const [phonePending, setPhonePending] = useState(false);
+  /** 重发倒计时（秒），由服务端返回的 cooldownSec 初始化。 */
+  const [cooldown, setCooldown] = useState(0);
+  const [signName, setSignName] = useState<string | null>(null);
+
+  // 倒计时：每秒减一（卸载自动清理，避免离开登录页后 setState）。
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
+  function switchMode(next: LoginMode) {
+    setMode(next);
+    setFailure(null);
+  }
+
+  async function handlePasswordSubmit() {
     if (pending) return;
     const account = username.trim();
     if (!account || !password) {
@@ -99,12 +137,83 @@ function LoginScreen() {
       // 成功后 store 切 authenticated → AuthGate 重渲染为 children，这里无需跳转；
       // 失败文案直接用服务端返回（账号或密码错误 / 登录尝试次数过多…），网络异常换人话。
     } catch (err) {
-      // 服务端中文 message 原样透传（账号或密码错误 / 登录尝试次数过多…）；
-      // 断网、超时、服务异常等英文技术错误由 core 统一换成中文，绝不原样上屏。
       setFailure(toUserMessage(err, "登录失败，请稍后重试"));
     } finally {
       setPending(false);
     }
+  }
+
+  async function handleSendCode() {
+    if (sending || cooldown > 0) return;
+    const value = phone.trim();
+    if (!PHONE_PATTERN.test(value)) {
+      setFailure("请输入 11 位手机号");
+      return;
+    }
+    setSending(true);
+    setFailure(null);
+    try {
+      const data = await requestPhoneCode(value);
+      setSignName(data.signName);
+      setCooldown(data.cooldownSec);
+    } catch (err) {
+      // SMS_LIMITED / SMS_SEND_FAILED / SMS_NOT_CONFIGURED 的中文 message 原样透传。
+      setFailure(toUserMessage(err, "验证码发送失败，请稍后重试"));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handlePhoneSubmit() {
+    if (phonePending) return;
+    const phoneValue = phone.trim();
+    const codeValue = code.trim();
+    if (!PHONE_PATTERN.test(phoneValue)) {
+      setFailure("请输入 11 位手机号");
+      return;
+    }
+    if (!/^\d{4,8}$/.test(codeValue)) {
+      setFailure("请输入短信验证码");
+      return;
+    }
+    setPhonePending(true);
+    setFailure(null);
+    try {
+      // 验证码即注册：首次通过核验由服务端自动建号。
+      await signInWithPhone(phoneValue, codeValue);
+    } catch (err) {
+      setFailure(toUserMessage(err, "登录失败，请稍后重试"));
+    } finally {
+      setPhonePending(false);
+    }
+  }
+
+  function modeButton(key: LoginMode, label: string) {
+    const active = mode === key;
+    return (
+      <Pressable
+        key={key}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ selected: active }}
+        onPress={() => switchMode(key)}
+        className={
+          active
+            ? "min-h-[48px] flex-1 items-center justify-center rounded-lg bg-background px-2 py-2"
+            : "min-h-[48px] flex-1 items-center justify-center rounded-lg px-2 py-2"
+        }
+      >
+        <Text
+          className={
+            active
+              ? "text-base font-semibold text-foreground"
+              : "text-base text-muted-foreground"
+          }
+        >
+          {label}
+        </Text>
+      </Pressable>
+    );
   }
 
   return (
@@ -127,72 +236,148 @@ function LoginScreen() {
               <ShieldAlert size={24} color={iconOnPrimary} importantForAccessibility="no" />
             </View>
             <CardTitle className="text-2xl">登录安心用药</CardTitle>
-            <CardDescription className="text-base leading-7">
-              请输入管理员分配给你的账号和密码。
-            </CardDescription>
+            <CardDescription className="text-base leading-7">请选择登录方式</CardDescription>
           </CardHeader>
           <CardContent className="gap-4">
-            <View className="gap-2">
-              <Label className="text-base">账号</Label>
-              <Input
-                className="min-h-[52px] text-lg"
-                value={username}
-                onChangeText={setUsername}
-                placeholder="请输入账号"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="username"
-                textContentType="username"
-                editable={!pending}
-                accessibilityLabel="账号"
-              />
+            <View className="mb-1 flex-row gap-1 rounded-xl bg-muted p-1">
+              {modeButton("password", "密码登录")}
+              {modeButton("phone", "手机号登录")}
             </View>
 
-            <View className="gap-2">
-              <Label className="text-base">密码</Label>
-              <Input
-                className="min-h-[52px] text-lg"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="请输入密码"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="current-password"
-                textContentType="password"
-                editable={!pending}
-                accessibilityLabel="密码"
-                returnKeyType="go"
-                onSubmitEditing={() => void handleSubmit()}
-              />
-            </View>
+            {mode === "password" ? (
+              <>
+                <View className="gap-2">
+                  <Label className="text-base">账号</Label>
+                  <Input
+                    className="min-h-[52px] text-lg"
+                    value={username}
+                    onChangeText={setUsername}
+                    placeholder="请输入账号"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="username"
+                    textContentType="username"
+                    editable={!pending}
+                    accessibilityLabel="账号"
+                  />
+                </View>
 
-            {failure ? (
-              /* 错误内联 + role="alert"：登录失败的原因要一直在眼前，也让读屏能播报。 */
-              <View
-                role="alert"
-                accessibilityLiveRegion="assertive"
-                className="rounded-xl border border-risk-l4 bg-risk-l4-tint px-4 py-3"
-              >
-                <Text className="text-base leading-6 text-risk-l4">{failure}</Text>
-              </View>
-            ) : null}
+                <View className="gap-2">
+                  <Label className="text-base">密码</Label>
+                  <Input
+                    className="min-h-[52px] text-lg"
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="请输入密码"
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="current-password"
+                    textContentType="password"
+                    editable={!pending}
+                    accessibilityLabel="密码"
+                    returnKeyType="go"
+                    onSubmitEditing={() => void handlePasswordSubmit()}
+                  />
+                </View>
 
-            {/* pending 时禁用，防连点重复提交（服务端有限流，但前端不该主动打满）。 */}
-            <Button
-              className="min-h-[52px] w-full"
-              disabled={pending}
-              onPress={() => void handleSubmit()}
-            >
-              <Text className="text-lg">{pending ? "正在登录…" : "登录"}</Text>
-            </Button>
+                {failure ? <FailureBox message={failure} /> : null}
 
-            <Text className="text-sm leading-6 text-muted-foreground">
-              账号由管理员分配；忘记密码请联系管理员重置。
-            </Text>
+                {/* pending 时禁用，防连点重复提交（服务端有限流，但前端不该主动打满）。 */}
+                <Button
+                  className="min-h-[52px] w-full"
+                  disabled={pending}
+                  onPress={() => void handlePasswordSubmit()}
+                >
+                  <Text className="text-lg">{pending ? "正在登录…" : "登录"}</Text>
+                </Button>
+
+                <Text className="text-sm leading-6 text-muted-foreground">
+                  账号由管理员分配；忘记密码请联系管理员重置。
+                </Text>
+              </>
+            ) : (
+              <>
+                <View className="gap-2">
+                  <Label className="text-base">手机号</Label>
+                  <Input
+                    className="min-h-[52px] text-lg"
+                    value={phone}
+                    onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
+                    placeholder="请输入 11 位手机号"
+                    keyboardType="number-pad"
+                    maxLength={11}
+                    autoComplete="tel"
+                    textContentType="telephoneNumber"
+                    editable={!phonePending}
+                    accessibilityLabel="手机号"
+                  />
+                </View>
+
+                <View className="gap-2">
+                  <Label className="text-base">短信验证码</Label>
+                  <View className="flex-row gap-2">
+                    <Input
+                      className="min-h-[52px] flex-1 text-lg"
+                      value={code}
+                      onChangeText={(text) => setCode(text.replace(/\D/g, ""))}
+                      placeholder="请输入验证码"
+                      keyboardType="number-pad"
+                      maxLength={8}
+                      autoComplete="one-time-code"
+                      textContentType="oneTimeCode"
+                      editable={!phonePending}
+                      accessibilityLabel="短信验证码"
+                    />
+                    <Button
+                      variant="outline"
+                      className="min-h-[52px] shrink-0 px-4"
+                      disabled={sending || cooldown > 0 || phonePending}
+                      onPress={() => void handleSendCode()}
+                    >
+                      <Text className="text-base">
+                        {sending ? "发送中…" : cooldown > 0 ? `${cooldown} 秒后重发` : "获取验证码"}
+                      </Text>
+                    </Button>
+                  </View>
+                  <Text className="text-sm leading-6 text-muted-foreground">
+                    {signName
+                      ? `短信落款为「${signName}」，请注意查收；验证码请勿告诉他人。`
+                      : "未注册的手机号验证通过后将自动创建账号。"}
+                  </Text>
+                </View>
+
+                {failure ? <FailureBox message={failure} /> : null}
+
+                <Button
+                  className="min-h-[52px] w-full"
+                  disabled={phonePending}
+                  onPress={() => void handlePhoneSubmit()}
+                >
+                  <Text className="text-lg">{phonePending ? "正在登录…" : "登录 / 注册"}</Text>
+                </Button>
+
+                <Text className="text-sm leading-6 text-muted-foreground">
+                  本系统仅用于演示与受控验收，不接收真实患者数据。
+                </Text>
+              </>
+            )}
           </CardContent>
         </Card>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** 登录失败提示（内联 + role=alert：原因要一直在眼前，也让读屏能播报）。 */
+function FailureBox({ message }: { message: string }) {
+  return (
+    <View
+      role="alert"
+      accessibilityLiveRegion="assertive"
+      className="rounded-xl border border-risk-l4 bg-risk-l4-tint px-4 py-3"
+    >
+      <Text className="text-base leading-6 text-risk-l4">{message}</Text>
+    </View>
   );
 }

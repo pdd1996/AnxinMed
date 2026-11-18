@@ -16,6 +16,10 @@ export const ERR_CODES = {
   AUTH_REQUIRED: 'AUTH_REQUIRED',           // 未登录 / 缺 Bearer token → 401（G7）
   AUTH_INVALID: 'AUTH_INVALID',             // 登录凭据错误 / token 失效 → 401（统一措辞，不泄漏账号是否存在）
   AUTH_LOCKED: 'AUTH_LOCKED',               // 登录失败次数过多 → 429（G7 限流）
+  AUTH_CODE_INVALID: 'AUTH_CODE_INVALID',   // 短信验证码错误/过期 → 401（P1 手机号登录）
+  SMS_NOT_CONFIGURED: 'SMS_NOT_CONFIGURED', // 部署未配置短信认证（缺 DYPNS_*）→ 503，失败可见
+  SMS_SEND_FAILED: 'SMS_SEND_FAILED',       // 短信服务商发送失败/不可用 → 503
+  SMS_LIMITED: 'SMS_LIMITED',               // 发码频控（同号冷却/同 IP 小时配额）→ 429
   RATE_LIMITED: 'RATE_LIMITED',             // 请求过于频繁（LLM 路由/IP 限流）→ 429（G10）
 } as const
 

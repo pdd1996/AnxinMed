@@ -102,6 +102,23 @@ function dummyHash(): Promise<string> {
 }
 
 /**
+ * 为用户创建会话（密码登录 / 手机号验证码登录共用）：返回 token 明文（只出现这一次）。
+ * 懒清理过期会话（单机 demo 规模够用，不做后台任务）。
+ */
+export async function issueSession(user: User): Promise<string> {
+  await db.delete(sessions).where(lt(sessions.expiresAt, new Date()))
+
+  const token = randomBytes(32).toString('base64url')
+  await db.insert(sessions).values({
+    id: `sess-${randomUUID()}`,
+    userId: user.id,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+  })
+  return token
+}
+
+/**
  * 登录：成功返回 token 明文 + 用户行（调用方必须只输出 publicUser）。
  * 失败统一 401 AUTH_INVALID；连续失败触发 429 AUTH_LOCKED。
  *
@@ -127,16 +144,7 @@ export async function login(
   }
   clearFailures(key)
 
-  // 懒清理过期会话（单机 demo 规模够用，不做后台任务）。
-  await db.delete(sessions).where(lt(sessions.expiresAt, new Date()))
-
-  const token = randomBytes(32).toString('base64url')
-  await db.insert(sessions).values({
-    id: `sess-${randomUUID()}`,
-    userId: user.id,
-    tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-  })
+  const token = await issueSession(user)
   return { token, user }
 }
 

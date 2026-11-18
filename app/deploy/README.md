@@ -227,6 +227,57 @@ curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '已登录 /api/drug
 
 **6.6 实跑记录（2026-11-17/18，`iv-yeha6zo9a8qbxyrwefzp`）**：迁移 0012 经隧道应用成功 → `docker compose build` 17m 后 `up -d` 成功 → 15 个账号（`p-001`…`p-107`）批量开通 → 公网验证：未登录 `/api/drugs` 401、p-001 登录 200、p-002 数据隔离、退出后旧 token 401。真机（PJZ110 / Android 15）登录/退出/重启保持/断网重试均通过，详见 [G7-真机验收.md](../../packages/mobile/G7-真机验收.md)。
 
+**6.7 手机号验证码登录/注册（P1 · 阿里云短息认证，2026-11-18）**
+
+> 与 G7 账号密码并行：老账号继续用密码登录；手机号走「验证码即注册」（首次验码通过自动建号）。
+> 短信通道由阿里云「号码认证服务 → 短信认证」提供（个人实名可用、赠送签名/模板、验证码托管核验）。
+
+部署顺序：**迁移 0013 → 服务器 .env 填 `DYPNS_*` → 重启 api → 验收发码/登录**。
+
+```bash
+# 1) 本机开隧道后应用迁移（0013：users.phone 唯一索引 + phone_verified_at）
+DATABASE_URL=postgresql://anxin:<POSTGRES_PASSWORD>@127.0.0.1:55432/anxin_medication \
+  pnpm --filter @anxin/api db:migrate
+
+# 2) 服务器 app/.env 追加（值来自阿里云控制台；AccessKey 建议 RAM 子账号只授两个 dypns Action）
+#    DYPNS_ACCESS_KEY_ID=...
+#    DYPNS_ACCESS_KEY_SECRET=...
+#    DYPNS_SIGN_NAME=恒创联众        # 控制台「赠送签名配置」里的名称
+#    DYPNS_TEMPLATE_LOGIN=100001     # 登录/注册模板
+#    SMS_IP_PER_HOUR=10              # 可选
+
+# 3) 重启 api 让 env 生效
+docker compose up -d api
+
+# 4) 先做免费连通性核验（不发短信、核验免费；验证码错误也证明 AK/签名/权限/开通正常）
+docker compose exec api node packages/api/dist/scripts/sms-smoke.js
+#    无参运行会打印当前签名/模板配置；验通另跑（免费）：
+docker compose exec api node packages/api/dist/scripts/sms-smoke.js --check 13800138000 --code 000000
+#    本机（app/ 下，读本地 .env）等价命令：
+pnpm --filter @anxin/api sms:smoke -- --check 13800138000 --code 000000
+```
+
+验收（公网，无需登录）：
+
+```bash
+# 发码（会产生一条真实短信，约 0.06 元；测试手机号先用控制台「快速测试」绑定过）
+curl -sS -X POST http://<ECS_IP>:8787/api/auth/phone/send-code \
+  -H 'content-type: application/json' -d '{"phone":"151xxxxxxxx"}'
+# 期望：{"ok":true,"mode":"password","cooldownSec":60,"expiresInSec":300,"signName":"..."}
+
+# 验证码登录 → 拿 token；首次登录返回 "created":true（自动建号）
+curl -sS -X POST http://<ECS_IP>:8787/api/auth/phone/login \
+  -H 'content-type: application/json' -d '{"phone":"151xxxxxxxx","code":"<收到的6位码>"}'
+# 期望：{"ok":true,"mode":"password","token":"...","user":{...},"created":true}
+
+# 用 token 访问业务路由应为 200
+curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '%{http_code}\n' http://<ECS_IP>:8787/api/drugs
+```
+
+已知边界：同号 60 秒冷却、同 IP 每小时 10 次（单实例内存限流，多副本前需换共享存储）；限流状态进程重启清零；
+短息认证目前只支持中国大陆手机号；自定义签名/通知类短信需升级企业资质 + 通用短信服务（见
+[specs/17](../../docs/specs/17-手机号验证码注册登录.md)）。
+
 ## 7. 验收（05 任务书 T1 完成标准逐条）
 
 | # | 验收项 | 命令 / 做法 | 期望 |
@@ -239,6 +290,7 @@ curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '已登录 /api/drug
 | 6 | 备份实测 | 见 §9，跑一次 `backup.sh` 并恢复一次 | 恢复后 §6.4 行数对得上 |
 | 7 | 登录已生效（G7） | 见 §6.6 的 curl 三连 | 未登录 401 / 登录后 200 / 前端出现登录页 |
 | 8 | 登录审计可见性 | `docker compose logs --tail=20 api` | 401/登录请求有访问日志；无明文密码输出 |
+| 9 | 手机号验证码登录（P1） | 见 §6.7 的发码/登录 curl | `ok:true` + 收到短信（落款=赠送签名）/ 首登 `created:true` / token 访问业务路由 200 |
 
 ## 8. e2e（AI_MODE=fixtures）对火山部署跑一遍
 
