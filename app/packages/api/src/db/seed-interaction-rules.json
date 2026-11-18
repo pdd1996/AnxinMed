@@ -1047,5 +1047,459 @@
     "quote": "（9）与卡马西平合用，由于肝酶的诱导而致药物代谢加速，可使二者的血药浓度和半衰期降低，故须检测血药浓度已决定是否需要调整用量。",
     "reviewedBy": "泮栋栋",
     "reviewedAt": "2026-11-17T07:50:14.580Z"
+  },
+  {
+    "id": "m12-b3-cand-01",
+    "drugIds": [
+      "drug-fulikangzuopian-50mg",
+      "drug-fulikangzuo-pian-50mg",
+      "drug-takemosi-jiaonang-1mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-fulikangzuopian-50mg",
+        "drug-fulikangzuo-pian-50mg"
+      ],
+      [
+        "drug-takemosi-jiaonang-1mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "当已经接受他克莫司治疗的患者开始应用伏立康唑时，建议将他克莫司的剂量减至原先剂量的1/3，并严密监测他克莫司的血药浓度。",
+    "source": "伏立康唑说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-fulikangzuo-pian-50mg@nmpa-JX20160393-13606e34\",\"drugId\":\"drug-fulikangzuo-pian-50mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20160393\"}",
+    "quote": "当已经接受他克莫司治疗的患者开始应用伏立康唑时，建议将他克莫司的剂量减至原先剂量的1/3，并严密监测他克莫司的血药浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-02",
+    "drugIds": [
+      "drug-glipizide-5",
+      "drug-geliebiqin-huanshi-jiaonang-10mg",
+      "drug-geliebiqin-kongshi-pian-5mg",
+      "drug-fukangzuo-jiaonang-150mg",
+      "drug-fukangzuo-jiaonang-50mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-glipizide-5",
+        "drug-geliebiqin-huanshi-jiaonang-10mg",
+        "drug-geliebiqin-kongshi-pian-5mg"
+      ],
+      [
+        "drug-fukangzuo-jiaonang-150mg",
+        "drug-fukangzuo-jiaonang-50mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "当本品与氟康唑合并使用时，必须密切监测患者的低血糖。",
+    "source": "格列吡嗪说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-geliebiqin-kongshi-pian-5mg@nmpa-YBH02752020-97da4010\",\"drugId\":\"drug-geliebiqin-kongshi-pian-5mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH02752020\"}",
+    "quote": "当本品与氟康唑合并使用时，必须密切监测患者的低血糖。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-03",
+    "drugIds": [
+      "drug-ynsun-shequlin-pin-50mg",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-ynsun-shequlin-pin-50mg"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "因此，舍曲林与华法林联合应用或停用时应密切监测凝血酶原时间。",
+    "source": "舍曲林说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-ynsun-shequlin-pin-50mg@nmpa-2020-YBH05442020-4ea2eb28\",\"drugId\":\"drug-ynsun-shequlin-pin-50mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020-YBH05442020\"}",
+    "quote": "因此，舍曲林与华法林联合应用或停用时应密切监测凝血酶原时间。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-04",
+    "drugIds": [
+      "drug-fulikangzuopian-50mg",
+      "drug-fulikangzuo-pian-50mg",
+      "drug-bentuoyingna-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-fulikangzuopian-50mg",
+        "drug-fulikangzuo-pian-50mg"
+      ],
+      [
+        "drug-bentuoyingna-pian-0p1g"
+      ]
+    ],
+    "level": "慎用",
+    "note": "应尽量避免同时伏立康唑与苯妥英合用，除非经权衡后利大于弊。建议严密监测苯妥英的血药浓度。",
+    "source": "伏立康唑说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-fulikangzuo-pian-50mg@nmpa-JX20160393-13606e34\",\"drugId\":\"drug-fulikangzuo-pian-50mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20160393\"}",
+    "quote": "应尽量避免同时伏立康唑与苯妥英合用，除非经权衡后利大于弊。建议严密监测苯妥英的血药浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-05",
+    "drugIds": [
+      "drug-nifedipine-30",
+      "drug-xiaobendiping-huanshi-pian-20mg",
+      "drug-xiaobendiping-huanshipian-20mg",
+      "drug-xiaobendiping-pian-10mg",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-nifedipine-30",
+        "drug-xiaobendiping-huanshi-pian-20mg",
+        "drug-xiaobendiping-huanshipian-20mg",
+        "drug-xiaobendiping-pian-10mg"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "本品可能增加血地高辛浓度，提示在初次使用、调整剂量或停用本品时应监测地高辛的血药浓度。",
+    "source": "硝苯地平说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-xiaobendiping-pian-10mg@nmpa-2010-0e77b342\",\"drugId\":\"drug-xiaobendiping-pian-10mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2010\"}",
+    "quote": "本品可能增加血地高辛浓度，提示在初次使用、调整剂量或停用本品时应监测地高辛的血药浓度。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-06",
+    "drugIds": [
+      "drug-liusuan-qiangl-kui-pian-0p2g",
+      "drug-liusuan-qianglvkui-pian-0p2g",
+      "drug-liusuanqianglvkuipian-0p1g",
+      "drug-liusuanqianglvkuipian-0p2g",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-liusuan-qiangl-kui-pian-0p2g",
+        "drug-liusuan-qianglvkui-pian-0p2g",
+        "drug-liusuanqianglvkuipian-0p1g",
+        "drug-liusuanqianglvkuipian-0p2g"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "有羟氯喹增加血浆地高辛水平的报道：接受联合治疗的患者应严密监测患者血清地高辛水平。",
+    "source": "羟氯喹说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-liusuanqianglvkuipian-0p1g@nmpa-YBH16622021-e9eb9ae9\",\"drugId\":\"drug-liusuanqianglvkuipian-0p1g\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH16622021\"}",
+    "quote": "有羟氯喹增加血浆地高辛水平的报道：接受联合治疗的患者应严密监测患者血清地高辛水平。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-07",
+    "drugIds": [
+      "drug-pufatatingna-pian-20mg",
+      "drug-pufatatingna-pian-40mg",
+      "drug-qiushuixianjian-pian-1mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-pufatatingna-pian-20mg",
+        "drug-pufatatingna-pian-40mg"
+      ],
+      [
+        "drug-qiushuixianjian-pian-1mg"
+      ]
+    ],
+    "level": "慎用",
+    "note": "13.秋水仙碱：有报道本品与秋水仙碱合用时发生肌病包括横纹肌溶解，合用应谨慎。",
+    "source": "普伐他汀说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-pufatatingna-pian-20mg@nmpa-YBH20302025-00650c59\",\"drugId\":\"drug-pufatatingna-pian-20mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH20302025\"}",
+    "quote": "13.秋水仙碱：有报道本品与秋水仙碱合用时发生肌病包括横纹肌溶解，合用应谨慎。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-08",
+    "drugIds": [
+      "drug-omeprazole-20",
+      "drug-aomeilazuo-changrongjiaonang-10mg",
+      "drug-aomeilazuo-changrongjiaonang-20mg",
+      "drug-aomeilazuochangrongjiaonang-20mg",
+      "drug-bentuoyingna-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-omeprazole-20",
+        "drug-aomeilazuo-changrongjiaonang-10mg",
+        "drug-aomeilazuo-changrongjiaonang-20mg",
+        "drug-aomeilazuochangrongjiaonang-20mg"
+      ],
+      [
+        "drug-bentuoyingna-pian-0p1g"
+      ]
+    ],
+    "level": "需监测",
+    "note": "在开始奥美拉唑治疗后的前两周内，建议监测苯妥英血药浓度，如果进行苯妥英剂量调整，则应在结束奥美拉唑治疗后监测并进一步调整剂量。",
+    "source": "奥美拉唑说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-aomeilazuo-changrongjiaonang-10mg@nmpa-YBH00352022-b435e201\",\"drugId\":\"drug-aomeilazuo-changrongjiaonang-10mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH00352022\"}",
+    "quote": "在开始奥美拉唑治疗后的前两周内，建议监测苯妥英血药浓度，如果进行苯妥英剂量调整，则应在结束奥美拉唑治疗后监测并进一步调整剂量。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-09",
+    "drugIds": [
+      "drug-ynsun-shequlin-pin-50mg",
+      "drug-bentuoyingna-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-ynsun-shequlin-pin-50mg"
+      ],
+      [
+        "drug-bentuoyingna-pian-0p1g"
+      ]
+    ],
+    "level": "需监测",
+    "note": "然而，如需与舍曲林合用，在开始加用舍曲林时应当监测苯妥英的血药浓度，同时适当调整苯妥英的剂量。",
+    "source": "舍曲林说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-ynsun-shequlin-pin-50mg@nmpa-2020-YBH05442020-4ea2eb28\",\"drugId\":\"drug-ynsun-shequlin-pin-50mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020-YBH05442020\"}",
+    "quote": "然而，如需与舍曲林合用，在开始加用舍曲林时应当监测苯妥英的血药浓度，同时适当调整苯妥英的剂量。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-10",
+    "drugIds": [
+      "drug-yansuan-paluoxiting-pian-20mg-h20133084",
+      "drug-yansuan-paluoxiting-pian-20mg",
+      "drug-digaoxin-pian-0p25mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-yansuan-paluoxiting-pian-20mg-h20133084",
+        "drug-yansuan-paluoxiting-pian-20mg"
+      ],
+      [
+        "drug-digaoxin-pian-0p25mg"
+      ]
+    ],
+    "level": "慎用",
+    "note": "由于临床经验较少，帕罗西汀与地高辛联合给药应尤为谨慎。",
+    "source": "帕罗西汀说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-yansuan-paluoxiting-pian-20mg-h20133084@nmpa-YBH06662019-9e89d47d\",\"drugId\":\"drug-yansuan-paluoxiting-pian-20mg-h20133084\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH06662019\"}",
+    "quote": "由于临床经验较少，帕罗西汀与地高辛联合给药应尤为谨慎。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-11",
+    "drugIds": [
+      "drug-fukangzuo-jiaonang-150mg",
+      "drug-fukangzuo-jiaonang-50mg",
+      "drug-kamaxiping-pian-0p1g"
+    ],
+    "drugGroups": [
+      [
+        "drug-fukangzuo-jiaonang-150mg",
+        "drug-fukangzuo-jiaonang-50mg"
+      ],
+      [
+        "drug-kamaxiping-pian-0p1g"
+      ]
+    ],
+    "level": "需监测",
+    "note": "氟康唑可抑制卡马西平的代谢，使卡马西平的血药浓度增加30%，因此具有导致卡马西平毒性增加的风险。可根据药物浓度监测结果或临床疗效决定是否需要调整卡马西平用药剂量。",
+    "source": "氟康唑说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-fukangzuo-jiaonang-50mg@nmpa-2020-5b689032\",\"drugId\":\"drug-fukangzuo-jiaonang-50mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-2020\"}",
+    "quote": "氟康唑可抑制卡马西平的代谢，使卡马西平的血药浓度增加30%，因此具有导致卡马西平毒性增加的风险。可根据药物浓度监测结果或临床疗效决定是否需要调整卡马西平用药剂量。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-12",
+    "drugIds": [
+      "drug-liusuan-qingl-bigelei-pian-25mg",
+      "drug-liusuan-qinglbigelei-pian-75mg",
+      "drug-liusuanqinglbigelei-pian-75mg-h20056410",
+      "drug-liusuanqinglbigelei-pian-75mg",
+      "drug-omeprazole-20",
+      "drug-aomeilazuo-changrongjiaonang-10mg",
+      "drug-aomeilazuo-changrongjiaonang-20mg",
+      "drug-aomeilazuochangrongjiaonang-20mg",
+      "drug-aisi-aomeilazuomei-changrongpian-20mg",
+      "drug-aisi-aomeilazuomei-changrongpian-20mg-h20203298",
+      "drug-aisi-aomeilazuomei-changrongpian-40mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-liusuan-qingl-bigelei-pian-25mg",
+        "drug-liusuan-qinglbigelei-pian-75mg",
+        "drug-liusuanqinglbigelei-pian-75mg-h20056410",
+        "drug-liusuanqinglbigelei-pian-75mg"
+      ],
+      [
+        "drug-omeprazole-20",
+        "drug-aomeilazuo-changrongjiaonang-10mg",
+        "drug-aomeilazuo-changrongjiaonang-20mg",
+        "drug-aomeilazuochangrongjiaonang-20mg",
+        "drug-aisi-aomeilazuomei-changrongpian-20mg",
+        "drug-aisi-aomeilazuomei-changrongpian-20mg-h20203298",
+        "drug-aisi-aomeilazuomei-changrongpian-40mg"
+      ]
+    ],
+    "level": "慎用",
+    "note": "不推荐氯吡格雷与奥美拉唑或埃索美拉唑联合使用（见[注意事项]）。",
+    "source": "氢氯吡格雷说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-liusuan-qinglbigelei-pian-75mg@nmpa-YBH10782022-6aee33e8\",\"drugId\":\"drug-liusuan-qinglbigelei-pian-75mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH10782022\"}",
+    "quote": "不推荐氯吡格雷与奥美拉唑或埃索美拉唑联合使用（见[注意事项]）。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-13",
+    "drugIds": [
+      "drug-lifashaban-pian-10mg-h20213374",
+      "drug-lifashaban-pian-10mg-hj20181083",
+      "drug-lifashaban-pian-10mg",
+      "drug-lifashaban-pian-15mg-h20213375",
+      "drug-lifashaban-pian-15mg-j20180076",
+      "drug-lifashaban-pian-15mg",
+      "drug-lifashaban-pian-20mg-h20213376",
+      "drug-lifashaban-pian-20mg-j20180077",
+      "drug-lifashaban-pian-20mg",
+      "drug-fukangzuo-jiaonang-150mg",
+      "drug-fukangzuo-jiaonang-50mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-lifashaban-pian-10mg-h20213374",
+        "drug-lifashaban-pian-10mg-hj20181083",
+        "drug-lifashaban-pian-10mg",
+        "drug-lifashaban-pian-15mg-h20213375",
+        "drug-lifashaban-pian-15mg-j20180076",
+        "drug-lifashaban-pian-15mg",
+        "drug-lifashaban-pian-20mg-h20213376",
+        "drug-lifashaban-pian-20mg-j20180077",
+        "drug-lifashaban-pian-20mg"
+      ],
+      [
+        "drug-fukangzuo-jiaonang-150mg",
+        "drug-fukangzuo-jiaonang-50mg"
+      ]
+    ],
+    "level": "注意",
+    "note": "利伐沙班与氟康唑之间的相互作用对于大多数患者可能无临床相关性，但对于高风险患者可具有潜在的临床显著性。",
+    "source": "利伐沙班说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-lifashaban-pian-10mg-h20213374@nmpa-YBH04692021-ebc46f9f\",\"drugId\":\"drug-lifashaban-pian-10mg-h20213374\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH04692021\"}",
+    "quote": "利伐沙班与氟康唑之间的相互作用对于大多数患者可能无临床相关性，但对于高风险患者可具有潜在的临床显著性。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-14",
+    "drugIds": [
+      "drug-ibuprofen-300",
+      "drug-buluofen-huanshijiaonang-0p3-h20203355",
+      "drug-buluofen-huanshijiaonang-0p3",
+      "drug-buluofen-hunxuanye-100",
+      "drug-buluofen-hunxuanye-2pct",
+      "drug-buluofen-hunxuanye-30",
+      "drug-buluofen-pian-0p1",
+      "drug-buluofenkeli-0p2",
+      "drug-fusaimi-pian-20mg",
+      "drug-fusaimi-zhusheye-2ml-h32021527",
+      "drug-fusaimi-zhusheye-2ml-h37020293",
+      "drug-fusaimi-zhusheye-2ml-h42020034",
+      "drug-fusaimi-zhusheye-2ml"
+    ],
+    "drugGroups": [
+      [
+        "drug-ibuprofen-300",
+        "drug-buluofen-huanshijiaonang-0p3-h20203355",
+        "drug-buluofen-huanshijiaonang-0p3",
+        "drug-buluofen-hunxuanye-100",
+        "drug-buluofen-hunxuanye-2pct",
+        "drug-buluofen-hunxuanye-30",
+        "drug-buluofen-pian-0p1",
+        "drug-buluofenkeli-0p2"
+      ],
+      [
+        "drug-fusaimi-pian-20mg",
+        "drug-fusaimi-zhusheye-2ml-h32021527",
+        "drug-fusaimi-zhusheye-2ml-h37020293",
+        "drug-fusaimi-zhusheye-2ml-h42020034",
+        "drug-fusaimi-zhusheye-2ml"
+      ]
+    ],
+    "level": "注意",
+    "note": "4.本品与呋塞米(呋喃苯胺酸)同用时，后者的排钠和降压作用减弱；",
+    "source": "布洛芬说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-buluofen-pian-0p1@nmpa-YBH07542019-2020-8abbf2d4\",\"drugId\":\"drug-buluofen-pian-0p1\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-YBH07542019-2020\"}",
+    "quote": "4.本品与呋塞米(呋喃苯胺酸)同用时，后者的排钠和降压作用减弱；",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
+  },
+  {
+    "id": "m12-b3-cand-15",
+    "drugIds": [
+      "drug-midanping-pian-15mg",
+      "drug-midanping-pian-30mg",
+      "drug-huafalinna-pian-2p5mg"
+    ],
+    "drugGroups": [
+      [
+        "drug-midanping-pian-15mg",
+        "drug-midanping-pian-30mg"
+      ],
+      [
+        "drug-huafalinna-pian-2p5mg"
+      ]
+    ],
+    "level": "需监测",
+    "note": "当增加米氮平的服用剂量时，不能排除更显著的作用，建议在米氮平和华法林同时使用时，监测INR水平。",
+    "source": "米氮平说明书·药物相互作用（M12 batch3 人工签核）",
+    "status": "curated",
+    "sourceType": "manual-interaction",
+    "sourceRef": "{\"insertId\":\"pi-drug-midanping-pian-30mg@nmpa-JX20220099-9b0d644a\",\"drugId\":\"drug-midanping-pian-30mg\",\"sectionKey\":\"药物相互作用\",\"version\":\"nmpa-JX20220099\"}",
+    "quote": "当增加米氮平的服用剂量时，不能排除更显著的作用，建议在米氮平和华法林同时使用时，监测INR水平。",
+    "reviewedBy": "泮栋栋",
+    "reviewedAt": "2026-11-18T07:03:28.214Z"
   }
 ]

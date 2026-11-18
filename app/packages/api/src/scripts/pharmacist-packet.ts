@@ -1,8 +1,8 @@
 /**
- * M11-T2 · 已入库 curated 规则的临床复核单（35 条）。
+ * M11-T2 · 已入库 curated 规则的临床复核单（M12 batch3 后为 50 条）。
  *
  * 输入：seed-interaction-rules.json 的 curated 规则 + drug_master 名称/剂型。
- * 输出：data/m11-reports/药师复核单-35条.md / .csv（本地，不入库）。
+ * 输出：data/m11-reports/药师复核单-{N}条.md / .csv（本地，不入库；N = 当前 curated 条数）。
  *
  * 只做材料整理：不改 seed、不改规则、不写库。药师判定由人工填写。
  */
@@ -53,7 +53,7 @@ async function main(): Promise<number> {
     (r.drugGroups ?? [r.drugIds]).map((g, i) => ({ label: `G${i + 1}`, items: g.map(show) }))
 
   const md: string[] = []
-  md.push('# 相互作用提示临床复核单（35 条已入库）')
+  md.push(`# 相互作用提示临床复核单（${curated.length} 条已入库）`)
   md.push('')
   md.push('> 给药师：不需要看代码。请确认每条提示的**级别**是否合适；如认为覆盖范围有问题，可在备注写明。原文均已逐字校验（quote 来自说明书原文）。')
   md.push('')
@@ -81,7 +81,7 @@ async function main(): Promise<number> {
   md.push('## 复核人')
   md.push('')
   md.push('姓名/资质：____________________　日期：____________')
-  writeFileSync(join(outDir, '药师复核单-35条.md'), md.join('\n') + '\n')
+  writeFileSync(join(outDir, `药师复核单-${curated.length}条.md`), md.join('\n') + '\n')
 
   const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const header = ['规则ID', '药对', '当前级别', '说明书原文', '覆盖范围', '判定', '改为级别', '备注']
@@ -92,10 +92,10 @@ async function main(): Promise<number> {
     const scope = groups.map((g) => `${g.label}：${g.items.join('、')}`).join('；')
     csv.push([r.id, pair, r.level, r.note, scope, '', '', ''].map(esc).join(','))
   }
-  writeFileSync(join(outDir, '药师复核单-35条.csv'), csv.join('\r\n'))
+  writeFileSync(join(outDir, `药师复核单-${curated.length}条.csv`), csv.join('\r\n'))
 
   console.log(`✅ 复核单：${curated.length} 条（禁忌 ${counts['禁忌'] ?? 0} / 慎用 ${counts['慎用'] ?? 0} / 需监测 ${counts['需监测'] ?? 0} / 注意 ${counts['注意'] ?? 0}）`)
-  console.log(`   输出：${join(outDir, '药师复核单-35条.md')} / 药师复核单-35条.csv`)
+  console.log(`   输出：${join(outDir, `药师复核单-${curated.length}条.md`)} / 药师复核单-${curated.length}条.csv`)
   return 0
 }
 

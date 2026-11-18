@@ -103,10 +103,11 @@ async function main(): Promise<number> {
   // 只重渲染已有 report JSON（预审修正版签核页用），不重新选候选/不查库
   const rerender = arg('--rerender')
   if (rerender) {
-    const report = JSON.parse(readFileSync(resolvePath(rerender), 'utf8'))
+    const report = JSON.parse(readFileSync(resolvePath(rerender), 'utf8')) as SheetReportView
     const prefix = arg('--out-prefix') ?? 'signoff-rerender'
     writeFileSync(join(outDir, `${prefix}.html`), renderReviewHtml(report))
-    console.log(`✅ 已重渲染签核页：${join(outDir, `${prefix}.html`)}（${report.items?.length ?? 0} 条）`)
+    writeFileSync(join(outDir, `${prefix}.md`), renderSheetMarkdown(report))
+    console.log(`✅ 已重渲染签核页：${join(outDir, `${prefix}.html`)} / ${prefix}.md（${report.items?.length ?? 0} 条）`)
     return 0
   }
 
@@ -130,6 +131,8 @@ async function main(): Promise<number> {
     return 1
   }
   const outPrefix = arg('--out-prefix') ?? 'signoff-20'
+  // 批次规则 ID 前缀（默认沿用 M10 批次；新批次必须换前缀，避免与已入库规则 ID 冲突）
+  const idPrefix = arg('--id-prefix') ?? 'm10-cand'
   const batchLabel = `${selected.length} 条窄批`
 
   const drugRows = (await db
@@ -244,7 +247,7 @@ async function main(): Promise<number> {
       flags,
       verbatimOk,
       proposedRule: {
-        id: `m10-cand-${String(index + 1).padStart(2, '0')}`,
+        id: `${idPrefix}-${String(index + 1).padStart(2, '0')}`,
         drugIds,
         drugGroups: proposedGroups,
         level: c.level,
@@ -292,6 +295,7 @@ async function main(): Promise<number> {
     batchId: outPrefix,
     batchLabel,
     source: inPath,
+    candidatePoolSize: all.length,
     totalSelected: items.length,
     byLevel,
     flagCounts,
@@ -302,18 +306,53 @@ async function main(): Promise<number> {
     note: '只产出签核清单；proposedRule 是草案，reviewedBy 空白；签核人逐条 pass/改判/reject 后才另起入库任务。',
   }
   writeFileSync(join(outDir, `${outPrefix}.json`), `${JSON.stringify(report, null, 2)}\n`)
+  writeFileSync(join(outDir, `${outPrefix}.md`), renderSheetMarkdown(report as unknown as SheetReportView))
+  writeFileSync(join(outDir, `${outPrefix}.html`), renderReviewHtml(report))
 
+  console.log(`\n✅ 签核清单：${items.length} 条（禁忌 ${byLevel['禁忌'] ?? 0} / 慎用 ${byLevel['慎用'] ?? 0} / 需监测 ${byLevel['需监测'] ?? 0}）`)
+  console.log(`   flags：${JSON.stringify(flagCounts)}；逐字失败 ${report.verbatimFailures} 条`)
+  console.log(`   输出：${join(outDir, `${outPrefix}.json`)} / ${outPrefix}.md / ${outPrefix}.html`)
+  return report.verbatimFailures === 0 ? 0 : 1
+}
+
+/** 签核报告 JSON 的人读视图（--rerender 与首次生成共用；字段来自 report）。 */
+interface SheetReportView {
+  generatedAt: string
+  batchLabel: string
+  candidatePoolSize?: number
+  totalSelected: number
+  byLevel: Record<string, number>
+  flagCounts: Record<string, number>
+  items: Array<{
+    index: number
+    level: string
+    quote: string
+    source: { insertId: string; genericName: string; version: string | null; sectionKey: string }
+    candidate: { genericNames: string[]; forms: string[] }
+    groups: string[][]
+    drugIds: string[]
+    flags: string[]
+  }>
+  note?: string
+}
+
+/** 签核清单 Markdown（首次生成与修正版重渲染共用，保证两份内容同源）。 */
+function renderSheetMarkdown(report: SheetReportView): string {
+  const items = report.items ?? []
+  const byLevel = report.byLevel ?? {}
   const md: string[] = []
-  md.push(`# 规则签核清单（${batchLabel}）`)
+  md.push(`# 规则签核清单（${report.batchLabel}）`)
   md.push('')
-  md.push(`生成：${report.generatedAt} · 来源候选池：${all.length} 条 · 本批 **${items.length}** 条（禁忌 ${byLevel['禁忌'] ?? 0} / 慎用 ${byLevel['慎用'] ?? 0} / 需监测 ${byLevel['需监测'] ?? 0}）`)
+  md.push(
+    `生成：${report.generatedAt} · 来源候选池：${report.candidatePoolSize ?? '—'} 条 · 本批 **${report.totalSelected ?? items.length}** 条（禁忌 ${byLevel['禁忌'] ?? 0} / 慎用 ${byLevel['慎用'] ?? 0} / 需监测 ${byLevel['需监测'] ?? 0} / 注意 ${byLevel['注意'] ?? 0}）`,
+  )
   md.push('')
   md.push('> 只产出清单，**未入库、未写 seed**。`proposedRule` 是草案（note=quote、reviewedBy 留空）；请在「判定」栏写 `pass` / `改判：…` / `reject：…`。')
-  md.push('- flags 统计：' + Object.entries(flagCounts).map(([k, v]) => `${k}=${v}`).join(' / '))
+  md.push('- flags 统计：' + Object.entries(report.flagCounts ?? {}).map(([k, v]) => `${k}=${v}`).join(' / '))
   md.push('')
   md.push('## 逐条')
   md.push('')
-  items.forEach((it) => {
+  for (const it of items) {
     md.push(`### ${it.index}. ${it.source.genericName} × ${[...new Set(it.candidate.genericNames)].join(' / ')}（${it.level}）`)
     md.push('')
     md.push(`- 来源：\`${it.source.insertId}\` · ${it.source.genericName} · ${it.source.version ?? '—'} · 段：${it.source.sectionKey}`)
@@ -321,22 +360,16 @@ async function main(): Promise<number> {
     md.push(`- 概念组：${it.groups.map((g, i) => `G${i + 1}=[${g.length} 个产品]`).join(' / ')}；drugIds ${it.drugIds.length} 个`)
     md.push(`- 候选剂型：${it.candidate.forms.join(' / ') || '—'}`)
     md.push(`- flags：${it.flags.join('；') || '无'}`)
-    md.push(`- 判定：\`pending\`（pass / 改判：____ / reject：____）`)
+    md.push('- 判定：`pending`（pass / 改判：____ / reject：____）')
     md.push('')
-  })
+  }
   md.push('## 批量签核后的入库流程')
   md.push('')
   md.push('1. 把 pass 条目按 `proposedRule` 写入 `seed-interaction-rules.json`，补 `reviewedBy`/`reviewedAt`；')
   md.push('2. `db:seed-interaction-rules --check` 必须全过（逐字/来源/概念组一致性）；')
   md.push('3. `--apply` 后再跑 `db:audit` 与规则命中测试；')
   md.push('4. 本批之外的候选仍留在候选池，不自动入库。')
-  writeFileSync(join(outDir, `${outPrefix}.md`), md.join('\n') + '\n')
-  writeFileSync(join(outDir, `${outPrefix}.html`), renderReviewHtml(report))
-
-  console.log(`\n✅ 签核清单：${items.length} 条（禁忌 ${byLevel['禁忌'] ?? 0} / 慎用 ${byLevel['慎用'] ?? 0} / 需监测 ${byLevel['需监测'] ?? 0}）`)
-  console.log(`   flags：${JSON.stringify(flagCounts)}；逐字失败 ${report.verbatimFailures} 条`)
-  console.log(`   输出：${join(outDir, `${outPrefix}.json`)} / ${outPrefix}.md / ${outPrefix}.html`)
-  return report.verbatimFailures === 0 ? 0 : 1
+  return md.join('\n') + '\n'
 }
 
 /** 生成自包含签核页（file:// 直接打开；决策存 localStorage，可导出 JSON）。 */
