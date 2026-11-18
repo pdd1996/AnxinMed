@@ -145,27 +145,30 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 
 ### 6.3 部署命令（用户执行）
 
-```bash
+> 所有命令都在**仓库根** `C:\Users\Paddy\Desktop\AnxinMed` 下执行；`ssh`/`scp` 会提示输入 root 密码（构建机未安装该服务器公钥，属正常）。
+
+```powershell
+cd C:\Users\Paddy\Desktop\AnxinMed
+
 # 0) 本机校验包
-Get-FileHash app/backups/anxin-src-8c10a6e.tar.gz -Algorithm SHA256   # 应为 AD18...A4A3
+Get-FileHash app\backups\anxin-src-8c10a6e.tar.gz -Algorithm SHA256   # 应为 AD18...A4A3
 
-# 1) 上传 + 备份旧源码 + 备份数据库
-scp app/backups/anxin-src-8c10a6e.tar.gz root@118.196.82.13:/tmp/
-ssh root@118.196.82.13 'set -e; cd /opt/AnxinMed; cp -a app app.bak-$(date +%F-%H%M); cd app; docker compose exec -T db pg_dump -U anxin anxin_medication > /opt/AnxinMed/anxin-pre-p1-$(date +%F-%H%M).sql; echo backup-done'
+# 1) 上传 + 备份旧源码 + 数据库备份（backup.sh 走 db 容器本地 trust，输出 app/backups/*.dump）
+scp app\backups\anxin-src-8c10a6e.tar.gz root@118.196.82.13:/tmp/
+ssh root@118.196.82.13 'set -e; cd /opt/AnxinMed; cp -a app app.bak-$(date +%F-%H%M); cd app; bash deploy/backup.sh'
 
-# 2) 迁移 0013（先查 phone 重复；无输出=可执行）
-ssh root@118.196.82.13 'cd /opt/AnxinMed; tar xzf /tmp/anxin-src-8c10a6e.tar.gz -C /opt/AnxinMed; cd app; docker compose exec -T db psql -U anxin -d anxin_medication -c "select phone,count(*) from users where phone is not null group by phone having count(*)>1;"'
-ssh root@118.196.82.13 'cd /opt/AnxinMed/app; docker compose exec -T db psql -U anxin -d anxin_medication -v ON_ERROR_STOP=1 < packages/api/drizzle/0013_powerful_talon.sql'
+# 2) 解包 + 幂等迁移（先看 phone 重复；有输出=有重复，停止并贴输出，无输出才继续）
+ssh root@118.196.82.13 'set -e; cd /opt/AnxinMed; tar xzf /tmp/anxin-src-8c10a6e.tar.gz -C /opt/AnxinMed; cd app; docker compose exec -T db psql -U anxin -d anxin_medication -c "select phone,count(*) from users where phone is not null group by phone having count(*)>1;"; docker compose exec -T db psql -U anxin -d anxin_medication -v ON_ERROR_STOP=1 -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at timestamp; CREATE UNIQUE INDEX IF NOT EXISTS users_phone_uq ON users(phone);"; echo MIGRATE_OK'
 
-# 3) 整体重建 + 起服务
-ssh root@118.196.82.13 'cd /opt/AnxinMed/app && docker compose config --quiet && docker compose build && docker compose up -d && docker compose ps && docker compose logs --tail=30 api'
+# 3) 整体重建 + 起服务（几分钟）
+ssh root@118.196.82.13 'set -e; cd /opt/AnxinMed/app; docker compose config --quiet; docker compose build; docker compose up -d; docker compose ps; docker compose logs --tail=30 api; curl -s http://127.0.0.1:8787/api/health; echo DEPLOY_OK'
 
-# 4) 冒烟
-curl -s http://118.196.82.13:8787/api/health    # {"ok":true,...}
+# 4) 外网冒烟
+curl.exe -s http://118.196.82.13:8787/api/health
 ```
 
-> 若第 2 步 `phone_verified_at` 已存在（信息架构列），跳过该条 ALTER 只补唯一索引即可；唯一索引已存在则整条 SQL 可跳过。
-> 回滚：`ssh root@118.196.82.13 'cd /opt/AnxinMed && rm -rf app && mv app.bak-<时间戳> app && cd app && docker compose build && docker compose up -d'`；必要时用第 1 步 SQL 备份恢复数据库。
+> 第 2 步的 ALTER 写成 `IF NOT EXISTS`，可安全重跑；若 phone 有重复行，唯一索引会失败（整条 -c 回滚），先清理重复再重跑。
+> 回滚：`ssh root@118.196.82.13 'cd /opt/AnxinMed && rm -rf app && mv app.bak-<时间戳> app && cd app && docker compose build && docker compose up -d'`；数据库恢复用 `app/backups/` 里第 1 步生成的 dump（README §9.1）。
 
 ### 6.4 部署后验收（我执行并回填）
 
