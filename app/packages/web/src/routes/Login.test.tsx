@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   signIn: vi.fn(),
   requestPhoneCode: vi.fn(),
   signInWithPhone: vi.fn(),
+  requestResetCode: vi.fn(),
+  resetPassword: vi.fn(),
 }))
 vi.mock('@anxin/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@anxin/core')>()
@@ -22,6 +24,8 @@ vi.mock('@anxin/core', async (importOriginal) => {
     signIn: mocks.signIn,
     requestPhoneCode: mocks.requestPhoneCode,
     signInWithPhone: mocks.signInWithPhone,
+    requestResetCode: mocks.requestResetCode,
+    resetPassword: mocks.resetPassword,
   }
 })
 
@@ -47,6 +51,8 @@ beforeEach(() => {
   mocks.signIn.mockReset()
   mocks.requestPhoneCode.mockReset()
   mocks.signInWithPhone.mockReset()
+  mocks.requestResetCode.mockReset()
+  mocks.resetPassword.mockReset()
   useAuthStore.setState({ status: 'anonymous', mode: null, user: null, error: null })
 })
 afterEach(() => {
@@ -201,5 +207,89 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('请输入短信验证码')
     expect(mocks.signInWithPhone).not.toHaveBeenCalled()
+  })
+})
+
+describe('Login 页 · 忘记密码（P1：未登录找回）', () => {
+  function openReset() {
+    renderLogin()
+    fireEvent.click(screen.getByRole('button', { name: '忘记密码？用手机号找回' }))
+  }
+
+  it('从密码登录进入找回表单，可返回密码登录', () => {
+    openReset()
+    expect(screen.getByText('找回密码')).toBeTruthy()
+    expect(screen.getByLabelText('手机号')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '← 返回密码登录' }))
+    expect(screen.getByLabelText('账号')).toBeTruthy()
+  })
+
+  it('手机号非法点获取验证码 → 提示且不请求', async () => {
+    openReset()
+    fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '12345' } })
+    fireEvent.click(screen.getByRole('button', { name: '获取验证码' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('请输入 11 位手机号')
+    expect(mocks.requestResetCode).not.toHaveBeenCalled()
+  })
+
+  it('获取重置验证码成功 → 调用 requestResetCode 并进入冷却', async () => {
+    mocks.requestResetCode.mockResolvedValue({
+      ok: true,
+      mode: 'password',
+      cooldownSec: 60,
+      expiresInSec: 300,
+      signName: '恒创联众',
+    })
+    openReset()
+    fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13600001111' } })
+    fireEvent.click(screen.getByRole('button', { name: '获取验证码' }))
+
+    await waitFor(() => expect(mocks.requestResetCode).toHaveBeenCalledWith('13600001111'))
+    const resend = screen.getByRole('button', { name: /秒后重发/ }) as HTMLButtonElement
+    expect(resend.disabled).toBe(true)
+  })
+
+  it('两次新密码不一致 → 内联提示，不请求接口', async () => {
+    openReset()
+    fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13600001111' } })
+    fireEvent.change(screen.getByLabelText('短信验证码'), { target: { value: '123456' } })
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'newpass123' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'newpass456' } })
+    fireEvent.click(screen.getByRole('button', { name: '重置密码并登录' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('两次输入的密码不一致')
+    expect(mocks.resetPassword).not.toHaveBeenCalled()
+  })
+
+  it('提交成功 → resetPassword(手机号, 验证码, 新密码)', async () => {
+    mocks.resetPassword.mockResolvedValue(undefined)
+    openReset()
+    fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13600001111' } })
+    fireEvent.change(screen.getByLabelText('短信验证码'), { target: { value: '123456' } })
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'newpass123' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'newpass123' } })
+    fireEvent.click(screen.getByRole('button', { name: '重置密码并登录' }))
+
+    await waitFor(() =>
+      expect(mocks.resetPassword).toHaveBeenCalledWith('13600001111', '123456', 'newpass123'),
+    )
+  })
+
+  it('验证码错误 → 内联服务端文案，按钮恢复可点', async () => {
+    mocks.resetPassword.mockRejectedValue(
+      new ApiRequestError('验证码错误或已过期，请重新获取', 'AUTH_CODE_INVALID', 401),
+    )
+    openReset()
+    fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13600001111' } })
+    fireEvent.change(screen.getByLabelText('短信验证码'), { target: { value: '000000' } })
+    fireEvent.change(screen.getByLabelText('新密码'), { target: { value: 'newpass123' } })
+    fireEvent.change(screen.getByLabelText('确认新密码'), { target: { value: 'newpass123' } })
+    fireEvent.click(screen.getByRole('button', { name: '重置密码并登录' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('验证码错误或已过期')
+    expect(
+      (screen.getByRole('button', { name: '重置密码并登录' }) as HTMLButtonElement).disabled,
+    ).toBe(false)
   })
 })

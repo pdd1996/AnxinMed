@@ -19,6 +19,8 @@ import { createHmac, randomUUID } from 'node:crypto'
 const API_VERSION = '2017-05-25'
 const DEFAULT_ENDPOINT = 'https://dypnsapi.aliyuncs.com/'
 const DEFAULT_TIMEOUT_MS = 10_000
+/** 阿里云赠送的「重置密码」模板 Code（固定编号；未配 DYPNS_TEMPLATE_RESET 时用它）。 */
+export const DEFAULT_TEMPLATE_RESET = '100003'
 
 /** 短信认证配置（缺任一项视为未配置；服务层 fail-closed 显式报错，不静默降级）。 */
 export interface DypnsConfig {
@@ -28,7 +30,7 @@ export interface DypnsConfig {
   signName: string
   /** 登录/注册模板 Code（赠送模板 100001）。 */
   templateLogin: string
-  /** 重置密码模板 Code（赠送模板 100003；P1 找回密码用，可暂缺）。 */
+  /** 重置密码/找回密码模板 Code（赠送模板 100003；可用 DYPNS_TEMPLATE_RESET 覆盖）。 */
   templateReset?: string
   endpoint?: string
   timeoutMs?: number
@@ -63,7 +65,7 @@ export function readDypnsConfig(): DypnsConfig | null {
     accessKeySecret,
     signName,
     templateLogin,
-    templateReset: (process.env.DYPNS_TEMPLATE_RESET ?? '').trim() || undefined,
+    templateReset: (process.env.DYPNS_TEMPLATE_RESET ?? '').trim() || DEFAULT_TEMPLATE_RESET,
     endpoint: (process.env.DYPNS_ENDPOINT ?? '').trim() || undefined,
     timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : undefined,
   }

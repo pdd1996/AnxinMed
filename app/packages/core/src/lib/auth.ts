@@ -15,7 +15,9 @@ import {
   loginWithPassword,
   loginWithPhone,
   logoutSession,
+  requestPasswordResetCode,
   requestPhoneLoginCode,
+  resetPasswordWithCode,
   setAccountPassword,
   updateMeName,
 } from '../api/auth'
@@ -161,6 +163,29 @@ export async function updateDisplayName(name: string): Promise<void> {
  */
 export async function updatePassword(oldPassword: string | undefined, password: string): Promise<void> {
   const data = await setAccountPassword(oldPassword ? { oldPassword, password } : { password })
+  authStore().setAuthenticated(data.mode, data.user)
+}
+
+/**
+ * 未登录「忘记密码」· 发送重置验证码（P1 增补，100003 模板）。
+ * 返回 { cooldownSec, expiresInSec, signName } 供登录页倒计时；未注册手机号也成功返回（服务端防枚举）。
+ */
+export async function requestResetCode(phone: string) {
+  return requestPasswordResetCode(phone)
+}
+
+/**
+ * 未登录「忘记密码」· 重置密码并登录（P1 增补）：
+ * 成功后写 token 持久化并切 authenticated（服务端已清该账号全部旧会话并发新会话）。
+ * 失败原样抛给登录页（AUTH_CODE_INVALID / VALIDATION / SMS_*，文案已中文）。
+ */
+export async function resetPassword(phone: string, code: string, newPassword: string): Promise<void> {
+  const data = await resetPasswordWithCode(phone, code, newPassword)
+  try {
+    await tokenStorage?.save(data.token)
+  } catch {
+    // 同 signIn：持久化失败不阻断本次登录。
+  }
   authStore().setAuthenticated(data.mode, data.user)
 }
 /**

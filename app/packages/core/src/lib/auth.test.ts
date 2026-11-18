@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
   loginWithPassword: vi.fn(),
   loginWithPhone: vi.fn(),
   logoutSession: vi.fn(),
+  requestPasswordResetCode: vi.fn(),
   requestPhoneLoginCode: vi.fn(),
+  resetPasswordWithCode: vi.fn(),
   setAccountPassword: vi.fn(),
   setAuthToken: vi.fn(),
 }))
@@ -19,7 +21,9 @@ vi.mock('../api/auth', () => ({
   loginWithPassword: mocks.loginWithPassword,
   loginWithPhone: mocks.loginWithPhone,
   logoutSession: mocks.logoutSession,
+  requestPasswordResetCode: mocks.requestPasswordResetCode,
   requestPhoneLoginCode: mocks.requestPhoneLoginCode,
+  resetPasswordWithCode: mocks.resetPasswordWithCode,
   setAccountPassword: mocks.setAccountPassword,
 }))
 
@@ -41,6 +45,8 @@ import { ApiRequestError } from '../api/client'
 import {
   bootstrapAuth,
   requestPhoneCode,
+  requestResetCode,
+  resetPassword,
   setAuthTokenStorage,
   signIn,
   signInWithPhone,
@@ -234,5 +240,49 @@ describe('设置 / 修改密码（P1 增补）', () => {
     await expect(updatePassword('wrong-pass', 'newpass456')).rejects.toThrow('当前密码不正确')
     // 400 不是 401：登录态保持不变（页面内联提示即可）
     expect(useAuthStore.getState().status).toBe('authenticated')
+  })
+})
+
+describe('未登录「忘记密码」自助找回（P1 增补）', () => {
+  it('requestResetCode → 透传发码结果（统一形态，未注册号也成功）', async () => {
+    const payload = {
+      ok: true,
+      mode: 'password',
+      cooldownSec: 60,
+      expiresInSec: 300,
+      signName: '恒创联众',
+    }
+    mocks.requestPasswordResetCode.mockResolvedValue(payload)
+
+    await expect(requestResetCode('13600001111')).resolves.toEqual(payload)
+    expect(mocks.requestPasswordResetCode).toHaveBeenCalledWith('13600001111')
+  })
+
+  it('resetPassword 成功 → 写 token 持久化并 authenticated（重置即登录）', async () => {
+    mocks.resetPasswordWithCode.mockResolvedValue({
+      ok: true,
+      mode: 'password',
+      token: 'reset-token',
+      user: { ...REAL_USER, hasPassword: true },
+    })
+
+    await resetPassword('13600001111', '123456', 'New-pass-456')
+
+    expect(mocks.resetPasswordWithCode).toHaveBeenCalledWith('13600001111', '123456', 'New-pass-456')
+    expect(storage.save).toHaveBeenCalledWith('reset-token')
+    expect(useAuthStore.getState().status).toBe('authenticated')
+    expect(useAuthStore.getState().user?.hasPassword).toBe(true)
+  })
+
+  it('验证码错误 → 状态不变、错误原样抛给登录页', async () => {
+    mocks.resetPasswordWithCode.mockRejectedValue(
+      new ApiRequestError('验证码错误或已过期，请重新获取', 'AUTH_CODE_INVALID', 401),
+    )
+
+    await expect(resetPassword('13600001111', '000000', 'New-pass-456')).rejects.toThrow(
+      '验证码错误或已过期',
+    )
+    expect(storage.save).not.toHaveBeenCalled()
+    expect(useAuthStore.getState().status).toBe('idle')
   })
 })

@@ -51,6 +51,26 @@ export async function setAccountPassword(input: { oldPassword?: string; password
   return unwrap(res, { silent: true })
 }
 
+/**
+ * 未登录「忘记密码」· 发送重置验证码（P1 增补，100003 模板）。
+ * 返回统一成功形态（未注册手机号不会真的发短信，服务端防枚举）；失败同发码错误码。
+ */
+export async function requestPasswordResetCode(phone: string) {
+  const res = await client.api.auth.password['reset-code'].$post({ json: { phone } })
+  return unwrap(res, { silent: true })
+}
+
+/**
+ * 未登录「忘记密码」· 重置密码（P1 增补）：核验通过后服务端重置密码、清该账号全部旧会话、
+ * 发新会话——成功等同登录（写 Bearer + 返回 { mode, token, user }），不用再回登录页输密码。
+ */
+export async function resetPasswordWithCode(phone: string, code: string, password: string) {
+  const res = await client.api.auth.password.reset.$post({ json: { phone, code, password } })
+  const data = await unwrap(res, { silent: true })
+  setAuthToken(data.token)
+  return data
+}
+
 /** 当前登录态（demo 模式返回 mode='demo' + p-001，不出现登录页）。 */
 export async function fetchAuthMe() {
   const res = await client.api.auth.me.$get()

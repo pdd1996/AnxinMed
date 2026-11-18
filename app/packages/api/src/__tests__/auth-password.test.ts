@@ -8,7 +8,7 @@
  * 环境：beforeAll 切 AUTH_MODE=password，直接插测试用户并用 issueSession 发 token（不经短信通道）。
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { inArray } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import {
   AUTH_REQUIRED_MESSAGE,
   LOGIN_FAILED_MESSAGE,
@@ -68,6 +68,19 @@ function postLogin(username: string, password: string, ip = '10.9.0.1') {
 async function cleanup(): Promise<void> {
   await db.delete(sessions).where(inArray(sessions.userId, USER_IDS))
   await db.delete(users).where(inArray(users.id, USER_IDS))
+}
+
+/** 给同一用户再造一个会话（模拟「另一台设备」），用于验证「改密即清其他设备会话」。 */
+async function anotherSession(userId: string): Promise<string> {
+  const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!row) throw new Error(`测试用户不存在：${userId}`)
+  return issueSession(row)
+}
+
+/** 用某 token 访问 /api/auth/me，返回状态码（200=会话有效，401=已失效）。 */
+async function meStatus(token: string): Promise<number> {
+  const res = await app.request('/api/auth/me', { headers: { authorization: `Bearer ${token}` } })
+  return res.status
 }
 
 beforeAll(async () => {
@@ -135,13 +148,20 @@ describe('POST /api/auth/password —— 鉴权与模式', () => {
 })
 
 describe('手机号账号补密码（验证码即注册的账号）', () => {
-  it('无旧密码即可设置：账号名自动取手机号，响应 hasPassword=true', async () => {
+  it('无旧密码即可设置：账号名自动取手机号，响应 hasPassword=true，并清掉其他设备会话', async () => {
+    const otherDevice = await anotherSession(U_PHONE)
+    expect(await meStatus(otherDevice)).toBe(200)
+
     const res = await postPassword(tokens[U_PHONE]!, { password: 'New-pass-123' })
     expect(res.status).toBe(200)
     const body = (await res.json()) as Envelope
     expect(body.ok).toBe(true)
     expect(body.mode).toBe('password')
     expect(body.user).toMatchObject({ id: U_PHONE, username: PHONE, hasPassword: true })
+
+    // 改密即清其他设备：当前会话保留，另一台会话失效
+    expect(await meStatus(tokens[U_PHONE]!)).toBe(200)
+    expect(await meStatus(otherDevice)).toBe(401)
 
     // 之后可用「手机号 + 密码」走密码登录
     const login = await postLogin(PHONE, 'New-pass-123', '10.9.0.2')
@@ -185,22 +205,30 @@ describe('已有密码账号改密', () => {
     expect(body.message).toBe(PASSWORD_INVALID_MESSAGE)
   })
 
-  it('旧密码错误 → 400 AUTH_PASSWORD_INVALID', async () => {
+  it('旧密码错误 → 400 AUTH_PASSWORD_INVALID，且**不**撤销其他设备会话（失败不该踢人）', async () => {
+    const otherDevice = await anotherSession(U_PWD)
     const res = await postPassword(tokens[U_PWD]!, {
       oldPassword: 'wrong-pass',
       password: 'New-pass-456',
     })
     expect(res.status).toBe(400)
     expect(((await res.json()) as Envelope).code).toBe('AUTH_PASSWORD_INVALID')
+    expect(await meStatus(otherDevice)).toBe(200)
   })
 
-  it('旧密码正确 → 改密成功；新密码可登录、旧密码失效', async () => {
+  it('旧密码正确 → 改密成功；新密码可登录、旧密码失效、其他设备会话被清', async () => {
+    const otherDevice = await anotherSession(U_PWD)
+
     const res = await postPassword(tokens[U_PWD]!, {
       oldPassword: OLD_PASSWORD,
       password: 'New-pass-456',
     })
     expect(res.status).toBe(200)
     expect(((await res.json()) as Envelope).user?.hasPassword).toBe(true)
+
+    // 当前会话保留，其他设备会话失效
+    expect(await meStatus(tokens[U_PWD]!)).toBe(200)
+    expect(await meStatus(otherDevice)).toBe(401)
 
     const loginNew = await postLogin(PWD_USERNAME, 'New-pass-456', '10.9.0.3')
     expect(loginNew.status).toBe(200)

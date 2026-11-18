@@ -17,12 +17,16 @@ import {
   AUTH_REQUIRED_MESSAGE,
   ERR_CODES,
   LoginRequestSchema,
+  PasswordResetCodeRequestSchema,
+  PasswordResetRequestSchema,
   PasswordSetRequestSchema,
   PhoneLoginRequestSchema,
   SendPhoneCodeRequestSchema,
   UpdateMeRequestSchema,
   type AuthMode,
   type AuthUser,
+  type PasswordResetCodeResponse,
+  type PasswordResetResponse,
   type PasswordSetResponse,
   type PhoneLoginResponse,
   type SendPhoneCodeResponse,
@@ -41,7 +45,12 @@ import {
   setUserPassword,
   updateUserName,
 } from '../services/auth.service.js'
-import { loginWithPhoneCode, sendLoginCode } from '../services/phone-auth.service.js'
+import {
+  loginWithPhoneCode,
+  resetPasswordWithCode,
+  sendLoginCode,
+  sendPasswordResetCode,
+} from '../services/phone-auth.service.js'
 
 /** 客户端标识：取 x-forwarded-for 首段（Caddy/反代），直连测试为 'local'。 */
 function clientKey(c: Context<AppEnv>): string {
@@ -117,8 +126,36 @@ export const authRoute = new Hono<AppEnv>()
     if (!token) throw new ApiError(401, ERR_CODES.AUTH_REQUIRED, AUTH_REQUIRED_MESSAGE)
     const user = await resolveSessionUser(token)
     if (!user) throw new ApiError(401, ERR_CODES.AUTH_INVALID, AUTH_INVALID_MESSAGE)
-    const updated = await setUserPassword(user, c.req.valid('json'))
+    const updated = await setUserPassword(user, c.req.valid('json'), token)
     const payload: PasswordSetResponse = { mode, user: publicUser(updated) }
+    return okJson(c, payload)
+  })
+  // P1 增补：未登录「忘记密码」——发送重置验证码（100003 模板）。
+  // 防枚举：未注册手机号也返回同一成功形态，但服务层不发短信。
+  .post('/password/reset-code', vJson(PasswordResetCodeRequestSchema), async (c) => {
+    const mode = readAuthMode()
+    if (mode === 'demo') {
+      throw new ApiError(400, ERR_CODES.VALIDATION, '演示模式已自动登录，无需找回密码')
+    }
+    const { phone } = c.req.valid('json')
+    const { signName } = await sendPasswordResetCode(phone, clientKey(c))
+    const payload: PasswordResetCodeResponse = {
+      mode,
+      cooldownSec: SMS_CODE_COOLDOWN_SEC,
+      expiresInSec: SMS_CODE_TTL_SEC,
+      signName,
+    }
+    return okJson(c, payload)
+  })
+  // P1 增补：未登录「忘记密码」——核验通过后重置密码、清该账号全部旧会话、发新会话（重置即登录）。
+  .post('/password/reset', vJson(PasswordResetRequestSchema), async (c) => {
+    const mode = readAuthMode()
+    if (mode === 'demo') {
+      throw new ApiError(400, ERR_CODES.VALIDATION, '演示模式已自动登录，无需找回密码')
+    }
+    const { phone, code, password } = c.req.valid('json')
+    const { token, user } = await resetPasswordWithCode(phone, code, password)
+    const payload: PasswordResetResponse = { mode, token, user: publicUser(user) }
     return okJson(c, payload)
   })
   .post('/logout', async (c) => {

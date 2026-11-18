@@ -146,7 +146,7 @@ export const SMS_TOO_FREQUENT_MESSAGE = '验证码发送太频繁，请稍后再
 //
 // 语义：手机号验证码注册的账号默认无密码；登录态下可补设密码（账号名自动取手机号），
 // 之后「手机号 + 密码」也可以登录。已有密码的账号改密必须校验当前密码。
-// 注意：改密不使既有 session 失效（G7 已知边界，与 specs/17 §8 一致）。
+// 会话：改密/设密成功即撤销该账号其他设备的会话，保留当前这台（见 specs/17 §2 D12）。
 // ---------------------------------------------------------------------------
 
 /** 密码长度区间（与服务端 hashPassword 输入上限一致；scrypt 无 72 字节限制，这里按输入体验取 72）。 */
@@ -180,3 +180,44 @@ export const PASSWORD_INVALID_MESSAGE = '当前密码不正确'
 export const PASSWORD_NOT_SUPPORTED_MESSAGE = '该账号暂不支持设置密码，请联系管理员'
 /** 手机号账号补密码时用户名冲突（极端情况：管理员建过同号账号名）。 */
 export const PASSWORD_USERNAME_CONFLICT_MESSAGE = '该手机号对应的账号名已被占用，请联系管理员'
+
+// ---------------------------------------------------------------------------
+// P1 增补 · 未登录「忘记密码」自助找回（短信认证 100003 重置密码模板）
+//
+// 语义：手机号 + 重置验证码 + 新密码 → 阿里云核验 PASS 后重置密码、**撤销该账号全部旧会话**、
+// 直接发新会话（重置成功即登录，不用再回登录页输一遍）。
+//
+// 防枚举：发码接口对「未注册手机号」也返回同一成功形态，但**不发短信**——
+// 响应里不加入任何能反推账号存在性的差异（signName 是全局配置，不属于差异）。
+// ---------------------------------------------------------------------------
+
+/** 重置密码 · 发送验证码入参（与登录发码同形）。 */
+export const PasswordResetCodeRequestSchema = z.object({ phone: PhoneSchema })
+export type PasswordResetCodeRequest = z.infer<typeof PasswordResetCodeRequestSchema>
+
+/** 重置密码 · 发码响应（与登录发码同形；未注册手机号也返回此形态，不暴露账号存在性）。 */
+export const PasswordResetCodeResponseSchema = z.object({
+  mode: AuthModeSchema,
+  cooldownSec: z.number().int().positive(),
+  expiresInSec: z.number().int().positive(),
+  signName: z.string(),
+})
+export type PasswordResetCodeResponse = z.infer<typeof PasswordResetCodeResponseSchema>
+
+/** 重置密码入参：手机号 + 重置验证码 + 新密码（长度复用密码契约）。 */
+export const PasswordResetRequestSchema = z.object({
+  phone: PhoneSchema,
+  code: z.string().trim().regex(/^\d{4,8}$/, '请输入短信验证码（4–8 位数字）'),
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, PASSWORD_MIN_LENGTH_MESSAGE)
+    .max(PASSWORD_MAX_LENGTH, PASSWORD_MAX_LENGTH_MESSAGE),
+})
+export type PasswordResetRequest = z.infer<typeof PasswordResetRequestSchema>
+
+/** 重置成功响应：与登录同形（重置即登录，发新 token）。 */
+export const PasswordResetResponseSchema = LoginResponseSchema
+export type PasswordResetResponse = z.infer<typeof PasswordResetResponseSchema>
+
+/** 忘记密码入口说明（发码后统一提示，不区分账号是否存在）。 */
+export const PASSWORD_RESET_SENT_HINT = '如该手机号已注册，验证码已发送'

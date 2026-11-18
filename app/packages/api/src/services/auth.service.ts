@@ -12,7 +12,7 @@
  * - 未开通登录（passwordHash=null）的账号不能登录——demo 用户即如此，需 CLI 开通。
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { eq, lt } from 'drizzle-orm'
+import { and, eq, lt, ne } from 'drizzle-orm'
 import { ERR_CODES, LOGIN_FAILED_MESSAGE, LOGIN_LOCKED_MESSAGE, PASSWORD_INVALID_MESSAGE, PASSWORD_NOT_SUPPORTED_MESSAGE, PASSWORD_USERNAME_CONFLICT_MESSAGE, type AuthUser } from '@anxin/shared'
 import { db } from '../db/client.js'
 import { sessions, users } from '../db/schema.js'
@@ -121,6 +121,23 @@ export async function issueSession(user: User): Promise<string> {
     expiresAt: new Date(Date.now() + SESSION_TTL_MS),
   })
   return token
+}
+
+/**
+ * 撤销某用户的其他会话（P1 增补）：
+ * - 传 currentToken：保留当前这台设备的会话，其余全部删除（改密/设密用）；
+ * - 不传：删除该用户全部会话（找回密码重置凭据时用——丢失/被盗设备一并失效）。
+ *
+ * 口径见 specs/17 §2 D12：改密即清其他设备，当前会话不踢；重置密码清全部后另发新会话。
+ */
+export async function revokeOtherSessions(userId: string, currentToken?: string): Promise<void> {
+  if (currentToken) {
+    await db
+      .delete(sessions)
+      .where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, hashToken(currentToken))))
+    return
+  }
+  await db.delete(sessions).where(eq(sessions.userId, userId))
 }
 
 /**
@@ -261,11 +278,14 @@ export async function resetPassword(username: string, password: string): Promise
  *   之后「账号=手机号 + 密码」也可登录（users.username 唯一冲突 → 409 可见报错）。
  * - 无手机号且无账号名（如 seed 演示用户）：不支持自助设密，400 明确提示走管理员。
  *
- * 已知边界：改密不撤销既有 session（与 G7 同口径，见 specs/17 §8）。
+ * 已知边界（P1 增补后）：改密/设密成功会撤销该账号**其他设备**的会话（保留当前这台），
+ * 口径见 specs/17 §2 D12。
  */
 export async function setUserPassword(
   user: User,
   input: { oldPassword?: string; password: string },
+  /** 当前请求所用的 token（保留它对应的会话，撤销同账号其余会话）；缺省则清全部。 */
+  currentToken?: string,
 ): Promise<User> {
   if (user.passwordHash) {
     if (!input.oldPassword) {
@@ -291,6 +311,16 @@ export async function setUserPassword(
       .where(eq(users.id, user.id))
       .returning()
     if (!updated) throw new ApiError(500, 'INTERNAL', '账号不存在，密码未更新')
+    // 改密即清其他设备会话（保留当前会话）；会话清理失败不能让「密码已改」变成假失败，
+    // 但也不能静默——记录可见告警，密码本身已更新成功。
+    try {
+      await revokeOtherSessions(user.id, currentToken)
+    } catch (revokeErr) {
+      console.error(
+        '[auth] 密码已更新，但撤销其他会话失败：',
+        revokeErr instanceof Error ? revokeErr.message : String(revokeErr),
+      )
+    }
     return updated
   } catch (err) {
     const code = (err as { code?: string }).code ?? (err as { cause?: { code?: string } }).cause?.code

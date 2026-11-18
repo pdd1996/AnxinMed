@@ -3,10 +3,12 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Pressable, ScrollView, View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { ShieldAlert } from "lucide-react-native";
-import { PHONE_PATTERN } from "@anxin/shared";
+import { PASSWORD_MIN_LENGTH, PHONE_PATTERN, PasswordResetRequestSchema } from "@anxin/shared";
 import {
   bootstrapAuth,
   requestPhoneCode,
+  requestResetCode,
+  resetPassword,
   signIn,
   signInWithPhone,
   toUserMessage,
@@ -109,12 +111,28 @@ function LoginScreen() {
   /** 重发倒计时（秒），由服务端返回的 cooldownSec 初始化。 */
   const [cooldown, setCooldown] = useState(0);
 
+  // 找回密码（未登录）：独立表单状态，避免与登录表单互相污染。
+  const [resetMode, setResetMode] = useState(false);
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetSending, setResetSending] = useState(false);
+  const [resetPending, setResetPending] = useState(false);
+  const [resetCooldown, setResetCooldown] = useState(0);
+
   // 倒计时：每秒减一（卸载自动清理，避免离开登录页后 setState）。
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
+
+  useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const timer = setTimeout(() => setResetCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [resetCooldown]);
 
   function switchMode(next: LoginMode) {
     setMode(next);
@@ -185,6 +203,52 @@ function LoginScreen() {
     }
   }
 
+  async function handleSendResetCode() {
+    if (resetSending || resetCooldown > 0) return;
+    const value = resetPhone.trim();
+    if (!PHONE_PATTERN.test(value)) {
+      setFailure("请输入 11 位手机号");
+      return;
+    }
+    setResetSending(true);
+    setFailure(null);
+    try {
+      const data = await requestResetCode(value);
+      setResetCooldown(data.cooldownSec);
+    } catch (err) {
+      setFailure(toUserMessage(err, "验证码发送失败，请稍后重试"));
+    } finally {
+      setResetSending(false);
+    }
+  }
+
+  async function handleResetSubmit() {
+    if (resetPending) return;
+    const parsed = PasswordResetRequestSchema.safeParse({
+      phone: resetPhone.trim(),
+      code: resetCode.trim(),
+      password: resetNewPassword,
+    });
+    if (!parsed.success) {
+      setFailure(parsed.error.issues[0]?.message ?? "请检查输入");
+      return;
+    }
+    if (resetNewPassword !== resetConfirm) {
+      setFailure("两次输入的密码不一致");
+      return;
+    }
+    setResetPending(true);
+    setFailure(null);
+    try {
+      // 重置成功即登录（服务端已清该账号旧会话并发新会话）。
+      await resetPassword(parsed.data.phone, parsed.data.code, parsed.data.password);
+    } catch (err) {
+      setFailure(toUserMessage(err, "重置失败，请稍后重试"));
+    } finally {
+      setResetPending(false);
+    }
+  }
+
   function modeButton(key: LoginMode, label: string) {
     const active = mode === key;
     return (
@@ -236,12 +300,124 @@ function LoginScreen() {
             <CardDescription className="text-base leading-7">请选择登录方式</CardDescription>
           </CardHeader>
           <CardContent className="gap-4">
-            <View className="mb-1 flex-row gap-1 rounded-xl bg-muted p-1">
-              {modeButton("password", "密码登录")}
-              {modeButton("phone", "手机号登录")}
-            </View>
+            {resetMode ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="返回密码登录"
+                  onPress={() => {
+                    setResetMode(false);
+                    setFailure(null);
+                  }}
+                  className="min-h-[44px] flex-row items-center self-start"
+                >
+                  <Text className="text-base font-semibold text-muted-foreground">
+                    ← 返回密码登录
+                  </Text>
+                </Pressable>
 
-            {mode === "password" ? (
+                <View className="gap-1">
+                  <Text className="text-xl font-bold text-foreground">找回密码</Text>
+                  <Text className="text-sm leading-6 text-muted-foreground">
+                    用注册手机号收验证码，验证通过后设置新密码；重置成功会自动登录。
+                  </Text>
+                </View>
+
+                <View className="gap-2">
+                  <Label className="text-base">手机号</Label>
+                  <Input
+                    className="min-h-[52px] text-lg"
+                    value={resetPhone}
+                    onChangeText={(text) => setResetPhone(text.replace(/\D/g, ""))}
+                    placeholder="请输入 11 位手机号"
+                    keyboardType="number-pad"
+                    maxLength={11}
+                    autoComplete="tel"
+                    textContentType="telephoneNumber"
+                    editable={!resetPending}
+                    accessibilityLabel="找回手机号"
+                  />
+                </View>
+
+                <View className="gap-2">
+                  <Label className="text-base">短信验证码</Label>
+                  <View className="flex-row gap-2">
+                    <Input
+                      className="min-h-[52px] flex-1 text-lg"
+                      value={resetCode}
+                      onChangeText={(text) => setResetCode(text.replace(/\D/g, ""))}
+                      placeholder="请输入验证码"
+                      keyboardType="number-pad"
+                      maxLength={8}
+                      autoComplete="one-time-code"
+                      textContentType="oneTimeCode"
+                      editable={!resetPending}
+                      accessibilityLabel="找回验证码"
+                    />
+                    <Button
+                      variant="outline"
+                      className="min-h-[52px] shrink-0 px-4"
+                      disabled={resetSending || resetCooldown > 0 || resetPending}
+                      onPress={() => void handleSendResetCode()}
+                    >
+                      <Text className="text-base">
+                        {resetSending ? "发送中…" : resetCooldown > 0 ? `${resetCooldown} 秒后重发` : "获取验证码"}
+                      </Text>
+                    </Button>
+                  </View>
+                  <Text className="text-sm leading-6 text-muted-foreground">
+                    如该手机号已注册，验证码将发送到该号码。
+                  </Text>
+                </View>
+
+                <View className="gap-2">
+                  <Label className="text-base">新密码</Label>
+                  <Input
+                    className="min-h-[52px] text-lg"
+                    value={resetNewPassword}
+                    onChangeText={setResetNewPassword}
+                    placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
+                    secureTextEntry
+                    autoComplete="new-password"
+                    textContentType="newPassword"
+                    editable={!resetPending}
+                    accessibilityLabel="找回新密码"
+                  />
+                  <Text className="text-xs text-muted-foreground">至少 {PASSWORD_MIN_LENGTH} 位</Text>
+                </View>
+
+                <View className="gap-2">
+                  <Label className="text-base">确认新密码</Label>
+                  <Input
+                    className="min-h-[52px] text-lg"
+                    value={resetConfirm}
+                    onChangeText={setResetConfirm}
+                    secureTextEntry
+                    autoComplete="new-password"
+                    textContentType="newPassword"
+                    editable={!resetPending}
+                    accessibilityLabel="找回确认密码"
+                  />
+                </View>
+
+                {failure ? <FailureBox message={failure} /> : null}
+
+                <Button
+                  className="min-h-[52px] w-full"
+                  disabled={resetPending}
+                  onPress={() => void handleResetSubmit()}
+                >
+                  <Text className="text-lg">{resetPending ? "正在重置…" : "重置密码并登录"}</Text>
+                </Button>
+              </>
+            ) : (
+              <>
+                <View className="mb-1 flex-row gap-1 rounded-xl bg-muted p-1">
+                  {modeButton("password", "密码登录")}
+                  {modeButton("phone", "手机号登录")}
+                </View>
+
+                {mode === "password" ? (
               <>
                 <View className="gap-2">
                   <Label className="text-base">账号</Label>
@@ -288,6 +464,20 @@ function LoginScreen() {
                 >
                   <Text className="text-lg">{pending ? "正在登录…" : "登录"}</Text>
                 </Button>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="忘记密码"
+                  onPress={() => {
+                    setResetMode(true);
+                    setFailure(null);
+                  }}
+                  className="min-h-[44px] items-center justify-center px-2"
+                >
+                  <Text className="text-base font-medium text-primary">
+                    忘记密码？用手机号找回
+                  </Text>
+                </Pressable>
               </>
             ) : (
               <>
@@ -347,6 +537,8 @@ function LoginScreen() {
                 >
                   <Text className="text-lg">{phonePending ? "正在登录…" : "登录 / 注册"}</Text>
                 </Button>
+              </>
+            )}
               </>
             )}
           </CardContent>

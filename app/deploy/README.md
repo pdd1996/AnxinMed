@@ -272,7 +272,24 @@ curl -sS -X POST http://<ECS_IP>:8787/api/auth/phone/login \
 
 # 用 token 访问业务路由应为 200
 curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '%{http_code}\n' http://<ECS_IP>:8787/api/drugs
+
+# 忘记密码（100003 重置密码模板）：发重置码——未注册号也返回 ok 但不会真发（防枚举）
+curl -sS -X POST http://<ECS_IP>:8787/api/auth/password/reset-code \
+  -H 'content-type: application/json' -d '{"phone":"151xxxxxxxx"}'
+
+# 重置并登录（成功后清该账号全部旧会话，旧 token 再访问应 401）
+curl -sS -X POST http://<ECS_IP>:8787/api/auth/password/reset \
+  -H 'content-type: application/json' \
+  -d '{"phone":"151xxxxxxxx","code":"<收到的6位码>","password":"Test-pass-123"}'
+# 期望：{"ok":true,...,"token":"..."}；之后用「手机号 + 新密码」走 /api/auth/login 应 200
+
+# 登录态改密（清其他设备会话、保留当前这台；已有密码必须带 oldPassword）
+curl -sS -X POST http://<ECS_IP>:8787/api/auth/password \
+  -H "authorization: Bearer <token>" -H 'content-type: application/json' \
+  -d '{"oldPassword":"<旧密码>","password":"New-pass-456"}'
 ```
+
+> 找回密码模板默认用赠送的 `100003`（`DYPNS_TEMPLATE_RESET` 可覆盖，一般不需要配）。
 
 已知边界：同号 60 秒冷却、同 IP 每小时 10 次（单实例内存限流，多副本前需换共享存储）；限流状态进程重启清零；
 短息认证目前只支持中国大陆手机号；自定义签名/通知类短信需升级企业资质 + 通用短信服务（见
@@ -291,6 +308,7 @@ curl -sS -H 'authorization: Bearer <token>' -o /dev/null -w '%{http_code}\n' htt
 | 7 | 登录已生效（G7） | 见 §6.6 的 curl 三连 | 未登录 401 / 登录后 200 / 前端出现登录页 |
 | 8 | 登录审计可见性 | `docker compose logs --tail=20 api` | 401/登录请求有访问日志；无明文密码输出 |
 | 9 | 手机号验证码登录（P1） | 见 §6.7 的发码/登录 curl | `ok:true` + 收到短信（落款=赠送签名）/ 首登 `created:true` / token 访问业务路由 200 |
+| 10 | 忘记密码 + 改密清会话（P1） | 见 §6.7 的 reset-code / reset / password curl | 未注册号也 ok 但不真发；已注册号收 100003 码；重置后旧 token 401、新 token 200；改密后其他设备 401、当前 200 |
 
 ## 8. e2e（AI_MODE=fixtures）对火山部署跑一遍
 

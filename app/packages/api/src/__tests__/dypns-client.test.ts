@@ -179,6 +179,18 @@ describe('readDypnsConfig / maskPhone', () => {
     expect(readDypnsConfig()).toBeNull()
   })
 
+  it('未配 DYPNS_TEMPLATE_RESET 时默认 100003（找回密码模板）', () => {
+    vi.stubEnv('DYPNS_ACCESS_KEY_ID', 'ak')
+    vi.stubEnv('DYPNS_ACCESS_KEY_SECRET', 'sk')
+    vi.stubEnv('DYPNS_SIGN_NAME', '恒创联众')
+    vi.stubEnv('DYPNS_TEMPLATE_LOGIN', '100001')
+    vi.stubEnv('DYPNS_TEMPLATE_RESET', '')
+    expect(readDypnsConfig()?.templateReset).toBe('100003')
+
+    vi.stubEnv('DYPNS_TEMPLATE_RESET', '100009')
+    expect(readDypnsConfig()?.templateReset).toBe('100009')
+  })
+
   it('maskPhone 只露前三后四，非法号码一律 ***', () => {
     expect(maskPhone('13800138000')).toBe('138****8000')
     expect(maskPhone('12345')).toBe('***')

@@ -5,13 +5,15 @@ import {
   ApiRequestError,
   bootstrapAuth,
   requestPhoneCode,
+  requestResetCode,
+  resetPassword,
   signIn,
   signInWithPhone,
   useAuthStore,
 } from "@anxin/core";
 import { AuthGate } from "./AuthGate";
 
-// 只替身网络动作（启动恢复 / 密码登录 / 手机号发码与登录），store 与 ApiRequestError 走真代码——
+// 只替身网络动作（启动恢复 / 密码登录 / 手机号发码与登录 / 忘记密码），store 与 ApiRequestError 走真代码——
 // 同 web Login.test.tsx 的做法。
 jest.mock("@anxin/core", () => {
   const actual = jest.requireActual<typeof import("@anxin/core")>("@anxin/core");
@@ -21,6 +23,8 @@ jest.mock("@anxin/core", () => {
     signIn: jest.fn(),
     requestPhoneCode: jest.fn(),
     signInWithPhone: jest.fn(),
+    requestResetCode: jest.fn(),
+    resetPassword: jest.fn(),
   };
 });
 
@@ -40,6 +44,8 @@ const mockBootstrap = jest.mocked(bootstrapAuth);
 const mockSignIn = jest.mocked(signIn);
 const mockRequestPhoneCode = jest.mocked(requestPhoneCode);
 const mockSignInWithPhone = jest.mocked(signInWithPhone);
+const mockRequestResetCode = jest.mocked(requestResetCode);
+const mockResetPassword = jest.mocked(resetPassword);
 
 function renderGate() {
   return render(
@@ -55,6 +61,8 @@ beforeEach(() => {
   mockSignIn.mockReset();
   mockRequestPhoneCode.mockReset();
   mockSignInWithPhone.mockReset();
+  mockRequestResetCode.mockReset();
+  mockResetPassword.mockReset();
   useAuthStore.setState({ status: "idle", mode: null, user: null, error: null });
 });
 
@@ -252,5 +260,70 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
 
     expect(await view.findByText("验证码错误或已过期，请重新获取")).toBeTruthy();
     expect(view.getByText("登录 / 注册")).toBeTruthy();
+  });
+});
+
+describe("AuthGate · 忘记密码（P1：未登录找回）", () => {
+  function renderAnonymous() {
+    useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
+    return renderGate();
+  }
+
+  it("密码登录页有「忘记密码」入口，进入找回表单并可返回", async () => {
+    const view = await renderAnonymous();
+
+    await fireEvent.press(view.getByLabelText("忘记密码"));
+    expect(view.getByText("找回密码")).toBeTruthy();
+    expect(view.getByLabelText("找回手机号")).toBeTruthy();
+
+    await fireEvent.press(view.getByLabelText("返回密码登录"));
+    expect(view.getByLabelText("账号")).toBeTruthy();
+  });
+
+  it("提交找回：参数交给 resetPassword（手机号/验证码/新密码）", async () => {
+    mockResetPassword.mockResolvedValue(undefined);
+    const view = await renderAnonymous();
+    await fireEvent.press(view.getByLabelText("忘记密码"));
+
+    await fireEvent.changeText(view.getByLabelText("找回手机号"), "13600001111");
+    await fireEvent.changeText(view.getByLabelText("找回验证码"), "123456");
+    await fireEvent.changeText(view.getByLabelText("找回新密码"), "newpass123");
+    await fireEvent.changeText(view.getByLabelText("找回确认密码"), "newpass123");
+    await fireEvent.press(view.getByRole("button", { name: "重置密码并登录" }));
+
+    await waitFor(() =>
+      expect(mockResetPassword).toHaveBeenCalledWith("13600001111", "123456", "newpass123"),
+    );
+  });
+
+  it("两次新密码不一致 → 内联提示且不请求接口", async () => {
+    const view = await renderAnonymous();
+    await fireEvent.press(view.getByLabelText("忘记密码"));
+
+    await fireEvent.changeText(view.getByLabelText("找回手机号"), "13600001111");
+    await fireEvent.changeText(view.getByLabelText("找回验证码"), "123456");
+    await fireEvent.changeText(view.getByLabelText("找回新密码"), "newpass123");
+    await fireEvent.changeText(view.getByLabelText("找回确认密码"), "newpass456");
+    await fireEvent.press(view.getByRole("button", { name: "重置密码并登录" }));
+
+    expect(await view.findByText("两次输入的密码不一致")).toBeTruthy();
+    expect(mockResetPassword).not.toHaveBeenCalled();
+  });
+
+  it("获取找回验证码 → 调用 requestResetCode", async () => {
+    mockRequestResetCode.mockResolvedValue({
+      ok: true,
+      mode: "password",
+      cooldownSec: 60,
+      expiresInSec: 300,
+      signName: "恒创联众",
+    });
+    const view = await renderAnonymous();
+    await fireEvent.press(view.getByLabelText("忘记密码"));
+    await fireEvent.changeText(view.getByLabelText("找回手机号"), "13600001111");
+
+    await fireEvent.press(view.getByRole("button", { name: "获取验证码" }));
+
+    await waitFor(() => expect(mockRequestResetCode).toHaveBeenCalledWith("13600001111"));
   });
 });

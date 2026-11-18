@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router'
-import { PHONE_PATTERN } from '@anxin/shared'
+import { PASSWORD_MIN_LENGTH, PHONE_PATTERN, PasswordResetRequestSchema } from '@anxin/shared'
 import {
   requestPhoneCode,
+  requestResetCode,
+  resetPassword,
   signIn,
   signInWithPhone,
   toUserMessage,
@@ -24,7 +26,9 @@ type LoginTab = 'password' | 'phone'
  * - 两种方式并存：老账号继续用管理员分配的账号密码；手机号验证码为「验证码即注册」
  *   （未注册手机号验码通过后自动建号），成功/失败文案都由服务端中文 message 直接透传，
  *   网络/超时/服务异常统一经 core 的 toUserMessage 归成中文（G8，禁止 Failed to fetch 原样上屏）；
- * - 无自助改密/找回：密码账号由 CLI 开通，忘记密码走管理员重置（G7 已知边界）。
+ * - 忘记密码：密码 tab 下「忘记密码？用手机号找回」→ 手机号 + 100003 重置验证码 + 新密码，
+ *   重置成功即登录（服务端清该账号全部旧会话）；未注册手机号统一返回「已发送」但不真发（防枚举）；
+ * - 登录后也可在「设置 → 账号与安全 → 登录密码」自行改密（改密会清其他设备会话）。
  */
 export default function Login() {
   const status = useAuthStore((s) => s.status)
@@ -47,12 +51,28 @@ export default function Login() {
   /** 重发倒计时（秒），由服务端返回的 cooldownSec 初始化。 */
   const [cooldown, setCooldown] = useState(0)
 
+  // 找回密码（未登录）：独立表单状态，避免与登录表单互相污染。
+  const [resetMode, setResetMode] = useState(false)
+  const [resetPhone, setResetPhone] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [resetNewPassword, setResetNewPassword] = useState('')
+  const [resetConfirm, setResetConfirm] = useState('')
+  const [resetSending, setResetSending] = useState(false)
+  const [resetPending, setResetPending] = useState(false)
+  const [resetCooldown, setResetCooldown] = useState(0)
+
   // 倒计时：每秒减一（卸载自动清理，避免离开页面后 setState）。
   useEffect(() => {
     if (cooldown <= 0) return
     const timer = setTimeout(() => setCooldown((s) => Math.max(0, s - 1)), 1000)
     return () => clearTimeout(timer)
   }, [cooldown])
+
+  useEffect(() => {
+    if (resetCooldown <= 0) return
+    const timer = setTimeout(() => setResetCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearTimeout(timer)
+  }, [resetCooldown])
 
   if (status === 'idle' || status === 'loading') {
     return (
@@ -134,6 +154,52 @@ export default function Login() {
     }
   }
 
+  async function handleSendResetCode() {
+    if (resetSending || resetCooldown > 0) return
+    const value = resetPhone.trim()
+    if (!PHONE_PATTERN.test(value)) {
+      setError('请输入 11 位手机号')
+      return
+    }
+    setResetSending(true)
+    setError(null)
+    try {
+      const data = await requestResetCode(value)
+      setResetCooldown(data.cooldownSec)
+    } catch (err) {
+      setError(toUserMessage(err, '验证码发送失败，请稍后重试'))
+    } finally {
+      setResetSending(false)
+    }
+  }
+
+  async function handleResetSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const parsed = PasswordResetRequestSchema.safeParse({
+      phone: resetPhone.trim(),
+      code: resetCode.trim(),
+      password: resetNewPassword,
+    })
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? '请检查输入')
+      return
+    }
+    if (resetNewPassword !== resetConfirm) {
+      setError('两次输入的密码不一致')
+      return
+    }
+    setResetPending(true)
+    setError(null)
+    try {
+      // 重置成功即登录（服务端已清该账号旧会话并发新会话）。
+      await resetPassword(parsed.data.phone, parsed.data.code, parsed.data.password)
+    } catch (err) {
+      setError(toUserMessage(err, '重置失败，请稍后重试'))
+    } finally {
+      setResetPending(false)
+    }
+  }
+
   const tabButton = (key: LoginTab, label: string) => (
     <button
       key={key}
@@ -160,12 +226,128 @@ export default function Login() {
           <CardDescription className="text-base leading-7">请选择登录方式</CardDescription>
         </CardHeader>
         <CardContent>
-          <div role="tablist" aria-label="登录方式" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-            {tabButton('password', '密码登录')}
-            {tabButton('phone', '手机号登录')}
-          </div>
+          {resetMode ? (
+            <form className="space-y-5" onSubmit={handleResetSubmit} noValidate>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetMode(false)
+                  setError(null)
+                }}
+                className="-ml-2 inline-flex min-h-11 items-center rounded-full px-2 text-base font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              >
+                ← 返回密码登录
+              </button>
+              <div>
+                <h2 className="text-xl font-bold">找回密码</h2>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  用注册手机号收验证码，验证通过后设置新密码；重置成功会自动登录。
+                </p>
+              </div>
 
-          {tab === 'password' ? (
+              <div className="space-y-2">
+                <Label htmlFor="reset-phone" className="text-base">
+                  手机号
+                </Label>
+                <Input
+                  id="reset-phone"
+                  name="reset-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={11}
+                  placeholder="请输入 11 位手机号"
+                  className="min-h-12 text-lg"
+                  value={resetPhone}
+                  onChange={(e) => setResetPhone(e.target.value.replace(/\D/g, ''))}
+                  disabled={resetPending}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reset-code" className="text-base">
+                  短信验证码
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="reset-code"
+                    name="reset-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={8}
+                    placeholder="请输入验证码"
+                    className="min-h-12 flex-1 text-lg"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                    disabled={resetPending}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 shrink-0 px-4 text-base"
+                    onClick={() => void handleSendResetCode()}
+                    disabled={resetSending || resetCooldown > 0 || resetPending}
+                  >
+                    {resetSending ? '发送中…' : resetCooldown > 0 ? `${resetCooldown} 秒后重发` : '获取验证码'}
+                  </Button>
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  如该手机号已注册，验证码将发送到该号码。
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reset-password" className="text-base">
+                  新密码
+                </Label>
+                <Input
+                  id="reset-password"
+                  name="reset-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
+                  className="min-h-12 text-lg"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  disabled={resetPending}
+                />
+                <p className="text-sm leading-6 text-muted-foreground">至少 {PASSWORD_MIN_LENGTH} 位</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reset-confirm" className="text-base">
+                  确认新密码
+                </Label>
+                <Input
+                  id="reset-confirm"
+                  name="reset-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  className="min-h-12 text-lg"
+                  value={resetConfirm}
+                  onChange={(e) => setResetConfirm(e.target.value)}
+                  disabled={resetPending}
+                />
+              </div>
+
+              {error ? (
+                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-base text-destructive">
+                  {error}
+                </p>
+              ) : null}
+
+              <Button type="submit" className="min-h-12 w-full text-base" disabled={resetPending}>
+                {resetPending ? '正在重置…' : '重置密码并登录'}
+              </Button>
+            </form>
+          ) : (
+            <>
+              <div role="tablist" aria-label="登录方式" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                {tabButton('password', '密码登录')}
+                {tabButton('phone', '手机号登录')}
+              </div>
+
+              {tab === 'password' ? (
             <form className="space-y-5" onSubmit={handlePasswordSubmit} noValidate>
               <div className="space-y-2">
                 <Label htmlFor="login-username" className="text-base">
@@ -209,6 +391,17 @@ export default function Login() {
               <Button type="submit" className="min-h-12 w-full text-base" disabled={passwordPending}>
                 {passwordPending ? '正在登录…' : '登录'}
               </Button>
+
+              <button
+                type="button"
+                className="min-h-11 w-full text-center text-base font-medium text-primary hover:underline"
+                onClick={() => {
+                  setResetMode(true)
+                  setError(null)
+                }}
+              >
+                忘记密码？用手机号找回
+              </button>
             </form>
           ) : (
             <form className="space-y-5" onSubmit={handlePhoneSubmit} noValidate>
@@ -273,6 +466,8 @@ export default function Login() {
                 {phonePending ? '正在登录…' : '登录 / 注册'}
               </Button>
             </form>
+          )}
+            </>
           )}
         </CardContent>
       </Card>
