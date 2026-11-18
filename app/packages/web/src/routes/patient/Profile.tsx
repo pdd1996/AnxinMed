@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { ChevronRight, ClipboardList, LogOut, Settings, UserRound, type LucideIcon } from 'lucide-react'
+import { ChevronRight, ClipboardList, Settings, UserRound, type LucideIcon } from 'lucide-react'
 import { signOut, useAuthStore } from '@anxin/core'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -53,9 +53,8 @@ export default function Profile() {
             type="button"
             onClick={() => void handleSignOut()}
             disabled={signingOut}
-            className="flex min-h-14 items-center gap-3 px-4 py-2 text-left text-risk-l4 transition-colors hover:bg-muted/50 disabled:opacity-60"
+            className="flex min-h-14 items-center justify-center px-4 py-2 text-risk-l4 transition-colors hover:bg-muted/50 disabled:opacity-60"
           >
-            <LogOut className="size-5 shrink-0" aria-hidden />
             <span className="font-medium">{signingOut ? '正在退出…' : '退出登录'}</span>
           </button>
         </Card>

@@ -5,7 +5,6 @@ import { useUnstableNativeVariable } from "nativewind";
 import {
   ChevronRight,
   ClipboardList,
-  LogOut,
   Settings as SettingsIcon,
   UserRound,
   type LucideIcon,
@@ -24,7 +23,6 @@ import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 export default function Profile() {
   const router = useRouter();
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
-  const riskL4 = useUnstableNativeVariable("--risk-l4");
   // 登录态（G7）：demo 模式免登录，账号区不出现。账号串是内部演示 ID，患者端不展示，只保留退出动作。
   const authMode = useAuthStore((s) => s.mode);
   const [signingOut, setSigningOut] = useState(false);
@@ -94,10 +92,9 @@ export default function Profile() {
               accessibilityState={{ disabled: signingOut }}
               disabled={signingOut}
               onPress={confirmSignOut}
-              className="min-h-[56px] flex-row items-center gap-3 px-4 active:opacity-80"
+              className="min-h-[56px] items-center justify-center px-4 active:opacity-80"
             >
-              <Icon as={LogOut} size={20} color={riskL4} />
-              <Text className="flex-1 text-base font-medium text-risk-l4">
+              <Text className="text-base font-medium text-risk-l4">
                 {signingOut ? "正在退出…" : "退出登录"}
               </Text>
             </Pressable>
