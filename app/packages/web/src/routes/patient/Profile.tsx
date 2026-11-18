@@ -53,7 +53,7 @@ export default function Profile() {
             type="button"
             onClick={() => void handleSignOut()}
             disabled={signingOut}
-            className="flex min-h-14 items-center justify-center px-4 py-2 text-risk-l4 transition-colors hover:bg-muted/50 disabled:opacity-60"
+            className="flex min-h-14 items-center justify-center px-4 py-2 text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-60"
           >
             <span className="font-medium">{signingOut ? '正在退出…' : '退出登录'}</span>
           </button>

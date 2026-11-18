@@ -94,7 +94,7 @@ export default function Profile() {
               onPress={confirmSignOut}
               className="min-h-[56px] items-center justify-center px-4 active:opacity-80"
             >
-              <Text className="text-base font-medium text-risk-l4">
+              <Text className="text-base font-medium text-muted-foreground">
                 {signingOut ? "正在退出…" : "退出登录"}
               </Text>
             </Pressable>
