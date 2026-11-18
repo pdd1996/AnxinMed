@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
-import { CalendarDays, Download } from "lucide-react-native";
+import { Download } from "lucide-react-native";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import {
@@ -16,10 +16,19 @@ import { Icon } from "@/components/ui/icon";
 import { AdherenceCharts } from "@/components/domain/records/AdherenceCharts";
 
 const MODES: { key: RangeMode; label: string }[] = [
-  { key: "day", label: "按日" },
-  { key: "week", label: "按周" },
-  { key: "month", label: "按月" },
+  { key: "day", label: "今天" },
+  { key: "week", label: "本周" },
+  { key: "month", label: "本月" },
 ];
+
+/** 区间自然语言（老年向：显示「11月16日 – 11月18日」，不用 2026-11-16 ~ 2026-11-18 这种机器格式）。 */
+function formatRange(mode: RangeMode, from: string, to: string): string {
+  const md = (iso: string) => {
+    const [, month, day] = iso.split("-");
+    return `${Number(month)}月${Number(day)}日`;
+  };
+  return mode === "day" ? md(from) : `${md(from)} – ${md(to)}`;
+}
 
 /**
  * 服药记录查询与导出（M5-T5d，照 web `routes/patient/Records.tsx`）。
@@ -90,15 +99,27 @@ export default function Records() {
         />
       }
     >
-      {/* 页面标题由根 stack 头部给（「服药记录」），页内只留动作导向的小标题。 */}
-      <Text className="text-2xl font-bold text-foreground">查询与导出</Text>
-      <Text className="mt-1 text-base leading-6 text-muted-foreground">
-        按日 / 周 / 月查看你亲自确认的服药留痕，可导出 CSV。
-      </Text>
-
       <AdherenceCharts />
 
-      <View className="mt-5 flex-row gap-2">
+      <View className="mt-6 flex-row items-center justify-between gap-3">
+        <Text className="text-lg font-semibold text-foreground">记录明细</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="导出 CSV"
+          disabled={items.length === 0 || busy}
+          onPress={() => void exportCsv()}
+          className={`min-h-[44px] flex-row items-center gap-1.5 rounded-xl border border-border bg-card px-3 active:opacity-80 ${
+            items.length === 0 || busy ? "opacity-50" : ""
+          }`}
+        >
+          <Icon as={Download} size={16} color={mutedForeground} />
+          <Text className="text-sm font-medium text-card-foreground">
+            {busy ? "生成中…" : "导出"}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View className="mt-3 flex-row gap-2">
         {MODES.map((item) => {
           const selected = mode === item.key;
           return (
@@ -107,7 +128,7 @@ export default function Records() {
               accessibilityRole="button"
               accessibilityState={{ selected }}
               onPress={() => setMode(item.key)}
-              className={`min-h-[52px] flex-1 items-center justify-center rounded-xl ${
+              className={`min-h-[48px] flex-1 items-center justify-center rounded-xl ${
                 selected
                   ? "border-2 border-primary bg-primary"
                   : "border border-border bg-card active:opacity-80"
@@ -125,59 +146,32 @@ export default function Records() {
         })}
       </View>
 
-      <View className="mt-4 rounded-2xl border border-border bg-card p-4">
-        {/* flex-wrap 是必需：大字档下日期串变宽，不换行会把「导出 CSV」整条挤出屏幕右边缘
-            （10-03 模拟器大字档实测，按钮节点 bounds 右沿 =1080 即屏宽，「CSV」三字看不见）。
-            标准档两者本来同宽一行，加 wrap 无变化。 */}
-        <View className="flex-row flex-wrap items-center justify-between gap-3">
-          <View className="min-w-0 flex-row items-center gap-2">
-            <Icon as={CalendarDays} size={20} color={mutedForeground} />
-            <Text className="text-base font-semibold text-card-foreground">
-              {from} ~ {to}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            disabled={items.length === 0 || busy}
-            onPress={() => void exportCsv()}
-            className={`min-h-[48px] flex-row items-center gap-1.5 rounded-xl bg-primary px-3 active:opacity-80 ${
-              items.length === 0 || busy ? "opacity-50" : ""
-            }`}
-          >
-            <Icon as={Download} size={18} color={mutedForeground} />
-            <Text className="text-base font-medium text-primary-foreground">
-              {busy ? "生成中…" : "导出 CSV"}
-            </Text>
-          </Pressable>
-        </View>
+      <Text className="mt-3 text-sm leading-5 text-muted-foreground">
+        {formatRange(mode, from, to)}
+        {summary
+          ? ` · 共 ${summary.total} 条 · 已服 ${summary.taken} · 漏服 ${summary.skipped} · 延后 ${summary.later}`
+          : ""}
+      </Text>
 
-        {summary ? (
-          <Text className="mt-3 text-sm text-muted-foreground">
-            共 {summary.total} 条 · 已服 {summary.taken} · 跳过 {summary.skipped} · 稍后{" "}
-            {summary.later}
+      {mismatch ? (
+        <View className="mt-3 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+          <Text className="text-sm font-semibold text-risk-l4">条数对不上</Text>
+          <Text className="mt-1 text-xs leading-5 text-risk-l4">
+            统计 {summary?.total} 条，列表只有 {items.length} 条——导出的 CSV 按列表生成，可能少{" "}
+            {Math.max(0, (summary?.total ?? 0) - items.length)} 条。请把这条提示与区间（
+            {from} ~ {to}）告知开发者。
           </Text>
-        ) : null}
+        </View>
+      ) : null}
 
-        {mismatch ? (
-          <View className="mt-3 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
-            <Text className="text-sm font-semibold text-risk-l4">条数对不上</Text>
-            <Text className="mt-1 text-xs leading-5 text-risk-l4">
-              页顶统计 {summary?.total} 条，列表只有 {items.length} 条——导出的 CSV 按列表生成，
-              可能少 {Math.max(0, (summary?.total ?? 0) - items.length)} 条。请把这条提示与区间
-              （{from} ~ {to}）告知开发者。
-            </Text>
-          </View>
-        ) : null}
-
-        {failure ? (
-          <View className="mt-3 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
-            <Text className="text-sm leading-5 text-risk-l4">{failure}</Text>
-          </View>
-        ) : null}
-        {notice ? (
-          <Text className="mt-3 text-xs leading-5 text-muted-foreground">{notice}</Text>
-        ) : null}
-      </View>
+      {failure ? (
+        <View className="mt-3 rounded-xl border border-risk-l4 bg-risk-l4-tint p-3">
+          <Text className="text-sm leading-5 text-risk-l4">{failure}</Text>
+        </View>
+      ) : null}
+      {notice ? (
+        <Text className="mt-3 text-xs leading-5 text-muted-foreground">{notice}</Text>
+      ) : null}
 
       {isPending ? (
         <Text className="mt-6 text-base text-muted-foreground">正在载入记录…</Text>

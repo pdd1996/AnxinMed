@@ -1,4 +1,4 @@
-/**
+﻿/**
  * M3-T6 · Records 页组件断言：按日/周/月查询接线 + 列表 + 导出按钮态。
  * 只 mock 传输层 fetchRecords，页面/纯函数走真代码；CSV 文本正确性由 core 的 lib/records.test.ts 覆盖。
  */
@@ -53,7 +53,7 @@ describe('Records 页 · 按日/周/月查询', () => {
   it('切到按日 → 用今天区间（from=to）重新查询', async () => {
     renderRecords()
     await screen.findByText('玻璃酸钠滴眼液')
-    fireEvent.click(screen.getByRole('button', { name: '按日' }))
+    fireEvent.click(screen.getByRole('button', { name: '今天' }))
     const { from, to } = computeRange('day')
     await waitFor(() => expect(mocks.fetchRecords).toHaveBeenCalledWith(from, to))
     expect(from).toBe(to)
@@ -62,7 +62,7 @@ describe('Records 页 · 按日/周/月查询', () => {
   it('切到按月 → 用本月区间（1 号..今天）重新查询', async () => {
     renderRecords()
     await screen.findByText('玻璃酸钠滴眼液')
-    fireEvent.click(screen.getByRole('button', { name: '按月' }))
+    fireEvent.click(screen.getByRole('button', { name: '本月' }))
     const { from, to } = computeRange('month')
     await waitFor(() => expect(mocks.fetchRecords).toHaveBeenCalledWith(from, to))
     expect(from.endsWith('-01')).toBe(true)

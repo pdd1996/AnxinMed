@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, Download, LoaderCircle } from 'lucide-react'
+import { Download, LoaderCircle } from 'lucide-react'
 import {
   computeRange,
   fetchRecords,
@@ -9,18 +9,28 @@ import {
   type RangeMode,
 } from '@anxin/core'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 /**
- * 服药记录查询与导出页（M3-T6 · PRD §7.4 沿用 V1 §7.5）：按日/周/月查询 + 前端 CSV 导出。
- * 文案口径：记录为用户操作留痕，非医学验证（后端 GET /api/records?from&to，PG 聚合）。
+ * 服药记录页（M3-T6 · PRD §7.4）：按「今天/本周/本月」查明细 + CSV 导出。
+ * 层级：粒度切换 → 明细标题（导出是这一区的次要动作）→ 区间与条数说明 → 记录列表。
+ * 导出不再是页面主视觉——低频的「数据导出」不该和主流程按钮同权重。
  */
 const MODES: { key: RangeMode; label: string }[] = [
-  { key: 'day', label: '按日' },
-  { key: 'week', label: '按周' },
-  { key: 'month', label: '按月' },
+  { key: 'day', label: '今天' },
+  { key: 'week', label: '本周' },
+  { key: 'month', label: '本月' },
 ]
+
+/** 区间自然语言（不用 2026-11-16 ~ 2026-11-18 这种机器格式）。 */
+function formatRange(mode: RangeMode, from: string, to: string): string {
+  const md = (iso: string) => {
+    const [, month, day] = iso.split('-')
+    return `${Number(month)}月${Number(day)}日`
+  }
+  return mode === 'day' ? md(from) : `${md(from)} – ${md(to)}`
+}
 
 export default function Records() {
   const [mode, setMode] = useState<RangeMode>('week')
@@ -46,11 +56,7 @@ export default function Records() {
 
   return (
     <div className="space-y-5">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">服药记录</p>
-        <h1 className="text-2xl font-bold">查询与导出</h1>
-        <p className="text-sm text-muted-foreground">按日 / 周 / 月查看你亲自确认的服药留痕，可导出 CSV。</p>
-      </header>
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">服药记录</p>
 
       {/* 粒度切换（老年向：大按钮 + 文字） */}
       <div className="flex gap-2">
@@ -68,26 +74,30 @@ export default function Records() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
-            <span className="flex items-center gap-2">
-              <CalendarDays className="size-5 text-primary" aria-hidden />
-              {from} ~ {to}
-            </span>
-            <Button type="button" size="sm" variant="outline" className="min-h-9" onClick={exportCsv} disabled={items.length === 0}>
-              <Download className="size-4" aria-hidden /> 导出 CSV
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {summary && (
-            <p className="text-sm text-muted-foreground">
-              共 <strong className="text-foreground">{summary.total}</strong> 条 · 已服 {summary.taken} · 跳过{' '}
-              {summary.skipped} · 稍后 {summary.later}
-            </p>
-          )}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold">记录明细</h1>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="min-h-9"
+          onClick={exportCsv}
+          disabled={items.length === 0}
+          aria-label="导出 CSV"
+        >
+          <Download className="size-4" aria-hidden /> 导出
+        </Button>
+      </div>
 
+      <p className="text-sm text-muted-foreground">
+        {formatRange(mode, from, to)}
+        {summary
+          ? ` · 共 ${summary.total} 条 · 已服 ${summary.taken} · 漏服 ${summary.skipped} · 延后 ${summary.later}`
+          : ''}
+      </p>
+
+      <Card>
+        <CardContent className="space-y-3 pt-6">
           {isLoading ? (
             <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" aria-hidden /> 正在载入记录…
