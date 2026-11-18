@@ -22,8 +22,12 @@ export const consultRoute = new Hono<AppEnv>()
     '/',
     vJson(ConsultRequestSchema),
     async (c) => {
-      const { question, drugIds, sessionId, skillId } = c.req.valid('json')
-      const result = await consultService.consult(c.get('user').id, question, drugIds, { sessionId, skillId })
+      const { question, drugIds, sessionId, skillId, consultStatusVersion } = c.req.valid('json')
+      const result = await consultService.consult(c.get('user').id, question, drugIds, {
+        sessionId,
+        skillId,
+        consultStatusVersion,
+      })
       return okJson(c, result)
     },
   )

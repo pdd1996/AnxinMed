@@ -24,6 +24,7 @@ import {
 } from '../db/schema.js'
 import { setAiClients } from '../lib/ai/registry.js'
 import type { AiClients } from '../lib/ai/types.js'
+import { toLegacyConsultStatus } from '../services/consult.service.js'
 import { mockClients, newCalls } from './helpers/ai-mocks.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -154,7 +155,11 @@ describe('对象澄清（status=clarify）', () => {
     const calls = newCalls()
     prevClients = setAiClients(mockClients({ calls }))
 
-    const res = await req('POST', '/api/consult', { question: '这个药有什么副作用', drugIds: [] })
+    const res = await req('POST', '/api/consult', {
+      question: '这个药有什么副作用',
+      drugIds: [],
+      consultStatusVersion: 2,
+    })
 
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('clarify')
@@ -228,7 +233,11 @@ describe('范围层（status=out-of-scope）', () => {
     const calls = newCalls()
     prevClients = setAiClients(mockClients({ calls }))
 
-    const res = await req('POST', '/api/consult', { question: '我是不是得了糖尿病', drugIds: [] })
+    const res = await req('POST', '/api/consult', {
+      question: '我是不是得了糖尿病',
+      drugIds: [],
+      consultStatusVersion: 2,
+    })
 
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('out-of-scope')
@@ -250,6 +259,7 @@ describe('范围层（status=out-of-scope）', () => {
     const res = await req('POST', '/api/consult', {
       question: '帮我写个劳动合同',
       drugIds: [DRUG_A],
+      consultStatusVersion: 2,
     })
 
     expect(res.body.status).toBe('out-of-scope')
@@ -264,6 +274,7 @@ describe('范围层（status=out-of-scope）', () => {
     const res = await req('POST', '/api/consult', {
       question: '帮我看看这个检查报告是不是癌症',
       drugIds: [DRUG_A],
+      consultStatusVersion: 2,
     })
 
     expect(res.body.status).toBe('out-of-scope')
@@ -293,5 +304,44 @@ describe('范围层（status=out-of-scope）', () => {
     expect(res.body.status).not.toBe('out-of-scope')
     expect(res.body.status).toBe('no-source')
     expect(calls.consultAnswer).toBe(0)
+  })
+})
+
+describe('旧客户端状态降级（M13-P1 · A1 客户端容错）', () => {
+  it('toLegacyConsultStatus 只降级 clarify / out-of-scope，旧枚举原样', () => {
+    expect(toLegacyConsultStatus('clarify')).toBe('no-source')
+    expect(toLegacyConsultStatus('out-of-scope')).toBe('no-source')
+    expect(toLegacyConsultStatus('answered')).toBe('answered')
+    expect(toLegacyConsultStatus('no-source')).toBe('no-source')
+    expect(toLegacyConsultStatus('emergency')).toBe('emergency')
+  })
+
+  it('不带 consultStatusVersion：clarify 响应降级为 no-source（仍带 clarifyOptions；落库真实状态 clarify）', async () => {
+    const calls = newCalls()
+    prevClients = setAiClients(mockClients({ calls }))
+
+    const res = await req('POST', '/api/consult', { question: '这个药有什么副作用', drugIds: [] })
+
+    expect(res.body.status).toBe('no-source')
+    expect((res.body.clarifyOptions as unknown[]).length).toBeGreaterThan(0)
+    expect(res.body.answer).toContain('哪种药')
+    expect(calls.consultAnswer).toBe(0)
+
+    const logs = await db.select().from(consultLogs).where(eq(consultLogs.userId, USER))
+    expect(logs.at(-1)?.status).toBe('clarify')
+  })
+
+  it('不带 consultStatusVersion：out-of-scope 响应降级为 no-source（落库真实状态 out-of-scope）', async () => {
+    const calls = newCalls()
+    prevClients = setAiClients(mockClients({ calls }))
+
+    const res = await req('POST', '/api/consult', { question: '我是不是得了糖尿病', drugIds: [] })
+
+    expect(res.body.status).toBe('no-source')
+    expect(res.body.answer).toContain('不能做诊断')
+    expect(calls.consultAnswer).toBe(0)
+
+    const logs = await db.select().from(consultLogs).where(eq(consultLogs.userId, USER))
+    expect(logs.at(-1)?.status).toBe('out-of-scope')
   })
 })

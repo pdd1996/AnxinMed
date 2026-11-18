@@ -321,10 +321,12 @@ export async function postConsult(
       ? {
           question,
           drugIds,
+          // M13-P1：声明客户端认识 clarify/out-of-scope（旧 APK 不带 → 服务端降级为 no-source，防渲染崩溃）
+          consultStatusVersion: 2,
           ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
           ...(opts.skillId ? { skillId: opts.skillId } : {}),
         }
-      : { question, drugIds },
+      : { question, drugIds, consultStatusVersion: 2 },
   })
   return unwrap(res)
 }

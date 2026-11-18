@@ -170,6 +170,18 @@ function toBlockedAt(status: string): RiskEventLevel | null {
 }
 
 /**
+ * 旧客户端状态降级（M13-P1 · A1「客户端未知枚举容错」）：
+ * G8 版 APK 的 AnswerCard 以 `STATUS_META[status]` 查表，未知 status 会 `undefined.icon` 渲染崩溃；
+ * 请求未携带 `consultStatusVersion=2` 时，把新状态降级为旧枚举安全值 `no-source`
+ * （固定 sections 仍可正常渲染），避免旧 APK 在 clarify/out-of-scope 回答上白屏。
+ * consult_logs / trace 始终记录真实状态，指标不受影响。
+ */
+export function toLegacyConsultStatus(status: ConsultRunResult['status']): ConsultRunResult['status'] {
+  if (status === 'clarify' || status === 'out-of-scope') return 'no-source'
+  return status
+}
+
+/**
  * POST /api/consult 业务入口。
  * @param userId    当前用户（resolveUser 中间件注入）
  * @param question  用户提问（原文；本层内做 L3 出口脱敏后落库与送 LLM）
@@ -182,6 +194,11 @@ function toBlockedAt(status: string): RiskEventLevel | null {
 export interface ConsultOptions {
   sessionId?: string | null
   skillId?: string | null
+  /**
+   * M13-P1 客户端状态能力协商：2 = 客户端认识 clarify/out-of-scope；
+   * 缺省 = 旧客户端（响应状态降级为 no-source，见 toLegacyConsultStatus）。
+   */
+  consultStatusVersion?: number | null
 }
 
 /** 会话标题截断长度（首问截断，specs/04-T5）。 */
@@ -365,6 +382,12 @@ export async function consult(
     }
   }
 
+  // 5e. 旧客户端状态兼容（M13-P1 · A1）：旧 APK 的 AnswerCard 用 STATUS_META[status] 查表，
+  //     未知 status 会渲染崩溃；请求未协商 v2 时把 clarify/out-of-scope 降级为 no-source。
+  //     落库与 trace 仍记录真实状态（指标口径不变），仅响应 status 面向旧客户端降级。
+  const responseStatus =
+    opts.consultStatusVersion === 2 ? result.status : toLegacyConsultStatus(result.status)
+
   // 6. 落库：会话解析收尾（M4-T5）+ consult_logs（一次咨询一行）
   //    无 sessionId → 建新会话（title=首问截断）；有 → 刷新活跃时间。
   //    turn_no = 会话内已有轮次 + 1（1 起）。intent = skillId 透传 ?? S2 意图；null = 说明书管线兜底
@@ -458,7 +481,7 @@ export async function consult(
       {
         layer: 'execute',
         outcome: result.status,
-        detail: { skill: route.skill, llmPath },
+        detail: { skill: route.skill, llmPath, clientStatus: responseStatus },
       },
     ],
     finalRoute: deterministicGate ? result.status : formatSkillRoute(route),
@@ -476,7 +499,7 @@ export async function consult(
   //    + sessionId 供前端续问带入（M4-T5 首答回传）+ suggestion 建议卡（M4-T6））
   return {
     riskLevel: result.riskLevel,
-    status: result.status,
+    status: responseStatus,
     answer: result.answer,
     sections: result.sections,
     citations: result.citations,

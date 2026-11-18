@@ -12,7 +12,7 @@
 
 | # | 裁决 | 采纳方案 |
 |---|---|---|
-| A1 | 新增 `clarify` / `out-of-scope` 状态 | 新增；旧客户端对未知 status 走通用卡（响应仍带固定 sections），不新增版本协商 |
+| A1 | 新增 `clarify` / `out-of-scope` 状态 | 新增；**落地时补客户端能力协商** `consultStatusVersion`：旧 APK 不带 → 服务端降级 `no-source`；新 Web/Mobile 带 `2` 收新状态 |
 | A2 | 诊断/处方判断请求归属 | 新增 `out-of-scope`（产品边界，L1，不进 risk_events），不并入 L3 |
 | A3 | clarify 范围与形态 | 只做「对象药缺失」+ 响应新增 `clarifyOptions`（药名选项 ≤6）；不泛化追问 |
 | A4 | 范围层规则强度 | 纯规则、保守、默认用药域；不引入模型判 scope |
@@ -68,7 +68,7 @@
 ### T4 Web / Mobile UI
 
 - `AnswerCard`（web/mobile）新增 `clarifyOptions` + `onPickDrug`：渲染药名按钮（≥44px，老年向）。
-- 咨询页点选后带该 `drugId` 重发原问题（续用同 session）；旧客户端未知 status 仍渲染通用卡（sections 固定文案兜底）。
+- 咨询页点选后带该 `drugId` 重发原问题（续用同 session）；旧客户端经服务端状态降级收到 `no-source`（固定 sections 正常渲染）。
 - 完成标准：web/mobile 组件测试 + 咨询页测试（点选重发带 drugId）；E2E 一条 clarify golden（若环境允许）。
 
 ### T5 评测集与文档收口
@@ -102,11 +102,14 @@ pnpm --filter @anxin/mobile test       # 视 mobile 测试配置
 | 任务 | commit | 内容 |
 |---|---|---|
 | T1–T3 契约/纯函数/接线 | `a0f0a7c` | `ConsultStatusSchema` + `clarify`/`out-of-scope` + `clarifyOptions`；`scope.ts`/`clarify.ts` 纯函数；service「范围 → 对象 → S1」接线；两个 kill switch；纯函数 + 集成测试；评测 16 条 P1 用例转绿 |
-| T4 Web/Mobile UI | `76932a9` | AnswerCard 药名选项（≥44px）；点选带 drugId 重发原问题；旧客户端未知 status 走通用卡 |
+| T4 Web/Mobile UI | `76932a9` | AnswerCard 药名选项（≥44px）；点选带 drugId 重发原问题 |
+| 兼容层补充（A1） | 本轮补丁 | `consultStatusVersion` 协商 + `toLegacyConsultStatus`（旧 APK 收 `no-source`，落库/trace 记真实状态）+ 纯函数/集成用例 |
 
-**验证**：`pnpm --filter @anxin/api test` 67 文件 / 844 用例全绿；`eval:intent` 134/134；web 18 文件 / 119 用例、mobile 6 套件 / 38 用例全绿；api/web/mobile/core/shared `typecheck` 通过。
+**验证**：`pnpm --filter @anxin/api test` 全量绿（含 P1 新增用例与兼容层 5 例；当时工作区并发认证线用例一并计入）；`eval:intent` 134/134；web 18 文件 / 119 用例、mobile 6 套件 / 38 用例、core 12 文件 / 148 用例全绿；shared/core/api/web/mobile `typecheck` 通过。
 
 **E2E**：2026-11-18 执行全量 Playwright（**21 条**，含新增 `consult-clarify` golden）：修复 3 条 G8 遗留徽章断言（`consult-llm.spec.ts` 仍断言已移除的「已回答」/「已过滤剂量」徽章）后 **21/21 全绿**；新增用例覆盖「无绑定药 → clarify 卡 → 点选药名 → 带 drugId 重问 + 0 次 LLM + consult_logs.status=clarify」。
+
+**旧客户端兼容补丁（2026-11-18，A1 落实）**：请求新增可选 `consultStatusVersion`；旧 APK 不带 → `toLegacyConsultStatus` 把 `clarify` / `out-of-scope` 降级映射为 `no-source`（`consult_logs`/trace 仍记真实状态）。依据：G8 v1.0.0 APK（模拟器实装）的 `AnswerCard` 以 `STATUS_META[status]` 查表，未知 status 会 `undefined.icon` 渲染崩溃——仅靠「响应带固定 sections」兜底不够。新增 3 例纯函数 + 2 例集成（legacy 映射/落库真实状态），API 全量回归绿；新 Web/Mobile 经 core 自动带 `2`。E2E 复核因并发认证线迁移/环境改动（测试库 `users.phone_verified_at` 不一致）本轮未能稳定复跑，需在该线收口后重跑全量 E2E；兼容层本身由 API 集成测试覆盖。
 
 **偏差**
 

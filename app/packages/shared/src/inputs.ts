@@ -138,6 +138,14 @@ export const ConsultRequestSchema = z.object({
   sessionId: z.string().min(1).optional(),
   /** 技能快路径（M4-T7）：合法值 = ConsultSkillId 联合；未知值 400（不静默改道回正则）。 */
   skillId: ConsultSkillIdSchema.optional(),
+  /**
+   * 客户端咨询状态能力协商（M13-P1 旧客户端兼容，2026-11-18）：
+   * - `2` = 客户端可处理新增 status（clarify / out-of-scope），服务端原样返回；
+   * - 缺省（旧 APK / 旧调用方）= 客户端只认识旧枚举，服务端把新状态降级映射为 `no-source`
+   *   （G8 版 AnswerCard 以 `STATUS_META[status]` 查表，未知 status 会渲染崩溃）。
+   * 落库与 trace 始终记录真实状态，指标不受影响。
+   */
+  consultStatusVersion: z.number().int().min(1).optional(),
 })
 export type ConsultRequest = z.infer<typeof ConsultRequestSchema>
 
