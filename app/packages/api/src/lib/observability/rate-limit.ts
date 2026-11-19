@@ -84,6 +84,11 @@ export class SlidingWindowLimiter {
     this.hits.clear()
   }
 
+  /** 清空单个 key 的窗口计数（如：核销成功后撤销该患者的尝试计数）。 */
+  resetKey(key: string): void {
+    this.hits.delete(key)
+  }
+
   /** 当前记录的去重 key 数（测试观察窗口清理用）。 */
   get keyCount(): number {
     return this.hits.size
@@ -225,7 +230,7 @@ export function resetRateLimitersForTests(): void {
 }
 
 /** 客户端 IP：优先 x-forwarded-for 首段（Caddy/反代），其次 x-real-ip，直连测试回 'local'。 */
-function clientIp(c: Context<AppEnv>): string {
+export function clientIp(c: Context<AppEnv>): string {
   const forwarded = c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
   if (forwarded) return forwarded
   const realIp = c.req.header('x-real-ip')?.trim()

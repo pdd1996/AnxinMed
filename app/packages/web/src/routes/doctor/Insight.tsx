@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ChevronLeft,
@@ -14,12 +14,15 @@ import {
   Sparkles,
   Stethoscope,
   TriangleAlert,
+  UserMinus,
 } from 'lucide-react'
 import {
   askInsight,
   fetchInsightQueue,
   generateInsightSummary,
   generateQueueSummary,
+  toUserMessage,
+  unbindPatientAsDoctor,
   useAuthStore,
   type InsightAskDto,
   type InsightQueueDto,
@@ -30,9 +33,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { DoctorBindDialog } from '@/components/domain/DoctorBindDialog'
-import { RiskBadge } from '@/components/domain/RiskBadge'
+import { RiskBadge, RISK_BADGE_META } from '@/components/domain/RiskBadge'
 import { PatientAdherenceCharts } from '@/components/domain/insight/PatientAdherenceCharts'
-import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventType } from '@anxin/shared'
+import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventLevel, type RiskEventType } from '@anxin/shared'
+import { cn } from '@/lib/utils'
 
 /** 临期/低库存药品项（shared dto 里为 z.unknown()，本处窄化为具体形态）。 */
 interface ExpiryItem {
@@ -48,6 +52,26 @@ const EVENT_TYPE_LABEL: Record<RiskEventType, string> = {
   refused: '拒答（停/换药/剂量）',
   'manual-blocked': '拦截个体化解释',
 }
+
+/**
+ * 风险事件等级展示顺序：风险从高到低。manual-gate（人工档门禁）不是风险分级，
+ * 但意味着该药未经 OCR 确认、只能查资料，排在 L3 之后（L1/L2 正常回答不进事件表）。
+ */
+const RISK_LEVEL_ORDER: RiskEventLevel[] = ['L4', 'L3', 'manual-gate']
+const RISK_LEVEL_RANK = Object.fromEntries(RISK_LEVEL_ORDER.map((level, i) => [level, i])) as Record<
+  RiskEventLevel,
+  number
+>
+
+/** 汇总构成里的圆点配色（与 RiskBadge 同源令牌；徽章本身始终带图标 + 中文等级名）。 */
+const RISK_LEVEL_DOT: Record<RiskEventLevel, string> = {
+  L4: 'bg-risk-l4',
+  L3: 'bg-risk-l3',
+  'manual-gate': 'bg-muted-foreground/60',
+}
+
+/** 时间线行（GET /api/insight/queue 的 riskTimeline 元素：日期 × 级别聚合）。 */
+type RiskTimelineItem = InsightQueueDto['riskTimeline'][number]
 
 /**
  * 分档 → 视觉语义（色 token 同 RiskBadge 体系）：
@@ -74,6 +98,8 @@ const GRADE_META: Record<AdherenceGrade | 'ungraded', { chip: string; bar: strin
  */
 export default function Insight() {
   const queueQuery = useQuery({ queryKey: ['insight', 'queue'], queryFn: fetchInsightQueue })
+  const queryClient = useQueryClient()
+  const authMode = useAuthStore((s) => s.mode)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [summary, setSummary] = useState<InsightSummaryDto | null>(null)
   const [queueSummary, setQueueSummary] = useState<QueueSummaryDto | null>(null)
@@ -88,7 +114,18 @@ export default function Insight() {
     onSuccess: (data) => setQueueSummary(data),
   })
 
+  // specs/25 增补：医生端解除患者（撤销权对称化）；成功后刷新队列并回队列视图。
+  const unbindMutation = useMutation({
+    mutationFn: (patientId: string) => unbindPatientAsDoctor(patientId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['insight', 'queue'] })
+      setSelectedId(null)
+      setSummary(null)
+    },
+  })
+
   const handlePick = (patientId: string) => {
+    unbindMutation.reset()
     setSelectedId(patientId)
     setSummary(null)
     summaryMutation.mutate(patientId)
@@ -101,7 +138,16 @@ export default function Insight() {
 
   // 患者摘要视图（下钻后）
   if (selectedId && summary) {
-    return <PatientSummaryView summary={summary} onBack={handleBack} />
+    return (
+      <PatientSummaryView
+        summary={summary}
+        onBack={handleBack}
+        // 仅真实医生账号（password 模式）可解除；demo 模式保持既有页面（E2E 零回归）。
+        onUnbind={authMode === 'password' ? () => unbindMutation.mutate(summary.patient.id) : undefined}
+        unbindPending={unbindMutation.isPending}
+        unbindError={unbindMutation.error ? toUserMessage(unbindMutation.error, '解除绑定失败，请重试') : null}
+      />
+    )
   }
 
   // 加载中骨架
@@ -302,7 +348,16 @@ function CohortTable({ queue, onPick }: { queue: InsightQueueDto; onPick: (id: s
   )
 }
 
-/** 风险事件时间线（按日期倒序；空态给安心文案）。 */
+/**
+ * 风险事件时间线（固定模板 · 0 次 LLM）。
+ *
+ * 版式：原来「日期 + 等级 + 起数」逐行平铺，同一天重复三次、等级顺序随库序，宽屏下右侧大片留白。
+ * 现改为「汇总条 + 按日分组」两层：
+ *   - 汇总条：总起数 / 有记录天数 + 分级构成，L4 直接标「需优先跟进」；
+ *   - 每日一行：日期列 → 各等级徽章 + 起数 → 当日小计（右对齐，形成表格节奏）；
+ *   - <sm 自动堆叠（日期在徽章上方、隐藏当日小计），不做横向滚动。
+ * 风险不单靠颜色传达：每枚徽章都是图标 + 中文等级名。
+ */
 function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
   const timeline = [...queue.riskTimeline].reverse() // 最新在前
   if (timeline.length === 0) {
@@ -315,19 +370,70 @@ function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
       </Card>
     )
   }
+
+  // 按日期归组：日期保持「最新在前」，组内按风险等级从高到低（先看最需要处理的）。
+  const byDate = new Map<string, RiskTimelineItem[]>()
+  for (const item of timeline) {
+    const rows = byDate.get(item.date)
+    if (rows) rows.push(item)
+    else byDate.set(item.date, [item])
+  }
+  const days = [...byDate.entries()].map(([date, rows]) => ({
+    date,
+    rows: [...rows].sort((a, b) => RISK_LEVEL_RANK[a.level] - RISK_LEVEL_RANK[b.level]),
+    count: rows.reduce((sum, r) => sum + r.count, 0),
+  }))
+  const total = days.reduce((sum, d) => sum + d.count, 0)
+  const levelTotals = RISK_LEVEL_ORDER.map((level) => ({
+    level,
+    count: timeline.filter((t) => t.level === level).reduce((sum, t) => sum + t.count, 0),
+  })).filter((l) => l.count > 0)
+  const hasUrgent = levelTotals.some((l) => l.level === 'L4')
+
   return (
-    <Card>
-      <CardContent className="space-y-2 p-3">
-        {timeline.map((t) => (
-          <div key={`${t.date}-${t.level}`} className="flex items-center gap-2 text-sm">
-            <RiskBadge level={t.level} showHint={false} className="shrink-0" />
-            <span className="text-xs text-muted-foreground">{t.date}</span>
-            <span className="text-xs">
-              {t.count} 起{t.level === 'L4' ? '（需优先跟进）' : ''}
-            </span>
-          </div>
+    <Card className="gap-0 py-0">
+      {/* 汇总条：总起数 + 分级构成（原版要在逐行里心算总览） */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border px-4 py-3">
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-xl font-bold leading-none tabular-nums">{total}</span>
+          <span className="text-sm text-muted-foreground">起 · {days.length} 天有记录</span>
+        </p>
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" aria-label="按风险等级构成">
+          {levelTotals.map(({ level, count }) => (
+            <li
+              key={level}
+              className={cn('inline-flex items-center gap-1.5 text-muted-foreground', level === 'L4' && 'text-risk-l4')}
+            >
+              <span className={cn('size-1.5 rounded-full', RISK_LEVEL_DOT[level])} aria-hidden />
+              <span>{RISK_BADGE_META[level].label}</span>
+              <span className="font-semibold tabular-nums">{count}</span>
+            </li>
+          ))}
+          {hasUrgent && <li className="font-semibold text-risk-l4">需优先跟进</li>}
+        </ul>
+      </div>
+
+      <ul className="divide-y divide-border">
+        {days.map((day) => (
+          <li
+            key={day.date}
+            className="flex flex-col gap-2 px-4 py-3 sm:grid sm:grid-cols-[6.5rem_1fr_auto] sm:items-center sm:gap-4"
+          >
+            <time dateTime={day.date} className="text-xs font-medium tabular-nums text-muted-foreground">
+              {day.date}
+            </time>
+            <ul className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              {day.rows.map((row) => (
+                <li key={row.level} className="inline-flex items-center gap-1.5">
+                  <RiskBadge level={row.level} showHint={false} />
+                  <span className="text-sm font-semibold tabular-nums">{row.count} 起</span>
+                </li>
+              ))}
+            </ul>
+            <span className="hidden text-xs text-muted-foreground sm:block sm:text-right">共 {day.count} 起</span>
+          </li>
         ))}
-      </CardContent>
+      </ul>
     </Card>
   )
 }
@@ -584,16 +690,68 @@ function PatientSummarySkeleton({ patientName, onBack }: { patientName: string; 
 // 摘要视图（患者下钻后；M3-T3 原三屏结构的第三屏）
 // ---------------------------------------------------------------------------
 
-function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; onBack: () => void }) {
+function PatientSummaryView({
+  summary,
+  onBack,
+  onUnbind,
+  unbindPending = false,
+  unbindError = null,
+}: {
+  summary: InsightSummaryDto
+  onBack: () => void
+  /** specs/25 增补：医生端解除绑定（仅 password 模式传入；demo 模式保持既有页面）。 */
+  onUnbind?: () => void
+  unbindPending?: boolean
+  unbindError?: string | null
+}) {
   const { patient, sections, tools, snapshot, riskLevel, notice } = summary
   const adherence = tools.adherence
+  const [confirmUnbind, setConfirmUnbind] = useState(false)
 
   return (
     <div className="space-y-4">
-      <Button variant="outline" size="sm" onClick={onBack} className="min-h-9">
-        <ChevronLeft className="size-4" aria-hidden />
-        返回队列视图
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button variant="outline" size="sm" onClick={onBack} className="min-h-9">
+          <ChevronLeft className="size-4" aria-hidden />
+          返回队列视图
+        </Button>
+
+        {onUnbind &&
+          (confirmUnbind ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">解除后该患者将从队列移除</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="min-h-9"
+                onClick={() => setConfirmUnbind(false)}
+                disabled={unbindPending}
+              >
+                取消
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="min-h-9"
+                onClick={onUnbind}
+                disabled={unbindPending}
+              >
+                {unbindPending ? '解除中…' : '确认解除'}
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" className="min-h-9" onClick={() => setConfirmUnbind(true)}>
+              <UserMinus className="size-4" aria-hidden />
+              解除绑定
+            </Button>
+          ))}
+      </div>
+
+      {unbindError && (
+        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {unbindError}
+        </p>
+      )}
 
       {/* 患者头部 */}
       <Card>

@@ -36,5 +36,14 @@ export async function unbindDoctor(doctorId: string) {
   return unwrap(res, { silent: true })
 }
 
+/**
+ * 医生端解除患者（specs/25 增补 · 撤销权对称化）：
+ * 用于患者转诊 / 误绑清理；解除后该患者立即从队列与摘要不可见（只缩小可见范围）。
+ */
+export async function unbindPatientAsDoctor(patientId: string) {
+  const res = await client.api.doctor.bindings[':patientId'].$delete({ param: { patientId } })
+  return unwrap(res, { silent: true })
+}
+
 export type DoctorBindCodeDto = Awaited<ReturnType<typeof createDoctorBindCode>>
 export type BoundDoctorDto = Awaited<ReturnType<typeof fetchMyDoctors>>[number]

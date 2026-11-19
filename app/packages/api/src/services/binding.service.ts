@@ -9,13 +9,16 @@
  * 安全约束：
  * - 核销必须由患者账号完成，且不能绑定自己；
  * - 绑定码单次有效、原子核销（并发下只有一个患者成功）；
- * - 所有错误显式抛出（400/403/404/409/500），不静默吞错。
+ * - 核销前过「患者账号 + IP」双维度滑动窗口限流（specs/25 §5 补强；超限 429 BIND_LOCKED）；
+ * - 生成/核销/解绑写绑定安全审计（JSONL，绝不落绑定码明文）；
+ * - 所有错误显式抛出（400/403/404/409/429/500），不静默吞错。
  */
 import { randomInt, randomUUID } from 'node:crypto'
 import {
   BIND_ALREADY_MESSAGE,
   BIND_CODE_INVALID_MESSAGE,
   BIND_CODE_LENGTH,
+  BIND_CODE_LOCKED_MESSAGE,
   BIND_CODE_TTL_SEC,
   BIND_NOT_FOUND_MESSAGE,
   BIND_PATIENT_ONLY_MESSAGE,
@@ -25,6 +28,8 @@ import {
   type BindRedeemResponse,
   type BindingListResponse,
 } from '@anxin/shared'
+import { consumeBindRedeem, clearBindRedeemForPatient } from '../lib/bind-rate-limit.js'
+import { logBindAudit } from '../lib/observability/bind-audit.js'
 import * as bindingRepo from '../repositories/binding.repo.js'
 import { ApiError } from '../lib/http.js'
 import { readAuthMode } from '../lib/auth/mode.js'
@@ -32,6 +37,11 @@ import type { User } from '../types.js'
 
 /** 绑定码生成失败（连续撞 uuid/唯一冲突等）时的可见错误文案。 */
 const BIND_CODE_GENERATE_FAILED_MESSAGE = '绑定码生成失败，请稍后重试'
+
+/** 限流 429 文案：基础文案 + 建议等待分钟数（retryAfterSec 同时在 details 里给出）。 */
+function bindLockedMessage(retryAfterSec: number): string {
+  return `${BIND_CODE_LOCKED_MESSAGE}（约 ${Math.max(1, Math.ceil(retryAfterSec / 60))} 分钟后可重试）`
+}
 
 /** 生成一次性绑定码（医生端）。 */
 export async function createBindCode(doctor: User): Promise<BindCodeCreateResponse> {
@@ -48,6 +58,8 @@ export async function createBindCode(doctor: User): Promise<BindCodeCreateRespon
         doctorId: doctor.id,
         expiresAt,
       })
+      // 审计不含码明文：只记「哪位医生在何时生成了码」。
+      logBindAudit({ action: 'bind_code_generated', actorUserId: doctor.id, doctorId: doctor.id })
       return { code, expiresAt: expiresAt.toISOString(), ttlSec: BIND_CODE_TTL_SEC }
     } catch (err) {
       // 唯一索引冲突（极小概率撞码）→ 重试；其余错误必须可见。
@@ -60,28 +72,72 @@ export async function createBindCode(doctor: User): Promise<BindCodeCreateRespon
 }
 
 /** 患者核销绑定码 → 建立授权关系。 */
-export async function redeemBindCode(patient: User, rawCode: string): Promise<BindRedeemResponse> {
+export async function redeemBindCode(
+  patient: User,
+  rawCode: string,
+  clientKey = 'local',
+): Promise<BindRedeemResponse> {
   if (patient.role !== 'patient') {
     throw new ApiError(403, ERR_CODES.FORBIDDEN, BIND_PATIENT_ONLY_MESSAGE)
   }
 
+  // 双维度限流：每次尝试先过闸门；超限直接 429，不继续查询/枚举。
+  const gate = consumeBindRedeem(patient.id, clientKey)
+  if (!gate.allowed) {
+    logBindAudit({ action: 'redeem_locked', actorUserId: patient.id, reason: 'rate_limited' })
+    throw new ApiError(429, ERR_CODES.BIND_LOCKED, bindLockedMessage(gate.retryAfterSec), {
+      retryAfterSec: gate.retryAfterSec,
+    })
+  }
+
   const row = await bindingRepo.findBindCode(rawCode.trim())
-  const expired = row ? row.expiresAt.getTime() <= Date.now() : true
-  if (!row || row.usedAt || expired) {
+  if (!row) {
+    logBindAudit({ action: 'redeem_rejected', actorUserId: patient.id, reason: 'invalid' })
+    throw new ApiError(400, ERR_CODES.VALIDATION, BIND_CODE_INVALID_MESSAGE)
+  }
+  if (row.usedAt) {
+    logBindAudit({
+      action: 'redeem_rejected',
+      actorUserId: patient.id,
+      doctorId: row.doctorId,
+      reason: 'used',
+    })
+    throw new ApiError(400, ERR_CODES.VALIDATION, BIND_CODE_INVALID_MESSAGE)
+  }
+  if (row.expiresAt.getTime() <= Date.now()) {
+    logBindAudit({
+      action: 'redeem_rejected',
+      actorUserId: patient.id,
+      doctorId: row.doctorId,
+      reason: 'expired',
+    })
     throw new ApiError(400, ERR_CODES.VALIDATION, BIND_CODE_INVALID_MESSAGE)
   }
   if (row.doctorId === patient.id) {
+    logBindAudit({ action: 'redeem_rejected', actorUserId: patient.id, reason: 'self' })
     throw new ApiError(400, ERR_CODES.VALIDATION, BIND_SELF_MESSAGE)
   }
 
   const existing = await bindingRepo.findLink(row.doctorId, patient.id)
   if (existing?.status === 'active') {
+    logBindAudit({
+      action: 'redeem_rejected',
+      actorUserId: patient.id,
+      doctorId: row.doctorId,
+      reason: 'already_bound',
+    })
     throw new ApiError(409, ERR_CODES.CONFLICT, BIND_ALREADY_MESSAGE)
   }
 
   // 原子核销：并发下只有一个患者能抢到该码。
   const consumed = await bindingRepo.markBindCodeUsed(row.id, patient.id)
   if (!consumed) {
+    logBindAudit({
+      action: 'redeem_rejected',
+      actorUserId: patient.id,
+      doctorId: row.doctorId,
+      reason: 'used',
+    })
     throw new ApiError(400, ERR_CODES.VALIDATION, BIND_CODE_INVALID_MESSAGE)
   }
 
@@ -90,6 +146,15 @@ export async function redeemBindCode(patient: User, rawCode: string): Promise<Bi
     doctorId: row.doctorId,
     patientId: patient.id,
     source: 'bind-code',
+  })
+
+  // 成功即清空该患者维度的尝试计数（IP 维度保留）；再写授权审计。
+  clearBindRedeemForPatient(patient.id)
+  logBindAudit({
+    action: 'bind_succeeded',
+    actorUserId: patient.id,
+    doctorId: row.doctorId,
+    patientId: patient.id,
   })
 
   const names = await bindingRepo.findUserNames([row.doctorId])
@@ -121,6 +186,21 @@ export async function unbindDoctor(patientId: string, doctorId: string): Promise
   if (!revoked) {
     throw new ApiError(404, ERR_CODES.NOT_FOUND, BIND_NOT_FOUND_MESSAGE)
   }
+  logBindAudit({ action: 'bind_revoked', actorUserId: patientId, doctorId, patientId })
+}
+
+/**
+ * 医生解绑患者（specs/25 增补 · 撤销权对称化）：
+ * - 用于患者转诊、误绑清理等场景；解除只会**缩小**医生可见范围，不扩大数据访问；
+ * - 与患者端解绑同一语义：status → revoked（保留授权历史），队列/摘要/问答立即不可见；
+ * - 未找到有效绑定 → 404（不静默成功）；审计记 `doctor_unbind`。
+ */
+export async function unbindPatientAsDoctor(doctorId: string, patientId: string): Promise<void> {
+  const revoked = await bindingRepo.revokeLink(doctorId, patientId)
+  if (!revoked) {
+    throw new ApiError(404, ERR_CODES.NOT_FOUND, BIND_NOT_FOUND_MESSAGE)
+  }
+  logBindAudit({ action: 'doctor_unbind', actorUserId: doctorId, doctorId, patientId })
 }
 
 /**
