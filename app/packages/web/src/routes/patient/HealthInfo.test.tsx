@@ -30,6 +30,12 @@ const ITEMS = [
   { id: 'h4', fieldKey: '诊断', value: '高血压、2型糖尿病', sourceMeta: { source: 'prescription_confirmed', confirmedAt: '2026-09-10T00:00:00.000Z' } },
 ]
 
+/** 出生年月 1958-06（存储形态）+ 一条故意不一致的旧手填年龄：联动后应以出生年月算出的为准。 */
+const BIRTH_ITEMS = [
+  { id: 'b1', fieldKey: '出生年月', value: '1958-06', sourceMeta: { source: 'self_reported', confirmedAt: '2026-11-01T00:00:00.000Z' } },
+  { id: 'b2', fieldKey: '年龄', value: '70', sourceMeta: { source: 'self_reported', confirmedAt: '2026-11-01T00:00:00.000Z' } },
+]
+
 function renderHealthInfo() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -78,18 +84,22 @@ describe('健康信息页 · 字段常驻', () => {
 })
 
 describe('健康信息页 · 补充与编辑弹窗', () => {
-  it('点待补充行 → 补充弹窗 → 填值保存 → PATCH 收到出生年月 + 联动算出的年龄', async () => {
+  it('点待补充行 → 补充弹窗 → 敲年份 + 点月份保存 → PATCH 收到出生年月 + 联动算出的年龄', async () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
     expect(await screen.findByText('补充「出生年月」')).toBeTruthy()
-    const input = screen.getByLabelText('出生年月（内容）') as HTMLInputElement
-    fireEvent.change(input, { target: { value: '1958-06' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    // 原生 `<input type="month">` 弹层已退役：年份可敲、月份点大按钮（见 HealthInfoCard 头注释）。
+    fireEvent.change(screen.getByLabelText('出生年份'), { target: { value: '1958' } })
+    fireEvent.click(screen.getByRole('button', { name: '6月' }))
 
     // 当前日期决定周岁；用 shared 纯函数算期望值，跨年跑测试也不写死数字。
     const age = ageFromBirthMonth('1958-06')
     expect(age).not.toBeNull()
+    // 填全当场回显「1958年6月 · 自动计算 68 岁」，老人据此自证没填错。
+    expect(await screen.findByText(`1958年6月 · 自动计算 ${age} 岁`)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() =>
       expect(mocks.patchProfile).toHaveBeenCalledWith({
         json: {
@@ -100,6 +110,35 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
         },
       }),
     )
+  })
+
+  it('出生年月弹窗：12 个月份大按钮可点，年份没填全时保存禁用并提示下一步', async () => {
+    renderHealthInfo()
+    await screen.findByText('青霉素')
+    fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
+    await screen.findByText('补充「出生年月」')
+    for (let month = 1; month <= 12; month += 1) {
+      expect(screen.getByRole('button', { name: `${month}月` })).toBeTruthy()
+    }
+    expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('先填出生年份，再点出生月份。')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('出生年份'), { target: { value: '195' } })
+    expect(await screen.findByText('年份要填 4 位数字，例如 1958。')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('出生年份'), { target: { value: '1958' } })
+    expect(await screen.findByText('再点一下出生月份。')).toBeTruthy()
+  })
+
+  it('编辑已填出生年月：回填年份且对应月份按钮为选中态', async () => {
+    mocks.fetchProfile.mockResolvedValue({ items: BIRTH_ITEMS })
+    renderHealthInfo()
+    await screen.findByText('按出生年月自动计算')
+    // 年龄行的副文案也含「出生年月」，用行首锚定出生年月那一行。
+    fireEvent.click(screen.getByRole('button', { name: /^出生年月/ }))
+    expect(await screen.findByText('编辑「出生年月」')).toBeTruthy()
+    expect((screen.getByLabelText('出生年份') as HTMLInputElement).value).toBe('1958')
+    expect(screen.getByRole('button', { name: '6月' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '1月' }).getAttribute('aria-pressed')).toBe('false')
   })
 
   it('性别字段弹窗渲染男/女大按钮（pill 单选），选「女」保存', async () => {
@@ -137,12 +176,6 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
  * 口径：有出生年月时年龄是派生只读值；手动改年龄请改出生年月；未填出生年月时年龄仍可手填。
  */
 describe('健康信息页 · 年龄与出生年月联动', () => {
-  const BIRTH_ITEMS = [
-    { id: 'b1', fieldKey: '出生年月', value: '1958-06', sourceMeta: { source: 'self_reported', confirmedAt: '2026-11-01T00:00:00.000Z' } },
-    // 旧的手填年龄故意留个不一致的值：联动后应以出生年月算出的为准。
-    { id: 'b2', fieldKey: '年龄', value: '70', sourceMeta: { source: 'self_reported', confirmedAt: '2026-11-01T00:00:00.000Z' } },
-  ]
-
   it('有出生年月：年龄行只读展示自动计算值，旧手填值不再显示', async () => {
     mocks.fetchProfile.mockResolvedValue({ items: BIRTH_ITEMS })
     renderHealthInfo()
@@ -151,6 +184,13 @@ describe('健康信息页 · 年龄与出生年月联动', () => {
     expect(await screen.findByText('按出生年月自动计算')).toBeTruthy()
     expect(screen.getByText(String(age))).toBeTruthy()
     expect(screen.queryByText('70')).toBeNull()
+  })
+
+  it('出生年月按「1958年6月」展示，不再露出 "1958-06" 存储形态', async () => {
+    mocks.fetchProfile.mockResolvedValue({ items: BIRTH_ITEMS })
+    renderHealthInfo()
+    expect(await screen.findByText('1958年6月')).toBeTruthy()
+    expect(screen.queryByText('1958-06')).toBeNull()
   })
 
   it('点年龄行：说明由出生年月算出，并直达出生年月编辑', async () => {
@@ -181,7 +221,8 @@ describe('健康信息页 · 年龄与出生年月联动', () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
-    fireEvent.change(screen.getByLabelText('出生年月（内容）'), { target: { value: '2999-01' } })
+    fireEvent.change(screen.getByLabelText('出生年份'), { target: { value: '2999' } })
+    fireEvent.click(screen.getByRole('button', { name: '1月' }))
     expect(await screen.findByText(/不能晚于当前月份/)).toBeTruthy()
     expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
   })

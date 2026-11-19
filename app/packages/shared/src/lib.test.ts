@@ -14,6 +14,7 @@ import {
   daysUntilExpiry,
   expiryState,
   ageFromBirthMonth,
+  formatBirthMonth,
   EXPIRY_WARNING_DAYS,
   gradeAdherence,
   ADHERENCE_GRADE_THRESHOLDS,
@@ -233,5 +234,21 @@ describe('ageFromBirthMonth · 出生年月 → 周岁（年龄联动）', () =>
     expect(ageFromBirthMonth('1958-6', today)).toBe(68)
     expect(ageFromBirthMonth('1900-01', today)).toBe(126)
     expect(ageFromBirthMonth('1800-01', today)).toBeNull()
+  })
+})
+
+describe('formatBirthMonth · 出生年月展示形态（存储仍是 YYYY-MM）', () => {
+  it('补零 / 不补零 / 带空白 → 「YYYY年M月」', () => {
+    expect(formatBirthMonth('1958-06')).toBe('1958年6月')
+    expect(formatBirthMonth('1958-6')).toBe('1958年6月')
+    expect(formatBirthMonth('  1975-11 ')).toBe('1975年11月')
+  })
+
+  it('非法形态 / 月份越界 → null（调用方回退展示原值，不格式化成空）', () => {
+    expect(formatBirthMonth('1958-13')).toBeNull()
+    expect(formatBirthMonth('1958-00')).toBeNull()
+    expect(formatBirthMonth('1958')).toBeNull()
+    expect(formatBirthMonth('1958-06-01')).toBeNull()
+    expect(formatBirthMonth('')).toBeNull()
   })
 })

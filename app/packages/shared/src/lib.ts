@@ -49,8 +49,20 @@ export function isIsoDate(value: string): boolean {
 // 健康信息：出生年月 → 周岁（「年龄」跟着「出生年月」联动，一份真相）
 // ---------------------------------------------------------------------------
 
-/** 出生年月形态："YYYY-MM"（月允许 1–2 位；web 的 month 控件输出补零形态，用户可能手敲不补零）。 */
+/** 出生年月形态："YYYY-MM"（月允许 1–2 位；老数据/手敲可能不补零）。 */
 const BIRTH_MONTH_PATTERN = /^(\d{4})-(\d{1,2})$/
+
+/**
+ * 出生年月 → 老人可读的「YYYY年M月」（展示口径；存储形态仍是 "YYYY-MM"，不跟着显示改）。
+ * 形态非法 / 月份越界 → null，调用方回退展示原值——脏数据不能被格式化成空。
+ */
+export function formatBirthMonth(birthMonth: string): string | null {
+  const match = BIRTH_MONTH_PATTERN.exec((birthMonth ?? '').trim())
+  if (!match) return null
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return null
+  return `${match[1]}年${month}月`
+}
 
 /**
  * 由出生年月估算周岁（用户自述字段「年龄」与「出生年月」联动；两栏不再各填各的）。

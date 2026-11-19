@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import { Check, ChevronRight, Trash2, UserRound } from "lucide-react-native";
 import { client, fetchProfile, unwrap } from "@anxin/core";
-import { HEALTH_FIELDS, ageFromBirthMonth, type HealthField } from "@anxin/shared";
+import { HEALTH_FIELDS, ageFromBirthMonth, formatBirthMonth, type HealthField } from "@anxin/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -46,7 +46,8 @@ const pad2 = (value: string) => value.padStart(2, "0");
  * `showHeader=false` 用于「健康信息」一级页：页头已给出标题与说明，卡内不再重复标题行。
  *
  * 两处平台适配（语义不变，见 T5-真机验收.md §2.9 差异清单）：
- * ① web 的 `<input type="month">` → 「年 / 月」两个 number-pad 框，拼回 `YYYY-MM`；
+ * ① 出生年月不用任何日期弹层：web 用「4 位年份输入 + 12 个月份大按钮」，RN 用「年 / 月」两个 number-pad
+ * 框拼回 `YYYY-MM`（两端都不走浏览器/系统日期选择器，只差「月份点按钮」还是「月份打字」）；
  * ② web 的行 hover 底色在 RN 换成 `active:opacity-80`。
  */
 export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) {
@@ -74,6 +75,10 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
   // 出生年月 → 周岁联动：有出生年月时，年龄由它算出来（改出生年月后自动更新，不用重填）。
   const birthEntry = byField.get("出生年月") ?? null;
   const derivedAge = ageFromBirthMonth(birthEntry?.value ?? "");
+  // 列表与「修改出生年月」说明里的展示形态（1958-06 → 1958年6月，与 web 同口径）；脏数据回退原值。
+  const birthDisplay = birthEntry
+    ? (formatBirthMonth(birthEntry.value ?? "") ?? birthEntry.value ?? "")
+    : "";
 
   const [editing, setEditing] = useState<{ field: HealthField; entry: HealthEntry | null } | null>(
     null,
@@ -181,7 +186,14 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
             const isAge = field === "年龄";
             // 有出生年月时年龄只读展示派生值（出生年月是唯一真相），没填时才允许手填。
             const derived = isAge && derivedAge !== null ? derivedAge : null;
-            const displayValue = derived !== null ? String(derived) : entry?.value ?? "";
+            // 出生年月按「1958年6月」展示（存储仍是 1958-06，与 web `displayValueOf` 同口径）；脏数据回退原值。
+            const rawValue = entry?.value ?? "";
+            const displayValue =
+              derived !== null
+                ? String(derived)
+                : field === "出生年月"
+                  ? (formatBirthMonth(rawValue) ?? rawValue)
+                  : rawValue;
             const filled = Boolean(displayValue.trim());
             const confirmed =
               derived === null && entry?.sourceMeta?.source === "prescription_confirmed";
@@ -389,7 +401,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
                 <DialogTitle>年龄</DialogTitle>
                 <DialogDescription>
                   <Text className="text-base text-muted-foreground">
-                    「出生年月 {birthEntry?.value ?? ""}」自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
+                    「出生年月 {birthDisplay}」自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
                   </Text>
                 </DialogDescription>
               </DialogHeader>
