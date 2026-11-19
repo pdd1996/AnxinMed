@@ -239,4 +239,22 @@ scp app\backups\deploy-latest.sh root@118.196.82.13:/tmp/deploy-latest.sh
 ssh root@118.196.82.13 'bash /tmp/deploy-latest.sh'
 ```
 
-2）若清理后 health 仍失败：贴 `docker compose ps` / `logs --tail=60 db` / `logs --tail=60 api`；必要时用 `app/backups` 最新 dump 恢复数据库（deploy/README §9.1 的 drop/create + pg_restore），再重启 api。清理脚本保留最新 3 份 dump（含部署前 07:27 那份）。
+2）若清理后 health 仍失败：贴 `docker compose ps` / `logs --tail=60 db` / `logs --tail=60 api`；必要时用 `app/backups` 最新 dump 恢复数据库（deploy/README §9.1 的 drop/create + pg_restore），再重启 api。清理脚本保留最新 1 份 dump（含部署前 07:27 那份）。
+
+> 实际执行记录：`cleanup-staging.sh` 第一次未完全释放（`docker builder prune` 回收 0B，构建缓存被失败构建卡住）→ 用 `app/backups/docker-recover.sh` 重启 dockerd 后清理，最终 **26GB 可用、health 恢复**；随后脱离 SSH 会话（`nohup`）重新部署成功。
+
+**部署结果（2026-11-19 07:5x，已完成）**
+
+- 新版前端资源：`index-DGwNLjWv.js` → **`index-DOPaYXio.js`**；`/api/health` = `{"ok":true,"status":"up","db":"up"}`；
+- 公网 API 验收：
+
+| 请求 | status | 结果 |
+|---|---|---|
+| 「药快吃没了」（T7 口语） | `data-answered` + `toolUsed=expiry-stock` | 归一化路由生效（部署前 no-source） |
+| 「我现在都吃哪些药」（T7 清单口语） | `data-answered` + `toolUsed=medication-list` | 归一化路由生效 |
+| 「这药有什么副作用」（指代变体，v2） | `clarify` + 5 选项 | T7 指代归一 + P1 对象澄清 |
+| 「这个药有什么副作用」（v2） | `clarify` + 5 选项 | P1 不回归 |
+| 「我是不是得了糖尿病」（不带版本 / v2） | `no-source` / `out-of-scope` | 旧客户端兼容映射与范围层均正常 |
+
+- **模拟器 G8 v1.0.0 旧包实机回归**（staging 真实链路）：「这个药有什么副作用」正常渲染澄清固定文案 + 5 个药名；「药快吃没了」正常渲染数据直答卡（`暂无过期…`）；**均无白屏、无 JS 错误、Activity 存活**。截图：`app/backups/g8-compat-evidence/postdeploy-*.png`（gitignored）。
+- 磁盘：恢复后 26GB 可用；后续建议 40G 盘扩至 80G，并把 `backups/*.dump` 定期外置/对象存储（本次 100% 满 = 失败构建缓存 + 多份备份叠加）。
