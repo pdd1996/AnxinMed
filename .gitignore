@@ -104,3 +104,8 @@ data/m14-reports/
 # CI 缺图由 e2e/scripts/make-sample-images.ts 在 globalSetup 补纯色占位图（回放不读像素）
 app/fixtures/rx-*.png
 tools/ocr-bench/sample-prescription.png
+
+# ── PPT 生成工作区（2026-11-19：医院推广片；ppt-master 项目全量本地保留，不入库）──
+# 含生成脚本、SVG 源页、设计清单、确认页 JSON、中间渲染与导出副本；
+# 交付物只留 promo/ 下的 pptx / pdf / docx / md 四件（见 commit 4588df7）。
+.tmp-ppt/
