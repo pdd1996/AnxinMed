@@ -68,6 +68,16 @@ describe('detectEmergency · L4 紧急信号（PRD §7.5.1）', () => {
     expect(detectEmergency('我胸痛得厉害')).toBe('胸痛')
   })
 
+  it('"我心痛"（口语）→ 命中「心痛」', () => {
+    expect(detectEmergency('我心痛')).toBe('心痛')
+  })
+
+  it('胸口/心口/胸闷变体 → 命中急救词', () => {
+    expect(detectEmergency('我心口疼')).toBe('心口疼')
+    expect(detectEmergency('胸口痛，喘不上气')).toBe('胸口痛')
+    expect(detectEmergency('有点胸闷')).toBe('胸闷')
+  })
+
   it('"呼吸困难" → 命中', () => {
     expect(detectEmergency('突然呼吸困难')).toBe('呼吸困难')
   })
