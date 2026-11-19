@@ -134,7 +134,7 @@ async function runBakeoff(): Promise<void> {
       let ok = false
       let sanitized: ReturnType<typeof sanitizeExternalSections> = null
       let error: string | null = null
-      let sample: { summary?: string; keyPoints?: string[] } = {}
+      let sample: { summary?: string; keyPoints?: string[]; modelLabel?: string } = {}
       let rawOut: unknown = null
       try {
         const output = await model.fn(question)
