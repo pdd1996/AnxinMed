@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 /**
  * 个人资料页（G8 增补）：只承载「身份资料」——当前是姓名，头像以后加在同一页。
  *
- * 登录密码不在这里：密码是安全设置，入口在「设置 → 账号与安全 → 登录密码」（P1 增补起）。
+ * 登录密码不在这里：密码是安全设置，入口在「我的 → 登录密码」（2026-11-19 从「设置 → 账号与安全」上移）。
  *
  * 头像不在这里——它涉及存储选型（本地磁盘 / 对象存储 / 入库 base64）与上传大小、类型白名单，
  * 需要单独立项；本页先把「名字」这条读+写链路打通。
@@ -56,9 +56,6 @@ export default function Account() {
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">个人资料</p>
         <h1 className="mt-2 text-2xl font-bold">姓名</h1>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          「我的」页和医生端都显示这个名字，随时可以改。
-        </p>
       </div>
 
       <Card>

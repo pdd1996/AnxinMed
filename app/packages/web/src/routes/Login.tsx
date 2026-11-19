@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router'
-import { PASSWORD_MIN_LENGTH, PHONE_PATTERN, PasswordResetRequestSchema } from '@anxin/shared'
+import { PHONE_PATTERN, PasswordResetRequestSchema } from '@anxin/shared'
 import {
   requestPhoneCode,
   requestResetCode,
@@ -11,7 +11,7 @@ import {
   useAuthStore,
 } from '@anxin/core'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,7 @@ type LoginTab = 'password' | 'phone'
  *   网络/超时/服务异常统一经 core 的 toUserMessage 归成中文（G8，禁止 Failed to fetch 原样上屏）；
  * - 忘记密码：密码 tab 下「忘记密码？用手机号找回」→ 手机号 + 100003 重置验证码 + 新密码，
  *   重置成功即登录（服务端清该账号全部旧会话）；未注册手机号统一返回「已发送」但不真发（防枚举）；
- * - 登录后也可在「设置 → 账号与安全 → 登录密码」自行改密（改密会清其他设备会话）。
+ * - 登录后也可在「我的 → 登录密码」自行改密（改密会清其他设备会话）。
  */
 export default function Login() {
   const status = useAuthStore((s) => s.status)
@@ -225,7 +225,6 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">登录安心用药</CardTitle>
-          <CardDescription className="text-base leading-7">请选择登录方式</CardDescription>
         </CardHeader>
         <CardContent>
           {resetMode ? (
@@ -242,9 +241,6 @@ export default function Login() {
               </button>
               <div>
                 <h2 className="text-xl font-bold">找回密码</h2>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  用注册手机号收验证码，验证通过后设置新密码；重置成功会自动登录。
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -305,13 +301,11 @@ export default function Login() {
                   name="reset-password"
                   type="password"
                   autoComplete="new-password"
-                  placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
                   className="min-h-12 text-lg"
                   value={resetNewPassword}
                   onChange={(e) => setResetNewPassword(e.target.value)}
                   disabled={resetPending}
                 />
-                <p className="text-sm leading-6 text-muted-foreground">至少 {PASSWORD_MIN_LENGTH} 位</p>
               </div>
 
               <div className="space-y-2">

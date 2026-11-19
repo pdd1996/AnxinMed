@@ -1,6 +1,6 @@
 /**
  * 个人资料页（G8）组件测试：姓名校验、成功保存后回「我的」、失败内联可见。
- * P1 起登录密码不再在此页（已移到「设置 → 账号与安全 → 登录密码」），这里加负向断言防回流。
+ * P1 起登录密码不再在此页（入口在「我的」页，2026-11-19 从设置页上移），这里加负向断言防回流。
  * 只 mock core 的 updateDisplayName 与 sonner，store 与 shared 契约走真代码。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -105,7 +105,7 @@ describe('Account 页 · 改姓名', () => {
     expect(saveButton().disabled).toBe(false)
   })
 
-  it('P1：个人资料页不再出现「登录密码」（入口已移到设置 → 账号与安全）', () => {
+  it('P1：个人资料页不再出现「登录密码」（入口在「我的」页）', () => {
     useAuthStore.setState({
       status: 'authenticated',
       mode: 'password',

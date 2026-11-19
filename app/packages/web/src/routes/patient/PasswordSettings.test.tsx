@@ -1,6 +1,6 @@
 /**
- * 登录密码页（P1 · 设置 → 账号与安全 → 登录密码）组件测试：
- * 设置/修改文案切换、最小长度与二次确认校验、成功后调用与提示、旧密码错误内联、返回设置页。
+ * 登录密码页（P1 · 我的 → 登录密码）组件测试：
+ * 设置/修改文案切换、最小长度与二次确认校验、成功后调用与提示、旧密码错误内联、返回「我的」页。
  * 只 mock core 的 updatePassword 与 sonner，store 与 shared 契约走真代码。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -23,10 +23,10 @@ const PASSWORD_USER = { id: 'u-2', name: '张某某', username: '15167179657', h
 
 function renderPage() {
   render(
-    <MemoryRouter initialEntries={['/settings/password']}>
+    <MemoryRouter initialEntries={['/password']}>
       <Routes>
-        <Route path="/settings/password" element={<PasswordSettings />} />
-        <Route path="/settings" element={<p>设置页</p>} />
+        <Route path="/password" element={<PasswordSettings />} />
+        <Route path="/profile" element={<p>我的页</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -56,18 +56,19 @@ afterEach(() => {
 })
 
 describe('PasswordSettings 页 · 设置/修改登录密码', () => {
-  it('页头有返回「设置」入口', () => {
+  it('页头有返回「我的」入口', () => {
     renderPage()
-    expect(screen.getByRole('link', { name: /返回/ }).getAttribute('href')).toBe('/settings')
+    expect(screen.getByRole('link', { name: /返回/ }).getAttribute('href')).toBe('/profile')
   })
 
-  it('手机号账号无密码 → 不显示「当前密码」，按钮为「设置密码」', () => {
+  it('手机号账号无密码 → 标题与按钮为「设置密码」，说明写明不设密码也能用验证码登录', () => {
     renderPage()
 
-    expect(screen.getByText('登录密码')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: '设置密码' })).toBeTruthy()
     expect(screen.queryByLabelText('当前密码')).toBeNull()
     expect(screen.getByRole('button', { name: '设置密码' })).toBeTruthy()
-    expect(screen.getByText(/手机号注册的账号还没有密码/)).toBeTruthy()
+    // 密码是可选能力：不再暗示「手机号账号必须补密码」。
+    expect(screen.getByText(/不设密码也可以/)).toBeTruthy()
   })
 
   it('两次输入不一致 → 内联提示，不请求接口', async () => {
@@ -109,6 +110,7 @@ describe('PasswordSettings 页 · 设置/修改登录密码', () => {
     )
     renderPage()
 
+    expect(screen.getByRole('heading', { level: 1, name: '修改密码' })).toBeTruthy()
     expect(screen.getByLabelText('当前密码')).toBeTruthy()
     fillPassword({ old: 'wrong-pass', next: 'newpass123', confirm: 'newpass123' })
     fireEvent.click(screen.getByRole('button', { name: '修改密码' }))
@@ -117,5 +119,30 @@ describe('PasswordSettings 页 · 设置/修改登录密码', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('当前密码不正确')
     expect((screen.getByRole('button', { name: '修改密码' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('已有密码 → 页头交代会话口径：其他设备退出、这台保持登录', () => {
+    useMode(PASSWORD_USER)
+    renderPage()
+
+    const hint = screen.getByText(/其他设备会被退出登录/)
+    expect(hint.textContent).toContain('这台设备保持登录')
+    // 旧文案把「请用新密码登录」和「不会被退出」挤在一句里，读起来自相矛盾，不再出现。
+    expect(hint.textContent).not.toContain('当前登录不会被退出')
+  })
+
+  it('修改成功 → 提示「密码已更新」并清空输入，不暗示当前设备要重新登录', async () => {
+    useMode(PASSWORD_USER)
+    mocks.updatePassword.mockResolvedValue(undefined)
+    renderPage()
+    fillPassword({ old: 'oldpass123', next: 'newpass123', confirm: 'newpass123' })
+    fireEvent.click(screen.getByRole('button', { name: '修改密码' }))
+
+    await waitFor(() =>
+      expect(mocks.updatePassword).toHaveBeenCalledWith('oldpass123', 'newpass123'),
+    )
+    expect(mocks.success).toHaveBeenCalledWith('密码已更新')
+    expect((screen.getByLabelText('新密码') as HTMLInputElement).value).toBe('')
+    expect(mocks.success).not.toHaveBeenCalledWith(expect.stringContaining('请使用新密码登录'))
   })
 })

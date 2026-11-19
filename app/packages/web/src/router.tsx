@@ -17,6 +17,7 @@ const Profile = lazy(() => import('@/routes/patient/Profile'))
 const Account = lazy(() => import('@/routes/patient/Account'))
 const HealthInfo = lazy(() => import('@/routes/patient/HealthInfo'))
 const Records = lazy(() => import('@/routes/patient/Records'))
+const MyDoctor = lazy(() => import('@/routes/patient/MyDoctor'))
 const Settings = lazy(() => import('@/routes/patient/Settings'))
 const PasswordSettings = lazy(() => import('@/routes/patient/PasswordSettings'))
 const NotFound = lazy(() => import('@/routes/patient/NotFound'))
@@ -32,7 +33,9 @@ const page = (node: ReactElement) => <Suspense fallback={<RouteFallback />}>{nod
  * - 患者端挂在 `<RequireAuth />` 下（未登录跳 /login，demo 模式直接放行）；
  * - `/doctor/*` 挂在 `<RequireAuth loginPath="/doctor/login" requireDoctor />` 下：
  *   未登录跳医生端登录页；password 模式下非医生账号跳回医生端登录页并提示（demo 模式旁路）；
- * - 患者端 PatientLayout（底部导航 5 项）；医生端 DoctorLayout（独立分支，无底部导航）。
+ * - 患者端 PatientLayout（底部导航 5 项）；医生端 DoctorLayout（独立分支，无底部导航）；
+ * - `/my-doctor`：患者端「我的医生」独立页（specs/25 绑定卡片从设置页迁出，入口在「我的」页）；
+ * - `/password`：患者端「登录密码」独立页（2026-11-19 从「设置 → 账号与安全」上移，入口在「我的」页）。
  */
 export const router = createBrowserRouter([
   { path: '/login', element: page(<Login />) },
@@ -53,8 +56,11 @@ export const router = createBrowserRouter([
           { path: '/account', element: page(<Account />) },
           { path: '/health-info', element: page(<HealthInfo />) },
           { path: '/records', element: page(<Records />) },
+          { path: '/my-doctor', element: page(<MyDoctor />) },
           { path: '/settings', element: page(<Settings />) },
-          { path: '/settings/password', element: page(<PasswordSettings />) },
+          // 登录密码自 2026-11-19 起从「设置 → 账号与安全」上移到「我的」页，路径随之提到一级
+          // （与 /my-doctor 同形，App 侧也叫 /password）。
+          { path: '/password', element: page(<PasswordSettings />) },
           { path: '*', element: page(<NotFound />) },
         ],
       },
