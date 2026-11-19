@@ -99,6 +99,13 @@
       "when": 1794979049741,
       "tag": "0013_powerful_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795075042579,
+      "tag": "0014_tiny_hellfire_club",
+      "breakpoints": true
     }
   ]
 }

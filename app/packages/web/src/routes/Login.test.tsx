@@ -1,7 +1,7 @@
 /**
  * 登录页（G7 密码 · P1 手机号验证码）组件测试：
  * 密码：表单校验、提交 trim、失败文案内联、pending 防重复；
- * 手机号：tab 切换、发码校验/倒计时禁用、提交 trim、验证码错误内联。
+ * 手机号：默认 tab（2026-11-19 用户裁定）、发码校验/倒计时禁用、提交 trim、验证码错误内联。
  * 只 mock core 的 signIn / requestPhoneCode / signInWithPhone，其余（ApiRequestError / store）走真代码。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -29,22 +29,20 @@ vi.mock('@anxin/core', async (importOriginal) => {
   }
 })
 
-function renderLogin() {
+/** 默认档是手机号验证码；传 'password' 表示先点「密码登录」切过去（对应用户的一次点击）。 */
+function renderLogin(tab: 'phone' | 'password' = 'phone') {
   render(
     <MemoryRouter initialEntries={['/login']}>
       <Login />
     </MemoryRouter>,
   )
+  if (tab === 'password') fireEvent.click(screen.getByRole('tab', { name: '密码登录' }))
 }
 
 function fillAndSubmit(username: string, password: string) {
   fireEvent.change(screen.getByLabelText('账号'), { target: { value: username } })
   fireEvent.change(screen.getByLabelText('密码'), { target: { value: password } })
   fireEvent.click(screen.getByRole('button', { name: '登录' }))
-}
-
-function switchToPhoneTab() {
-  fireEvent.click(screen.getByRole('tab', { name: '手机号登录' }))
 }
 
 beforeEach(() => {
@@ -63,14 +61,14 @@ afterEach(() => {
 describe('Login 页 · 账号密码登录', () => {
   it('提交时账号 trim 后交给 signIn', async () => {
     mocks.signIn.mockResolvedValue(undefined)
-    renderLogin()
+    renderLogin('password')
     fillAndSubmit('  demo-user  ', 'secret-123')
     await waitFor(() => expect(mocks.signIn).toHaveBeenCalledWith('demo-user', 'secret-123'))
   })
 
   it('登录失败 → 内联展示服务端可读文案，按钮恢复可点', async () => {
     mocks.signIn.mockRejectedValue(new ApiRequestError('账号或密码错误', 'AUTH_INVALID', 401))
-    renderLogin()
+    renderLogin('password')
     fillAndSubmit('demo-user', 'wrong')
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('账号或密码错误')
@@ -81,7 +79,7 @@ describe('Login 页 · 账号密码登录', () => {
     mocks.signIn.mockRejectedValue(
       new ApiRequestError('登录尝试次数过多，请 15 分钟后再试', 'AUTH_LOCKED', 429),
     )
-    renderLogin()
+    renderLogin('password')
     fillAndSubmit('demo-user', 'wrong')
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('登录尝试次数过多')
@@ -89,7 +87,7 @@ describe('Login 页 · 账号密码登录', () => {
 
   it('断网/网络层异常 → 展示中文「网络连接失败」，不把英文技术串上屏', async () => {
     mocks.signIn.mockRejectedValue(new TypeError('Failed to fetch'))
-    renderLogin()
+    renderLogin('password')
     fillAndSubmit('demo-user', 'secret-123')
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('网络连接失败，请检查网络后重试')
@@ -98,7 +96,7 @@ describe('Login 页 · 账号密码登录', () => {
 
   it('英文服务异常（500）→ 展示中文「服务暂时不可用」', async () => {
     mocks.signIn.mockRejectedValue(new ApiRequestError('Internal Server Error', undefined, 500))
-    renderLogin()
+    renderLogin('password')
     fillAndSubmit('demo-user', 'secret-123')
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toContain('服务暂时不可用，请稍后重试')
@@ -106,7 +104,7 @@ describe('Login 页 · 账号密码登录', () => {
   })
 
   it('空表单提交 → 不请求接口，提示请输入账号和密码', async () => {
-    renderLogin()
+    renderLogin('password')
     fireEvent.click(screen.getByRole('button', { name: '登录' }))
     expect((await screen.findByRole('alert')).textContent).toContain('请输入账号和密码')
     expect(mocks.signIn).not.toHaveBeenCalled()
@@ -114,10 +112,12 @@ describe('Login 页 · 账号密码登录', () => {
 })
 
 describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
-  it('切到手机号 tab → 显示手机号/验证码表单；空提交不发请求并提示手机号', async () => {
+  it('默认落在手机号验证码 tab（密码表单不渲染）→ 显示手机号/验证码表单；空提交不发请求并提示手机号', async () => {
     renderLogin()
-    switchToPhoneTab()
 
+    // 默认档（2026-11-19 用户裁定）：进登录页即可发码/验证码登录，不先看到账号密码。
+    expect(screen.getByRole('tab', { name: '手机号登录' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByLabelText('账号')).toBeNull()
     expect(screen.getByLabelText('手机号')).toBeTruthy()
     expect(screen.getByLabelText('短信验证码')).toBeTruthy()
 
@@ -128,7 +128,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
 
   it('获取验证码：手机号非法 → 提示且不请求接口', async () => {
     renderLogin()
-    switchToPhoneTab()
     fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '12345' } })
     fireEvent.click(screen.getByRole('button', { name: '获取验证码' }))
 
@@ -145,7 +144,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
       signName: '恒创联众',
     })
     renderLogin()
-    switchToPhoneTab()
     fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13800138000' } })
     fireEvent.click(screen.getByRole('button', { name: '获取验证码' }))
 
@@ -163,7 +161,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
       new ApiRequestError('验证码发送太频繁，请稍后再试', 'SMS_LIMITED', 429),
     )
     renderLogin()
-    switchToPhoneTab()
     fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13800138000' } })
     fireEvent.click(screen.getByRole('button', { name: '获取验证码' }))
 
@@ -173,7 +170,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
   it('提交登录/注册：手机号与验证码 trim 后交给 signInWithPhone', async () => {
     mocks.signInWithPhone.mockResolvedValue({ created: true })
     renderLogin()
-    switchToPhoneTab()
     fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13800138000' } })
     fireEvent.change(screen.getByLabelText('短信验证码'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: '登录 / 注册' }))
@@ -188,7 +184,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
       new ApiRequestError('验证码错误或已过期，请重新获取', 'AUTH_CODE_INVALID', 401),
     )
     renderLogin()
-    switchToPhoneTab()
     fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13800138000' } })
     fireEvent.change(screen.getByLabelText('短信验证码'), { target: { value: '000000' } })
     fireEvent.click(screen.getByRole('button', { name: '登录 / 注册' }))
@@ -201,7 +196,6 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
 
   it('验证码为空 → 提示「请输入短信验证码」，不发请求', async () => {
     renderLogin()
-    switchToPhoneTab()
     fireEvent.change(screen.getByLabelText('手机号'), { target: { value: '13800138000' } })
     fireEvent.click(screen.getByRole('button', { name: '登录 / 注册' }))
 
@@ -212,7 +206,7 @@ describe('Login 页 · 手机号验证码登录/注册（P1）', () => {
 
 describe('Login 页 · 忘记密码（P1：未登录找回）', () => {
   function openReset() {
-    renderLogin()
+    renderLogin('password')
     fireEvent.click(screen.getByRole('button', { name: '忘记密码？用手机号找回' }))
   }
 

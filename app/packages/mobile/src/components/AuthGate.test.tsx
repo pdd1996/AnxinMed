@@ -55,6 +55,11 @@ function renderGate() {
   );
 }
 
+/** 登录默认档是手机号验证码；密码/找回用例先点「密码登录」切过去（对应用户的一次点击）。 */
+async function switchToPassword(view: Awaited<ReturnType<typeof renderGate>>) {
+  await fireEvent.press(view.getByLabelText("密码登录"));
+}
+
 beforeEach(() => {
   mockBootstrap.mockClear();
   mockBootstrap.mockResolvedValue(undefined);
@@ -118,6 +123,7 @@ describe("AuthGate · 登录门", () => {
     useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
     mockSignIn.mockRejectedValue(new ApiRequestError("账号或密码错误", "AUTH_INVALID", 401));
     const view = await renderGate();
+    await switchToPassword(view);
 
     await fireEvent.changeText(view.getByLabelText("账号"), "  demo-user  ");
     await fireEvent.changeText(view.getByLabelText("密码"), "wrong-password");
@@ -135,6 +141,7 @@ describe("AuthGate · 登录门", () => {
     useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
     mockSignIn.mockRejectedValue(new TypeError("Network request failed"));
     const view = await renderGate();
+    await switchToPassword(view);
 
     await fireEvent.changeText(view.getByLabelText("账号"), "demo-user");
     await fireEvent.changeText(view.getByLabelText("密码"), "secret-123");
@@ -148,6 +155,7 @@ describe("AuthGate · 登录门", () => {
     useAuthStore.setState({ status: "anonymous", mode: null, user: null, error: null });
     mockSignIn.mockRejectedValue(new ApiRequestError("Internal Server Error", undefined, 500));
     const view = await renderGate();
+    await switchToPassword(view);
 
     await fireEvent.changeText(view.getByLabelText("账号"), "demo-user");
     await fireEvent.changeText(view.getByLabelText("密码"), "secret-123");
@@ -176,12 +184,13 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
     return renderGate();
   }
 
-  it("切到手机号登录 → 显示手机号/验证码表单；空提交不发请求并提示手机号", async () => {
+  it("默认落在手机号验证码登录 → 显示手机号/验证码表单（密码表单不渲染）；空提交不发请求并提示手机号", async () => {
     const view = await renderAnonymous();
-    await fireEvent.press(view.getByLabelText("手机号登录"));
 
+    // 默认档（2026-11-19 用户裁定）：进登录页即可发码/验证码登录，不先看到账号密码。
     expect(view.getByLabelText("手机号")).toBeTruthy();
     expect(view.getByLabelText("短信验证码")).toBeTruthy();
+    expect(view.queryByLabelText("账号")).toBeNull();
     expect(view.getByText("未注册的手机号验证通过后将自动创建账号。")).toBeTruthy();
 
     await fireEvent.press(view.getByRole("button", { name: "登录 / 注册" }));
@@ -191,7 +200,6 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
 
   it("获取验证码：手机号非法 → 提示且不请求接口", async () => {
     const view = await renderAnonymous();
-    await fireEvent.press(view.getByLabelText("手机号登录"));
     await fireEvent.changeText(view.getByLabelText("手机号"), "12345");
 
     await fireEvent.press(view.getByRole("button", { name: "获取验证码" }));
@@ -209,7 +217,6 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
       signName: "恒创联众",
     });
     const view = await renderAnonymous();
-    await fireEvent.press(view.getByLabelText("手机号登录"));
     await fireEvent.changeText(view.getByLabelText("手机号"), "13800138000");
 
     await fireEvent.press(view.getByRole("button", { name: "获取验证码" }));
@@ -227,7 +234,6 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
       new ApiRequestError("验证码发送太频繁，请稍后再试", "SMS_LIMITED", 429),
     );
     const view = await renderAnonymous();
-    await fireEvent.press(view.getByLabelText("手机号登录"));
     await fireEvent.changeText(view.getByLabelText("手机号"), "13800138000");
 
     await fireEvent.press(view.getByRole("button", { name: "获取验证码" }));
@@ -238,7 +244,6 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
   it("提交登录/注册：手机号与验证码交给 signInWithPhone", async () => {
     mockSignInWithPhone.mockResolvedValue({ created: true });
     const view = await renderAnonymous();
-    await fireEvent.press(view.getByLabelText("手机号登录"));
     await fireEvent.changeText(view.getByLabelText("手机号"), "13800138000");
     await fireEvent.changeText(view.getByLabelText("短信验证码"), "123456");
 
@@ -252,7 +257,6 @@ describe("AuthGate · 手机号验证码登录/注册（P1）", () => {
       new ApiRequestError("验证码错误或已过期，请重新获取", "AUTH_CODE_INVALID", 401),
     );
     const view = await renderAnonymous();
-    await fireEvent.press(view.getByLabelText("手机号登录"));
     await fireEvent.changeText(view.getByLabelText("手机号"), "13800138000");
     await fireEvent.changeText(view.getByLabelText("短信验证码"), "000000");
 
@@ -269,8 +273,9 @@ describe("AuthGate · 忘记密码（P1：未登录找回）", () => {
     return renderGate();
   }
 
-  it("密码登录页有「忘记密码」入口，进入找回表单并可返回", async () => {
+  it("切到密码登录页有「忘记密码」入口，进入找回表单并可返回", async () => {
     const view = await renderAnonymous();
+    await switchToPassword(view);
 
     await fireEvent.press(view.getByLabelText("忘记密码"));
     expect(view.getByText("找回密码")).toBeTruthy();
@@ -283,6 +288,7 @@ describe("AuthGate · 忘记密码（P1：未登录找回）", () => {
   it("提交找回：参数交给 resetPassword（手机号/验证码/新密码）", async () => {
     mockResetPassword.mockResolvedValue(undefined);
     const view = await renderAnonymous();
+    await switchToPassword(view);
     await fireEvent.press(view.getByLabelText("忘记密码"));
 
     await fireEvent.changeText(view.getByLabelText("找回手机号"), "13600001111");
@@ -298,6 +304,7 @@ describe("AuthGate · 忘记密码（P1：未登录找回）", () => {
 
   it("两次新密码不一致 → 内联提示且不请求接口", async () => {
     const view = await renderAnonymous();
+    await switchToPassword(view);
     await fireEvent.press(view.getByLabelText("忘记密码"));
 
     await fireEvent.changeText(view.getByLabelText("找回手机号"), "13600001111");
@@ -319,6 +326,7 @@ describe("AuthGate · 忘记密码（P1：未登录找回）", () => {
       signName: "恒创联众",
     });
     const view = await renderAnonymous();
+    await switchToPassword(view);
     await fireEvent.press(view.getByLabelText("忘记密码"));
     await fireEvent.changeText(view.getByLabelText("找回手机号"), "13600001111");
 

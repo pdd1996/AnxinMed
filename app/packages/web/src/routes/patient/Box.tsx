@@ -170,7 +170,7 @@ export default function Box() {
             <Hand className="size-4" aria-hidden /> 手动建档
           </Button>
           <Button asChild className="min-h-11">
-            <Link to="/intake/rx">
+            <Link to="/intake/drug">
               <Plus className="size-4" aria-hidden /> 拍照录入
             </Link>
           </Button>
@@ -187,9 +187,9 @@ export default function Box() {
               <BoxIcon className="size-8" aria-hidden />
             </span>
             <h3 className="text-lg font-bold">药箱还是空的</h3>
-            <p className="text-sm text-muted-foreground">拍一张处方笺或药盒照片，识别并确认后加入药箱；也可手动建档。</p>
+            <p className="text-sm text-muted-foreground">拍一张药盒或处方笺照片，识别并确认后加入药箱；也可手动建档。</p>
             <Button asChild className="min-h-11">
-              <Link to="/intake/rx">开始录入</Link>
+              <Link to="/intake/drug">开始录入</Link>
             </Button>
           </CardContent>
         </Card>

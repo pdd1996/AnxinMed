@@ -21,7 +21,7 @@ export const recordsRoute = new Hono<AppEnv>()
   })
   .get('/adherence-series', vQuery(InsightAdherenceSeriesQuerySchema), async (c) => {
     const { days } = c.req.valid('query')
-    const result = await insightService.getPatientAdherenceSeries(c.get('user').id, days)
+    const result = await insightService.getSelfAdherenceSeries(c.get('user').id, days)
     return okJson(c, result)
   })
   .post('/', vJson(RecordCreateSchema), async (c) => {

@@ -15,6 +15,7 @@
 
 export * from './api/client'
 export * from './api/auth'
+export * from './api/binding'
 export * from './stores/auth'
 export * from './lib/auth'
 export * from './lib/errors'

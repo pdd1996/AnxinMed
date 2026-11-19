@@ -36,6 +36,9 @@ import { intakeRoute } from './routes/intake.js'
 import { draftsRoute } from './routes/drafts.js'
 import { consultRoute } from './routes/consult.js'
 import { insightRoute } from './routes/insight.js'
+import { safetyRoute } from './routes/safety.js'
+// specs/25：医患绑定（医生生成绑定码 / 患者核销解绑）
+import { bindingRoute, doctorBindingRoute } from './routes/binding.js'
 import { registerStubs } from './routes/_stubs.js'
 
 export const app = new Hono<AppEnv>()
@@ -94,6 +97,11 @@ const route = app
   .route('/api/drafts', draftsRoute)
   .route('/api/consult', consultRoute)
   .route('/api/insight', insightRoute)
+  // specs/25：医生端绑定码（role=doctor）与患者端绑定关系（登录即可）
+  .route('/api/doctor', doctorBindingRoute)
+  .route('/api/bindings', bindingRoute)
+  // V2.5：患者端用药安全常驻汇总（生效计划集合的相互作用，0 次 LLM）
+  .route('/api/safety', safetyRoute)
 
 /** RPC 类型出口：web 端 `import type { AppType } from '@anxin/api'` 获得端到端类型。 */
 export type AppType = typeof route

@@ -121,6 +121,8 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
   const [busy, setBusy] = useState<"" | "confirm" | "reject">("");
   const [mismatchOpen, setMismatchOpen] = useState(false);
   const [result, setResult] = useState<ConfirmResult | null>(null);
+  /** 结果弹窗口径：confirm=带计划（对最终值重跑）；precheck=仅建档（本药 × 当前生效集合，V2.5）。 */
+  const [resultMode, setResultMode] = useState<"confirm" | "precheck">("confirm");
   // 原图只在本机会话内存（core 的 intakeSession，绝不持久化）；取不到 → 文字对照降级
   const imageUrl = useIntakeSession((s) => s.imageByDraftId[draft.id]);
 
@@ -147,6 +149,8 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
     for (const key of [["drugs"], ["plans"], ["tasks", "today"], ["profile"], ["draft", draft.id]]) {
       queryClient.invalidateQueries({ queryKey: key });
     }
+    // V2.5：在服集合可能变化 → 首页/药箱常驻安全卡同步失效
+    queryClient.invalidateQueries({ queryKey: ["safety", "interactions"] });
   };
 
   /** 确认后跳转：带计划 → 药箱；无计划（入口 B / 降级）→ 药箱并直接打开该药的计划弹窗。 */
@@ -166,10 +170,15 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
       const res = await confirmDraft(draft.id, buildConfirm(payload, state));
       useIntakeSession.getState().clear([draft.id]);
       invalidate();
-      const risky = (res.interactions?.hits.length ?? 0) > 0 || res.dosageRange?.status === "exceed";
-      if (risky) {
+      const planRisky =
+        (res.interactions?.hits.length ?? 0) > 0 || res.dosageRange?.status === "exceed";
+      // 入口B 仅建档：入箱预检（本药 × 当前生效计划集合）有命中也要在跳转前看到（V2.5）
+      const precheckHits =
+        res.precheck?.status === "checked" ? res.precheck.interactions.hits.length : 0;
+      if (planRisky || precheckHits > 0) {
         // 有风险发现 → 跳转前让用户真的看到（只标注不阻止）；此时不切只读态，见下面的 `&& !result`
         setBusy("");
+        setResultMode(planRisky ? "confirm" : "precheck");
         setResult(res);
         return;
       }
@@ -363,6 +372,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         <ConfirmResultDialog
           result={result}
           drugName={drugName}
+          mode={resultMode}
           onDone={() => {
             setResult(null);
             goBox(result);

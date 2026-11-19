@@ -8,13 +8,13 @@ import {
   fetchDrugs,
   fetchTodayTasks,
   groupTasksByPlan,
-  planMetaSegments,
   unwrap,
   useReminderQueue,
   type PlanGroup,
   type TaskStatus,
 } from '@anxin/core'
 import { ReminderModal } from '@/components/domain/ReminderModal'
+import { PlanMeta } from '@/components/domain/PlanMeta'
 import { ConfirmRecordDialog, type PendingRecord } from '@/components/domain/ConfirmRecordDialog'
 import { ExpiryBanner } from '@/components/domain/ExpiryAlert'
 import { Button } from '@/components/ui/button'
@@ -159,7 +159,7 @@ export default function Home() {
             <h3 className="text-lg font-bold">还没有今日用药任务</h3>
             <p className="text-sm text-muted-foreground">完成录入并建立计划后，这里会出现每日服药任务。</p>
             <Button asChild className="min-h-11">
-              <Link to="/intake/rx">
+              <Link to="/intake/drug">
                 开始录入 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -181,13 +181,9 @@ export default function Home() {
                         {cycleLabel(group)}
                       </span>
                     </div>
-                    {/* 用法逐段渲染：大字档下折行不拆「每日 1 次」（与提醒弹窗同口径） */}
-                    <p className="flex flex-wrap text-sm text-muted-foreground">
-                      {planMetaSegments(group).map((segment, index, all) => (
-                        <span key={segment} className="mr-1.5 whitespace-nowrap">
-                          {index < all.length - 1 ? `${segment} ·` : segment}
-                        </span>
-                      ))}
+                    {/* 用法逐段不换行 + 均衡折行：大字档不拆「每日 1 次」、也不剩单字尾巴 */}
+                    <p className="text-sm text-muted-foreground [text-wrap:balance]">
+                      <PlanMeta group={group} />
                     </p>
                   </div>
                 </div>
@@ -231,11 +227,11 @@ export default function Home() {
       {/* 入口卡片 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Button asChild variant="secondary" className="min-h-16 h-auto flex-col items-start gap-1 p-4 text-left">
-          <Link to="/intake/rx">
+          <Link to="/intake/drug">
             <span className="flex items-center gap-2 text-base font-bold">
               <Camera className="size-5" aria-hidden /> 拍照录入
             </span>
-            <span className="text-xs font-normal opacity-80">拍处方笺一步建档建计划 / 拍药品建档</span>
+            <span className="text-xs font-normal opacity-80">拍药品建档 / 拍处方笺一步建档建计划</span>
           </Link>
         </Button>
         <Button asChild variant="secondary" className="min-h-16 h-auto flex-col items-start gap-1 p-4 text-left">

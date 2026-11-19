@@ -20,9 +20,10 @@ export const plansRoute = new Hono<AppEnv>()
     return okJson(c, result, 201)
   })
   .patch('/:id', vJson(PlanPatchSchema), async (c) => {
-    const plan = await plansService.patchPlan(c.get('user').id, c.req.param('id'), c.req.valid('json'))
-    if (!plan) throw new ApiError(404, ERR_CODES.NOT_FOUND, '计划不存在')
-    return okJson(c, { plan })
+    // V2.5：暂停/恢复/编辑后重跑生效集合检查，随响应返回（PRD §7.3.5 / §7.8.2，只标注不阻止）
+    const result = await plansService.patchPlan(c.get('user').id, c.req.param('id'), c.req.valid('json'))
+    if (!result) throw new ApiError(404, ERR_CODES.NOT_FOUND, '计划不存在')
+    return okJson(c, result)
   })
   .delete('/:id', async (c) => {
     const ok = await plansService.deletePlan(c.get('user').id, c.req.param('id'))

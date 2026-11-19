@@ -23,7 +23,8 @@ type LoginTab = 'password' | 'phone'
  *
  * - 已登录访问 → 回原页（state.from）或首页；
  * - demo 模式不会出现本页（/api/auth/me 直接返回 p-001，路由守卫放行）；
- * - 两种方式并存：老账号继续用管理员分配的账号密码；手机号验证码为「验证码即注册」
+ * - 默认落在手机号验证码（2026-11-19 用户裁定：老年用户记不住账号密码，验证码即注册一步到位）；
+ *   两种方式并存：老账号继续用管理员分配的账号密码；手机号验证码为「验证码即注册」
  *   （未注册手机号验码通过后自动建号），成功/失败文案都由服务端中文 message 直接透传，
  *   网络/超时/服务异常统一经 core 的 toUserMessage 归成中文（G8，禁止 Failed to fetch 原样上屏）；
  * - 忘记密码：密码 tab 下「忘记密码？用手机号找回」→ 手机号 + 100003 重置验证码 + 新密码，
@@ -35,7 +36,7 @@ export default function Login() {
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/'
 
-  const [tab, setTab] = useState<LoginTab>('password')
+  const [tab, setTab] = useState<LoginTab>('phone')
   const [error, setError] = useState<string | null>(null)
 
   // 密码登录
@@ -343,8 +344,8 @@ export default function Login() {
           ) : (
             <>
               <div role="tablist" aria-label="登录方式" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-                {tabButton('password', '密码登录')}
                 {tabButton('phone', '手机号登录')}
+                {tabButton('password', '密码登录')}
               </div>
 
               {tab === 'password' ? (

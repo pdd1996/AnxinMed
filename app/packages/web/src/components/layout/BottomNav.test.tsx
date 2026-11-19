@@ -15,7 +15,8 @@ describe('BottomNav（患者端底部导航）', () => {
     for (const label of ['用药', '药箱', '录入', 'AI 咨询', '我的']) {
       expect(screen.getByText(label)).toBeTruthy()
     }
-    // 每项都是可导航链接
+    // 每项都是可导航链接；录入默认落药盒档（2026-11-19 用户裁定：先拍药品，处方笺为次选）
     expect(screen.getAllByRole('link')).toHaveLength(5)
+    expect(screen.getByRole('link', { name: /录入/ }).getAttribute('href')).toBe('/intake/drug')
   })
 })

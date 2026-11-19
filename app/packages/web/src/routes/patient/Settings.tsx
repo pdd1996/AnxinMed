@@ -1,6 +1,7 @@
 import { ChevronRight, KeyRound, Type } from 'lucide-react'
 import { Link } from 'react-router'
 import { useAuthStore } from '@anxin/core'
+import { PatientBindDoctorCard } from '@/components/domain/PatientBindDoctorCard'
 import { useFontScale, type FontScale } from '@/stores/fontScale'
 import { BackLink } from '@/components/layout/BackLink'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -68,6 +69,9 @@ export default function Settings() {
           </Link>
         </section>
       )}
+
+      {/* specs/25：患者端「我的医生」绑定/解绑（password 模式才有真实授权语义）。 */}
+      {authMode === 'password' && <PatientBindDoctorCard />}
     </div>
   )
 }

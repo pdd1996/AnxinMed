@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { render } from "@testing-library/react-native";
 import type { DraftPayload } from "@anxin/core";
-import { InteractionCard } from "./RiskCards";
+import { ConfirmResultDialog, InteractionCard, type ConfirmResult } from "./RiskCards";
 
 jest.mock("nativewind", () => ({
   useUnstableNativeVariable: () => "#336699",
@@ -9,13 +9,18 @@ jest.mock("nativewind", () => ({
   remapProps: (component: unknown) => component,
 }));
 
-// Dialog 链会拉起 reanimated/worklets 原生初始化；本测试只渲染 InteractionCard，
-// 用 host 组件名直接替身，避免在 jest 环境启动原生 worklets。
+// Dialog 链会拉起 reanimated/worklets 原生初始化；本测试只渲染 InteractionCard（不触发 Dialog），
+// 用 host 组件名直接替身，避免在 jest 环境启动原生 worklets。ConfirmResultDialog 用例需要标题/说明
+// 能承载原始字符串，故映射为 "Text"。
 jest.mock("@/components/ui/dialog", () =>
   new Proxy(
     {},
     {
-      get: (_target, name) => (name === "__esModule" ? true : String(name)),
+      get: (_target, name) => {
+        if (name === "__esModule") return true;
+        const key = String(name);
+        return key === "DialogTitle" || key === "DialogDescription" ? "Text" : "View";
+      },
     },
   ),
 );
@@ -54,5 +59,38 @@ describe("InteractionCard · M8 规则状态标识", () => {
       />,
     );
     expect(view.getByText(/未被相互作用规则库覆盖/)).toBeTruthy();
+  });
+});
+
+describe("ConfirmResultDialog · 入箱预检口径（V2.5）", () => {
+  const precheckResult = {
+    ok: true,
+    drugId: "drug-new",
+    planId: null,
+    sourceId: "src-1",
+    status: "confirmed",
+    interactions: null,
+    dosageRange: null,
+    precheck: {
+      status: "checked",
+      interactions: { hits: [resultWith("curated").hits[0]], coverageNote: null },
+      activePlanCount: 1,
+      skippedDrugNames: [],
+      ruleLibrary: { total: 1, demo: 0, curated: 1 },
+    },
+  } as unknown as ConfirmResult;
+
+  it("mode='precheck' 用「当前生效计划集合」口径描述，并展示命中", async () => {
+    const view = await render(
+      <ConfirmResultDialog
+        result={precheckResult}
+        drugName="药B"
+        mode="precheck"
+        onDone={() => {}}
+      />,
+    );
+    expect(view.getByText(/已按你当前生效的计划集合检查相互作用/)).toBeTruthy();
+    expect(view.getByText(/相互作用（1 条）/)).toBeTruthy();
+    expect(view.getByText(/药A、药B/)).toBeTruthy();
   });
 });

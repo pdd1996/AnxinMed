@@ -7,6 +7,7 @@ import {
   client,
   duePendingSlots,
   fetchDrugs,
+  fetchSafetySummary,
   fetchTodayTasks,
   groupTasksByPlan,
   planMetaSegments,
@@ -20,6 +21,7 @@ import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 import { ConfirmRecordDialog, type PendingRecord } from "@/components/domain/ConfirmRecordDialog";
 import { ExpiryBanner } from "@/components/domain/ExpiryAlert";
 import { ReminderModal } from "@/components/domain/ReminderModal";
+import { SafetyAlertCard } from "@/components/domain/SafetyAlertCard";
 import { TaskSlotChip } from "@/components/domain/task-slot";
 import { Icon } from "@/components/ui/icon";
 import { useReminderSync } from "@/stores/reminderSync";
@@ -84,6 +86,14 @@ export default function Today() {
     enabled: configured,
   });
   const drugs = drugsQuery.data ?? [];
+
+  // 用药安全常驻卡（V2.5）：检查对象是生效计划集合，0 次 LLM；与药箱/录入页共用缓存键，
+  // 计划或药品变更后由写操作 invalidate，无需轮询。
+  const safetyQuery = useQuery({
+    queryKey: ["safety", "interactions"],
+    queryFn: fetchSafetySummary,
+    enabled: configured,
+  });
 
   // 记录服药：乐观改 today 缓存 → 失败回滚（unwrap 已经 ApiNotifier 弹 toast，页内再落一条可见错误）。
   const recordMutation = useMutation({
@@ -175,7 +185,7 @@ export default function Today() {
           <RefreshControl
             refreshing={isRefetching}
             // 下拉同时补拉药品：任务轮询不覆盖效期横幅，手动刷新时一并更新（失败不影响今日主流程）
-            onRefresh={() => void Promise.all([refetch(), drugsQuery.refetch()])}
+            onRefresh={() => void Promise.all([refetch(), drugsQuery.refetch(), safetyQuery.refetch()])}
             tintColor={mutedForeground}
           />
         ) : undefined
@@ -235,6 +245,9 @@ export default function Today() {
               <Text className="text-xs text-primary opacity-80">今日完成</Text>
             </View>
           </View>
+
+          {/* 用药安全常驻提示（V2.5）：生效计划集合有已知相互作用时置顶展示，无命中不占位 */}
+          <SafetyAlertCard summary={safetyQuery.data} />
 
           {reminderPermission === "denied" || reminderPermission === "undetermined" ? (
             <View className="mt-4 rounded-2xl border border-risk-l3 bg-risk-l3-tint p-4">

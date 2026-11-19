@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactElement } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router'
 import { RequireAuth } from '@/components/auth/RequireAuth'
+import { RequireDoctor } from '@/components/auth/RequireDoctor'
 import { PatientLayout } from '@/components/layout/PatientLayout'
 import { DoctorLayout } from '@/components/layout/DoctorLayout'
 import { RouteFallback } from '@/components/layout/RouteFallback'
@@ -53,11 +54,17 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: '/doctor',
-        element: <DoctorLayout />,
+        // specs/25：医生端角色守卫（demo 模式放行；password 模式仅 role='doctor'）。
+        element: <RequireDoctor />,
         children: [
-          { index: true, element: <Navigate to="/doctor/insight" replace /> },
-          { path: 'insight', element: page(<Insight />) },
+          {
+            path: '/doctor',
+            element: <DoctorLayout />,
+            children: [
+              { index: true, element: <Navigate to="/doctor/insight" replace /> },
+              { path: 'insight', element: page(<Insight />) },
+            ],
+          },
         ],
       },
     ],

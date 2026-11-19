@@ -227,6 +227,10 @@ export const users = pgTable('users', {
   passwordUpdatedAt: timestamp('password_updated_at'),   // G7 上次设密时间（审计/重置留痕）
   phoneVerifiedAt: timestamp('phone_verified_at'),       // P1 手机号最近一次验证通过时间（短信核验成功）
 
+  // specs/25：账号角色（演示最小闭环）。patient = 患者端（默认）；doctor = 医生端。
+  // 只用于医生端接口的角色闸门与数据作用域，不做院区/科室等业务档案（属方案 B）。
+  role: varchar('role', { enum: ['patient', 'doctor'] }).default('patient').notNull(),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => [
@@ -524,3 +528,47 @@ export const insightAskLogs = pgTable('insight_ask_logs', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// doctor_patient_links · 医患授权绑定（specs/25 · 演示最小闭环）
+// 不变式：
+// - 一个医生与一个患者最多一条记录（唯一索引）；解绑 = status 置 revoked（保留授权历史，不物理删除）；
+// - 医生端所有数据作用域（队列/下钻/摘要/问答）一律由本表 active 行派生，不接受客户端传 patientId 扩大范围；
+// - 跨作用域访问一律 404（不泄漏存在性，ADR #23 第 1 条）。
+// ---------------------------------------------------------------------------
+export const doctorPatientLinks = pgTable('doctor_patient_links', {
+  id: text('id').primaryKey(),                           // link-<uuid>，应用生成
+  doctorId: text('doctor_id').notNull(),                 // → users.id（role='doctor'，应用层过滤）
+  patientId: text('patient_id').notNull(),               // → users.id（role='patient'）
+  status: varchar('status', { enum: ['active', 'revoked'] }).notNull().default('active'),
+  /** 授权来源：seed = 演示预置；bind-code = 患者核销一次性绑定码 */
+  source: varchar('source', { enum: ['seed', 'bind-code'] }).notNull().default('bind-code'),
+  boundAt: timestamp('bound_at').defaultNow().notNull(), // 当前授权生效时间（重新绑定会刷新）
+  revokedAt: timestamp('revoked_at'),                    // 解绑时间（active 时为 null）
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('doctor_patient_uq').on(table.doctorId, table.patientId),
+  index('doctor_patient_doctor_idx').on(table.doctorId, table.status),
+  index('doctor_patient_patient_idx').on(table.patientId, table.status),
+])
+
+// ---------------------------------------------------------------------------
+// doctor_bind_codes · 一次性绑定码（specs/25）
+// 不变式：6 位数字、10 分钟有效、单次核销；医生重新生成时旧的未使用码作废（删除）。
+// 只存必要信息（不含明文之外的敏感数据）；核销成功后写 used_at/used_by_patient_id 供追溯。
+// ---------------------------------------------------------------------------
+export const doctorBindCodes = pgTable('doctor_bind_codes', {
+  id: text('id').primaryKey(),                           // bcode-<uuid>
+  code: varchar('code', { length: 6 }).notNull(),        // 6 位数字（全局唯一；生成时重试保证）
+  doctorId: text('doctor_id').notNull(),                 // → users.id（role='doctor'）
+  expiresAt: timestamp('expires_at').notNull(),          // 10 分钟有效期
+  usedAt: timestamp('used_at'),                          // 核销时间（null = 未使用）
+  usedByPatientId: text('used_by_patient_id'),           // 核销的患者（→ users.id）
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('doctor_bind_codes_code_uq').on(table.code),
+  index('doctor_bind_codes_doctor_idx').on(table.doctorId),
+])

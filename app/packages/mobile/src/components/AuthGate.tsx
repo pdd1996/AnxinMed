@@ -35,7 +35,8 @@ type LoginMode = "password" | "phone";
  * 状态机在 @anxin/core 的 useAuthStore + bootstrapAuth，本组件只做渲染分支：
  * - idle/loading：启动恢复中 → 全屏「正在检查登录状态」，避免先闪一下业务页再弹登录；
  * - error：检查本身失败（网络/服务异常）→ 说明 + 重试，不静默当作未登录；
- * - anonymous：password 模式的登录界面（密码 / 手机号验证码两种方式，渲染在本组件里，不新增路由）；
+ * - anonymous：登录界面（手机号验证码 / 密码两种方式，渲染在本组件里，不新增路由）；
+ *   默认落在手机号验证码（老年用户记不住账号密码，2026-11-19 用户裁定），密码登录保留为次选；
  * - authenticated：直接渲染 children（demo 模式自动通过，既有本地开发行为不变）。
  *
  * error 在 core/bootstrapAuth 写入 store 前已归成中文（G8）；这里再过一次 toUserMessage
@@ -95,7 +96,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 function LoginScreen() {
   // 品牌色圆底上的图标色：图标是 SVG，套不了 class，直接取 --primary-foreground（随深浅色翻转）。
   const iconOnPrimary = useUnstableNativeVariable("--primary-foreground");
-  const [mode, setMode] = useState<LoginMode>("password");
+  // 默认手机号验证码（验证码即注册）；密码登录保留给老账号，切一次即可。
+  const [mode, setMode] = useState<LoginMode>("phone");
   const [failure, setFailure] = useState<string | null>(null);
 
   // 密码登录
@@ -413,8 +415,8 @@ function LoginScreen() {
             ) : (
               <>
                 <View className="mb-1 flex-row gap-1 rounded-xl bg-muted p-1">
-                  {modeButton("password", "密码登录")}
                   {modeButton("phone", "手机号登录")}
+                  {modeButton("password", "密码登录")}
                 </View>
 
                 {mode === "password" ? (

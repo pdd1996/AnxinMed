@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View, type ColorValue } fr
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
+import { toast } from "sonner-native";
 import {
   AlertTriangle,
   Bot,
@@ -18,7 +19,7 @@ import {
   Square,
   Trash2,
 } from "lucide-react-native";
-import { client, fetchDrugs, fetchPlans, unwrap } from "@anxin/core";
+import { client, fetchDrugs, fetchPlans, fetchSafetySummary, unwrap } from "@anxin/core";
 import {
   CONFIRM_STATUS_META,
   daysUntilExpiry,
@@ -31,6 +32,12 @@ import { ExpiryAlert } from "@/components/domain/ExpiryAlert";
 import { ExpiryDialog, type ExpiryFormResult } from "@/components/domain/ExpiryDialog";
 import { ManualDrugModal, type ManualDrugForm } from "@/components/domain/ManualDrugModal";
 import { PlanModal, type PlanFormResult } from "@/components/domain/PlanModal";
+import { SafetyAlertCard, worstInteractionLevelForDrug } from "@/components/domain/SafetyAlertCard";
+import {
+  RuleCheckAlertDialog,
+  type DosageRangeView,
+  type InteractionView,
+} from "@/components/domain/draft/RiskCards";
 import { Icon } from "@/components/ui/icon";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 import { cn } from "@/lib/utils";
@@ -75,9 +82,21 @@ export default function Box() {
   const [deleteTarget, setDeleteTarget] = useState<DrugItem | null>(null);
   const [expiryTarget, setExpiryTarget] = useState<DrugItem | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** 建计划 / 恢复计划后服务端返回的规则检查结果（V2.5：结果必须可见，不再静默丢弃）。 */
+  const [planCheck, setPlanCheck] = useState<{
+    title: string;
+    description?: string;
+    result: InteractionView;
+    dosageRange?: DosageRangeView | null;
+  } | null>(null);
 
   const drugsQuery = useQuery({ queryKey: ["drugs"], queryFn: fetchDrugs });
   const plansQuery = useQuery({ queryKey: ["plans"], queryFn: fetchPlans });
+  // 用药安全常驻卡（V2.5）：与首页共用缓存键，检查对象 = 生效计划集合（0 次 LLM）
+  const safetyQuery = useQuery({
+    queryKey: ["safety", "interactions"],
+    queryFn: fetchSafetySummary,
+  });
   const drugs = drugsQuery.data ?? [];
   const plans = plansQuery.data ?? [];
   const loading = drugsQuery.isPending || plansQuery.isPending;
@@ -123,6 +142,7 @@ export default function Box() {
     queryClient.invalidateQueries({ queryKey: ["drugs"] });
     queryClient.invalidateQueries({ queryKey: ["plans"] });
     queryClient.invalidateQueries({ queryKey: ["tasks", "today"] });
+    queryClient.invalidateQueries({ queryKey: ["safety", "interactions"] });
   };
 
   /**
@@ -141,9 +161,19 @@ export default function Box() {
       return unwrap(res);
     },
     ...visibleFailure,
-    onSuccess: () => {
+    onSuccess: (data) => {
       setShowManual(false);
       invalidate();
+      // V2.5 入箱预检：手动建档无标准库身份，无法参与规则匹配——明确告知，不假装查过。
+      // 仅当确实有在服药品需要比对时才提示，避免空药箱也弹。
+      const precheck = data.precheck;
+      if (
+        precheck?.status === "unavailable" &&
+        precheck.reason === "manual" &&
+        precheck.activePlanCount > 0
+      ) {
+        toast.info("该药为手动建档，未关联标准药品库，无法自动核对与其他在服药品的相互作用");
+      }
     },
   });
 
@@ -178,9 +208,24 @@ export default function Box() {
       return unwrap(res);
     },
     ...visibleFailure,
-    onSuccess: () => {
+    onSuccess: (data, input) => {
       setPlanTarget(null);
       invalidate();
+      // V2.5：服务端已随建计划返回规则检查结果，必须让用户看到（只标注不阻止）。
+      const hits = data.interactions?.hits ?? [];
+      // 建计划（POST）有说明书范围校验，编辑/恢复（PATCH）没有；RPC 联合类型在此收窄
+      const dosageRange =
+        "dosageRange" in data ? (data.dosageRange as DosageRangeView | null) : null;
+      if (hits.length > 0 || dosageRange?.status === "exceed") {
+        setPlanCheck({
+          title: input.planId ? "计划已保存" : "计划已创建",
+          description: input.planId
+            ? "已对你当前生效的计划集合重跑规则检查。提示不阻止、不改方案，请知悉。"
+            : "计划已生效，已对你当前在服的药品组合重跑规则检查。提示不阻止、不改方案，请知悉。",
+          result: data.interactions,
+          dosageRange,
+        });
+      }
     },
   });
 
@@ -193,7 +238,18 @@ export default function Box() {
       return unwrap(res);
     },
     ...visibleFailure,
-    onSuccess: invalidate,
+    onSuccess: (data, input) => {
+      invalidate();
+      // 恢复计划 = 用药集合变化（PRD §7.3.5/§7.8.2 时机二）：有命中必须回显
+      if (input.status === "active" && (data.interactions?.hits.length ?? 0) > 0) {
+        setPlanCheck({
+          title: "计划已恢复",
+          description: "恢复后已重跑相互作用检查。提示不阻止、不改方案，请知悉。",
+          result: data.interactions,
+          dosageRange: null,
+        });
+      }
+    },
   });
 
   const deleteDrug = useMutation({
@@ -288,6 +344,9 @@ export default function Box() {
         </Pressable>
       </View>
 
+      {/* 用药安全常驻提示（V2.5）：生效计划集合有已知相互作用时置顶，无命中不占位 */}
+      <SafetyAlertCard summary={safetyQuery.data} />
+
       {/* 30 天临期/过期汇总（阈值在 shared；两桶皆空时组件返回 null，不占位） */}
       <ExpiryAlert drugs={drugs} />
 
@@ -341,6 +400,8 @@ export default function Box() {
             drugs.map((drug) => {
               const plan = plans.find((item) => item.drugId === drug.id);
               const meta = CONFIRM_STATUS_META[drug.confirmStatus];
+              // 药卡角标：该药在「生效集合相互作用」里涉及的最重级别（有命中才显示）
+              const interactionLevel = worstInteractionLevelForDrug(safetyQuery.data, drug.drugMasterId);
               return (
                 <View key={drug.id} className="rounded-2xl border border-border bg-card p-4">
                   <View className="flex-row items-start gap-3">
@@ -394,6 +455,29 @@ export default function Box() {
                         {planChip(plan)}
                       </Text>
                     </View>
+                    {interactionLevel ? (
+                      <View
+                        className={
+                          interactionLevel === "禁忌"
+                            ? "rounded-full border border-risk-l4 bg-risk-l4-tint px-2 py-0.5"
+                            : interactionLevel === "慎用"
+                              ? "rounded-full border border-risk-l3 bg-risk-l3-tint px-2 py-0.5"
+                              : "rounded-full border border-risk-l2 bg-risk-l2-tint px-2 py-0.5"
+                        }
+                      >
+                        <Text
+                          className={
+                            interactionLevel === "禁忌"
+                              ? "text-xs font-bold text-risk-l4"
+                              : interactionLevel === "慎用"
+                                ? "text-xs font-bold text-risk-l3"
+                                : "text-xs font-bold text-risk-l2"
+                          }
+                        >
+                          相互作用：{interactionLevel}
+                        </Text>
+                      </View>
+                    ) : null}
                     {plan?.tags?.dose ? (
                       <View className="rounded-full bg-secondary px-2 py-0.5">
                         <Text className="text-xs font-semibold text-secondary-foreground">
@@ -537,6 +621,16 @@ export default function Box() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => deleteTarget && deleteDrug.mutate(deleteTarget.id)}
       />
+      {planCheck ? (
+        <RuleCheckAlertDialog
+          open
+          title={planCheck.title}
+          description={planCheck.description}
+          result={planCheck.result}
+          dosageRange={planCheck.dosageRange ?? null}
+          onClose={() => setPlanCheck(null)}
+        />
+      ) : null}
     </ScrollView>
   );
 }

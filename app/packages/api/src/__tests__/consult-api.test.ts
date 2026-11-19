@@ -260,7 +260,8 @@ describe('POST /api/consult · L3 拒答（PRD §7.5.2）', () => {
     expect(res.body.riskLevel).toBe('L3')
     expect(res.body.status).toBe('refused')
     expect(res.body.blocked).toBe(true)
-    expect(res.body.sections.nextAction).toContain('医生或药师')
+    // d784894 起 L3 拒答文案改为「由医生/药师评估…」：断言兼容「或」「/」两种写法，避免文案微调再误红。
+    expect(res.body.sections.nextAction).toMatch(/医生[或/]药师/)
 
     const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
     expect(events).toHaveLength(1)

@@ -3,10 +3,11 @@ import { Bot, Box, Camera, CircleUserRound, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // 5 项，对齐 demo/src/App.tsx 的 navItems（用药/药箱/录入/AI 咨询/我的）。
+// 录入默认落药盒档 /intake/drug（2026-11-19 用户裁定：先拍药品，处方笺为次选）。
 const navItems = [
   { to: '/', label: '用药', icon: Home, end: true },
   { to: '/box', label: '药箱', icon: Box, end: false },
-  { to: '/intake/rx', label: '录入', icon: Camera, end: false },
+  { to: '/intake/drug', label: '录入', icon: Camera, end: false },
   { to: '/consult', label: 'AI 咨询', icon: Bot, end: false },
   { to: '/profile', label: '我的', icon: CircleUserRound, end: false },
 ] as const

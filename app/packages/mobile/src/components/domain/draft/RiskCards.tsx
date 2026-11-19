@@ -42,6 +42,10 @@ type Hit = Interaction["hits"][number];
 type DosageRange = NonNullable<DraftPayload["dosageRange"]>;
 type Issue = DosageRange["issues"][number];
 
+/** 供其它页面复用的规则检查视图类型（药箱建计划/恢复计划结果弹窗）。 */
+export type InteractionView = Interaction;
+export type DosageRangeView = DosageRange;
+
 const LEVEL_META: Record<InteractionLevel, { icon: LucideIcon; shell: string }> = {
   禁忌: { icon: OctagonX, shell: "border-risk-l4 bg-risk-l4-tint" },
   慎用: { icon: TriangleAlert, shell: "border-risk-l3 bg-risk-l3-tint" },
@@ -55,7 +59,8 @@ function sortedHits(hits: Hit[]): Hit[] {
   );
 }
 
-function HitList({ hits }: { hits: Hit[] }) {
+/** 命中条目列表（草稿确认页、计划结果弹窗、常驻安全卡共用同一渲染口径）。 */
+export function InteractionHitList({ hits }: { hits: Hit[] }) {
   // 图标颜色必须在渲染顶部取（hook 不能进循环）：三档各读一次 CSS 变量
   const l4 = useUnstableNativeVariable("--risk-l4");
   const l3 = useUnstableNativeVariable("--risk-l3");
@@ -114,7 +119,7 @@ export function InteractionCard({ result }: { result: Interaction | null }) {
       <CardContent className="gap-2">
         {hits.length > 0 ? (
           <>
-            <HitList hits={hits} />
+            <InteractionHitList hits={hits} />
             <Text className="text-xs leading-5 text-muted-foreground">
               提示不阻止确认、也不会替你改方案 —— 请带着这条提示咨询医生或药师。
             </Text>
@@ -203,18 +208,34 @@ export function DosageRangeCard({ result }: { result: DosageRange | null }) {
 /**
  * 确认成功后的规则检查结果（对**用户最终确认值**重跑）。只在有发现时弹出：
  * 让用户在跳转前真的看到风险；无发现则直接 toast + 跳转（web Draft.tsx:109-114 同口径）。
+ * mode='precheck'：入口B 仅建档路径（无计划）——检查对象是「本药 × 当前生效计划集合」（V2.5 入箱预检）。
  */
 export function ConfirmResultDialog({
   result,
   drugName,
   onDone,
+  mode = "confirm",
 }: {
   result: ConfirmResult;
   drugName: string;
   onDone: () => void;
+  mode?: "confirm" | "precheck";
 }) {
-  const hits = result.interactions?.hits ?? [];
-  const issues = result.dosageRange?.issues ?? [];
+  const precheck = mode === "precheck" ? result.precheck : null;
+  const hits =
+    mode === "precheck"
+      ? precheck?.status === "checked"
+        ? precheck.interactions.hits
+        : []
+      : result.interactions?.hits ?? [];
+  const coverageNote =
+    mode === "precheck"
+      ? precheck?.status === "checked"
+        ? precheck.interactions.coverageNote
+        : null
+      : result.interactions?.coverageNote ?? null;
+  const skipped = precheck?.status === "checked" ? precheck.skippedDrugNames : [];
+  const issues = mode === "precheck" ? [] : result.dosageRange?.issues ?? [];
   const worst = sortedHits(hits)[0]?.level;
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>
@@ -222,8 +243,9 @@ export function ConfirmResultDialog({
         <DialogHeader>
           <DialogTitle className="text-xl text-card-foreground">已写入药箱：{drugName}</DialogTitle>
           <DialogDescription className="text-sm leading-5 text-muted-foreground">
-            按你最终确认的值重跑了规则检查{worst ? `，最高级别为「${worst}」` : ""}。
-            提示不阻止、不改方案，请知悉后再用药。
+            {mode === "precheck"
+              ? `已按你当前生效的计划集合检查相互作用${worst ? `，最高级别为「${worst}」` : ""}。提示不阻止、不改方案，请知悉后再用药。`
+              : `按你最终确认的值重跑了规则检查${worst ? `，最高级别为「${worst}」` : ""}。提示不阻止、不改方案，请知悉后再用药。`}
           </DialogDescription>
         </DialogHeader>
         <View className="gap-3">
@@ -232,7 +254,7 @@ export function ConfirmResultDialog({
               <Text className="text-base font-bold text-foreground">
                 相互作用（{hits.length} 条）
               </Text>
-              <HitList hits={hits} />
+              <InteractionHitList hits={hits} />
             </View>
           ) : null}
           {issues.length > 0 ? (
@@ -250,9 +272,12 @@ export function ConfirmResultDialog({
               ))}
             </View>
           ) : null}
-          {result.interactions?.coverageNote && hits.length === 0 ? (
+          {coverageNote && hits.length === 0 ? (
+            <Text className="text-xs leading-5 text-muted-foreground">{coverageNote}</Text>
+          ) : null}
+          {skipped.length > 0 ? (
             <Text className="text-xs leading-5 text-muted-foreground">
-              {result.interactions.coverageNote}
+              另有 {skipped.length} 个在服药品未关联标准药品库，未参与比对：{skipped.join("、")}。
             </Text>
           ) : null}
           <Pressable
@@ -261,6 +286,79 @@ export function ConfirmResultDialog({
             className="min-h-[52px] items-center justify-center rounded-xl bg-primary px-6 active:opacity-80"
           >
             <Text className="text-lg font-semibold text-primary-foreground">我已知悉，去药箱</Text>
+          </Pressable>
+        </View>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * 建计划 / 恢复计划后的规则检查结果弹窗（V2.5：「变更即重跑、结果必须可见」）。
+ * 服务端随 createPlan / patchPlan 返回检查结果，前端不得再静默丢弃；只标注不阻止，无发现不弹。
+ */
+export function RuleCheckAlertDialog({
+  open,
+  title,
+  description,
+  result,
+  dosageRange,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  result: InteractionView;
+  dosageRange?: DosageRangeView | null;
+  onClose: () => void;
+}) {
+  const hits = result.hits ?? [];
+  const issues = dosageRange?.issues ?? [];
+  if (!open || (hits.length === 0 && issues.length === 0)) return null;
+  const worst = sortedHits(hits)[0]?.level;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[88vh]">
+        <DialogHeader>
+          <DialogTitle className="text-xl text-card-foreground">{title}</DialogTitle>
+          <DialogDescription className="text-sm leading-5 text-muted-foreground">
+            {description ??
+              `已对你当前生效的计划集合重跑规则检查${worst ? `，最高级别为「${worst}」` : ""}。提示不阻止、不改方案，请知悉。`}
+          </DialogDescription>
+        </DialogHeader>
+        <View className="gap-3">
+          {hits.length > 0 ? (
+            <View className="gap-1">
+              <Text className="text-base font-bold text-foreground">
+                相互作用（{hits.length} 条）
+              </Text>
+              <InteractionHitList hits={hits} />
+            </View>
+          ) : null}
+          {issues.length > 0 ? (
+            <View className="gap-1">
+              <Text className="text-base font-bold text-foreground">
+                超出说明书范围（{issues.length} 项）
+              </Text>
+              {issues.map((issue, i) => (
+                <View key={i} className="rounded-xl border-2 border-risk-l3 bg-risk-l3-tint p-2">
+                  <Text className="text-sm leading-5 text-foreground">
+                    {issue.field === "frequency" ? "频次" : "单次用量"} {issue.planValue} · 上限{" "}
+                    {issue.insertMax} —— {issue.insertNote}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {result.coverageNote && hits.length === 0 ? (
+            <Text className="text-xs leading-5 text-muted-foreground">{result.coverageNote}</Text>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={onClose}
+            className="min-h-[52px] items-center justify-center rounded-xl bg-primary px-6 active:opacity-80"
+          >
+            <Text className="text-lg font-semibold text-primary-foreground">我已知悉</Text>
           </Pressable>
         </View>
       </DialogContent>

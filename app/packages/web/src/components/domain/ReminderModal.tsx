@@ -7,8 +7,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { PlanMeta } from '@/components/domain/PlanMeta'
 import { cn } from '@/lib/utils'
-import { speak, planMetaSegments, type PlanGroup, type TaskStatus } from '@anxin/core'
+import { speak, type PlanGroup, type TaskStatus } from '@anxin/core'
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   pending: '待服用',
@@ -53,12 +54,8 @@ export function ReminderModal({
           {/* 两行：药名单独成行做视觉锚点；用法按段折行，不在「每日 1 次」中间断开 */}
           <DialogDescription className="text-left">
             <span className="block text-base font-semibold text-foreground">{group.drugName}</span>
-            <span className="mt-1 flex flex-wrap">
-              {planMetaSegments(group).map((segment, index, all) => (
-                <span key={segment} className="mr-1.5 whitespace-nowrap">
-                  {index < all.length - 1 ? `${segment} ·` : segment}
-                </span>
-              ))}
+            <span className="mt-1 block [text-wrap:balance]">
+              <PlanMeta group={group} />
             </span>
           </DialogDescription>
         </DialogHeader>

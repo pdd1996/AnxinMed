@@ -74,6 +74,8 @@ export function publicUser(user: User): AuthUser {
     name: user.name,
     username: user.username,
     hasPassword: Boolean(user.passwordHash),
+    // specs/25：医生端角色（前端用于路由守卫与入口展示；权限判定一律以服务端为准）。
+    role: user.role === 'doctor' ? 'doctor' : 'patient',
   }
 }
 
@@ -221,6 +223,8 @@ export async function createUserCredential(input: {
   username: string
   password: string
   name?: string | null
+  /** specs/25：开通医生账号（缺省 patient；既有 CLI 调用不受影响）。 */
+  role?: 'patient' | 'doctor'
 }): Promise<User> {
   const passwordHash = await hashPassword(input.password)
   const now = new Date()
@@ -236,6 +240,7 @@ export async function createUserCredential(input: {
           passwordUpdatedAt: now,
           updatedAt: now,
           ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.role !== undefined ? { role: input.role } : {}),
         })
         .where(eq(users.id, input.id))
         .returning()
@@ -251,6 +256,7 @@ export async function createUserCredential(input: {
       username: input.username,
       passwordHash,
       passwordUpdatedAt: now,
+      role: input.role ?? 'patient',
     })
     .returning()
   return created!

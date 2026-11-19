@@ -22,6 +22,7 @@ export const ERR_CODES = {
   SMS_SEND_FAILED: 'SMS_SEND_FAILED',       // 短信服务商发送失败/不可用 → 503
   SMS_LIMITED: 'SMS_LIMITED',               // 发码频控（同号冷却/同 IP 小时配额）→ 429
   RATE_LIMITED: 'RATE_LIMITED',             // 请求过于频繁（LLM 路由/IP 限流）→ 429（G10）
+  FORBIDDEN: 'FORBIDDEN',                   // 已登录但角色不匹配（如患者访问医生端接口）→ 403（specs/25）
 } as const
 
 export type ErrCode = (typeof ERR_CODES)[keyof typeof ERR_CODES]

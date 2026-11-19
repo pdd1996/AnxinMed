@@ -14,7 +14,7 @@
  * （ADR #17 第 3 条：分档口径一份真相，可审计、可复现）。
  * 医生端 MVP 为演示模式，暂不做多医生权限。
  */
-import { and, desc, eq, gte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { drugs, healthProfiles, insightAskLogs, plans, records, riskEvents, users } from '../db/schema.js'
 import { todayStr, addDaysStr, gradeAdherence, isPlanActiveOn, EXPIRY_WARNING_DAYS } from '@anxin/shared'
@@ -48,8 +48,12 @@ export interface AdherenceByUser {
   rate: number | null
 }
 
-/** 全体患者近 N 天执行率（常数 1 次查询；shared gradeAdherence 在调用方分档）。 */export async function getAdherenceByUser(days = 30): Promise<AdherenceByUser[]> {
+/** 全体患者近 N 天执行率（常数 1 次查询；shared gradeAdherence 在调用方分档）。 */
+export async function getAdherenceByUser(days = 30, patientIds?: string[]): Promise<AdherenceByUser[]> {
+  // specs/25：patientIds 缺省 = 全量（demo 旁路）；空数组 = 无授权患者（不查库直接空）。
+  if (patientIds && patientIds.length === 0) return []
   const cutoff = addDaysStr(todayStr(), -days + 1)
+  const scope = patientIds ? inArray(records.userId, patientIds) : undefined
   const rows = await db
     .select({
       userId: records.userId,
@@ -58,7 +62,7 @@ export interface AdherenceByUser {
       skipped: sql<number>`count(*) filter (where ${records.status} = 'skipped')::int`,
     })
     .from(records)
-    .where(gte(records.scheduledDate, cutoff))
+    .where(scope ? and(gte(records.scheduledDate, cutoff), scope) : gte(records.scheduledDate, cutoff))
     .groupBy(records.userId)
   return rows.map((r) => ({ ...r, rate: r.total > 0 ? Math.round((r.taken / r.total) * 100) : null }))
 }
@@ -70,29 +74,39 @@ export interface AdherenceByUser {
  * - lastActiveAt = max(records.actedAt)；
  * - adherenceRate/Grade = 近 30 天执行率 + shared gradeAdherence 分档。
  */
-export async function listPatientsWithStats(days = 30): Promise<PatientListItem[]> {
+export async function listPatientsWithStats(days = 30, patientIds?: string[]): Promise<PatientListItem[]> {
+  // specs/25：patientIds 缺省 = 全量（demo 旁路）；空数组 = 无授权患者（返回空，不查库）。
+  if (patientIds && patientIds.length === 0) return []
   const today = todayStr()
   const cutoff = addDaysStr(today, -days + 1)
+  const scopeUsers = patientIds ? inArray(users.id, patientIds) : undefined
+  const scopeProfiles = patientIds ? inArray(healthProfiles.userId, patientIds) : undefined
+  const scopePlans = patientIds ? inArray(plans.userId, patientIds) : undefined
+  const scopeRecords = patientIds ? inArray(records.userId, patientIds) : undefined
 
   // 常数 4 次查询（患者数无关；原实现逐用户 3-4 次循环 → N+1，spec §T7.2 硬要求改造）
   const [userRows, healthRows, planCounts, adherence, lastActives] = await Promise.all([
     // 只取展示所需列：G7 起 users 含 password_hash，禁止整行 select 后不慎序列化到响应。
-    db.select({ id: users.id, name: users.name, createdAt: users.createdAt }).from(users).orderBy(users.id),
-    db.select().from(healthProfiles),
+    (scopeUsers
+      ? db.select({ id: users.id, name: users.name, createdAt: users.createdAt }).from(users).where(scopeUsers)
+      : db.select({ id: users.id, name: users.name, createdAt: users.createdAt }).from(users)
+    ).orderBy(users.id),
+    scopeProfiles ? db.select().from(healthProfiles).where(scopeProfiles) : db.select().from(healthProfiles),
     db
       .select({
         userId: plans.userId,
         drugCount: sql<number>`count(*) filter (where ${plans.status} = 'active' and ${plans.startDate} <= ${today} and (${plans.endDate} is null or ${plans.endDate} >= ${today}))::int`,
       })
       .from(plans)
+      .where(scopePlans)
       .groupBy(plans.userId),
-    getAdherenceByUser(days),
+    getAdherenceByUser(days, patientIds),
     // 最近活跃：max(actedAt) 按 user 聚合（口径同 T3 的 actedAt 最新一条）；
     // postgres-js 对聚合表达式不套 Date 解码器 → ::text 取回再转 ISO 日期
     db
       .select({ userId: records.userId, lastActiveAt: sql<string | null>`max(${records.actedAt})::text` })
       .from(records)
-      .where(gte(records.scheduledDate, cutoff))
+      .where(scopeRecords ? and(gte(records.scheduledDate, cutoff), scopeRecords) : gte(records.scheduledDate, cutoff))
       .groupBy(records.userId),
   ])
 
@@ -391,13 +405,16 @@ export interface RiskEventWindowRow {
  * 窗口内全体患者风险事件原始行（date = occurredAt UTC 日，与 insight/types.ts toRiskEventItem 同口径）。
  * 仅 L4/L3/manual-gate 会写入 risk_events（consult.service 落库纪律），无需再过滤。
  */
-export async function listRiskEventsWindow(days = 30): Promise<RiskEventWindowRow[]> {
+export async function listRiskEventsWindow(days = 30, patientIds?: string[]): Promise<RiskEventWindowRow[]> {
+  // specs/25：patientIds 缺省 = 全量（demo 旁路）；空数组 = 无授权患者。
+  if (patientIds && patientIds.length === 0) return []
   const since = new Date()
   since.setDate(since.getDate() - days)
+  const scope = patientIds ? inArray(riskEvents.userId, patientIds) : undefined
   const rows = await db
     .select({ occurredAt: riskEvents.occurredAt, level: riskEvents.level })
     .from(riskEvents)
-    .where(gte(riskEvents.occurredAt, since))
+    .where(scope ? and(gte(riskEvents.occurredAt, since), scope) : gte(riskEvents.occurredAt, since))
   return rows.map((r) => ({ date: r.occurredAt.toISOString().slice(0, 10), level: r.level }))
 }
 

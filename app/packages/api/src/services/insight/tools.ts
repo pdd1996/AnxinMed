@@ -112,12 +112,15 @@ export function rollupTimeline(
 // 工具执行器（参数 safeParse 失败抛 Error——错误可见，绝不猜参数执行）
 // ---------------------------------------------------------------------------
 
-export async function runAdherenceDistribution(raw: unknown): Promise<AdherenceDistributionResult> {
+export async function runAdherenceDistribution(
+  raw: unknown,
+  patientIds?: string[],
+): Promise<AdherenceDistributionResult> {
   const params = AdherenceDistributionParamsSchema.safeParse(raw)
   if (!params.success) {
     throw new Error(`adherence_distribution 参数非法：${params.error.message}`)
   }
-  const patients = await listPatientsWithStats(params.data.days)
+  const patients = await listPatientsWithStats(params.data.days, patientIds)
   return {
     tool: 'adherence_distribution',
     days: params.data.days,
@@ -132,13 +135,13 @@ export async function runAdherenceDistribution(raw: unknown): Promise<AdherenceD
   }
 }
 
-export async function runPatientCohort(raw: unknown): Promise<PatientCohortResult> {
+export async function runPatientCohort(raw: unknown, patientIds?: string[]): Promise<PatientCohortResult> {
   const params = PatientCohortParamsSchema.safeParse(raw)
   if (!params.success) {
     throw new Error(`patient_cohort 参数非法：${params.error.message}`)
   }
   const { grade, days } = params.data
-  const all = await listPatientsWithStats(days)
+  const all = await listPatientsWithStats(days, patientIds)
   const hit = all.filter((p) => p.adherenceGrade === grade)
   return {
     tool: 'patient_cohort',
@@ -161,12 +164,12 @@ export async function runPatientCohort(raw: unknown): Promise<PatientCohortResul
   }
 }
 
-export async function runRiskEventRollup(raw: unknown): Promise<RiskEventRollupResult> {
+export async function runRiskEventRollup(raw: unknown, patientIds?: string[]): Promise<RiskEventRollupResult> {
   const params = RiskEventRollupParamsSchema.safeParse(raw)
   if (!params.success) {
     throw new Error(`risk_event_rollup 参数非法：${params.error.message}`)
   }
-  const rows = await listRiskEventsWindow(params.data.days)
+  const rows = await listRiskEventsWindow(params.data.days, patientIds)
   const timeline = rollupTimeline(rows)
   return {
     tool: 'risk_event_rollup',
@@ -185,7 +188,8 @@ export interface QueueToolDef {
   /** 图表模板绑定（spec §T7.5 三件；前端按此选择渲染组件）。 */
   chart: 'histogram' | 'table' | 'timeline'
   paramSchema: z.ZodType
-  run: (raw: unknown) => Promise<QueueToolResult>
+  /** patientIds 缺省 = 全量（demo 旁路）；由 service 从医生绑定关系派生（specs/25）。 */
+  run: (raw: unknown, patientIds?: string[]) => Promise<QueueToolResult>
 }
 
 export const QUEUE_TOOLS: Record<QueueToolName, QueueToolDef> = {
@@ -210,6 +214,10 @@ export const QUEUE_TOOLS: Record<QueueToolName, QueueToolDef> = {
 }
 
 /** 统一工具执行入口：执行器内部先 safeParse（校验与执行同源，杜绝旁路），失败抛错可见。 */
-export async function runQueueTool(name: QueueToolName, raw: unknown): Promise<QueueToolResult> {
-  return QUEUE_TOOLS[name].run(raw ?? {})
+export async function runQueueTool(
+  name: QueueToolName,
+  raw: unknown,
+  patientIds?: string[],
+): Promise<QueueToolResult> {
+  return QUEUE_TOOLS[name].run(raw ?? {}, patientIds)
 }

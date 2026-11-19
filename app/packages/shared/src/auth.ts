@@ -15,6 +15,19 @@ export const AUTH_MODES = ['demo', 'password'] as const
 export type AuthMode = (typeof AUTH_MODES)[number]
 export const AuthModeSchema = z.enum(AUTH_MODES)
 
+/**
+ * 账号角色（specs/25 医生端患者绑定·演示最小闭环）：
+ * - patient：患者端账号（默认）；
+ * - doctor：医生端账号，可生成绑定码、查看已授权患者；
+ * - demo 模式下角色校验整体旁路（既有多用户演示与 721 测试零回归）。
+ *
+ * 为什么放在 users 行而不是独立医生表：本切片只解决「能不能看」，
+ * 不做医生工号/机构/科室等业务档案（完整建模属方案 B）。
+ */
+export const USER_ROLES = ['patient', 'doctor'] as const
+export type UserRole = (typeof USER_ROLES)[number]
+export const UserRoleSchema = z.enum(USER_ROLES)
+
 /** 登录入参。username 为账号（演示账号可就是 p-001），不是手机号/邮箱。 */
 export const LoginRequestSchema = z.object({
   username: z.string().trim().min(1, '请输入账号').max(64),
@@ -33,6 +46,11 @@ export const AuthUserSchema = z.object({
    * 可选：兼容既有测试夹具/旧响应（缺省按「未设置」处理）。
    */
   hasPassword: z.boolean().optional(),
+  /**
+   * 账号角色（specs/25）。可选：兼容既有测试夹具与旧响应（缺省按患者处理）。
+   * 前端只用于「首屏是否渲染医生端入口 / 医生端页面守卫」，权限判定一律以服务端为准。
+   */
+  role: UserRoleSchema.optional(),
 })
 export type AuthUser = z.infer<typeof AuthUserSchema>
 

@@ -7,6 +7,7 @@ import * as drugsRepo from '../repositories/drugs.repo.js'
 import * as plansRepo from '../repositories/plans.repo.js'
 import * as recordsRepo from '../repositories/records.repo.js'
 import * as sourcesRepo from '../repositories/sources.repo.js'
+import { getAddInteractionPrecheck, type AddInteractionPrecheck } from './safety.service.js'
 import type { DrugRow } from '../repositories/drugs.repo.js'
 import type { PlanRow } from '../repositories/plans.repo.js'
 import { compact, newId } from '../lib/util.js'
@@ -57,8 +58,17 @@ export async function getDrug(userId: string, id: string) {
   return { ...toDrugDto(row), estimatedStockDays: estimatedStockDaysFor(row, planRows) }
 }
 
+/** 手动建档结果：药品 DTO + 入箱预检（手动建档无标准库身份，预检会明示无法比对，不静默跳过）。 */
+export type CreateManualDrugResult = {
+  drug: ReturnType<typeof toDrugDto> & { estimatedStockDays: number | null }
+  precheck: AddInteractionPrecheck
+}
+
 /** 手动建档：confirmStatus 固定 'manual' + 写 sources(type='manual') 留痕（PRD §7.2.6 兜底路径）。 */
-export async function createManualDrug(userId: string, input: DrugCreate) {
+export async function createManualDrug(userId: string, input: DrugCreate): Promise<CreateManualDrugResult> {
+  // V2.5：入箱即预检（手动建档无 drug_master.id → unavailable/manual，UI 明示无法自动核对）。
+  // 放在写入之前：预检失败不应留下「接口报错但药已入箱」的半成品状态。
+  const precheck = await getAddInteractionPrecheck(userId, null)
   const now = new Date()
   const sourceId = newId('src')
   await sourcesRepo.insertSource({
@@ -86,7 +96,8 @@ export async function createManualDrug(userId: string, input: DrugCreate) {
     sourceId,
     confirmedAt: now,
   })
-  return { ...toDrugDto(row), estimatedStockDays: null }
+  // V2.5：入箱即预检（手动建档无 drug_master.id → unavailable/manual，UI 明示无法自动核对）
+  return { drug: { ...toDrugDto(row), estimatedStockDays: null }, precheck }
 }
 
 export async function patchDrug(userId: string, id: string, patch: DrugPatch) {

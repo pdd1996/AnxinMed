@@ -34,6 +34,7 @@ import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 
 /**
  * 录入屏（M5-T6a · 双入口平级 tab；M5-T6b · 本地质量预检）：处方笺（A）/ 药盒（B）两个路由各挂一份本组件。
+ * 2026-11-19 用户裁定默认药盒档：录入 tab 默认选中「拍药品」、双入口 tab 药盒在前（处方笺为次选）。
  * 对齐 web `IntakeFlow.tsx` 的 09-25 改造口径——tab 只在 upload 步渲染（照片进流程后收起）、
  * 点另一颗即切（无确认弹窗，RN 用 replace 实现对方页重挂的「上传态归零」语义）、眉题「拍照录入」常驻。
  * 分工不变：决策全在 core 的 `transitionIntakeFlow`（纯函数、已单测），本组件只是动作解释器 + 渲染。
@@ -67,9 +68,10 @@ const COPY: Record<IntakeEntry, IntakeCopy> = {
   },
 };
 
+/** 双入口平级 tab：药盒在前（默认档，2026-11-19 用户裁定），处方笺在后；文案逐字照搬 web。 */
 const ENTRY_TABS: { entry: IntakeEntry; label: string; icon: typeof FileText }[] = [
-  { entry: "A", label: "拍处方笺", icon: FileText },
   { entry: "B", label: "拍药品", icon: Package },
+  { entry: "A", label: "拍处方笺", icon: FileText },
 ];
 
 const PRESSABLE_CLASS =

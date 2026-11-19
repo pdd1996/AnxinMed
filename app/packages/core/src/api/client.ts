@@ -183,6 +183,17 @@ export async function fetchPlans() {
   return data.items
 }
 
+/**
+ * GET /api/safety —— 当前生效计划集合的用药安全汇总（V2.5 · PRD §7.8.2）。
+ * 患者端首页/药箱「用药安全」常驻卡的唯一数据源：0 次 LLM，规则只匹配不生成；
+ * 未覆盖 ≠ 无风险（coverageNote）与规则库统计随响应返回，UI 必须如实展示。
+ */
+export async function fetchSafetySummary() {
+  const res = await client.api.safety.$get()
+  return unwrap(res)
+}
+export type SafetySummaryDto = Omit<Awaited<ReturnType<typeof fetchSafetySummary>>, 'ok'>
+
 /** 健康信息（我的页用）。 */
 export async function fetchProfile() {
   const res = await client.api.profile.$get()

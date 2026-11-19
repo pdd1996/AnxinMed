@@ -20,6 +20,7 @@ import {
   fetchInsightQueue,
   generateInsightSummary,
   generateQueueSummary,
+  useAuthStore,
   type InsightAskDto,
   type InsightQueueDto,
   type InsightSummaryDto,
@@ -28,6 +29,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { DoctorBindCodeCard } from '@/components/domain/DoctorBindCodeCard'
 import { RiskBadge } from '@/components/domain/RiskBadge'
 import { PatientAdherenceCharts } from '@/components/domain/insight/PatientAdherenceCharts'
 import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventType } from '@anxin/shared'
@@ -143,6 +145,7 @@ function QueueView({
   onGenerateSummary: () => void
   onPick: (id: string) => void
 }) {
+  const authMode = useAuthStore((s) => s.mode)
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -164,6 +167,9 @@ function QueueView({
           </p>
         </CardContent>
       </Card>
+
+      {/* specs/25：仅真实账号（password 模式）显示绑定入口；demo 模式保持页面逐字不变（E2E 零回归）。 */}
+      {authMode === 'password' && <DoctorBindCodeCard />}
 
       {loading && (
         <p className="flex items-center justify-center gap-2 py-16 text-muted-foreground">

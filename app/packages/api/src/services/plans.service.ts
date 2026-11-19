@@ -17,6 +17,7 @@ import * as plansRepo from '../repositories/plans.repo.js'
 import * as drugsRepo from '../repositories/drugs.repo.js'
 import * as recordsRepo from '../repositories/records.repo.js'
 import * as assetsRepo from '../repositories/assets.repo.js'
+import type { InteractionRuleRow } from '../repositories/assets.repo.js'
 import type { PlanRow } from '../repositories/plans.repo.js'
 import {
   checkDosageRange,
@@ -73,6 +74,86 @@ export type CreatePlanResult = {
   dosageRange: DosageRangeResult
 }
 
+/** 生效集合快照（检查对象 = 在服计划集合，不是药箱库存；PRD §7.8.2）。 */
+export interface ActiveMedicationSnapshot {
+  /** 今日时间窗内 status=active 的计划数（含未关联标准药品库的药）。 */
+  activePlanCount: number
+  /** 生效集合内可参与规则匹配的 drug_master.id（去重）。 */
+  activeMasterIds: string[]
+  /** 参与比对的在服药品通用名（已关联标准库）。 */
+  checkedDrugNames: string[]
+  /** 在服但未关联标准药品库、无法参与比对的药品通用名（诚实披露，不静默跳过）。 */
+  skippedDrugNames: string[]
+}
+
+/** 规则库统计（UI 诚实披露覆盖范围用）。 */
+export interface RuleLibraryStats {
+  total: number
+  demo: number
+  curated: number
+}
+
+/** 规则行 → 引擎入参（唯一映射处；安全汇总/入箱预检/咨询同源）。 */
+export function toInteractionRuleInputs(rows: InteractionRuleRow[]): InteractionRuleInput[] {
+  return rows.map((r) => ({
+    id: r.id,
+    drugIds: (r.drugIds as string[] | null) ?? [],
+    drugGroups: (r.drugGroups as string[][] | null) ?? null,
+    level: r.level,
+    status: r.status,
+    note: r.note,
+    source: r.source,
+  }))
+}
+
+export function countRuleLibrary(rows: InteractionRuleRow[]): RuleLibraryStats {
+  let demo = 0
+  let curated = 0
+  for (const r of rows) {
+    if (r.status === 'demo') demo += 1
+    else if (r.status === 'curated') curated += 1
+  }
+  return { total: rows.length, demo, curated }
+}
+
+/** 生效计划集合（status=active 且时间窗覆盖今日）→ 可比对药品与无法比对的药。 */
+export async function resolveActiveMedications(userId: string): Promise<ActiveMedicationSnapshot> {
+  const today = todayStr()
+  const [planRows, drugRows] = await Promise.all([plansRepo.listPlans(userId), drugsRepo.listDrugs(userId)])
+  const activePlanCount = planRows.filter((p) => isPlanActiveOn(p, today)).length
+  const activeDrugs = drugRows.filter((d) =>
+    planRows.some((p) => p.drugId === d.id && isPlanActiveOn(p, today)),
+  )
+  const checked = activeDrugs.filter((d) => !!d.drugMasterId)
+  return {
+    activePlanCount,
+    activeMasterIds: [...new Set(checked.map((d) => d.drugMasterId as string))],
+    checkedDrugNames: checked.map((d) => d.genericName),
+    skippedDrugNames: activeDrugs.filter((d) => !d.drugMasterId).map((d) => d.genericName),
+  }
+}
+
+/**
+ * 生效集合的相互作用检查（V2.5 · PRD §7.8.2「主动干预」）：
+ * 患者端常驻安全卡（GET /api/safety）与计划变更重跑共用；0 次 LLM。
+ * 规则条目只匹配、不生成（PRD §7.8.1）。
+ */
+export async function checkActiveInteractions(userId: string): Promise<{
+  interactions: InteractionResult
+  snapshot: ActiveMedicationSnapshot
+  ruleLibrary: RuleLibraryStats
+}> {
+  const snapshot = await resolveActiveMedications(userId)
+  const ruleRows = await assetsRepo.listInteractionRules()
+  const rules = toInteractionRuleInputs(ruleRows)
+  const names = await assetsRepo.findDrugMasterNames(snapshot.activeMasterIds)
+  return {
+    interactions: checkInteractions(snapshot.activeMasterIds, rules, names),
+    snapshot,
+    ruleLibrary: countRuleLibrary(ruleRows),
+  }
+}
+
 /**
  * 建计划/确认时的规则检查（PRD §7.8.2 时机二 / §8.3）：相互作用对「生效计划集合 + 即将新建的药」，
  * 范围校验对新计划的药。只标注不阻止；资产库缺数据时引擎自然返回空/none（不报错、不阻断建计划）。
@@ -83,25 +164,14 @@ export async function runRuleChecks(
   newDrugMasterId: string | null,
   planDraft: { dose: Stock; frequency: number },
 ): Promise<{ interactions: InteractionResult; dosageRange: DosageRangeResult }> {
-  const today = todayStr()
-  const [planRows, drugRows] = await Promise.all([plansRepo.listPlans(userId), drugsRepo.listDrugs(userId)])
-
   // 生效计划集合（active 且时间窗覆盖今日）→ 药的 drugMasterId（手动建档 masterId=null 排除）
-  const activeMasterIds = drugRows
-    .filter((d) => d.drugMasterId && planRows.some((p) => p.drugId === d.id && isPlanActiveOn(p, today)))
-    .map((d) => d.drugMasterId as string)
-  const masterIds = [...new Set([...activeMasterIds, ...(newDrugMasterId ? [newDrugMasterId] : [])])]
+  const snapshot = await resolveActiveMedications(userId)
+  const masterIds = [
+    ...new Set([...snapshot.activeMasterIds, ...(newDrugMasterId ? [newDrugMasterId] : [])]),
+  ]
 
   const ruleRows = await assetsRepo.listInteractionRules()
-  const rules: InteractionRuleInput[] = ruleRows.map((r) => ({
-    id: r.id,
-    drugIds: (r.drugIds as string[] | null) ?? [],
-    drugGroups: (r.drugGroups as string[][] | null) ?? null,
-    level: r.level,
-    status: r.status,
-    note: r.note,
-    source: r.source,
-  }))
+  const rules = toInteractionRuleInputs(ruleRows)
   const names = await assetsRepo.findDrugMasterNames(masterIds)
   const interactions = checkInteractions(masterIds, rules, names)
 
@@ -174,12 +244,18 @@ export async function createPlan(userId: string, input: PlanCreate): Promise<Cre
   return { plan: toPlanDto(row), interactions, dosageRange }
 }
 
-/** 暂停/恢复/结束（status）或编辑字段；只更新提供的字段。 */
+/**
+ * 暂停/恢复/结束（status）或编辑字段；只更新提供的字段。
+ * V2.5：用药集合变化后重跑生效集合检查并随响应返回（PRD §7.3.5 / §7.8.2；恢复计划是最易漏的入口）。
+ * 只标注不阻止：暂停/结束后剩余集合的命中照常返回，由前端决定是否展示。
+ */
 export async function patchPlan(userId: string, id: string, input: PlanPatch) {
   const existing = await plansRepo.findPlan(userId, id)
   if (!existing) return undefined
   const row = await plansRepo.updatePlan(userId, id, compact({ ...input }))
-  return row ? toPlanDto(row) : undefined
+  if (!row) return undefined
+  const { interactions } = await checkActiveInteractions(userId)
+  return { plan: toPlanDto(row), interactions }
 }
 
 export async function deletePlan(userId: string, id: string): Promise<boolean> {

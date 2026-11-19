@@ -258,7 +258,7 @@ export default function Consult() {
                       <>
                         药箱为空：去
                         <Link
-                          to="/intake/rx"
+                          to="/intake/drug"
                           className="font-medium text-primary underline underline-offset-2"
                         >
                           录入

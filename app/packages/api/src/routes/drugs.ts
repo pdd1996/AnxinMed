@@ -15,8 +15,9 @@ export const drugsRoute = new Hono<AppEnv>()
     return okJson(c, { items })
   })
   .post('/', vJson(DrugCreateSchema), async (c) => {
-    const drug = await drugsService.createManualDrug(c.get('user').id, c.req.valid('json'))
-    return okJson(c, { drug }, 201)
+    // V2.5：手动建档也返回入箱预检（手动无标准库身份 → 明示无法比对，不假装查过）
+    const result = await drugsService.createManualDrug(c.get('user').id, c.req.valid('json'))
+    return okJson(c, result, 201)
   })
   .get('/:id', async (c) => {
     const drug = await drugsService.getDrug(c.get('user').id, c.req.param('id'))

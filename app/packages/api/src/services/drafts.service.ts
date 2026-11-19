@@ -19,6 +19,7 @@ import type { DraftRow } from '../repositories/drafts.repo.js'
 import type { HealthSourceMeta } from '../repositories/profiles.repo.js'
 import type { DraftPayload } from './pipeline/index.js'
 import { runRuleChecks } from './plans.service.js'
+import { getAddInteractionPrecheck, type AddInteractionPrecheck } from './safety.service.js'
 import type { DosageRangeResult, InteractionResult } from './rules/index.js'
 
 /** 确认方式留痕（缺省按 confirmStatus 推导；对齐 demo confirmMethod 文案）。 */
@@ -37,6 +38,11 @@ export type ConfirmDraftResult = {
   /** 对**最终确认值**重跑的规则检查（只标注不阻止；无计划为 null）。M2 收尾清单：检查接入建计划与确认两条路径。 */
   interactions: InteractionResult | null
   dosageRange: DosageRangeResult | null
+  /**
+   * V2.5 入箱预检（仅无计划路径）：新药 × 当前生效计划集合。
+   * `interactions` 与 `dosageRange` 仅覆盖带计划的确认；入口B 仅建档的主动干预走这里。
+   */
+  precheck: AddInteractionPrecheck | null
 }
 export type RejectDraftResult = { id: string; status: 'rejected' }
 
@@ -125,6 +131,12 @@ export async function confirmDraft(userId: string, id: string, input: DraftConfi
       ? input.plan.tags ?? payload.planDraft?.tags ?? null
       : { ...(input.plan.tags ?? {}), dose: 'user', frequency: 'user', duration: 'user' }
     : null
+
+  // V2.5 入箱预检：入口B 仅建档也会立刻与「当前在服集合」比一次（主动干预；只提示不阻止）。
+  // 放在事务之前：预检失败不应让「已确认入箱」看起来像失败（检查是附赠信息，不是闸门）。
+  const precheck = input.plan
+    ? null
+    : await getAddInteractionPrecheck(userId, input.drug.drugMasterId ?? null)
 
   await db.transaction(async (tx) => {
     // ① sources：三层追溯锚点 + 确认留痕（追溯上下文全部从 payload 取，客户端无法伪造）
@@ -220,6 +232,7 @@ export async function confirmDraft(userId: string, id: string, input: DraftConfi
     status: 'confirmed',
     interactions: checks?.interactions ?? null,
     dosageRange: checks?.dosageRange ?? null,
+    precheck,
   }
 }
 

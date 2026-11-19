@@ -34,6 +34,7 @@ import {
 } from './insight/askTemplates.js'
 import { classifyConsultIntent } from './consult/intent.js'
 import { runDataQuery } from './consult/dataquery.js'
+import { resolveDoctorPatientScope } from './binding.service.js'
 import { scrubWithPatterns, PII_ASSERT_PATTERNS } from './sanitize/scan.js'
 import { newId } from '../lib/util.js'
 import type { QueuePromptPayload } from '../lib/ai/types.js'
@@ -42,16 +43,42 @@ import type { ConsultSections, InsightAdherenceSeriesResponse, InsightAskRespons
 import { ApiError } from '../lib/http.js'
 import { ERR_CODES } from '@anxin/shared'
 
-/** 患者列表（GET /api/insight/patients）。 */
-export async function listPatients() {
-  return insightRepo.listPatientsWithStats()
+/**
+ * 患者可见性断言（specs/25 · ADR #23 第 1 条）：
+ * - password 模式：只允许当前医生绑定关系内的患者，否则 404（不泄漏存在性）；
+ * - demo 模式：旁路（scope=undefined），退化为既有「患者存在即可」语义，保证 E2E 逐字不变。
+ */
+async function assertPatientVisible(
+  doctorId: string,
+  patientId: string,
+  precomputedScope?: string[],
+): Promise<string[] | undefined> {
+  const scope = precomputedScope ?? (await resolveDoctorPatientScope(doctorId))
+  if (scope !== undefined) {
+    if (!scope.includes(patientId)) {
+      throw new ApiError(404, ERR_CODES.NOT_FOUND, '未找到该患者，请确认 patientId')
+    }
+    return scope
+  }
+  const patient = await insightRepo.findPatient(patientId)
+  if (!patient) {
+    throw new ApiError(404, ERR_CODES.NOT_FOUND, '未找到该患者，请确认 patientId')
+  }
+  return undefined
+}
+
+/** 患者列表（GET /api/insight/patients）——仅当前医生的授权患者（demo 模式旁路）。 */
+export async function listPatients(doctorId: string) {
+  const scope = await resolveDoctorPatientScope(doctorId)
+  return insightRepo.listPatientsWithStats(30, scope)
 }
 
 /** 队列视图数据（GET /api/insight/queue · T7）：分档统计 + 患者表 + 事件时间线，0 次 LLM 直查库。 */
-export async function getQueue(): Promise<InsightQueueResponse> {
+export async function getQueue(doctorId: string): Promise<InsightQueueResponse> {
   const days = 30
-  const patients = await insightRepo.listPatientsWithStats(days)
-  const rows = await insightRepo.listRiskEventsWindow(days)
+  const scope = await resolveDoctorPatientScope(doctorId)
+  const patients = await insightRepo.listPatientsWithStats(days, scope)
+  const rows = await insightRepo.listRiskEventsWindow(days, scope)
 
   return {
     generatedAt: new Date().toISOString(),
@@ -122,9 +149,14 @@ async function resolveRiskEventsSummary(userId: string): Promise<RiskEventsSumma
  * @param patientId 患者 id（users.id）
  * @param question  医生追问（可空；非空时 LLM 聚焦回答该问题，仍只基于工具输出事实）
  */
-export async function generateSummary(patientId: string, question?: string): Promise<InsightSummaryResponse> {
-  // 1. 查患者信息
-  const patients = await insightRepo.listPatientsWithStats()
+export async function generateSummary(
+  doctorId: string,
+  patientId: string,
+  question?: string,
+): Promise<InsightSummaryResponse> {
+  // 1. 作用域校验 + 查患者信息（未授权与不存在同为 404，不泄漏存在性）
+  const scope = await assertPatientVisible(doctorId, patientId)
+  const patients = await insightRepo.listPatientsWithStats(30, scope)
   const patient = patients.find((p) => p.id === patientId)
   if (!patient) {
     throw new ApiError(404, ERR_CODES.NOT_FOUND, '未找到该患者，请确认 patientId')
@@ -156,10 +188,11 @@ export async function generateSummary(patientId: string, question?: string): Pro
  * 数字全部来自工具计算结果（listPatientsWithStats / listRiskEventsWindow），
  * 咨询文本模型仅在链路末端做叙述，过 guardSummary 二次守门；无 key / LLM 失败走规则降级。
  */
-export async function generateQueueSummary(question?: string) {
+export async function generateQueueSummary(doctorId: string, question?: string) {
   const days = 30
-  const patients = await insightRepo.listPatientsWithStats(days)
-  const windowRows = await insightRepo.listRiskEventsWindow(days)
+  const scope = await resolveDoctorPatientScope(doctorId)
+  const patients = await insightRepo.listPatientsWithStats(days, scope)
+  const windowRows = await insightRepo.listRiskEventsWindow(days, scope)
 
   const grades = countGrades(patients)
   const riskEvents = {
@@ -201,18 +234,12 @@ async function resolveActiveMasterIds(userId: string): Promise<string[]> {
 }
 
 /**
- * 患者下钻打卡时序（T7 图表卡片 · 0 次 LLM 直查库）。
- * 按日序列（taken/skipped/later/expected）+ 按药品聚合 + 窗口合计；口径与队列视图同源
- * （getAdherenceStats / shared isPlanActiveOn），供前端 G2 模板按结果契约渲染。
+ * 打卡时序聚合（内部实现）：patientId 的调用方负责可见性/归属校验。
  */
-export async function getPatientAdherenceSeries(
+async function buildAdherenceSeries(
   patientId: string,
-  days = 30,
+  days: number,
 ): Promise<InsightAdherenceSeriesResponse> {
-  const patient = await insightRepo.findPatient(patientId)
-  if (!patient) {
-    throw new ApiError(404, ERR_CODES.NOT_FOUND, '未找到该患者，请确认 patientId')
-  }
   const [seriesData, stats] = await Promise.all([
     insightRepo.getAdherenceSeries(patientId, days),
     insightRepo.getAdherenceStats(patientId, days),
@@ -233,6 +260,30 @@ export async function getPatientAdherenceSeries(
   }
 }
 
+/**
+ * 患者自查打卡时序（GET /api/records/adherence-series）：patientId 由会话派生，不做医生作用域校验。
+ * 与医生端 /api/insight/patients/:id/adherence-series 共用同一响应契约与聚合口径。
+ */
+export async function getSelfAdherenceSeries(
+  patientId: string,
+  days = 30,
+): Promise<InsightAdherenceSeriesResponse> {
+  return buildAdherenceSeries(patientId, days)
+}
+
+/**
+ * 医生端患者下钻打卡时序（GET /api/insight/patients/:id/adherence-series · T7 图表卡片 · 0 次 LLM）。
+ * specs/25：先校验该患者是否在当前医生的授权作用域内（未授权 404）。
+ */
+export async function getPatientAdherenceSeries(
+  doctorId: string,
+  patientId: string,
+  days = 30,
+): Promise<InsightAdherenceSeriesResponse> {
+  await assertPatientVisible(doctorId, patientId)
+  return buildAdherenceSeries(patientId, days)
+}
+
 /** 队列/患者数据路径 citation（与 insight 摘要 run 的字符串口径一致；consult 的 Citation 三件套不进医生端 ask）。 */
 const QUEUE_CITATION = '本地队列数据（演示数据，未经医学审核）'
 const PATIENT_CITATION = '本地患者数据（演示数据，未经医学审核）'
@@ -246,9 +297,15 @@ const PATIENT_CITATION = '本地患者数据（演示数据，未经医学审核
  *   3. 漏判长尾 → 复用既有摘要编排（咨询模型末端叙述 + guardSummary + 规则降级）；
  *   4. 每问一行 insight_ask_logs 留痕——intent=null 即漏判，作为扩工具依据（绝不放开 SQL）。
  */
-export async function insightAsk(question: string, patientId: string | null): Promise<InsightAskResponse> {
+export async function insightAsk(
+  doctorId: string,
+  question: string,
+  patientId: string | null,
+): Promise<InsightAskResponse> {
   const questionRedacted = scrubWithPatterns(question, PII_ASSERT_PATTERNS)
   const days = 30
+  // specs/25：作用域从医生绑定关系派生（demo 模式 = undefined 全量）；患者维度先校验可见性。
+  const scope = await resolveDoctorPatientScope(doctorId)
 
   let mode: 'data' | 'llm' | undefined
   let intent: string | null = null
@@ -258,12 +315,9 @@ export async function insightAsk(question: string, patientId: string | null): Pr
   let citations: string[] = []
   let notice: string | null = null
 
-  // 患者存在性前置（患者维度 404，与 summary 同口径）
+  // 患者可见性前置（未授权与不存在同为 404，与 summary 同口径；specs/25）
   if (patientId) {
-    const patient = await insightRepo.findPatient(patientId)
-    if (!patient) {
-      throw new ApiError(404, ERR_CODES.NOT_FOUND, '未找到该患者，请确认 patientId')
-    }
+    await assertPatientVisible(doctorId, patientId, scope)
   }
 
   // ── 患者维度：复用 consult 意图路由（解释类词仲裁内建；manual-gate 语义由 dataquery 边界保证）──
@@ -311,17 +365,17 @@ export async function insightAsk(question: string, patientId: string | null): Pr
       if (qi === 'adherence-distribution') {
         toolUsed = 'adherence_distribution'
         sections = renderAdherenceDistributionSections(
-          (await runQueueTool('adherence_distribution', { days })) as AdherenceDistributionResult,
+          (await runQueueTool('adherence_distribution', { days }, scope)) as AdherenceDistributionResult,
         )
       } else if (qi === 'poor-cohort') {
         toolUsed = 'patient_cohort'
         sections = renderPatientCohortSections(
-          (await runQueueTool('patient_cohort', { grade: 'poor', days })) as PatientCohortResult,
+          (await runQueueTool('patient_cohort', { grade: 'poor', days }, scope)) as PatientCohortResult,
         )
       } else {
         toolUsed = 'risk_event_rollup'
         sections = renderRiskEventRollupSections(
-          (await runQueueTool('risk_event_rollup', { days })) as RiskEventRollupResult,
+          (await runQueueTool('risk_event_rollup', { days }, scope)) as RiskEventRollupResult,
         )
       }
     }
@@ -331,13 +385,13 @@ export async function insightAsk(question: string, patientId: string | null): Pr
   if (mode === undefined) {
     mode = 'llm'
     if (patientId) {
-      const result = await generateSummary(patientId, questionRedacted)
+      const result = await generateSummary(doctorId, patientId, questionRedacted)
       sections = result.sections
       riskLevel = result.riskLevel
       citations = result.citations
       notice = result.notice ?? null
     } else {
-      const result = await generateQueueSummary(questionRedacted)
+      const result = await generateQueueSummary(doctorId, questionRedacted)
       sections = result.sections
       riskLevel = result.riskLevel
       citations = result.citations
