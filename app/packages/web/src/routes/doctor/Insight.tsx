@@ -199,8 +199,8 @@ function QueueView({
           {/* 依从性分布直方图（固定模板 · spec §T7.5） */}
           <AdherenceHistogram queue={queue} />
 
-          {/* 队列表格（患者下钻为显式动作） */}
-          <SectionHeading title="按患者下钻" />
+          {/* 患者列表（点一行查看该患者摘要；原「按患者下钻」为看板术语，改为白话） */}
+          <SectionHeading title="患者列表" />
           <CohortTable queue={queue} onPick={onPick} />
 
           {/* 风险事件时间线（固定模板） */}
