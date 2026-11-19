@@ -8,7 +8,18 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/drizzle/**', '**/coverage/**'],
+    // 本地产物 / 生成物目录（根 .gitignore 已排除，CI checkout 中不存在）：
+    // 一并 ignore，保证本地 `pnpm lint` 与 CI 口径一致（否则本机备份脚本、Playwright 产物会报 no-undef）。
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/drizzle/**',
+      '**/coverage/**',
+      '**/backups/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
+      '**/.expo/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
