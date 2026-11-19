@@ -51,6 +51,7 @@ import {
   isExternalKnowledgeEnabled,
   shouldAnswerExternalKnowledge,
 } from './consult/external.js'
+import { shouldAnswerExternalByModel } from './consult/intent-external.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
 import { validateCitationCoverage } from './consult/coverage.js'
@@ -331,11 +332,16 @@ export async function consult(
     } else {
       gateSteps.push({ layer: 'object', outcome: 'missing' })
       // M14 演示版：本地库未收录的「物质 × 药物同服」问题 → 外部知识兜底（百川医疗优先）。
-      // 只在此分支触发（S1 + 无绑定药 + 无澄清对象），失败回退固定通用提示，不静默。
-      if (isExternalKnowledgeEnabled() && shouldAnswerExternalKnowledge(questionRedacted)) {
-        const external = await answerExternalKnowledge(ai, questionRedacted)
-        result = external.result
-        gateSteps.push({ layer: 'external', outcome: external.source })
+      // 触发：规则命中优先；规则漏判（如「酒和头孢能吃吗」）时由 DeepSeek 意图兜底补一刀，
+      // 模型失败/超时回落规则结果。只在此分支触发（S1 + 无绑定药 + 无澄清对象）。
+      if (isExternalKnowledgeEnabled()) {
+        const ruleTriggered = shouldAnswerExternalKnowledge(questionRedacted)
+        const modelTriggered = ruleTriggered ? false : await shouldAnswerExternalByModel(questionRedacted)
+        if (ruleTriggered || modelTriggered) {
+          const external = await answerExternalKnowledge(ai, questionRedacted)
+          result = external.result
+          gateSteps.push({ layer: 'external', outcome: `${external.source}:${ruleTriggered ? 'rule' : 'model'}` })
+        }
       }
     }
   }

@@ -193,4 +193,13 @@ export interface AiClients {
    * 可选方法：未配置时上层回退固定通用提示，不静默。
    */
   externalKnowledge?(question: string): Promise<ConsultExternalKnowledgeOutput>
+  /**
+   * 外部知识候选链（M14 演示版）：主 → 备顺序（百川医疗 → 千问 → deepseek）。
+   * 服务层逐个尝试；某候选**调用失败或输出过不了安全清洗**时自动换下一个，全失败回退固定提示。
+   * 可选方法：未实现时回退单方法 externalKnowledge（测试/旧 mock 兼容）。
+   */
+  externalKnowledgeFallbacks?(): Array<{
+    label: string
+    call: (question: string) => Promise<ConsultExternalKnowledgeOutput>
+  }>
 }

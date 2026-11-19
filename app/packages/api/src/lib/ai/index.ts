@@ -47,7 +47,29 @@ export function createAiClients(): AiClients {
     insightSummary: rest.insightSummary,
     queueSummary: rest.queueSummary,
     externalKnowledge: externalKnowledgeClient,
+    externalKnowledgeFallbacks,
   }
+}
+
+/**
+ * 外部知识候选链（M14 演示版）：百川医疗 → 千问 → deepseek，按配置存在的模型入链。
+ * 服务层逐个尝试，调用失败或输出安全清洗不过都换下一个——比单方法回落更稳（输出不合格也能降级）。
+ */
+function externalKnowledgeFallbacks(): Array<{
+  label: string
+  call: (question: string) => Promise<ConsultExternalKnowledgeOutput>
+}> {
+  const chain: Array<{ label: string; call: (question: string) => Promise<ConsultExternalKnowledgeOutput> }> = []
+  if (process.env.BAICHUAN_API_KEY && process.env.BAICHUAN_BASE_URL) {
+    chain.push({ label: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus', call: baichuan.externalKnowledge })
+  }
+  if (process.env.QWEN_API_KEY) {
+    chain.push({ label: process.env.CONSULT_MODEL || 'qwen3.8-flash', call: qwenText.externalKnowledge })
+  }
+  if (process.env.DEEPSEEK_API_KEY) {
+    chain.push({ label: process.env.DEEPSEEK_MODEL || 'deepseek-flash', call: deepseek.externalKnowledge })
+  }
+  return chain
 }
 
 /**

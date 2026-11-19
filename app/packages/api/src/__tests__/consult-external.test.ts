@@ -121,6 +121,40 @@ describe('sanitizeExternalSections · 安全清洗', () => {
     expect(sanitizeExternalSections({ ...SAFE_RAW, keyPoints: ['每次 2 片，每日 3 次'] })).toBeNull()
   })
 
+  it('中文数字剂量指令仍拦（每日三次 / 每次一片 / 剂量为 5mg）', () => {
+    expect(sanitizeExternalSections({ ...SAFE_RAW, keyPoints: ['每日三次，每次一片'] })).toBeNull()
+    expect(sanitizeExternalSections({ ...SAFE_RAW, keyPoints: ['剂量为 5mg，疗程两周'] })).toBeNull()
+    expect(sanitizeExternalSections({ ...SAFE_RAW, nextAction: '一天最多两次，分 2 次服用' })).toBeNull()
+  })
+
+  it('风险解释里的「剂量」不算剂量指令（百川误杀回归）', () => {
+    const s = sanitizeExternalSections({
+      ...SAFE_RAW,
+      risks: ['双硫仑样反应的严重程度与药物剂量和饮酒量成正比。'],
+    })
+    expect(s).not.toBeNull()
+    expect(s!.risks.join('')).toContain('剂量')
+
+    const s2 = sanitizeExternalSections({
+      ...SAFE_RAW,
+      risks: ['尤其在大剂量使用他汀时，肌病风险更高。'],
+    })
+    expect(s2).not.toBeNull()
+  })
+
+  it('清除 Markdown 加粗/斜体/代码标记（百川输出带 **加粗**）', () => {
+    const s = sanitizeExternalSections({
+      ...SAFE_RAW,
+      summary: '**不建议**同时服用。',
+      keyPoints: ['`藿香正气水` 含乙醇 __40%__。'],
+    })
+    expect(s).not.toBeNull()
+    expect(s!.summary).not.toContain('**')
+    expect(s!.summary).toContain('不建议同时服用')
+    expect(s!.keyPoints.join('')).not.toContain('`')
+    expect(s!.keyPoints.join('')).not.toContain('_')
+  })
+
   it('出现「可以一起/放心」等绝对安全表述 → 整段弃用', () => {
     expect(sanitizeExternalSections({ ...SAFE_RAW, summary: '可以一起服用，放心。' })).toBeNull()
   })
@@ -160,6 +194,42 @@ describe('answerExternalKnowledge · 模型成败路径（不连外网）', () =
     expect(r.result.notice).toContain('AI 服务暂不可用')
     expect(r.result.notice).toContain('通用用药安全提示')
     expect(r.result.citations[0]?.source).toContain('人工配置')
+  })
+
+  it('候选链：主模型输出过不了清洗 → 自动换下一个，引用标实际模型', async () => {
+    const ai: AiClients = {
+      ...mockClients({}),
+      externalKnowledgeFallbacks: () => [
+        { label: 'baichuan-m3-plus', call: async () => ({ sections: { ...SAFE_RAW, warning: '每天 3 次' }, modelLabel: 'baichuan-m3-plus' }) },
+        { label: 'qwen3.8-flash', call: async () => ({ sections: SAFE_RAW, modelLabel: 'qwen3.8-flash' }) },
+      ],
+    }
+    const r = await answerExternalKnowledge(ai, '酒和藿香正气水能一起吃吗')
+    expect(r.source).toBe('ai')
+    expect(r.result.citations[0]?.version).toContain('qwen3.8-flash')
+  })
+
+  it('候选链：主模型抛错 → 次模型兜住；全部失败 → 固定提示', async () => {
+    const ok: AiClients = {
+      ...mockClients({}),
+      externalKnowledgeFallbacks: () => [
+        { label: 'baichuan-m3-plus', call: async () => { throw new Error('429') } },
+        { label: 'qwen3.8-flash', call: async () => ({ sections: SAFE_RAW, modelLabel: 'qwen3.8-flash' }) },
+      ],
+    }
+    const r = await answerExternalKnowledge(ok, '酒和藿香正气水能一起吃吗')
+    expect(r.source).toBe('ai')
+
+    const allBad: AiClients = {
+      ...mockClients({}),
+      externalKnowledgeFallbacks: () => [
+        { label: 'baichuan-m3-plus', call: async () => { throw new Error('429') } },
+        { label: 'qwen3.8-flash', call: async () => ({ sections: { ...SAFE_RAW, keyPoints: ['每次 2 片'] }, modelLabel: 'qwen3.8-flash' }) },
+      ],
+    }
+    const r2 = await answerExternalKnowledge(allBad, '酒和藿香正气水能一起吃吗')
+    expect(r2.source).toBe('fallback')
+    expect(r2.result.notice).toContain('AI 服务暂不可用')
   })
 })
 

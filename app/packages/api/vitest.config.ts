@@ -9,7 +9,11 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     globalSetup: ['./src/__tests__/global-setup.ts'],
-    env: { DATABASE_URL: TEST_URL },
+    env: {
+      DATABASE_URL: TEST_URL,
+      // 测试默认关闭「意图模型兜底」：避免带物质词的用例触发真实 DeepSeek 调用（本仓库对应测试显式开启）。
+      ENABLE_INTENT_MODEL: 'false',
+    },
     fileParallelism: false, // 共享单一测试库，串行更稳
   },
 })

@@ -54,18 +54,33 @@ export function shouldAnswerExternalKnowledge(question: string): boolean {
 }
 
 /** 模型输出安全红线：剂量/绝对安全/停换药/诊断，命中即整段弃用。 */
-const MODEL_DOSAGE_PATTERN = /每次|每日|一天|疗程|剂量|多少片|毫克|\d+\s*mg|\d+\s*ml|毫升/i
+/**
+ * 剂量红线：只拒绝「剂量指令」（数字与用量单位/频次同现），不误杀风险解释里的
+ * 「与剂量成正比」「大剂量使用他汀」——M14 验收实测：百川 8 题中 3 题因此被整段误杀。
+ * 覆盖：每次/每日/每天/一天 + 数字；剂量/疗程 + 数字；数字 + 片/粒/支/滴/mg/ml/克；分 X 次。
+ */
+const CN_NUM = '0-9一二三四五六七八九十两半'
+const MODEL_DOSAGE_PATTERN = new RegExp(
+  `(?:每次|每日|每天|一天)\\s*(?:最多|不超过|可服|服|用)?\\s*[${CN_NUM}]|` +
+    `(?:剂量|疗程)\\s*(?:为|是|约|[:：])?\\s*[${CN_NUM}]|` +
+    `[${CN_NUM}]\\s*(?:mg|毫克|ml|毫升|g|克|片|粒|支|滴)|` +
+    `分\\s*[${CN_NUM}]\\s*次|多少片`,
+  'i',
+)
 const MODEL_AFFIRM_PATTERN = /可以一起|可以同服|可以同时|放心吃|放心喝|可以喝酒|没问题|绝对安全|不会有风险|没有影响/
 const MODEL_PROHIBITED_PATTERN = /建议停药|建议换药|开处方|诊断为|你得了|确诊/
 /** 模型输出里漏出的引用编号/参考文献标记（^[1]^、[1] 等），展示前一律清除。 */
 const CITATION_MARKER_PATTERN = /\^?\[\d+\]\^?/g
+/** 模型输出里漏出的 Markdown 强调/代码标记（**加粗**、_斜体_、`代码`），展示前清除。 */
+const MARKDOWN_MARKER_PATTERN = /\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|(?<![*])\*([^*\s][^*]*?)\*(?![*])/g
 /** warning 里模型自带的 AI 声明句（AI 全文免责由 notice 统一展示，避免重复）。 */
 const AI_CLAUSE_PATTERN = /（?AI\s*生成[，,、]?\s*仅供参考[，,、]?\s*请?咨询?医生或药师?）?/g
 
-/** 单字段清洗：去引用标记 + 折叠空白。 */
+/** 单字段清洗：去引用标记 + 去 Markdown + 折叠空白。 */
 function cleanField(value: unknown): string {
   return String(value ?? '')
     .replace(CITATION_MARKER_PATTERN, '')
+    .replace(MARKDOWN_MARKER_PATTERN, (_m, bold, underline, code, italic) => bold ?? underline ?? code ?? italic ?? '')
     .replace(/\s{2,}/g, ' ')
     .trim()
 }
@@ -183,31 +198,39 @@ export function buildExternalResult(
 }
 
 /**
- * 调模型 → 安全清洗 → 失败回退固定提示。绝不静默失败：fallback 也有明确 notice + 引用。
- * 本函数不判断是否该走外部知识（由 shouldAnswerExternalKnowledge 决定）。
+ * 调模型链 → 安全清洗 → 失败回退固定提示。绝不静默失败：fallback 也有明确 notice + 引用。
+ * 本函数不判断是否该走外部知识（由 shouldAnswerExternalKnowledge / 意图模型决定）。
+ *
+ * 模型链：优先 externalKnowledgeFallbacks（主→备）；某候选调用失败或输出过不了安全清洗
+ * 都自动换下一个（百川输出偶尔带剂量/绝对化表述时，由千问/deepseek 兜住）；
+ * 未提供链时回退单方法 externalKnowledge（测试/旧 mock 兼容）。
  */
 export async function answerExternalKnowledge(
   ai: AiClients,
   question: string,
 ): Promise<ExternalAnswer> {
-  if (ai.externalKnowledge) {
+  const candidates =
+    ai.externalKnowledgeFallbacks?.() ??
+    (ai.externalKnowledge ? [{ label: 'external-knowledge', call: ai.externalKnowledge }] : [])
+  for (const candidate of candidates) {
+    // 失败可见：错误只写 stderr（不含问题原文/模型输出），继续下一个模型
     try {
-      const output = await ai.externalKnowledge(question)
+      const output = await candidate.call(question)
       const sections = sanitizeExternalSections(output.sections)
-      if (!sections) console.error('[consult/external] 模型输出未通过安全清洗，回退固定提示')
-      if (sections) {
-        return {
-          result: buildExternalResult(sections, {
-            notice: EXTERNAL_AI_DISCLAIMER,
-            modelLabel: output.modelLabel,
-          }),
-          source: 'ai',
-        }
+      if (!sections) {
+        console.error(`[consult/external] ${candidate.label} 输出未通过安全清洗，尝试下一个模型`)
+        continue
+      }
+      return {
+        result: buildExternalResult(sections, {
+          notice: EXTERNAL_AI_DISCLAIMER,
+          modelLabel: output.modelLabel,
+        }),
+        source: 'ai',
       }
     } catch (e) {
-      // 失败可见：错误只写 stderr（不含问题原文/模型输出），再由下方固定提示兜底
       console.error(
-        '[consult/external] 模型调用失败：',
+        `[consult/external] ${candidate.label} 调用失败，尝试下一个模型：`,
         e instanceof Error ? `${e.name}: ${e.message}` : String(e),
       )
     }
