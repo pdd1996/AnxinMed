@@ -42,17 +42,26 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --froze
 # ── stage 2: build ────────────────────────────────────────────
 FROM node:22-slim AS build
 WORKDIR /app
-# 沿用 deps 阶段的 npmrc：corepack prepare 与 pnpm 的「跑脚本前校验依赖」也要走同一个源，
-# 否则这层又会在 npmjs 上重新超时一遍。
+# 沿用 deps 阶段的 npmrc：corepack 与 pnpm 都走同一个源（并把「跑脚本前自动重装」关掉，见下）。
 COPY --from=deps /root/.npmrc /root/.npmrc
-RUN corepack enable
+# 复用 deps 阶段已下载的 pnpm（corepack 缓存）：这一层不再联网取 pnpm。
+# 2026-11-20 失败构建里 corepack prepare 单独吃了约 3 分钟（镜像源 30KB/s）。
+COPY --from=deps /root/.cache/node/corepack /root/.cache/node/corepack
+RUN echo 'verify-deps-before-run=false' >> /root/.npmrc \
+  && corepack enable
 COPY --from=deps /app ./
 COPY . .
 # 只构建镜像真正伺服的两个包：web → packages/web/dist（vite）；api → packages/api/dist（esbuild）。
 # 不用 `pnpm -r build`：@anxin/core 无 build 脚本（exports 直指 src/*.ts，由 vite/esbuild 消费），
 # mobile/mcp 与镜像无关，构建它们只是白等。
+#
+# --config.verify-deps-before-run=false（2026-11-20 构建失败根因）
+#   pnpm 11 在执行脚本前会「校验依赖，过期就自动重装」。`COPY . .` 让 pnpm-lock.yaml 的 mtime 变新，
+#   这层于是判定依赖过期，在**没有 store 缓存**的这里重装一遍，且不带 --trust-lockfile：大陆 ECS 上等于
+#   1371 条 packument 请求 + 30KB/s 的 tarball，8 分 21 秒后以 ERR_PNPM_BROKEN_METADATA_JSON 超时退出。
+#   deps 阶段已用 --frozen-lockfile --trust-lockfile 装全并逐包校验 integrity，这里不需要再装。
 RUN corepack prepare pnpm@11.23.0 --activate \
-  && pnpm --filter @anxin/api --filter @anxin/web build
+  && pnpm --config.verify-deps-before-run=false --filter @anxin/api --filter @anxin/web build
 
 # ── stage 3: runtime ──────────────────────────────────────────
 FROM node:22-slim AS runtime
