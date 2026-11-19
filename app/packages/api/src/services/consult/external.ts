@@ -71,12 +71,17 @@ export function sanitizeExternalSections(raw: ConsultRawSections | null): Normal
   if (MODEL_DOSAGE_PATTERN.test(all)) return null
   if (MODEL_AFFIRM_PATTERN.test(all)) return null
   if (MODEL_PROHIBITED_PATTERN.test(all)) return null
+  // 模型常自带给「AI 生成」声明；已有时不再追加，避免「…（AI 生成，仅供参考）」重复
+  const baseWarning = warning || '不要自行调整用药，具体请咨询医生或药师。'
+  const warningWithDisclaimer = baseWarning.includes('AI 生成')
+    ? baseWarning
+    : `${baseWarning}（AI 生成，仅供参考）`
   return {
     summary,
     keyPoints: keys,
     risks,
     nextAction: nextAction || '具体请咨询医生或药师；如有不适，请及时就医。',
-    warning: `${warning || '不要自行调整用药，具体请咨询医生或药师。'}（AI 生成，仅供参考）`,
+    warning: warningWithDisclaimer,
     limited: false,
   }
 }

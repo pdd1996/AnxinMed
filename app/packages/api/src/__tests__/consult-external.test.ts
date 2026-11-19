@@ -86,6 +86,13 @@ describe('sanitizeExternalSections · 安全清洗', () => {
     expect(s!.warning).toContain('AI 生成')
   })
 
+  it('warning 已含 AI 声明时不重复追加（M14 验收发现 2）', () => {
+    const s = sanitizeExternalSections({ ...SAFE_RAW, warning: 'AI 生成，仅供参考，请咨询医生或药师。' })
+    expect(s).not.toBeNull()
+    expect((s!.warning.match(/AI 生成/g) ?? []).length).toBe(1)
+    expect((s!.warning.match(/（AI 生成，仅供参考）/g) ?? []).length).toBe(0)
+  })
+
   it('出现剂量 → 整段弃用', () => {
     expect(sanitizeExternalSections({ ...SAFE_RAW, keyPoints: ['每次 2 片，每日 3 次'] })).toBeNull()
   })
