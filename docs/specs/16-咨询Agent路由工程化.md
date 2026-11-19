@@ -135,3 +135,11 @@ pnpm --filter @anxin/api test        # 需本机 PostgreSQL（globalSetup 建测
 3. 提交顺序 T3 → T2 → T1（依赖倒置）：T1 评测模块依赖 T2 的 `resolveSkillRoute`、T2 依赖 T3 的 `analyzeConsultIntent`；保证每个 commit 独立可绿。
 4. 新增 status（clarify/out-of-scope）未实施，仍待 docs/14 §9 A1/A2 裁决。
 
+
+## 落地补丁（2026-11-19，演示发现）
+
+**问题**：线上 Web 输入「我心痛」落入 S1 无绑定药 → `no-source`，未触发急救守门。根因不是意图路由，而是 S0 的 `EMERGENCY_PATTERN` 只覆盖「胸痛」，缺患者口语「心痛/心口疼/胸闷」等变体。
+
+**修复**：`patterns.ts` 的 L4 词表补 `心痛|心口痛|心口疼|心脏疼|心脏痛|胸口疼|胸口痛|心绞痛|胸闷`；`consult-guards.test.ts` 增加对应单测。修复后「我心痛」→ `status=emergency`、`riskLevel=L4`、急救固定文案（含拨打 120 按钮）并写 risk_events；全量 74 文件 / 939 用例绿。
+
+**结论/纪律**：S0 急救守门先于一切意图路由；口语变体必须靠演练/评测持续补词——这是“规则优先、安全兜底”架构的例行迭代，不是路由缺陷。
