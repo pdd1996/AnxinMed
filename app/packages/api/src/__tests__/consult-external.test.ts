@@ -90,18 +90,31 @@ describe('A12 对打 · deepseek 外部知识请求', () => {
 })
 
 describe('sanitizeExternalSections · 安全清洗', () => {
-  it('合规输出保留，warning 追加 AI 免责', () => {
+  it('合规输出保留；warning 只留安全提示（AI 声明由 notice 统一展示）', () => {
     const s = sanitizeExternalSections(SAFE_RAW)
     expect(s).not.toBeNull()
     expect(s!.summary).toContain('不建议一起服用')
-    expect(s!.warning).toContain('AI 生成')
+    expect(s!.warning).toContain('不要自行调整用药')
+    expect(s!.warning).not.toContain('AI 生成')
   })
 
-  it('warning 已含 AI 声明时不重复追加（M14 验收发现 2）', () => {
+  it('清除模型漏出的引用标记 ^[1]^ / [1]（验收发现：展示成裸文本）', () => {
+    const s = sanitizeExternalSections({
+      ...SAFE_RAW,
+      summary: '不建议一起服用 ^[1]^。',
+      keyPoints: ['藿香正气水含乙醇（40%～50%）[1]'],
+    })
+    expect(s).not.toBeNull()
+    expect(s!.summary).not.toContain('^[1]^')
+    expect(s!.summary).not.toContain('[1]')
+    expect(s!.keyPoints.join('')).not.toContain('[1]')
+  })
+
+  it('warning 只有 AI 声明时回退默认安全提示（不出现重复免责）', () => {
     const s = sanitizeExternalSections({ ...SAFE_RAW, warning: 'AI 生成，仅供参考，请咨询医生或药师。' })
     expect(s).not.toBeNull()
-    expect((s!.warning.match(/AI 生成/g) ?? []).length).toBe(1)
-    expect((s!.warning.match(/（AI 生成，仅供参考）/g) ?? []).length).toBe(0)
+    expect(s!.warning).toContain('不要自行调整用药')
+    expect(s!.warning).not.toContain('AI 生成')
   })
 
   it('出现剂量 → 整段弃用', () => {

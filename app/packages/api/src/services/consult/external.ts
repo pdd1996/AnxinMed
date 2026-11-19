@@ -57,31 +57,43 @@ export function shouldAnswerExternalKnowledge(question: string): boolean {
 const MODEL_DOSAGE_PATTERN = /每次|每日|一天|疗程|剂量|多少片|毫克|\d+\s*mg|\d+\s*ml|毫升/i
 const MODEL_AFFIRM_PATTERN = /可以一起|可以同服|可以同时|放心吃|放心喝|可以喝酒|没问题|绝对安全|不会有风险|没有影响/
 const MODEL_PROHIBITED_PATTERN = /建议停药|建议换药|开处方|诊断为|你得了|确诊/
+/** 模型输出里漏出的引用编号/参考文献标记（^[1]^、[1] 等），展示前一律清除。 */
+const CITATION_MARKER_PATTERN = /\^?\[\d+\]\^?/g
+/** warning 里模型自带的 AI 声明句（AI 全文免责由 notice 统一展示，避免重复）。 */
+const AI_CLAUSE_PATTERN = /（?AI\s*生成[，,、]?\s*仅供参考[，,、]?\s*请?咨询?医生或药师?）?/g
+
+/** 单字段清洗：去引用标记 + 折叠空白。 */
+function cleanField(value: unknown): string {
+  return String(value ?? '')
+    .replace(CITATION_MARKER_PATTERN, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
 
 /** 原始模型分区 → 安全分区（不过红线才返回；否则 null，由上层回退固定提示）。 */
 export function sanitizeExternalSections(raw: ConsultRawSections | null): NormalizedSections | null {
   if (!raw) return null
-  const summary = String(raw.summary ?? '').trim()
+  const summary = cleanField(raw.summary)
   if (summary.length < 6 || summary.length > 160) return null
-  const keys = (raw.keyPoints ?? []).map((s) => String(s).trim()).filter(Boolean).slice(0, 3)
-  const risks = (raw.risks ?? []).map((s) => String(s).trim()).filter(Boolean).slice(0, 3)
-  const nextAction = String(raw.nextAction ?? '').trim()
-  const warning = String(raw.warning ?? '').trim()
+  const keys = (raw.keyPoints ?? []).map(cleanField).filter(Boolean).slice(0, 3)
+  const risks = (raw.risks ?? []).map(cleanField).filter(Boolean).slice(0, 3)
+  const nextAction = cleanField(raw.nextAction)
+  const warning = cleanField(raw.warning)
   const all = [summary, ...keys, ...risks, nextAction, warning].join('')
   if (MODEL_DOSAGE_PATTERN.test(all)) return null
   if (MODEL_AFFIRM_PATTERN.test(all)) return null
   if (MODEL_PROHIBITED_PATTERN.test(all)) return null
-  // 模型常自带给「AI 生成」声明；已有时不再追加，避免「…（AI 生成，仅供参考）」重复
-  const baseWarning = warning || '不要自行调整用药，具体请咨询医生或药师。'
-  const warningWithDisclaimer = baseWarning.includes('AI 生成')
-    ? baseWarning
-    : `${baseWarning}（AI 生成，仅供参考）`
+  // warning 只保留安全提示：模型自带的 AI 声明句剥离，AI 全文免责由 notice 统一展示（避免两处重复）。
+  const warningText = warning
+    .replace(AI_CLAUSE_PATTERN, '')
+    .replace(/^[。！？，,；;：:\s]+|[。！？，,；;：:\s]+$/g, '')
+    .trim()
   return {
     summary,
     keyPoints: keys,
     risks,
     nextAction: nextAction || '具体请咨询医生或药师；如有不适，请及时就医。',
-    warning: warningWithDisclaimer,
+    warning: warningText || '不要自行调整用药，具体请咨询医生或药师。',
     limited: false,
   }
 }
