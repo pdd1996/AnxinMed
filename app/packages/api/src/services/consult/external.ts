@@ -172,20 +172,27 @@ export function buildExternalResult(
 export async function answerExternalKnowledge(
   ai: AiClients,
   question: string,
-  modelLabel: string,
 ): Promise<ExternalAnswer> {
   if (ai.externalKnowledge) {
     try {
-      const raw = await ai.externalKnowledge(question)
-      const sections = sanitizeExternalSections(raw)
+      const output = await ai.externalKnowledge(question)
+      const sections = sanitizeExternalSections(output.sections)
+      if (!sections) console.error('[consult/external] 模型输出未通过安全清洗，回退固定提示')
       if (sections) {
         return {
-          result: buildExternalResult(sections, { notice: EXTERNAL_AI_DISCLAIMER, modelLabel }),
+          result: buildExternalResult(sections, {
+            notice: EXTERNAL_AI_DISCLAIMER,
+            modelLabel: output.modelLabel,
+          }),
           source: 'ai',
         }
       }
-    } catch {
-      // 失败可见：走下方固定提示（notice 说明 AI 不可用），不把错误吞成无源
+    } catch (e) {
+      // 失败可见：错误只写 stderr（不含问题原文/模型输出），再由下方固定提示兜底
+      console.error(
+        '[consult/external] 模型调用失败：',
+        e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+      )
     }
   }
   return {

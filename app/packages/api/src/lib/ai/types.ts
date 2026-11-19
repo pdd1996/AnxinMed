@@ -156,6 +156,12 @@ export interface QueuePromptPayload {
  * 统一 AI 客户端接口。管线只依赖此接口，不直接 import 具体实现。
  * 每个方法失败时抛 AIUnavailableError（或经 zod safeParse 失败抛明确错误），由编排层转降级。
  */
+/** 外部知识模型输出（带实际模型标签：百川不可用回落千问时引用如实标实际模型）。 */
+export interface ConsultExternalKnowledgeOutput {
+  sections: ConsultRawSections
+  modelLabel: string
+}
+
 export interface AiClients {
   /** 层检测：返回检测到的层标签数组（多选）。 */
   detectLayers(image: ImageInput): Promise<LayerLabel[]>
@@ -186,5 +192,5 @@ export interface AiClients {
    * 仅由 consult.service 在 S1 无源分支调用；输出必过安全清洗（禁剂量/禁绝对安全）。
    * 可选方法：未配置时上层回退固定通用提示，不静默。
    */
-  externalKnowledge?(question: string): Promise<ConsultRawSections>
+  externalKnowledge?(question: string): Promise<ConsultExternalKnowledgeOutput>
 }

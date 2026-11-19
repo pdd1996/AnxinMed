@@ -110,8 +110,8 @@ describe('buildFallbackSections · 固定通用提示', () => {
 
 describe('answerExternalKnowledge · 模型成败路径（不连外网）', () => {
   it('模型返回合规内容 → source=ai，notice=AI 免责', async () => {
-    const ai: AiClients = { ...mockClients({}), externalKnowledge: async () => SAFE_RAW }
-    const r = await answerExternalKnowledge(ai, '酒和藿香正气水能一起吃吗', 'baichuan-m3-plus')
+    const ai: AiClients = { ...mockClients({}), externalKnowledge: async () => ({ sections: SAFE_RAW, modelLabel: 'qwen3.8-flash' }) }
+    const r = await answerExternalKnowledge(ai, '酒和藿香正气水能一起吃吗')
     expect(r.source).toBe('ai')
     expect(r.result.notice).toBe(EXTERNAL_AI_DISCLAIMER)
     expect(r.result.citations[0]?.unverified).toBe(true)
@@ -124,7 +124,7 @@ describe('answerExternalKnowledge · 模型成败路径（不连外网）', () =
         throw new Error('AI down')
       },
     }
-    const r = await answerExternalKnowledge(ai, '酒和藿香正气水能一起吃吗', 'baichuan-m3-plus')
+    const r = await answerExternalKnowledge(ai, '酒和藿香正气水能一起吃吗')
     expect(r.source).toBe('fallback')
     expect(r.result.notice).toContain('AI 服务暂不可用')
     expect(r.result.notice).toContain('通用用药安全提示')
@@ -140,7 +140,7 @@ describe('API 集成 · 外部知识兜底', () => {
       ...mockClients({ calls }),
       externalKnowledge: async () => {
         externalCalls += 1
-        return SAFE_RAW
+        return { sections: SAFE_RAW, modelLabel: 'qwen3.8-flash' }
       },
     }
     setAiClients(ai)
@@ -169,7 +169,10 @@ describe('API 集成 · 外部知识兜底', () => {
     const calls = newCalls()
     const ai: AiClients = {
       ...mockClients({ calls }),
-      externalKnowledge: async () => ({ ...SAFE_RAW, summary: '每次 1 支，每日 2 次即可。' }),
+      externalKnowledge: async () => ({
+          sections: { ...SAFE_RAW, summary: '每次 1 支，每日 2 次即可。' },
+          modelLabel: 'qwen3.8-flash',
+        }),
     }
     setAiClients(ai)
 
@@ -192,7 +195,7 @@ describe('API 集成 · 外部知识兜底', () => {
       ...mockClients({ calls }),
       externalKnowledge: async () => {
         externalCalls += 1
-        return SAFE_RAW
+        return { sections: SAFE_RAW, modelLabel: 'qwen3.8-flash' }
       },
     })
 

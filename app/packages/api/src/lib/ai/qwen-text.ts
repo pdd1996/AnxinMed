@@ -10,6 +10,7 @@
  */
 import {
   AIUnavailableError,
+  type ConsultExternalKnowledgeOutput,
   type ConsultPromptPayload,
   type ConsultRawSections,
   type FallbackFields,
@@ -99,7 +100,7 @@ export async function queueSummary(payload: QueuePromptPayload): Promise<Consult
 }
 
 /** 外部知识兜底（演示版）：百川不可用时的文本模型回落；同 prompt 同 schema、非思考、温度 0。 */
-export async function externalKnowledge(question: string): Promise<ConsultRawSections> {
+export async function externalKnowledge(question: string): Promise<ConsultExternalKnowledgeOutput> {
   const raw = await chatJson(
     textRequest({ messages: [{ role: 'user' as const, content: buildExternalKnowledgePrompt(question) }] }),
   )
@@ -107,5 +108,5 @@ export async function externalKnowledge(question: string): Promise<ConsultRawSec
   if (!parsed.success) {
     throw new AIUnavailableError('qwen-text', `外部知识输出不符合约定：${parsed.error.message}`)
   }
-  return parsed.data
+  return { sections: parsed.data, modelLabel: process.env.CONSULT_MODEL || 'qwen3.8-flash' }
 }

@@ -8,7 +8,7 @@
  *   baichuan     → baichuan.ts 全量文本方法（回滚通道：CONSULT_PROVIDER=baichuan 一键回退）
  * 视觉链（detectLayers/extractIdentity/runOcr）恒走 qwen/ocr，不随 provider 切换。
  */
-import type { AiClients, ConsultRawSections } from './types.js'
+import { AIUnavailableError, type AiClients, type ConsultExternalKnowledgeOutput, type ConsultRawSections } from './types.js'
 import * as qwen from './qwen.js'
 import * as ocr from './ocr.js'
 import * as baichuan from './baichuan.js'
@@ -51,22 +51,22 @@ export function createAiClients(): AiClients {
 }
 
 /**
- * 外部知识兜底模型选择（M14 演示版）：百川医疗模型优先，未配置时回落千问文本；
- * 均未配置则由调用方抛 AIUnavailableError → 上层固定通用提示（不静默）。
+ * 外部知识兜底模型选择（M14 演示版）：百川医疗模型优先；百川不可用（含 429 限流）自动回落千问文本，
+ * 引用 version 由实际调用的模型返回（不冒充）；两者都不可用才抛错 → 上层固定通用提示。
  */
-function externalKnowledgeClient(question: string): Promise<ConsultRawSections> {
-  if (process.env.BAICHUAN_API_KEY && process.env.BAICHUAN_BASE_URL) {
-    return baichuan.externalKnowledge(question)
+async function externalKnowledgeClient(question: string): Promise<ConsultExternalKnowledgeOutput> {
+  const baichuanReady = Boolean(process.env.BAICHUAN_API_KEY && process.env.BAICHUAN_BASE_URL)
+  const qwenReady = Boolean(process.env.QWEN_API_KEY)
+  if (baichuanReady) {
+    try {
+      return await baichuan.externalKnowledge(question)
+    } catch (e) {
+      console.error('[ai] 百川外部知识调用失败，尝试千问回落：', e instanceof Error ? e.message : String(e))
+      if (!qwenReady) throw e
+    }
   }
-  return qwenText.externalKnowledge(question)
-}
-
-/** 外部知识实际模型标签（引用 version 字段用，与 externalKnowledgeClient 选择逻辑同源）。 */
-export function externalKnowledgeModelLabel(): string {
-  if (process.env.BAICHUAN_API_KEY && process.env.BAICHUAN_BASE_URL) {
-    return process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus'
-  }
-  return process.env.CONSULT_MODEL || 'qwen3.8-flash'
+  if (qwenReady) return qwenText.externalKnowledge(question)
+  throw new AIUnavailableError('baichuan', '外部知识模型未配置（百川/千问均不可用）')
 }
 
 export * from './types.js'

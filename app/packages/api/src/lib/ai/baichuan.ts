@@ -4,6 +4,7 @@
  */
 import {
   AIUnavailableError,
+  type ConsultExternalKnowledgeOutput,
   type ConsultPromptPayload,
   type ConsultRawSections,
   type FallbackFields,
@@ -135,7 +136,7 @@ export function buildExternalKnowledgeRequest(question: string) {
 }
 
 /** 外部知识兜底：百川医疗模型回答结构化分区；非法输出抛 AIUnavailableError（上层回退固定提示）。 */
-export async function externalKnowledge(question: string): Promise<ConsultRawSections> {
+export async function externalKnowledge(question: string): Promise<ConsultExternalKnowledgeOutput> {
   const baseUrl = process.env.BAICHUAN_BASE_URL
   const key = process.env.BAICHUAN_API_KEY
   if (!baseUrl || !key) {
@@ -155,7 +156,7 @@ export async function externalKnowledge(question: string): Promise<ConsultRawSec
   if (!parsed.success) {
     throw new AIUnavailableError('baichuan', `外部知识输出不符合约定：${parsed.error.message}`)
   }
-  return parsed.data
+  return { sections: parsed.data, modelLabel: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus' }
 }
 
 /** 咨询回答：本地说明书 + 相互作用上下文 → 结构化分区。输出过 ConsultRawSectionsSchema safeParse。 */
