@@ -8,6 +8,7 @@ import {
   fetchDrugs,
   fetchTodayTasks,
   groupTasksByPlan,
+  planMetaSegments,
   unwrap,
   useReminderQueue,
   type PlanGroup,
@@ -180,9 +181,13 @@ export default function Home() {
                         {cycleLabel(group)}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {group.specification ?? ''} · 每次 {group.dose.value} {group.dose.unit} · 每日 {group.frequency} 次
-                      {group.route ? ` · ${group.route}` : ''}
+                    {/* 用法逐段渲染：大字档下折行不拆「每日 1 次」（与提醒弹窗同口径） */}
+                    <p className="flex flex-wrap text-sm text-muted-foreground">
+                      {planMetaSegments(group).map((segment, index, all) => (
+                        <span key={segment} className="mr-1.5 whitespace-nowrap">
+                          {index < all.length - 1 ? `${segment} ·` : segment}
+                        </span>
+                      ))}
                     </p>
                   </div>
                 </div>

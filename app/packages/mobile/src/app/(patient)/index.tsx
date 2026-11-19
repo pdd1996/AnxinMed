@@ -9,6 +9,7 @@ import {
   fetchDrugs,
   fetchTodayTasks,
   groupTasksByPlan,
+  planMetaSegments,
   unwrap,
   useReminderQueue,
   type PlanGroup,
@@ -306,11 +307,17 @@ export default function Today() {
                           </Text>
                         </View>
                       </View>
-                      <Text className="mt-1 text-sm text-muted-foreground">
-                        {group.specification ?? ""} · 每次 {group.dose.value} {group.dose.unit} ·
-                        每日 {group.frequency} 次
-                        {group.route ? ` · ${group.route}` : ""}
-                      </Text>
+                      {/* 用法逐段渲染：大字档下折行不拆「每日 1 次」（与提醒弹窗同口径） */}
+                      <View className="mt-1 flex-row flex-wrap">
+                        {planMetaSegments(group).map((segment, index, all) => (
+                          <Text
+                            key={segment}
+                            className="text-muted-foreground mr-1.5 text-sm"
+                          >
+                            {index < all.length - 1 ? `${segment} ·` : segment}
+                          </Text>
+                        ))}
+                      </View>
                     </View>
                   </View>
 
