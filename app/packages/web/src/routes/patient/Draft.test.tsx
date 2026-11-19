@@ -366,4 +366,29 @@ describe('批准文号口径（2026-11-19 现场反馈：批号不是身份核�
     expect(await screen.findByText(/填写的批准文号在候选中没有命中/)).toBeTruthy()
     expect(screen.queryByText(/批准文号命中（用户填写·未校验）/)).toBeNull()
   })
+
+  /** 同数字不同类别字母（国药准字按类别分池编号，H20138002 与 S20138002 可能并存）：
+   *  用户只填数字时命中多条，系统不能替用户选边——这是「字母不用填」这句话的边界。 */
+  const COLLIDING_ROWS = [
+    { ...MERGED_CANDIDATE, id: 'dm-h', multiSpec: false, approvalNumber: '国药准字H20138002', approvalNumbers: undefined },
+    { ...MERGED_CANDIDATE, id: 'dm-s', multiSpec: false, approvalNumber: '国药准字S20138002', approvalNumbers: undefined },
+  ]
+  const COLLIDING_CONFLICT: DraftPayload = {
+    ...MERGED_CONFLICT,
+    match: { status: 'ambiguous', candidates: COLLIDING_ROWS, note: '同数字不同类别' },
+    conflicts: [{ type: 'multi', note: '同数字不同类别', candidates: COLLIDING_ROWS }],
+  }
+
+  it('只填数字命中多条（同数字、不同字母）→ 一条都不点亮，提示补字母或按规格选', async () => {
+    renderDraft(COLLIDING_CONFLICT)
+    const input = (await screen.findByLabelText('批准文号（选填）')) as HTMLInputElement
+
+    fireEvent.change(input, { target: { value: '20138002' } })
+    expect(await screen.findByText(/这个编号在候选里对应 2 条记录/)).toBeTruthy()
+    expect(screen.queryByText(/批准文号命中（用户填写·未校验）/)).toBeNull()
+
+    fireEvent.change(input, { target: { value: 'S20138002' } })
+    expect(await screen.findByText(/批准文号命中（用户填写·未校验）/)).toBeTruthy()
+    expect(screen.queryByText(/这个编号在候选里对应/)).toBeNull()
+  })
 })

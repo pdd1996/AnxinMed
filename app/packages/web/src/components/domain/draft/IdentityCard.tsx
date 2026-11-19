@@ -44,6 +44,11 @@ export function IdentityCard({
   const unique = payload.match?.status === 'unique' ? payload.match.match : null
   const infos = infoConflicts(payload)
   const identity = payload.identity ?? null
+  // 批准文号定位：数字在**同一类别字母内**才唯一（国药准字按类别分池编号，H20138002 与 S20138002 可能并存），
+  // 所以「只填数字」命中多条时不能替用户选边——不点亮任何一条，提示补字母或按规格选。
+  const approvalInput = state.approvalInput.trim()
+  const approvalHits = approvalInput ? candidates.filter((c) => approvalMatchesCandidate(c, approvalInput)) : []
+  const approvalHitIds = new Set(approvalHits.map((c) => c.id))
 
   return (
     <Card>
@@ -143,16 +148,21 @@ export function IdentityCard({
               <p className="text-xs leading-5 text-muted-foreground">
                 填了只帮你在候选里定位记录，<strong>不做官方校验</strong>；以包装/说明书为准。
               </p>
-              {state.approvalInput.trim() &&
-                (candidates.some((c) => approvalMatchesCandidate(c, state.approvalInput)) ? (
-                  <p className="text-xs leading-5 text-risk-l2">
-                    已命中下方带「批准文号命中」的候选（用户填写·未校验），请核对实物规格后点选。
-                  </p>
-                ) : (
-                  <p className="text-xs leading-5 text-risk-l3">
-                    填写的批准文号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
-                  </p>
-                ))}
+              {approvalHits.length === 1 && (
+                <p className="text-xs leading-5 text-risk-l2">
+                  已命中下方带「批准文号命中」的候选（用户填写·未校验），请核对实物规格后点选。
+                </p>
+              )}
+              {approvalHits.length > 1 && (
+                <p className="text-xs leading-5 text-risk-l3">
+                  这个编号在候选里对应 {approvalHits.length} 条记录，没法替你区分。请把字母也填上（如 S20138002），或直接按实物规格/厂家选择。
+                </p>
+              )}
+              {approvalInput && approvalHits.length === 0 && (
+                <p className="text-xs leading-5 text-risk-l3">
+                  填写的批准文号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               {candidates.map((c) => (
@@ -182,7 +192,7 @@ export function IdentityCard({
                         多规格库条目 · 规格以实物为准
                       </span>
                     )}
-                    {state.approvalInput.trim() && approvalMatchesCandidate(c, state.approvalInput) && (
+                    {approvalHits.length === 1 && approvalHitIds.has(c.id) && (
                       <span className="mt-1 ml-1 inline-block rounded-full bg-risk-l2/15 px-2 py-0.5 text-xs font-semibold text-risk-l2">
                         批准文号命中（用户填写·未校验）
                       </span>
