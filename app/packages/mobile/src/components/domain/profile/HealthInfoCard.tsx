@@ -38,6 +38,7 @@ const pad2 = (value: string) => value.padStart(2, "0");
  * 健康信息卡（M5-T5e，照 web `profile/HealthInfoCard.tsx`）：HEALTH_FIELDS 七字段常驻——
  * 已填显示值 + 来源标注，未填显示「待补充 ›」点行即填；编辑/补充共用一个弹窗，
  * 删除走弹窗内二次确认（行上一键即删已移除，防误触）。
+ * 弹窗标题只留字段名（2026-11-19 用户要求，照 web：去掉「补充 / 编辑」前缀与「」引号）。
  * 写入一律 `PATCH /api/profile`，来源标注由服务端定（手动保存 = self_reported，见 profiles.service:32）。
  *
  * 「年龄」与「出生年月」联动（2026-11-19，照 web）：填了出生年月即按周岁自动算年龄，年龄行改只读展示
@@ -253,7 +254,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
           {editing && confirmingDelete ? (
             <>
               <DialogHeader>
-                <DialogTitle>删除「{editing.field}」</DialogTitle>
+                <DialogTitle>删除{editing.field}</DialogTitle>
                 <DialogDescription>
                   <Text className="text-base text-muted-foreground">
                     确定删除这条健康信息？删除后如需恢复要重新填写。
@@ -283,9 +284,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
           ) : editing ? (
             <>
               <DialogHeader>
-                <DialogTitle>
-                  {editing.entry ? "编辑" : "补充"}「{editing.field}」
-                </DialogTitle>
+                <DialogTitle>{editing.field}</DialogTitle>
               </DialogHeader>
 
               {editing.field === "性别" ? (
@@ -401,7 +400,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
                 <DialogTitle>年龄</DialogTitle>
                 <DialogDescription>
                   <Text className="text-base text-muted-foreground">
-                    「出生年月 {birthDisplay}」自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
+                    出生年月 {birthDisplay}，自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
                   </Text>
                 </DialogDescription>
               </DialogHeader>

@@ -44,6 +44,8 @@ function displayValueOf(field: HealthField, raw: string): string {
  * 「用户自述」弱化灰字，「处方笺抄录 · 已确认」品牌色强调。
  * 编辑/补充共用一个弹窗；删除走弹窗内二次确认（行上一键即删已移除，防误触）。
  * 手动保存一律由服务端标 source='self_reported'（profiles.service）。
+ * 弹窗标题只留字段名（2026-11-19 用户要求：去掉「补充 / 编辑」前缀与「」引号，与全站弹窗标题的
+ * 白话风格一致，如「手动建档」「确认记录」）；补录还是修改由表单内容（预填值 / 删除按钮）自明。
  *
  * 「年龄」与「出生年月」联动（2026-11-19）：填了出生年月即按周岁自动算年龄，年龄行改只读展示
  * 「按出生年月自动计算」，避免同一件事填两遍；未填出生年月时才允许手填年龄（只知年龄的老人）。
@@ -209,7 +211,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
           {editing && confirmingDelete ? (
             <>
               <DialogHeader>
-                <DialogTitle>删除「{editing.field}」</DialogTitle>
+                <DialogTitle>删除{editing.field}</DialogTitle>
                 <DialogDescription>确定删除这条健康信息？删除后如需恢复要重新填写。</DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -224,9 +226,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
           ) : editing ? (
             <>
               <DialogHeader>
-                <DialogTitle>
-                  {editing.entry ? '编辑' : '补充'}「{editing.field}」
-                </DialogTitle>
+                <DialogTitle>{editing.field}</DialogTitle>
               </DialogHeader>
               {editing.field === '性别' ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -306,7 +306,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
               <DialogHeader>
                 <DialogTitle>年龄</DialogTitle>
                 <DialogDescription>
-                  「出生年月 {birthDisplay}」自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
+                 出生年月 {birthDisplay}，自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

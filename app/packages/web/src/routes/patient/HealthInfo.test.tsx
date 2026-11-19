@@ -88,7 +88,7 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
-    expect(await screen.findByText('补充「出生年月」')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '出生年月' })).toBeTruthy()
     // 原生 `<input type="month">` 弹层已退役：年份可敲、月份点大按钮（见 HealthInfoCard 头注释）。
     fireEvent.change(screen.getByLabelText('出生年份'), { target: { value: '1958' } })
     fireEvent.click(screen.getByRole('button', { name: '6月' }))
@@ -116,7 +116,7 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
-    await screen.findByText('补充「出生年月」')
+    await screen.findByRole('heading', { name: '出生年月' })
     for (let month = 1; month <= 12; month += 1) {
       expect(screen.getByRole('button', { name: `${month}月` })).toBeTruthy()
     }
@@ -135,7 +135,7 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     await screen.findByText('按出生年月自动计算')
     // 年龄行的副文案也含「出生年月」，用行首锚定出生年月那一行。
     fireEvent.click(screen.getByRole('button', { name: /^出生年月/ }))
-    expect(await screen.findByText('编辑「出生年月」')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '出生年月' })).toBeTruthy()
     expect((screen.getByLabelText('出生年份') as HTMLInputElement).value).toBe('1958')
     expect(screen.getByRole('button', { name: '6月' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: '1月' }).getAttribute('aria-pressed')).toBe('false')
@@ -145,7 +145,7 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /性别/ }))
-    expect(await screen.findByText('编辑「性别」')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '性别' })).toBeTruthy()
     const male = screen.getByRole('button', { name: '男' }) as HTMLButtonElement
     const female = screen.getByRole('button', { name: '女' }) as HTMLButtonElement
     expect(male.getAttribute('aria-pressed')).toBe('true')
@@ -161,7 +161,7 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /过敏史/ }))
-    expect(await screen.findByText('编辑「过敏史」')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '过敏史' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '删除' }))
     // 二次确认态出现，此时尚未发起删除
     expect(screen.getByText(/确定删除这条健康信息/)).toBeTruthy()
@@ -202,14 +202,14 @@ describe('健康信息页 · 年龄与出生年月联动', () => {
     fireEvent.click(screen.getByRole('button', { name: /年龄/ }))
     expect(await screen.findByText(new RegExp(`自动算出 ${age} 岁`))).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '修改出生年月' }))
-    expect(await screen.findByText('编辑「出生年月」')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '出生年月' })).toBeTruthy()
   })
 
   it('未填出生年月：年龄仍可手填（只知年龄的老人有退路）', async () => {
     renderHealthInfo() // 默认 ITEMS 没有出生年月
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /年龄/ }))
-    expect(await screen.findByText('编辑「年龄」')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '年龄' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('年龄（内容）'), { target: { value: '70' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() =>

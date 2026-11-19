@@ -86,7 +86,8 @@ describe("健康信息卡 · 年龄与出生年月联动", () => {
     await fireEvent.press(view.getByRole("button", { name: /年龄/ }));
     expect(await view.findByText(new RegExp(`自动算出 ${age} 岁`))).toBeTruthy();
     await fireEvent.press(view.getByText("修改出生年月"));
-    expect(await view.findByText("编辑「出生年月」")).toBeTruthy();
+    // 标题现在是字段名（与行文案同名），用编辑器里才有的年份输入框断言「已打开出生年月编辑」。
+    expect(await view.findByLabelText("出生年份")).toBeTruthy();
   });
 
   it("未填出生年月：年龄仍可手填（只知年龄的老人有退路）", async () => {
