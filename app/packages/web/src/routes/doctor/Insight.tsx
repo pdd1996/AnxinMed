@@ -188,7 +188,7 @@ function QueueView({
           <RiskTimeline queue={queue} />
 
           {/* 队列摘要 */}
-          <SectionHeading eyebrow="Agent 摘要" title="队列摘要" />
+          <SectionHeading title="队列摘要" />
           <QueueSummaryPanel
             summary={summary}
             pending={summaryPending}
@@ -197,7 +197,7 @@ function QueueView({
           />
 
           {/* 医生问答（T7）：队列维度 */}
-          <SectionHeading eyebrow="Agent 问答" title="向队列提问" />
+          <SectionHeading title="向队列提问" />
           <AskPanel patientId={null} />
         </>
       )}
@@ -389,13 +389,6 @@ function AskPanel({ patientId }: { patientId: string | null }) {
   return (
     <Card>
       <CardContent className="space-y-3 p-4" data-testid="ask-panel">
-        {exchanges.length === 0 && !pending && (
-          <p className="text-sm text-muted-foreground">
-            直接提问即可查询队列/患者数据：固定问法由只读工具直查数据库（0 次大模型调用），其他问法由 Agent
-            基于统计事实作答。查不了的会明确告知能查什么，绝不编造数字。
-          </p>
-        )}
-
         {/* 问答线程 */}
         {exchanges.map((ex, i) => (
           <div key={i} className="space-y-1.5" data-testid={i === exchanges.length - 1 ? 'ask-exchange' : undefined}>
@@ -561,15 +554,6 @@ function QueueSummaryPanel({
               <span className="font-medium">下一步：</span>
               {summary.sections.nextAction}
             </p>
-            <div className="space-y-0.5 text-xs text-muted-foreground">
-              <p>生成时间：{summary.snapshot.generatedAt}</p>
-              <p>工具链：{summary.snapshot.toolChain.join(' → ')}</p>
-              <p>来源：{summary.citations.join('；')}</p>
-            </div>
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              {summary.sections.warning}
-            </p>
           </>
         )}
       </CardContent>
@@ -602,7 +586,7 @@ function PatientSummarySkeleton({ patientName, onBack }: { patientName: string; 
 // ---------------------------------------------------------------------------
 
 function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; onBack: () => void }) {
-  const { patient, sections, tools, snapshot, riskLevel, citations, notice } = summary
+  const { patient, sections, tools, snapshot, riskLevel, notice } = summary
   const adherence = tools.adherence
 
   return (
@@ -800,7 +784,6 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
 
       {/* Agent 摘要 */}
       <SectionHeading
-        eyebrow="Agent 摘要"
         title="诊前摘要"
         chip={snapshot.mode === 'llm' ? 'LLM 生成' : '规则降级'}
       />
@@ -860,17 +843,6 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
         </CardContent>
       </Card>
 
-      {/* 数据快照 */}
-      <Card>
-        <CardContent className="space-y-1 p-3 text-xs text-muted-foreground">
-          <strong className="text-sm text-foreground">数据快照</strong>
-          <p>生成时间：{snapshot.generatedAt}</p>
-          <p>数据区间：{snapshot.dateRange}</p>
-          <p>工具链：{snapshot.toolChain.join(' → ')}</p>
-          <p>来源：{citations.join('；')}</p>
-        </CardContent>
-      </Card>
-
       {/* 免责声明 */}
       <Card className="border-risk-l3/30 bg-risk-l3/5">
         <CardContent className="flex items-start gap-3 p-4">
@@ -885,7 +857,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
       </Card>
 
       {/* 医生问答（T7）：患者维度追问 */}
-      <SectionHeading eyebrow="Agent 问答" title="向 Agent 追问该患者" />
+      <SectionHeading title="向 Agent 追问该患者" />
       <AskPanel patientId={patient.id} />
     </div>
   )
