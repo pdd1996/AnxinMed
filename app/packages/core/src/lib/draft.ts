@@ -25,6 +25,32 @@ export interface ManualDrugForm {
   stockUnit: string
 }
 
+/** 批准文号类别字母：本库只有化学药（H）/ 中药（Z）两类；其他类别把字母直接填进输入框即可。 */
+export type ApprovalLetter = 'H' | 'Z'
+
+/** 类别选择按钮（默认第一项 H）。 */
+export const APPROVAL_LETTER_OPTIONS: { letter: ApprovalLetter; label: string }[] = [
+  { letter: 'H', label: '化学药（H）' },
+  { letter: 'Z', label: '中药（Z）' },
+]
+
+/** 类别字母 → 人话（提示「这个编号是 Z 的」用；含本库之外的类别）。 */
+export const APPROVAL_LETTER_LABEL: Record<string, string> = {
+  H: '化学药（H）',
+  Z: '中药（Z）',
+  S: '生物制品（S）',
+  J: '进口分包装（J）',
+  B: '保健药（B）',
+  T: '体外诊断试剂（T）',
+  F: '辅料（F）',
+}
+
+/** 类别字母的人话名字；取不到字母时给中性说法（不猜类别）。 */
+export function approvalLetterLabel(letter: string | null | undefined): string {
+  if (!letter) return '其他类别'
+  return APPROVAL_LETTER_LABEL[letter] ?? letter
+}
+
 export interface ConfirmFormState {
   // ── 身份线 ──
   /** 冲突清单中用户选定的候选 id；初始 ''（系统不选边）。 */
@@ -37,6 +63,12 @@ export interface ConfirmFormState {
    * 用于在冲突候选中「命中定位」——不做官方校验、不落库、不参与 confirmStatus 判定。
    */
   approvalInput: string
+  /**
+   * 类别字母（2026-11-20 用户定调：默认 H，可选 Z）。国药准字按类别字母分池编号，
+   * 同 8 位数字可能分别属于不同字母，所以用户选的类别要参与判定：H 的声明不该点亮 Z 那条。
+   * 用户直接把字母填进输入框时（如 S20138002），以输入框为准，本字段不生效。
+   */
+  approvalLetter: ApprovalLetter
   // ── 医嘱线 ──
   doseValue: string
   doseUnit: string
@@ -158,6 +190,50 @@ export function approvalMatchesCandidate(candidate: Candidate, input: string): b
   return keys.some((key) => key === needle || key.endsWith(needle))
 }
 
+/** 候选自带的类别字母（从它的批准文号里取；取不到 → null，不猜）。 */
+export function candidateApprovalLetter(candidate: Candidate): string | null {
+  for (const raw of [candidate.approvalNumber, ...(candidate.approvalNumbers ?? [])]) {
+    if (!raw) continue
+    const m = /国药准字\s*([A-Za-z])/.exec(raw)
+    if (m?.[1]) return m[1].toUpperCase()
+  }
+  return null
+}
+
+/** 批准文号定位结果（2026-11-20 用户定调：默认 H、可选 Z，类别参与判定）。 */
+export interface ApprovalLookup {
+  /**
+   * hit       命中恰好一条（点亮该候选）
+   * mismatch  数字在候选里找得到，但类别字母对不上（不点亮，提示切换类别）
+   * none      没有命中（含输入过短）
+   * multi     同类别下命中多条（理论上不会发生：同字母同数字即同一条文号）
+   */
+  status: 'hit' | 'mismatch' | 'none' | 'multi'
+  hits: Candidate[]
+  /** mismatch 时候选里实际出现的字母（如 'Z'），用于提示用户改选类别。 */
+  actualLetter?: string
+}
+
+/**
+ * 「数字 + 类别字母」定位候选：用户选的字母**参与判定**——声明是化学药的，不点亮中药那条；
+ * 但类别选错时不能把人堵死（显示「没命中」），而是回落到纯数字，给出「这是 Z 的」提示。
+ * 用户直接在输入框里写了字母（如 S20138002）时以输入框为准（本库之外的类别也能用）。
+ */
+export function lookupApproval(candidates: Candidate[], input: string, picked: ApprovalLetter): ApprovalLookup {
+  // 全角归一后再取数字（与 approvalLooseKey 同一套口径）
+  const normalized = input.replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+  const digits = normalized.replace(/\D/g, '')
+  if (digits.length < 6) return { status: 'none', hits: [] }
+  const typed = /[A-Za-z]/.exec(normalized)?.[0]?.toUpperCase()
+  const letter = typed ?? picked
+  const exact = candidates.filter((c) => approvalMatchesCandidate(c, `${letter}${digits}`))
+  if (exact.length === 1) return { status: 'hit', hits: exact }
+  if (exact.length > 1) return { status: 'multi', hits: exact }
+  const loose = candidates.filter((c) => approvalMatchesCandidate(c, digits))
+  if (loose.length > 0) return { status: 'mismatch', hits: loose, actualLetter: candidateApprovalLetter(loose[0]!) ?? undefined }
+  return { status: 'none', hits: [] }
+}
+
 /** 人工补用量时的默认单位（按剂型归一，属「默认」标注，用户可改）；无线索回落「片」。 */
 export function defaultDoseUnit(p: DraftPayload): string {
   const text = `${p.drugDraft.form ?? ''}${p.identity?.form ?? ''}${p.drugDraft.genericName ?? ''}`
@@ -190,6 +266,7 @@ export function initialConfirmState(p: DraftPayload): ConfirmFormState {
     selectedCandidateId: '',
     useManual: false,
     approvalInput: '',
+    approvalLetter: 'H',
     manual,
     doseValue: plan?.dose && !sigNeedsManual(p, 'dose') ? String(plan.dose.value) : '',
     doseUnit: unit,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * M2-T7 · 确认页组件断言（任务书完成标准：needsManual 字段无法被预填值、冲突清单不自动选择）。
  *
  * 只 mock 传输层（@anxin/core 的三个函数），页面/纯逻辑/组件全走真代码：
@@ -351,12 +351,14 @@ describe('批准文号口径（2026-11-19 现场反馈：批号不是身份核�
     expect(screen.queryByText('批准文号（照片抄录）')).toBeNull()
   })
 
-  it('多规格合并候选：出现「批准文号（选填）」；填对号命中候选、填错给可见提示', async () => {
+  it('多规格合并候选：出现「批准文号（选填）」+ 化学药/中药两个按钮；填对号命中候选、填错给可见提示', async () => {
     renderDraft(MERGED_CONFLICT)
     const input = (await screen.findByLabelText('批准文号（选填）')) as HTMLInputElement
-    // 2026-11-20 用户定调：字段要用户自己填，只把「填什么」讲清楚——占位符给数字样例，提示行说字母不用填
+    // 2026-11-20 用户定调：字段由用户自己填；类别默认化学药、可切中药
     expect(input.placeholder).toBe('如 20138002')
-    expect(screen.getByText(/字母（H \/ Z \/ S…）不用填/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '化学药（H）' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '中药（Z）' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText(/先选类别、再填后面那串数字/)).toBeTruthy()
     expect(await screen.findByText(/多规格库条目 · 规格以实物为准/)).toBeTruthy()
 
     fireEvent.change(input, { target: { value: '国药准字H20138002' } })
@@ -367,28 +369,41 @@ describe('批准文号口径（2026-11-19 现场反馈：批号不是身份核�
     expect(screen.queryByText(/批准文号命中（用户填写·未校验）/)).toBeNull()
   })
 
-  /** 同数字不同类别字母（国药准字按类别分池编号，H20138002 与 S20138002 可能并存）：
-   *  用户只填数字时命中多条，系统不能替用户选边——这是「字母不用填」这句话的边界。 */
-  const COLLIDING_ROWS = [
-    { ...MERGED_CANDIDATE, id: 'dm-h', multiSpec: false, approvalNumber: '国药准字H20138002', approvalNumbers: undefined },
-    { ...MERGED_CANDIDATE, id: 'dm-s', multiSpec: false, approvalNumber: '国药准字S20138002', approvalNumbers: undefined },
-  ]
-  const COLLIDING_CONFLICT: DraftPayload = {
+  /** 同 8 位数字分属不同类别字母（国药准字按类别分池编号，H20138002 与 Z20138002 可并存）：
+   *  这正是「默认 H、可选 Z」要解决的情形——用户选的类别参与判定。 */
+  const H_ROW = { ...MERGED_CANDIDATE, id: 'dm-h', multiSpec: false, approvalNumber: '国药准字H20138002', approvalNumbers: undefined }
+  const Z_ROW = { ...MERGED_CANDIDATE, id: 'dm-z', multiSpec: false, approvalNumber: '国药准字Z20138002', approvalNumbers: undefined }
+  const LETTER_CONFLICT: DraftPayload = {
     ...MERGED_CONFLICT,
-    match: { status: 'ambiguous', candidates: COLLIDING_ROWS, note: '同数字不同类别' },
-    conflicts: [{ type: 'multi', note: '同数字不同类别', candidates: COLLIDING_ROWS }],
+    match: { status: 'ambiguous', candidates: [H_ROW, Z_ROW], note: '同数字不同类别' },
+    conflicts: [{ type: 'multi', note: '同数字不同类别', candidates: [H_ROW, Z_ROW] }],
   }
 
-  it('只填数字命中多条（同数字、不同字母）→ 一条都不点亮，提示补字母或按规格选', async () => {
-    renderDraft(COLLIDING_CONFLICT)
+  it('默认化学药：同一串数字只点亮 H 那条；切到中药 → 只点亮 Z 那条', async () => {
+    renderDraft(LETTER_CONFLICT)
     const input = (await screen.findByLabelText('批准文号（选填）')) as HTMLInputElement
-
     fireEvent.change(input, { target: { value: '20138002' } })
-    expect(await screen.findByText(/这个编号在候选里对应 2 条记录/)).toBeTruthy()
+    expect(await screen.findAllByText(/批准文号命中（用户填写·未校验）/)).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: '中药（Z）' }))
+    expect(await screen.findAllByText(/批准文号命中（用户填写·未校验）/)).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '中药（Z）' }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('类别选错（选化学药，但候选里只有中药那条）→ 提示「这个编号在候选里是中药（Z）的」，不是干巴巴的没命中', async () => {
+    const onlyZ: DraftPayload = {
+      ...MERGED_CONFLICT,
+      match: { status: 'ambiguous', candidates: [Z_ROW], note: '只有中药' },
+      conflicts: [{ type: 'multi', note: '只有中药', candidates: [Z_ROW] }],
+    }
+    renderDraft(onlyZ)
+    const input = (await screen.findByLabelText('批准文号（选填）')) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '20138002' } })
+    expect(await screen.findByText(/这个编号在候选里是「中药（Z）」的/)).toBeTruthy()
+    expect(screen.queryByText(/没有命中/)).toBeNull()
     expect(screen.queryByText(/批准文号命中（用户填写·未校验）/)).toBeNull()
 
-    fireEvent.change(input, { target: { value: 'S20138002' } })
+    fireEvent.click(screen.getByRole('button', { name: '中药（Z）' }))
     expect(await screen.findByText(/批准文号命中（用户填写·未校验）/)).toBeTruthy()
-    expect(screen.queryByText(/这个编号在候选里对应/)).toBeNull()
   })
 })

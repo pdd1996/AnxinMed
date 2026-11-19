@@ -1,4 +1,4 @@
-import { Hand, Pill, ShieldCheck, Undo2 } from 'lucide-react'
+﻿import { Hand, Pill, ShieldCheck, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { DOSE_UNITS } from '@anxin/shared'
 import {
-  approvalMatchesCandidate,
+  APPROVAL_LETTER_OPTIONS,
+  approvalLetterLabel,
   identityNeedsManual,
   infoConflicts,
   isManualMode,
+  lookupApproval,
   selectableCandidates,
   type ConfirmFormState,
   type DraftPayload,
@@ -44,11 +46,9 @@ export function IdentityCard({
   const unique = payload.match?.status === 'unique' ? payload.match.match : null
   const infos = infoConflicts(payload)
   const identity = payload.identity ?? null
-  // 批准文号定位：数字在**同一类别字母内**才唯一（国药准字按类别分池编号，H20138002 与 S20138002 可能并存），
-  // 所以「只填数字」命中多条时不能替用户选边——不点亮任何一条，提示补字母或按规格选。
-  const approvalInput = state.approvalInput.trim()
-  const approvalHits = approvalInput ? candidates.filter((c) => approvalMatchesCandidate(c, approvalInput)) : []
-  const approvalHitIds = new Set(approvalHits.map((c) => c.id))
+  // 批准文号定位：数字在**同一类别字母内**才唯一（国药准字按类别分池编号，H20138002 与 Z20138002 可能并存），
+  // 所以用户选/填的类别参与判定；选错时不堵死，回落到纯数字并提示切换类别。
+  const approval = lookupApproval(candidates, state.approvalInput, state.approvalLetter)
 
   return (
     <Card>
@@ -131,11 +131,30 @@ export function IdentityCard({
             {/* 2026-11-20：冲突清单的两段提示文案（「系统不选边」横幅 + 每条冲突说明）按用户要求删除，
                 只保留候选单选列表；「不选边」由 core 初值保证（selectedCandidateId 恒为 ''），不依赖文案。 */}
             {/* 批准文号选填（2026-11-19）：只作「候选定位」辅助——不校验、不落库、不阻塞确认。
-                口径（2026-11-20 用户现场提问）：批准文号 =「国药准字 + 类别字母 + 8 位数字」，
-                字母随药类变（H 化学药 / Z 中药 / S 生物制品 / B 保健药 / T 体外诊断试剂 / F 辅料），
-                **不能按 H 写死**；生产批号（如 20250812）一批一变，不是身份字段，别和批准文号混称。 */}
-            <div className="space-y-1 rounded-lg border border-dashed border-input bg-muted/40 p-3">
+                口径（2026-11-20 用户定调）：批准文号 =「国药准字 + 类别字母 + 8 位数字」，字母随药类变
+                （H 化学药 / Z 中药 / S 生物制品 / B 保健药 / T 体外诊断试剂 / F 辅料）。本库只收 H/Z 两类，
+                所以给「化学药 H（默认）/ 中药 Z」两个大按钮；其他类别把字母直接填进输入框即可。
+                批准文号 ≠ 生产批号（批号一批一变），文案里必须区分。 */}
+            <div className="space-y-2 rounded-lg border border-dashed border-input bg-muted/40 p-3">
               <Label htmlFor="id-approval">批准文号（选填）</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {APPROVAL_LETTER_OPTIONS.map((item) => (
+                  <button
+                    key={item.letter}
+                    type="button"
+                    aria-pressed={state.approvalLetter === item.letter}
+                    onClick={() => patch({ approvalLetter: item.letter })}
+                    className={cn(
+                      'min-h-11 rounded-lg border text-sm font-semibold transition-colors',
+                      state.approvalLetter === item.letter
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background text-muted-foreground',
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
               <Input
                 id="id-approval"
                 value={state.approvalInput}
@@ -143,22 +162,27 @@ export function IdentityCard({
                 placeholder="如 20138002"
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                盒子上的批准文号长这样：<span className="whitespace-nowrap">国药准字H20138002</span>。字母（H / Z / S…）不用填，只填后面那串数字；它不是生产批号。
+                先选类别、再填后面那串数字（「国药准字」四个字不用打）；它不是生产批号。其他类别把字母一起写上也行（如 S20138002）。
               </p>
               <p className="text-xs leading-5 text-muted-foreground">
                 填了只帮你在候选里定位记录，<strong>不做官方校验</strong>；以包装/说明书为准。
               </p>
-              {approvalHits.length === 1 && (
+              {approval.status === 'hit' && (
                 <p className="text-xs leading-5 text-risk-l2">
                   已命中下方带「批准文号命中」的候选（用户填写·未校验），请核对实物规格后点选。
                 </p>
               )}
-              {approvalHits.length > 1 && (
+              {approval.status === 'mismatch' && (
                 <p className="text-xs leading-5 text-risk-l3">
-                  这个编号在候选里对应 {approvalHits.length} 条记录，没法替你区分。请把字母也填上（如 S20138002），或直接按实物规格/厂家选择。
+                  这个编号在候选里是「{approvalLetterLabel(approval.actualLetter)}」的。把上面切到对应的类别再试，或直接按实物规格/厂家选择。
                 </p>
               )}
-              {approvalInput && approvalHits.length === 0 && (
+              {approval.status === 'multi' && (
+                <p className="text-xs leading-5 text-risk-l3">
+                  这个编号在候选里对应 {approval.hits.length} 条记录，请直接按实物规格/厂家选择。
+                </p>
+              )}
+              {approval.status === 'none' && state.approvalInput.trim().length > 0 && (
                 <p className="text-xs leading-5 text-risk-l3">
                   填写的批准文号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
                 </p>
@@ -192,7 +216,7 @@ export function IdentityCard({
                         多规格库条目 · 规格以实物为准
                       </span>
                     )}
-                    {approvalHits.length === 1 && approvalHitIds.has(c.id) && (
+                    {approval.status === 'hit' && approval.hits.some((hit) => hit.id === c.id) && (
                       <span className="mt-1 ml-1 inline-block rounded-full bg-risk-l2/15 px-2 py-0.5 text-xs font-semibold text-risk-l2">
                         批准文号命中（用户填写·未校验）
                       </span>

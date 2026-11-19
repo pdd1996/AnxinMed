@@ -18,10 +18,12 @@ import {
   finalTags,
   initialConfirmState,
   isManualMode,
+  lookupApproval,
   resolveCycle,
   selectableCandidates,
   sigNeedsManual,
   unmetReasons,
+  type Candidate,
   type DraftPayload,
 } from './draft'
 import {
@@ -303,5 +305,50 @@ describe('批准文号选填（2026-11-19：仅辅助候选定位，不做官方
   it('普通（单规格）候选仍取候选规格，行为不变', () => {
     const s = { ...initialConfirmState(rxConflictPayload), selectedCandidateId: 'dm-hycosan-02', whoConfirmed: true }
     expect(buildConfirm(rxConflictPayload, s).drug.specification).toBe('0.2%（10mL:20mg）')
+  })
+})
+
+describe('批准文号定位（2026-11-20 用户定调：默认 H、可选 Z，类别参与判定）', () => {
+  const row = (id: string, approvalNumber: string): Candidate => ({
+    id,
+    genericName: '阿利沙坦酯片',
+    specification: '240mg',
+    form: '片',
+    manufacturer: '深圳信立泰药业股份有限公司',
+    approvalNumber,
+  })
+  const H = row('dm-h', '国药准字H20138002')
+  const Z = row('dm-z', '国药准字Z20138002')
+
+  it('默认 H + 只填数字 → 只点亮化学药那条，不点亮中药那条', () => {
+    const r = lookupApproval([H, Z], '20138002', 'H')
+    expect(r.status).toBe('hit')
+    expect(r.hits.map((c) => c.id)).toEqual(['dm-h'])
+  })
+
+  it('切到 Z + 同一串数字 → 点亮中药那条', () => {
+    const r = lookupApproval([H, Z], '20138002', 'Z')
+    expect(r.status).toBe('hit')
+    expect(r.hits.map((c) => c.id)).toEqual(['dm-z'])
+  })
+
+  it('类别选错 → mismatch（不是「没命中」），并给出候选里实际的类别字母', () => {
+    const r = lookupApproval([Z], '20138002', 'H')
+    expect(r.status).toBe('mismatch')
+    expect(r.actualLetter).toBe('Z')
+    expect(r.hits.map((c) => c.id)).toEqual(['dm-z'])
+  })
+
+  it('输入里自己写了字母 → 以输入为准（本库之外的类别也能用）', () => {
+    expect(lookupApproval([H, Z], 'Z20138002', 'H').status).toBe('hit') // 输入字母覆盖按钮
+    expect(lookupApproval([H, Z], 'Z20138002', 'H').hits.map((c) => c.id)).toEqual(['dm-z'])
+    expect(lookupApproval([H], 'S20138002', 'H').status).toBe('mismatch') // 库里没有 S，提示实际是 H
+  })
+
+  it('全角数字照样命中；过短输入与空候选一律 none（不猜）', () => {
+    expect(lookupApproval([H], 'ｈ２０１３８００２', 'H').status).toBe('hit')
+    expect(lookupApproval([H], '2013', 'H').status).toBe('none')
+    expect(lookupApproval([], '20138002', 'H').status).toBe('none')
+    expect(lookupApproval([H], '   ', 'H').status).toBe('none')
   })
 })
