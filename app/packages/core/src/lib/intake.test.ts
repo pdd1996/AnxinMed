@@ -38,7 +38,8 @@ describe('assessQuality · 本地质量预检阈值', () => {
     expect(assessQuality({ ...good, meanLuma: 60 })).toEqual([])
     expect(assessQuality({ ...good, meanLuma: 59 })).toEqual(['too-dark'])
     expect(assessQuality({ ...good, clippedRatio: 0.18 })).toEqual([])
-    expect(assessQuality({ ...good, sharpness: 0.02 })).toEqual([])
+    expect(assessQuality({ ...good, sharpness: 0.012 })).toEqual([])
+    expect(assessQuality({ ...good, sharpness: 0.0119 })).toEqual(['blurry'])
   })
 })
 
@@ -215,10 +216,10 @@ describe('statsFromRgba · 手算像素 fixture（RN 解码后的数学与 web c
     expect(assessQuality(measure(highlight(10)))).toEqual(['glare'])
   })
 
-  it('模糊：每列 +10 的斜坡判模糊、+11 不判（sharpness 阈值 0.02 两侧各一档）', () => {
-    expect(measure(ramp(10)).sharpness).toBeCloseTo(200 / 40 / 255, 10)
-    expect(assessQuality(measure(ramp(10)))).toEqual(['blurry'])
-    expect(assessQuality(measure(ramp(11)))).toEqual([])
+  it('模糊：每列 +6 的斜坡判模糊、+7 不判（sharpness 阈值 0.012 两侧各一档）', () => {
+    expect(measure(ramp(6)).sharpness).toBeCloseTo(120 / 40 / 255, 10)
+    expect(assessQuality(measure(ramp(6)))).toEqual(['blurry'])
+    expect(assessQuality(measure(ramp(7)))).toEqual([])
   })
 
   it('分辨率过低：判的是原图边长，不是缩放后的采样网格（480 不命中 / 479 命中）', () => {

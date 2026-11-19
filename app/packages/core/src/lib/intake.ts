@@ -257,6 +257,18 @@ export const QUALITY_ISSUE_LABEL: Record<QualityIssue, string> = {
 }
 
 /**
+ * 「模糊/遮挡」阈值：灰度梯度均值 / 255 低于此值才提示重拍。
+ *
+ * 2026-11-19 演示前实测：真实药盒照片（2364×1773、平均亮度 119、截断 0.07%）在浏览器 canvas
+ * 双线性缩放到 512 网格后 sharpness≈0.0194，被原阈值 0.02 误报「模糊/遮挡」——差 3% 就翻面。
+ * 该指标是「整幅画面平均边缘强度」而非对焦检测：药盒只占约一半画面时，桌面/手/平滑盒面
+ * 会把均值稀释（只截药盒 0.0244、文字区 0.0279、整幅 0.0194），真实手机照片普遍落在 0.015–0.03。
+ * 合成样张的参照值：quality-blurry 0.0010（近乎纯色）、quality-ok 0.0564，所以 0.012 对
+ * 「几乎没细节」的图仍有约 12 倍余量，只放过真实照片那一档误报。仅作建议、不拦人，误报代价高。
+ */
+const SHARPNESS_MIN = 0.012
+
+/**
  * 像素统计 → 质量问题清单（阈值为本项目经验值，仅做重拍建议，不做任何医学/识别判断）。
  * 纯函数：测试用合成统计值即可覆盖，不依赖 canvas。
  */
@@ -265,7 +277,7 @@ export function assessQuality(s: ImageStats): QualityIssue[] {
   if (s.width < 480 || s.height < 480) issues.push('too-small')
   if (s.meanLuma < 60) issues.push('too-dark')
   if (s.clippedRatio > 0.18) issues.push('glare')
-  if (s.sharpness < 0.02) issues.push('blurry')
+  if (s.sharpness < SHARPNESS_MIN) issues.push('blurry')
   return issues
 }
 

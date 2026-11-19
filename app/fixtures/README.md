@@ -48,7 +48,7 @@ CI / 新克隆无需 Pillow：`pnpm test:e2e` 的 globalSetup 会调
 
 `make-quality-fixtures.py` → `quality/` 五张：暗 / 反光 / 模糊 / 分辨率过低 各命中一条判据，加一张
 `quality-ok.png` 对照（应当不出质量卡）。服务对象是录入屏的本地质量预检（`core` 的 `assessQuality`
-阈值：meanLuma<60、clippedRatio>0.18、sharpness<0.02、原图任一边<480），**与 `golden-cases.json` 无关**，
+阈值：meanLuma<60、clippedRatio>0.18、sharpness<0.012、原图任一边<480），**与 `golden-cases.json` 无关**，
 e2e 与 zero-leak 都不读它们；设备上怎么用见 `docs/specs/05e-M5-T6-录入双入口完整化执行书.md` §2-T6-b 口令包。
 
 ## 合成 PII 声明
