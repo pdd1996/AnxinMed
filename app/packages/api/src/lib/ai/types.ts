@@ -181,4 +181,10 @@ export interface AiClients {
    * 可选方法：FixtureAiClients / mock 未配置时由编排层转 error-fallback（不静默）。
    */
   queueSummary?(payload: QueuePromptPayload): Promise<ConsultRawSections>
+  /**
+   * 外部知识兜底（M14 演示版）：本地说明书库未收录的「物质 × 药物同服」问题。
+   * 仅由 consult.service 在 S1 无源分支调用；输出必过安全清洗（禁剂量/禁绝对安全）。
+   * 可选方法：未配置时上层回退固定通用提示，不静默。
+   */
+  externalKnowledge?(question: string): Promise<ConsultRawSections>
 }

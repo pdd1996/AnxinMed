@@ -157,7 +157,7 @@ export type ExpiryStockFocus = 'expiry' | 'stock' | 'both'
 
 /** 效期词组 / 库存词组——必须与 intent.ts expiry-stock 正则的两个语义组保持同步（改一处改两处）。 */
 const EXPIRY_WORDS = /过期|临期/
-const STOCK_WORDS = /快用完|还剩多少|库存/
+const STOCK_WORDS = /快用完|快吃没|快吃完|见底|用完|剩不多|还剩多少|库存/
 
 /** 从提问推导子焦点（纯函数）：命中哪组词先答哪个桶；两组都命中或都未命中（理论不可达兜底）= both。 */
 export function deriveExpiryStockFocus(question: string): ExpiryStockFocus {
@@ -192,6 +192,23 @@ export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpirySto
   for (const m of lowStock) {
     const stock = m.stock ? `（库存剩余 ${m.stock.value} ${m.stock.unit}）` : ''
     keyPoints.push(`${m.genericName} 库存不足${stock}`)
+  }
+
+  /** 库存焦点补充明细（M14 修复）：已记录余量 + 未记录库存数量，避免「快吃完了」答成「暂无提醒」。 */
+  const stocked = status.stocked ?? []
+  const unknownStock = status.unknownStock ?? 0
+  const stockDetailPoints: string[] = []
+  if (focus === 'stock') {
+    if (stocked.length > 0) {
+      const named = stocked
+        .slice(0, 8)
+        .map((m) => (m.stock ? `${m.genericName} ${m.stock.value} ${m.stock.unit}` : m.genericName))
+        .join('、')
+      stockDetailPoints.push(`已记录的剩余数量：${named}${stocked.length > 8 ? ' 等' : ''}`)
+    }
+    if (unknownStock > 0) {
+      stockDetailPoints.push(`${unknownStock} 种药品没有记录剩余数量，无法判断是否快用完，可在「药箱」补录。`)
+    }
   }
 
   const risks: string[] = []
@@ -235,10 +252,26 @@ export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpirySto
     if (hasStock) {
       summary = `你的药箱有 ${stockPart}的药品。${expiryAside()}`
     } else {
-      summary = `你的药箱目前没有库存不足的药品。${expiryAside()}`
+      const stockHint =
+        unknownStock > 0
+          ? `其中 ${unknownStock} 种药品没有记录剩余数量，无法判断是否快用完。`
+          : '如果你觉得快用完了，可能是剩余数量没有更新。'
+      summary = `你的药箱目前没有库存不足的药品。${stockHint}${expiryAside()}`
     }
-    const nextAction = !hasStock && !hasExpiry ? IDLE_NEXT : '前往「药箱」页面处理过期/临期药品并补充库存。'
-    return { summary, keyPoints, risks, nextAction, warning: DATA_QUERY_WARNING, limited: false }
+    const nextAction =
+      !hasStock && !hasExpiry
+        ? unknownStock > 0
+          ? '前往「药箱」核对并补录剩余数量；如确实快用完，请及时购买。'
+          : IDLE_NEXT
+        : '前往「药箱」页面处理过期/临期药品并补充库存。'
+    return {
+      summary,
+      keyPoints: [...keyPoints, ...stockDetailPoints],
+      risks,
+      nextAction,
+      warning: DATA_QUERY_WARNING,
+      limited: false,
+    }
   }
 
   // both：两桶都明确作答（空桶也明说，不静默跳过）

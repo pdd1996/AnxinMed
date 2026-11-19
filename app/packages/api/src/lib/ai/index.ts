@@ -8,7 +8,7 @@
  *   baichuan     → baichuan.ts 全量文本方法（回滚通道：CONSULT_PROVIDER=baichuan 一键回退）
  * 视觉链（detectLayers/extractIdentity/runOcr）恒走 qwen/ocr，不随 provider 切换。
  */
-import type { AiClients } from './types.js'
+import type { AiClients, ConsultRawSections } from './types.js'
 import * as qwen from './qwen.js'
 import * as ocr from './ocr.js'
 import * as baichuan from './baichuan.js'
@@ -46,7 +46,27 @@ export function createAiClients(): AiClients {
     consultAnswer,
     insightSummary: rest.insightSummary,
     queueSummary: rest.queueSummary,
+    externalKnowledge: externalKnowledgeClient,
   }
+}
+
+/**
+ * 外部知识兜底模型选择（M14 演示版）：百川医疗模型优先，未配置时回落千问文本；
+ * 均未配置则由调用方抛 AIUnavailableError → 上层固定通用提示（不静默）。
+ */
+function externalKnowledgeClient(question: string): Promise<ConsultRawSections> {
+  if (process.env.BAICHUAN_API_KEY && process.env.BAICHUAN_BASE_URL) {
+    return baichuan.externalKnowledge(question)
+  }
+  return qwenText.externalKnowledge(question)
+}
+
+/** 外部知识实际模型标签（引用 version 字段用，与 externalKnowledgeClient 选择逻辑同源）。 */
+export function externalKnowledgeModelLabel(): string {
+  if (process.env.BAICHUAN_API_KEY && process.env.BAICHUAN_BASE_URL) {
+    return process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus'
+  }
+  return process.env.CONSULT_MODEL || 'qwen3.8-flash'
 }
 
 export * from './types.js'

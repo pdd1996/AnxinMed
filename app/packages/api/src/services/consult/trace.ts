@@ -34,7 +34,7 @@ export const TraceDetailValueSchema = z.union([
 
 /** 路由轨迹单步：层 + 结果 + 安全 detail。 */
 export const RouteTraceStepSchema = z.object({
-  layer: z.enum(['input', 'guard', 'object', 'scope', 'intent', 'route', 'execute']),
+  layer: z.enum(['input', 'guard', 'object', 'scope', 'intent', 'route', 'execute', 'external']),
   outcome: z.string().min(1),
   detail: z.record(z.string(), TraceDetailValueSchema).optional(),
 })

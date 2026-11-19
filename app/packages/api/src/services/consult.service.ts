@@ -46,6 +46,12 @@ import {
 import { buildClarifyOptions, buildClarifyResult, shouldClarifyObject } from './consult/clarify.js'
 import { buildOutOfScopeResult, classifyConsultScope } from './consult/scope.js'
 import { normalizeRoutingText } from './consult/normalize.js'
+import {
+  answerExternalKnowledge,
+  isExternalKnowledgeEnabled,
+  shouldAnswerExternalKnowledge,
+} from './consult/external.js'
+import { externalKnowledgeModelLabel } from '../lib/ai/index.js'
 import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
 import { validateCitationCoverage } from './consult/coverage.js'
@@ -325,6 +331,13 @@ export async function consult(
       }
     } else {
       gateSteps.push({ layer: 'object', outcome: 'missing' })
+      // M14 演示版：本地库未收录的「物质 × 药物同服」问题 → 外部知识兜底（百川医疗优先）。
+      // 只在此分支触发（S1 + 无绑定药 + 无澄清对象），失败回退固定通用提示，不静默。
+      if (isExternalKnowledgeEnabled() && shouldAnswerExternalKnowledge(questionRedacted)) {
+        const external = await answerExternalKnowledge(ai, questionRedacted, externalKnowledgeModelLabel())
+        result = external.result
+        gateSteps.push({ layer: 'external', outcome: external.source })
+      }
     }
   }
 

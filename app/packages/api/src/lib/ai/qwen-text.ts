@@ -20,6 +20,7 @@ import { callJson, extractChatContentStrict, parseModelJson, type ChatResponse }
 import { ConsultRawSectionsSchema, FallbackParseSchema } from './schemas.js'
 import {
   buildConsultRequest,
+  buildExternalKnowledgePrompt,
   buildFallbackParseRequest,
   buildInsightRequest,
   buildQueueSummaryRequest,
@@ -93,6 +94,18 @@ export async function queueSummary(payload: QueuePromptPayload): Promise<Consult
   const parsed = ConsultRawSectionsSchema.safeParse(raw)
   if (!parsed.success) {
     throw new AIUnavailableError('qwen-text', `队列摘要输出不符合约定：${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
+/** 外部知识兜底（演示版）：百川不可用时的文本模型回落；同 prompt 同 schema、非思考、温度 0。 */
+export async function externalKnowledge(question: string): Promise<ConsultRawSections> {
+  const raw = await chatJson(
+    textRequest({ messages: [{ role: 'user' as const, content: buildExternalKnowledgePrompt(question) }] }),
+  )
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('qwen-text', `外部知识输出不符合约定：${parsed.error.message}`)
   }
   return parsed.data
 }

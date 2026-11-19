@@ -103,6 +103,61 @@ ${interactionsText}
   }
 }
 
+// ---------------------------------------------------------------------------
+// M14：外部知识兜底（本地库未收录的「物质 × 药物同服」问题）
+// ---------------------------------------------------------------------------
+
+/** 外部知识 prompt（纯函数，可测）：严格 JSON + 安全红线；不含本地说明书段落。 */
+export function buildExternalKnowledgePrompt(question: string): string {
+  return `你是"安心用药"的用药安全信息助手。用户问的是本地知识库未收录的「药物/食物/饮品同服」问题。
+
+硬性规则：
+1. 只输出严格 JSON，禁止 Markdown、禁止引用编号。格式：
+{"summary":"一句话直接回答","keyPoints":["最多3条"],"risks":["最多3条"],"nextAction":"下一步建议","warning":"安全提示"}
+2. 总字数 100-220 个汉字。
+3. 不得给出具体剂量、频次、疗程数字（不得出现"每次X片/每天X次/X毫克"）。
+4. 不得诊断、开处方、建议自行停药或换药。
+5. 不得说"可以放心同服/绝对安全/没有问题"；不确定时明确说"不确定/请咨询医生或药师"。
+6. 涉及酒精与头孢类、甲硝唑等药物同服时，必须提示双硫仑样反应风险与及时就医。
+7. 不编造参考文献、指南名称或药名；只给一般性安全常识。
+8. warning 必须提醒"AI 生成，仅供参考，请咨询医生或药师"。
+
+用户问题：${question}`
+}
+
+/** 外部知识请求体（纯函数）：百川模型、温度 0、单轮 user 消息。 */
+export function buildExternalKnowledgeRequest(question: string) {
+  return {
+    model: process.env.BAICHUAN_MODEL ?? 'baichuan-m3-plus',
+    temperature: 0,
+    messages: [{ role: 'user' as const, content: buildExternalKnowledgePrompt(question) }],
+  }
+}
+
+/** 外部知识兜底：百川医疗模型回答结构化分区；非法输出抛 AIUnavailableError（上层回退固定提示）。 */
+export async function externalKnowledge(question: string): Promise<ConsultRawSections> {
+  const baseUrl = process.env.BAICHUAN_BASE_URL
+  const key = process.env.BAICHUAN_API_KEY
+  if (!baseUrl || !key) {
+    throw new AIUnavailableError('baichuan', '缺少 BAICHUAN_BASE_URL / BAICHUAN_API_KEY 配置（外部知识兜底）')
+  }
+  const res = await callJson<ChatResponse>(
+    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildExternalKnowledgeRequest(question)),
+    },
+    { client: 'baichuan' },
+  )
+  const raw = parseModelJson(extractChatContent(res, 'baichuan'), 'baichuan')
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('baichuan', `外部知识输出不符合约定：${parsed.error.message}`)
+  }
+  return parsed.data
+}
+
 /** 咨询回答：本地说明书 + 相互作用上下文 → 结构化分区。输出过 ConsultRawSectionsSchema safeParse。 */
 export async function consultAnswer(payload: ConsultPromptPayload): Promise<ConsultRawSections> {
   const baseUrl = process.env.BAICHUAN_BASE_URL

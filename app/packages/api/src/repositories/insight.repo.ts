@@ -330,6 +330,10 @@ export interface ExpiryStatus {
   expiring: Array<MedicationItem & { days: number }>
   expired: Array<MedicationItem & { days: number }>
   lowStock: MedicationItem[]
+  /** 库存未记录的药（stock=null）：模板据此说明「无法判断是否快用完」，不把未记录当库存充足。 */
+  unknownStock?: number
+  /** 已记录库存的药（含足量）：库存焦点下展示余量，避免「快吃完了」答成「暂无提醒」。 */
+  stocked?: MedicationItem[]
 }
 
 /** 临期/过期/低库存分类（照搬 demo:1163-1179，阈值：临期 ≤30 天、低库存 ≤10）。 */
@@ -339,6 +343,8 @@ export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
   const expiring: Array<MedicationItem & { days: number }> = []
   const expired: Array<MedicationItem & { days: number }> = []
   const lowStock: MedicationItem[] = []
+  const stocked: MedicationItem[] = []
+  let unknownStock = 0
 
   for (const m of meds) {
     if (m.expiry) {
@@ -346,10 +352,15 @@ export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
       if (days < 0) expired.push({ ...m, days })
       else if (days <= 30) expiring.push({ ...m, days })
     }
-    if (m.stock && m.stock.value <= 10) lowStock.push(m)
+    if (m.stock) {
+      stocked.push(m)
+      if (m.stock.value <= 10) lowStock.push(m)
+    } else {
+      unknownStock += 1
+    }
   }
 
-  return { expiring, expired, lowStock }
+  return { expiring, expired, lowStock, unknownStock, stocked }
 }
 
 /** 时间戳（postgres text 形态）→ ISO 日期 "YYYY-MM-DD"；空/非法返回 null（口径同 toISOString 的 UTC 日）。 */

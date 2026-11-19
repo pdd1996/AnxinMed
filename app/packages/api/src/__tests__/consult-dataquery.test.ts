@@ -232,6 +232,26 @@ describe('renderExpiryStockSections · 子焦点（M4-T6-fix 答非所问修正�
     expect(s.summary).toContain('另外，有 1 种 30 天内到期')
   })
 
+  it('M14 修复：「药快吃没了」→ 子焦点为库存，并列出已记录余量与未记录数量', () => {
+    expect(deriveExpiryStockFocus('药快吃没了')).toBe('stock')
+    expect(deriveExpiryStockFocus('我的药快吃完了')).toBe('stock')
+
+    const s = renderExpiryStockSections(
+      {
+        expired: [],
+        expiring: [],
+        lowStock: [],
+        stocked: [mkMed({ genericName: '阿托伐他汀钙片', stock: { value: 27, unit: '片' } })],
+        unknownStock: 1,
+      },
+      'stock',
+    )
+    expect(s.summary).toContain('你的药箱目前没有库存不足的药品')
+    expect(s.summary).toContain('1 种药品没有记录剩余数量')
+    expect(s.keyPoints.join('')).toContain('已记录的剩余数量：阿托伐他汀钙片 27 片')
+    expect(s.keyPoints.join('')).toContain('1 种药品没有记录剩余数量')
+  })
+
   it('both（chips 文案）→ 两桶都明确作答，空桶也明说', () => {
     const s = renderExpiryStockSections(ONLY_LOW_STOCK, 'both')
     expect(s.summary).toContain('没有过期或临期药品')
