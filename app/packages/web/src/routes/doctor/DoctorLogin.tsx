@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation } from 'react-router'
 import { signIn, signOut, toUserMessage, useAuthStore } from '@anxin/core'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Stethoscope } from 'lucide-react'
@@ -80,9 +80,6 @@ export default function DoctorLogin() {
               安心用药 · 医生端
             </p>
             <CardTitle className="text-2xl">医生登录</CardTitle>
-            <CardDescription className="text-base leading-7">
-              仅限医生账号。登录后可查看已授权患者的用药与打卡情况。
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={handleSubmit} noValidate>
