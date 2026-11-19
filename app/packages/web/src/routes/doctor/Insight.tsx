@@ -624,7 +624,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
       )}
 
       {/* 依从性 */}
-      <SectionHeading eyebrow="工具输出" title="依从性" />
+      <SectionHeading title="依从性" />
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -665,11 +665,11 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
       </Card>
 
       {/* 打卡时序图表（T7 · G2 5.x 前端渲染，数据 0 次 LLM 直查库） */}
-      <SectionHeading eyebrow="工具输出" title="打卡时序图表" />
+      <SectionHeading title="打卡时序图表" />
       <PatientAdherenceCharts patientId={patient.id} />
 
       {/* 用药清单与相互作用 */}
-      <SectionHeading eyebrow="工具输出" title="用药清单与相互作用" />
+      <SectionHeading title="用药清单与相互作用" />
       <div className="grid gap-2 sm:grid-cols-2">
         {tools.medicationList.map((m) => (
           <Card key={m.id}>
@@ -745,7 +745,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
       )}
 
       {/* 风险事件与咨询 */}
-      <SectionHeading eyebrow="工具输出" title="风险事件与咨询" />
+      <SectionHeading title="风险事件与咨询" />
       {tools.riskEvents.events.length > 0 ? (
         <Card>
           <CardContent className="space-y-2 p-3">
