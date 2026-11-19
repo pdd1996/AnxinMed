@@ -89,11 +89,13 @@ class TestCoverage(unittest.TestCase):
         self.assertIn('痉', cov['missingSample'])
         self.assertEqual(cov['lostContent'], 2)
         self.assertEqual(cov['lostDistinctContent'], 2)
+        self.assertEqual(cov['lostDistinctCJK'], 2)
 
     def test_punctuation_only_loss_is_not_content(self):
         cov = xc.char_coverage('1.0mg（10^6 U）', '1.0mg10^6U')
         self.assertEqual(cov['lostContent'], 0)
         self.assertEqual(cov['lostDistinctContent'], 0)
+        self.assertEqual(cov['lostDistinctCJK'], 0)
 
     def test_html_tag_ignored(self):
         cov = xc.char_coverage('腹痛', '<table><tr><td>腹痛</td></tr></table>')
@@ -192,9 +194,11 @@ class TestSections(unittest.TestCase):
 
 
 class TestClassify(unittest.TestCase):
-    def _cov(self, rate=1.0, lost_distinct=0):
+    def _cov(self, rate=1.0, lost_cjk=0, lost_digit=0, section_split=False):
         return {'rate': rate, 'lost': 0, 'lostContent': 0,
-                'lostDistinctContent': lost_distinct, 'chars': 10, 'missingSample': ''}
+                'lostDistinctContent': lost_cjk + lost_digit,
+                'lostDistinctCJK': lost_cjk, 'lostDistinctDigit': lost_digit,
+                'sectionSplit': section_split, 'chars': 10, 'missingSample': ''}
 
     def test_structure_upgraded(self):
         draft = {'tables': 1, 'rows': 8, 'maxCols': 2, 'emptyCellRows': 3, 'emptyCells': 6}
@@ -229,8 +233,21 @@ class TestClassify(unittest.TestCase):
 
     def test_serious_text_gap(self):
         empty = {'tables': 0, 'rows': 0, 'maxCols': 0, 'emptyCellRows': 0, 'emptyCells': 0}
-        _, flags = xc.classify_section(empty, empty, self._cov(0.95, lost_distinct=5), [])
+        _, flags = xc.classify_section(empty, empty, self._cov(0.95, lost_cjk=5), [])
         self.assertIn('serious-text-gap', flags)
+
+    def test_latin_only_loss_not_serious(self):
+        empty = {'tables': 0, 'rows': 0, 'maxCols': 0, 'emptyCellRows': 0, 'emptyCells': 0}
+        cov = {'rate': 0.98, 'lost': 5, 'lostContent': 5, 'lostDistinctContent': 5,
+               'lostDistinctCJK': 0, 'lostDistinctDigit': 0, 'chars': 100, 'missingSample': 'Cmax'}
+        _, flags = xc.classify_section(empty, empty, cov, [])
+        self.assertNotIn('serious-text-gap', flags)
+
+    def test_section_split_not_serious(self):
+        empty = {'tables': 0, 'rows': 0, 'maxCols': 0, 'emptyCellRows': 0, 'emptyCells': 0}
+        _, flags = xc.classify_section(empty, empty, self._cov(0.9, lost_cjk=20, section_split=True), [])
+        self.assertIn('section-split', flags)
+        self.assertNotIn('serious-text-gap', flags)
 
     def test_aggregate_priority(self):
         self.assertEqual(
@@ -269,6 +286,28 @@ class TestPlan(unittest.TestCase):
         self.assertIn('/mnt/d/manuals/x.pdf', script)
         self.assertIn('/mnt/c/repo/data/mineru-xcheck/raw', script)
         self.assertIn('--tier basic --format middle_json', script)
+
+    def test_run_script_workers_round_robin(self):
+        plan = [{'slug': f's{i}', 'sourceFile': f'{i}.pdf', 'pdfPath': f'D:\\manuals\\{i}.pdf',
+                 'drugIds': [f'd{i}'], 'pageCount': 1} for i in range(5)]
+        script = xc.render_run_script(plan, 'C:\\repo\\raw', '/mnt/home', 'kit', workers=3)
+        for w in range(3):
+            self.assertIn(f'worker{w} () {{', script)
+        self.assertIn('done: outputs=', script)
+        # 轮转分配：worker0 拿到 s0/s3，worker1 拿到 s1/s4，worker2 拿到 s2
+        worker0 = script.split('worker0 () {')[1].split('}')[0]
+        self.assertIn('"s0"', worker0)
+        self.assertIn('"s3"', worker0)
+        self.assertNotIn('"s1"', worker0)
+
+    def test_load_drug_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            txt = Path(tmp) / 'ids.txt'
+            txt.write_text('drug-a\ndrug-b\n\n# 注释\ndrug-c\n', encoding='utf-8')
+            self.assertEqual(xc.load_drug_ids(txt), ['drug-a', 'drug-b', 'drug-c'])
+            jsonl = Path(tmp) / 'ids.jsonl'
+            jsonl.write_text('{"drugId": "drug-x", "sourceFile": "x.pdf"}\n', encoding='utf-8')
+            self.assertEqual(xc.load_drug_ids(jsonl), ['drug-x'])
 
     def test_write_text_lf(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -314,7 +353,8 @@ class TestActionFor(unittest.TestCase):
         self.assertEqual(xc._action_for('no-source-table', [], flattened=True),
                          'confirm-no-source-table')
         self.assertEqual(xc._action_for('no-source-table', [], flattened=False), 'manual-review')
-        self.assertEqual(xc._action_for('structure-same', ['text-gap']), 'manual-review')
+        self.assertEqual(xc._action_for('structure-same', ['text-gap']), 'no-action')
+        self.assertEqual(xc._action_for('structure-same', ['section-split']), 'no-action')
         self.assertEqual(xc._action_for('structure-same', []), 'no-action')
 
 

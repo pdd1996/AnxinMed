@@ -40,7 +40,7 @@ except ModuleNotFoundError:  # pragma: no cover - 缺依赖时 report 会显式�
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extract as ex  # noqa: E402
 
-TOOL_VERSION = 'mineru-xcheck-2026-11-19'
+TOOL_VERSION = 'mineru-xcheck-2026-11-19b'
 TABLE_LINE_RE = re.compile(r'^\s*\|')
 TABLE_SEP_RE = re.compile(r'^\s*\|?[\s:|-]+\|[\s:|-]*$')
 FREQ_PREFIX_RE = re.compile(r'^(十分常见|常见|偶见|罕见|十分罕见|未知|不常见|非常常见)[：:、]?')
@@ -261,10 +261,18 @@ def char_coverage(draft_text: str, mineru_text: str) -> dict:
     missing = ''.join(sorted(lost))
     lost_content = sum(n for ch, n in lost.items() if ch.isalnum())
     lost_distinct = sum(1 for ch in lost if ch.isalnum() and b.get(ch, 0) == 0)
+    # 汉字与数字分开计：化学式/上下标的拉丁字母丢失通常只是 LaTeX 表示差异，不算真丢字
+    lost_distinct_cjk = sum(1 for ch in lost if b.get(ch, 0) == 0 and _is_cjk(ch))
+    lost_distinct_digit = sum(1 for ch in lost if b.get(ch, 0) == 0 and ch.isdigit())
     return {'chars': sum(a.values()), 'lost': sum(lost.values()),
             'lostContent': lost_content, 'lostDistinctContent': lost_distinct,
+            'lostDistinctCJK': lost_distinct_cjk, 'lostDistinctDigit': lost_distinct_digit,
             'rate': round(1 - sum(lost.values()) / total, 6),
             'missingSample': missing[:40]}
+
+
+def _is_cjk(ch: str) -> bool:
+    return '\u3400' <= ch <= '\u4dbf' or '\u4e00' <= ch <= '\u9fff' or '\uf900' <= ch <= '\ufaff'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -422,7 +430,10 @@ def classify_section(draft_stats: dict, mu_stats: dict, coverage: dict,
     flags: list[str] = []
     if coverage['rate'] < 0.99:
         flags.append('text-gap')
-    if coverage.get('lostDistinctContent', 0) >= 3:
+    if coverage.get('sectionSplit'):
+        # 段内缺、全文有：MinerU 阅读顺序/段边界归位问题，不是丢字
+        flags.append('section-split')
+    elif coverage.get('lostDistinctCJK', 0) >= 3 or coverage.get('lostDistinctDigit', 0) >= 3:
         flags.append('serious-text-gap')
     if clipped:
         flags.append('source-clipped')
@@ -504,14 +515,19 @@ def build_plan(drafts: dict[str, dict], scan_samples: list[dict] | None,
 
 
 def render_run_script(plan: list[dict], out_dir: str, mineru_home: str,
-                      mineru_bin: str) -> str:
-    """生成 WSL/Linux 批跑脚本（LF 换行；在 Windows 上写盘时由 write_text_lf 保证）。"""
+                      mineru_bin: str, workers: int = 1) -> str:
+    """生成 WSL/Linux 批跑脚本（LF 换行；在 Windows 上写盘时由 write_text_lf 保证）。
+
+    workers>1 时按轮转把 PDF 分给多个后台 worker 并行跑；单文件失败只记录到 .failed，
+    不中断其他文件。MinerU 每个进程会加载一次模型，并行是「多文件小 PDF」场景的主要提速手段。
+    """
     out_path = Path(out_dir)
     if not out_path.is_absolute():
         out_path = Path.cwd() / out_path
     out_wsl = str(out_path.resolve()).replace('\\', '/')
     if re.match(r'^[A-Za-z]:/', out_wsl):
         out_wsl = '/mnt/' + out_wsl[0].lower() + out_wsl[2:]
+    workers = max(1, int(workers or 1))
     lines = [
         '#!/usr/bin/env bash',
         'set -uo pipefail',
@@ -521,25 +537,41 @@ def render_run_script(plan: list[dict], out_dir: str, mineru_home: str,
         f'M={mineru_bin}',
         f'OUT={out_wsl}',
         'mkdir -p "$OUT"',
+        'rm -f "$OUT/.failed"',
         'echo "=== mineru: $($M --version 2>&1 | head -1) ==="',
         'echo "=== models: $($M models show 2>&1 | grep -E \'^  basic:\' | head -1) ==="',
-        'fail=0',
+        'parse_one () {',
+        '  local pdf="$1" slug="$2" log="/tmp/xc_${2}.log"',
+        '  if $M parse "$pdf" -o "$OUT/$slug.middle_json" --tier basic '
+        '--format middle_json --pages all >"$log" 2>&1; then',
+        '    echo "  ok $slug"',
+        '  else',
+        '    echo "  FAILED $slug"; echo "$slug" >> "$OUT/.failed"',
+        '  fi',
+        '}',
     ]
-    for entry in plan:
+
+    def pdf_arg(entry: dict) -> str:
         pdf = entry['pdfPath'].replace('\\', '/')
         if re.match(r'^[A-Za-z]:/', pdf):
             pdf = '/mnt/' + pdf[0].lower() + pdf[2:]
-        slug = entry['slug']
-        log = f'/tmp/xc_{slug}.log'
-        lines.append(f'echo "--- {slug} ---"')
-        lines.append(
-            f'$M parse "{pdf}" -o "$OUT/{slug}.middle_json" --tier basic '
-            f'--format middle_json --pages all >{log} 2>&1 '
-            f'|| {{ echo "FAILED {slug}"; fail=$((fail+1)); }}'
-        )
-        lines.append(f'tail -2 {log} | sed "s/^/    /"')
+        return pdf
+
+    for w in range(workers):
+        chunk = plan[w::workers]
+        lines.append(f'worker{w} () {{')
+        if not chunk:
+            lines.append('  true')
+        for entry in chunk:
+            lines.append(f'  parse_one "{pdf_arg(entry)}" "{entry["slug"]}"')
+        lines.append('}')
+    for w in range(workers):
+        lines.append(f'worker{w} & p{w}=$!')
+    lines.append('for pid in ' + ' '.join(f'$p{w}' for w in range(workers)) + '; do wait "$pid"; done')
     lines += [
-        'echo "=== done: failed=$fail, outputs=$(ls -1 "$OUT" 2>/dev/null | wc -l) ==="',
+        'failed=$( [ -f "$OUT/.failed" ] && wc -l < "$OUT/.failed" || echo 0 )',
+        'echo "=== done: outputs=$(ls -1 "$OUT" 2>/dev/null | wc -l) failed=$failed ==="',
+        '[ "$failed" -eq 0 ] || { echo "failed slugs:"; cat "$OUT/.failed"; exit 1; }',
     ]
     return '\n'.join(lines) + '\n'
 
@@ -548,6 +580,20 @@ def write_text_lf(path: Path, text: str) -> None:
     """显式 LF 写盘：bash 脚本在 Windows 上被转成 CRLF 会直接语法错误。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(text.replace('\r\n', '\n').encode('utf-8'))
+
+
+def load_drug_ids(path: str | Path) -> list[str]:
+    """drugId 清单文件：一行一个 drugId，或 JSONL（每行含 drugId 字段）。"""
+    ids: list[str] = []
+    for line in Path(path).read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('{'):
+            ids.append(json.loads(line)['drugId'])
+        else:
+            ids.append(line)
+    return ids
 
 
 def load_drafts(drafts_dir: Path, only: list[str] | None = None) -> dict[str, dict]:
@@ -642,6 +688,7 @@ def build_row(entry: dict, draft: dict, pdf: dict, mu: dict) -> dict:
     candidates: list[dict] = []
     mu_sections = mu['sections']
     draft_sections = draft.get('sections') or {}
+    doc_text = _all_text(mu)
     names = list(draft_sections)
     for name in mu_sections:
         if name not in names and name != '_preamble':
@@ -661,6 +708,13 @@ def build_row(entry: dict, draft: dict, pdf: dict, mu: dict) -> dict:
             'emptyCells': sum(t['emptyCells'] for t in mu_tables),
         }
         coverage = char_coverage(body, section_visible_text(mu_section or {'texts': [], 'tables': []}))
+        if body.strip() and coverage['rate'] < 0.99:
+            # 段内缺、全文有 → MinerU 段边界/阅读顺序归位问题，不是丢字
+            doc_cov = char_coverage(body, doc_text)
+            if doc_cov['lostContent'] <= 3 and doc_cov['lostDistinctContent'] <= 2:
+                coverage = dict(coverage)
+                coverage['sectionSplit'] = True
+                coverage['docRate'] = doc_cov['rate']
 
         # 贴边表格 → 该页文本层最右列的裁切回补候选
         clipped: list[dict] = []
@@ -703,7 +757,7 @@ def build_row(entry: dict, draft: dict, pdf: dict, mu: dict) -> dict:
                 'proposedMarkdownTables': [],
             })
 
-    whole = char_coverage('\n'.join(draft_sections.values()), _all_text(mu))
+    whole = char_coverage('\n'.join(draft_sections.values()), doc_text)
     return {
         'drugId': draft['drugId'], 'sourceFile': entry['sourceFile'],
         'pageCount': entry.get('pageCount'),
@@ -726,8 +780,10 @@ def _action_for(verdict: str, flags: list[str], flattened: bool = False) -> str:
         return 'manual-review'
     if verdict == 'no-source-table':
         return 'confirm-no-source-table' if flattened else 'manual-review'
-    if 'text-gap' in flags:
+    if 'serious-text-gap' in flags:
         return 'manual-review'
+    if 'section-split' in flags and verdict == 'structure-same':
+        return 'no-action'
     return 'no-action'
 
 
@@ -770,6 +826,7 @@ def _render_mu_tables(mu_tables: list[dict]) -> str:
 def render_report(rows: list[dict], meta: dict) -> tuple[str, dict]:
     verdict_counter = Counter(row['verdict'] for row in rows)
     action_counter = Counter(c['action'] for row in rows for c in row['candidates'])
+    flags_counter = Counter(f for row in rows for sec in row['sections'] for f in sec['flags'])
     actions = {a: sum(1 for row in rows for c in row['candidates'] if c['action'] == a)
                for a in sorted(action_counter)}
     payload = {
@@ -777,6 +834,7 @@ def render_report(rows: list[dict], meta: dict) -> tuple[str, dict]:
         'targets': len(rows),
         'verdicts': dict(verdict_counter),
         'actions': actions,
+        'flags': dict(flags_counter),
         'rows': rows,
     }
     lines = [
@@ -785,6 +843,7 @@ def render_report(rows: list[dict], meta: dict) -> tuple[str, dict]:
         f'- 工具：{TOOL_VERSION}；档位：basic（文本层模式，非 OCR）；目标：{len(rows)} 行说明书',
         f'- 判定分布：{dict(verdict_counter)}',
         f'- 候选处置分布：{actions}',
+        f'- flags 分布（按段）：{dict(flags_counter)}',
         '',
         '## 总表',
         '',
@@ -842,8 +901,10 @@ def cmd_plan(args: argparse.Namespace) -> int:
         scan = json.loads(Path(args.scan).read_text(encoding='utf-8'))
         scan_samples = scan.get('samples') or []
     drug_ids = list(args.drug_ids or [])
+    if args.drug_ids_file:
+        drug_ids.extend(load_drug_ids(args.drug_ids_file))
     if not scan_samples and not drug_ids:
-        print('需要 --scan 或 --drug-ids 至少一个', file=sys.stderr)
+        print('需要 --scan / --drug-ids / --drug-ids-file 至少一个', file=sys.stderr)
         return 2
     wanted = drug_ids + [s['drugId'] for s in (scan_samples or [])]
     drafts = load_drafts(Path(args.drafts), only=wanted)
@@ -853,11 +914,14 @@ def cmd_plan(args: argparse.Namespace) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     plan_path = out_dir / 'plan.jsonl'
     write_text_lf(plan_path, '\n'.join(json.dumps(p, ensure_ascii=False) for p in plan) + '\n')
-    script = render_run_script(plan, str(out_dir / 'raw'), args.mineru_home, args.mineru_bin)
+    script = render_run_script(plan, str(out_dir / 'raw'), args.mineru_home, args.mineru_bin,
+                               args.workers)
     write_text_lf(out_dir / 'run-mineru.sh', script)
     print(json.dumps({
         'plan': str(plan_path), 'script': str(out_dir / 'run-mineru.sh'),
         'pdfs': len(plan), 'drugRows': sum(len(p['drugIds']) for p in plan),
+        'pages': sum(p.get('pageCount') or 0 for p in plan),
+        'workers': max(1, int(args.workers or 1)),
         'missingDrafts': missing,
     }, ensure_ascii=False, indent=2))
     return 0
@@ -912,6 +976,9 @@ def build_parser() -> argparse.ArgumentParser:
                       help='M7 质量扫描结果（默认 30 行残差样本）')
     plan.add_argument('--no-scan', action='store_true', help='不用默认扫描样本，只按 --drug-ids 选')
     plan.add_argument('--drug-ids', nargs='*', default=None, help='额外/指定的 drugId 列表')
+    plan.add_argument('--drug-ids-file', default=None,
+                      help='drugId 清单文件（一行一个，或 JSONL 含 drugId 字段）')
+    plan.add_argument('--workers', type=int, default=1, help='批跑并行 worker 数（默认 1）')
     plan.add_argument('--drafts', default='data/manuals')
     plan.add_argument('--pdf-dir', default='D:/manuals')
     plan.add_argument('--out', default='data/mineru-xcheck')
