@@ -1,4 +1,4 @@
-/**
+﻿/**
  * M2-T7 · 确认页组件断言（任务书完成标准：needsManual 字段无法被预填值、冲突清单不自动选择）。
  *
  * 只 mock 传输层（@anxin/core 的三个函数），页面/纯逻辑/组件全走真代码：
@@ -357,10 +357,10 @@ describe('批准文号口径（2026-11-19 现场反馈：批号不是身份核�
     expect(await screen.findByText(/多规格库条目 · 规格以实物为准/)).toBeTruthy()
 
     fireEvent.change(input, { target: { value: '国药准字H20138002' } })
-    expect(await screen.findByText(/批号命中（用户填写·未校验）/)).toBeTruthy()
+    expect(await screen.findByText(/批准文号命中（用户填写·未校验）/)).toBeTruthy()
 
     fireEvent.change(input, { target: { value: '国药准字H99999999' } })
-    expect(await screen.findByText(/填写的批号在候选中没有命中/)).toBeTruthy()
-    expect(screen.queryByText(/批号命中（用户填写·未校验）/)).toBeNull()
+    expect(await screen.findByText(/填写的批准文号在候选中没有命中/)).toBeTruthy()
+    expect(screen.queryByText(/批准文号命中（用户填写·未校验）/)).toBeNull()
   })
 })

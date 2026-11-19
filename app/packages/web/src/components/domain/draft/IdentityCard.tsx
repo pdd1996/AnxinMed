@@ -125,27 +125,32 @@ export function IdentityCard({
           <div className="space-y-3">
             {/* 2026-11-20：冲突清单的两段提示文案（「系统不选边」横幅 + 每条冲突说明）按用户要求删除，
                 只保留候选单选列表；「不选边」由 core 初值保证（selectedCandidateId 恒为 ''），不依赖文案。 */}
-            {/* 批准文号选填（2026-11-19）：批号会随规格/注册变更而不同，且常印在包装侧面；
-                因此不做身份核对字段，只作「候选定位」辅助——不校验、不落库、不阻塞确认。 */}
+            {/* 批准文号选填（2026-11-19）：只作「候选定位」辅助——不校验、不落库、不阻塞确认。
+                口径（2026-11-20 用户现场提问）：批准文号 =「国药准字 + 类别字母 + 8 位数字」，
+                字母随药类变（H 化学药 / Z 中药 / S 生物制品 / B 保健药 / T 体外诊断试剂 / F 辅料），
+                **不能按 H 写死**；生产批号（如 20250812）一批一变，不是身份字段，别和批准文号混称。 */}
             <div className="space-y-1 rounded-lg border border-dashed border-input bg-muted/40 p-3">
               <Label htmlFor="id-approval">批准文号（选填）</Label>
               <Input
                 id="id-approval"
                 value={state.approvalInput}
                 onChange={(e) => patch({ approvalInput: e.target.value })}
-                placeholder="如 国药准字H20138002（可只填 H 后面的编号）"
+                placeholder="如 国药准字H20138002"
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                只在包装上印了才需要填：帮你从候选里定位对应记录，<strong>不做官方校验</strong>；以包装/说明书为准。
+                填包装上的<strong>批准文号</strong>（不是生产批号）；只填后面那串数字也行。
+              </p>
+              <p className="text-xs leading-5 text-muted-foreground">
+                帮你在候选里定位对应记录，<strong>不做官方校验</strong>；以包装/说明书为准。
               </p>
               {state.approvalInput.trim() &&
                 (candidates.some((c) => approvalMatchesCandidate(c, state.approvalInput)) ? (
                   <p className="text-xs leading-5 text-risk-l2">
-                    已命中下方带「批号命中」的候选（用户填写·未校验），请核对实物规格后点选。
+                    已命中下方带「批准文号命中」的候选（用户填写·未校验），请核对实物规格后点选。
                   </p>
                 ) : (
                   <p className="text-xs leading-5 text-risk-l3">
-                    填写的批号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
+                    填写的批准文号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
                   </p>
                 ))}
             </div>
@@ -179,7 +184,7 @@ export function IdentityCard({
                     )}
                     {state.approvalInput.trim() && approvalMatchesCandidate(c, state.approvalInput) && (
                       <span className="mt-1 ml-1 inline-block rounded-full bg-risk-l2/15 px-2 py-0.5 text-xs font-semibold text-risk-l2">
-                        批号命中（用户填写·未校验）
+                        批准文号命中（用户填写·未校验）
                       </span>
                     )}
                   </span>
