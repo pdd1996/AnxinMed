@@ -37,6 +37,10 @@ const STATUS_ICON: Record<TaskStatus, typeof Check> = {
   later: Clock3,
 }
 
+/** hero 日期：「11月19日」与「星期四」分开格式化，给窄屏留一个只在两者之间折行的断点。 */
+const HERO_DATE_FMT = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' })
+const HERO_WEEKDAY_FMT = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' })
+
 function cycleLabel(group: PlanGroup): string {
   if (group.cycleType === 'open') return '长期'
   if (group.cycleType === 'stock') return '用完为止'
@@ -127,21 +131,18 @@ export default function Home() {
       <Card className="border-primary/20 bg-primary text-primary-foreground">
         <CardContent className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs opacity-80">
-              {new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())}
+            {/* 日期已是 hero 左侧唯一信息，不能再按辅助小字排：老年向正文级字号（rem 随大字档联动），
+                且不用 opacity 压暗——白字 80% 叠在 brand 绿上对比不足。
+                窄屏放不下一行时只在「月日 / 星期」之间折行，不把「星期四」拆成孤字。 */}
+            <p className="text-xl font-semibold">
+              <span className="whitespace-nowrap">{HERO_DATE_FMT.format(new Date())}</span>
+              {'\u200B'}
+              <span className="whitespace-nowrap">{HERO_WEEKDAY_FMT.format(new Date())}</span>
             </p>
-            <h2 className="mt-1 text-2xl font-bold">
-              {!summary || summary.total === 0
-                ? '把所有来源的药放进同一个药箱'
-                : progress >= 100
-                  ? '今天的用药已全部记录'
-                  : '按时用药，安心每一天'}
-            </h2>
-            <p className="mt-1 text-sm opacity-80">所有提醒均来自你亲自确认的计划。</p>
           </div>
           <div className="grid size-24 shrink-0 place-content-center rounded-full border-4 border-primary-foreground/30 text-center">
             <span className="text-2xl font-bold">{progress}%</span>
-            <small className="text-[10px] opacity-80">今日完成</small>
+            <small className="text-sm">今日完成</small>
           </div>
         </CardContent>
       </Card>
@@ -231,7 +232,6 @@ export default function Home() {
             <span className="flex items-center gap-2 text-base font-bold">
               <Camera className="size-5" aria-hidden /> 拍照录入
             </span>
-            <span className="text-xs font-normal opacity-80">拍药品建档 / 拍处方笺一步建档建计划</span>
           </Link>
         </Button>
         <Button asChild variant="secondary" className="min-h-16 h-auto flex-col items-start gap-1 p-4 text-left">
