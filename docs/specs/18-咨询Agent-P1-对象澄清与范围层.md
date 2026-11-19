@@ -257,4 +257,4 @@ ssh root@118.196.82.13 'bash /tmp/deploy-latest.sh'
 | 「我是不是得了糖尿病」（不带版本 / v2） | `no-source` / `out-of-scope` | 旧客户端兼容映射与范围层均正常 |
 
 - **模拟器 G8 v1.0.0 旧包实机回归**（staging 真实链路）：「这个药有什么副作用」正常渲染澄清固定文案 + 5 个药名；「药快吃没了」正常渲染数据直答卡（`暂无过期…`）；**均无白屏、无 JS 错误、Activity 存活**。截图：`app/backups/g8-compat-evidence/postdeploy-*.png`（gitignored）。
-- 磁盘：恢复后 26GB 可用；后续建议 40G 盘扩至 80G，并把 `backups/*.dump` 定期外置/对象存储（本次 100% 满 = 失败构建缓存 + 多份备份叠加）。
+- 磁盘：2026-11-19 已完成 **40G→80G 在线扩容**（`growpart /dev/vda 2` + `resize2fs /dev/vda2`，无需重启），扩容后 `/` 为 **79G、可用 61G（20%）**；备份轮转与构建缓存治理见 [specs/22](./22-M13-收口总结与试点观测清单.md) §2。
