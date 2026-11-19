@@ -10,7 +10,7 @@
 |---|---|
 | 服务器 | 火山引擎 ECS **4C8G**（任务书基线 2C4G，当前配置有余量） |
 | 系统 | Ubuntu 22.04 / 24.04 LTS，Docker + compose plugin 已装 |
-| 部署路径 | `/opt/AnxinMed`（仓库根），compose 在 `/opt/AnxinMed/app` |
+| 部署路径 | 仓库根 `/opt/AnxinMed`（3a）或 `~/anxin`（3b）——**staging 实际在 `/root/anxin/app`**。别照抄路径：以 `docker inspect anxin-api` 里 `com.docker.compose.project.working_dir` 标签为准（2026-11-20 照抄 `/opt/AnxinMed/app` 直接 `No such file or directory`） |
 | 公网入口（过渡期） | `http://<ECS_IP>:8787` —— api 进程同时托管 `/api` 与前端静态 dist |
 | 数据库 | **不映射公网**，compose 里已收紧为 `127.0.0.1:5432`，只供容器内访问与 SSH 隧道 |
 
