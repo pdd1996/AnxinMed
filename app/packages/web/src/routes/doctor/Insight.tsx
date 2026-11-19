@@ -175,28 +175,8 @@ function QueueView({
 
       {!loading && !error && queue && (
         <>
-          {/* 分档统计卡 */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {(['good', 'fair', 'poor', 'ungraded'] as const).map((g) => {
-              const meta = GRADE_META[g]
-              const Icon = meta.icon
-              const count = queue.grades[g]
-              const label = g === 'ungraded' ? '未分档' : ADHERENCE_GRADE_LABEL[g]
-              return (
-                <Card key={g}>
-                  <CardContent className="flex items-center gap-3 p-3">
-                    <Icon className={`size-5 shrink-0 ${g === 'good' ? 'text-risk-l1' : g === 'fair' ? 'text-risk-l2' : g === 'poor' ? 'text-risk-l3' : 'text-muted-foreground'}`} aria-hidden />
-                    <div>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                      <p className="text-lg font-bold leading-tight">{count}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-
-          {/* 依从性分布直方图（固定模板 · spec §T7.5） */}
+          {/* 依从性分布直方图（固定模板 · spec §T7.5）
+              原 2×2 分档统计卡与下图完全重复（优/中/差/未分档 + 人数），已删除、只保留带百分比的图。 */}
           <AdherenceHistogram queue={queue} />
 
           {/* 患者列表（点一行查看该患者摘要；原「按患者下钻」为看板术语，改为白话） */}
