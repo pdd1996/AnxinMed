@@ -22,6 +22,7 @@ import {
   sanitizeExternalSections,
   shouldAnswerExternalKnowledge,
 } from '../services/consult/external.js'
+import { buildDeepseekExternalKnowledgeRequest } from '../lib/ai/deepseek.js'
 import { mockClients, newCalls } from './helpers/ai-mocks.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -75,6 +76,16 @@ describe('shouldAnswerExternalKnowledge · 触发范围（纯函数）', () => {
     expect(shouldAnswerExternalKnowledge('这个药每次吃几片')).toBe(false)
     expect(shouldAnswerExternalKnowledge('我今天血压怎么样')).toBe(false)
     expect(shouldAnswerExternalKnowledge('藿香正气水说明书')).toBe(false)
+  })
+})
+
+describe('A12 对打 · deepseek 外部知识请求', () => {
+  it('非思考、温度 0、复用外部知识 prompt', () => {
+    const req = buildDeepseekExternalKnowledgeRequest('酒和藿香正气水能一起吃吗')
+    expect(req.model).toBe(process.env.DEEPSEEK_MODEL || 'deepseek-flash')
+    expect(req.temperature).toBe(0)
+    expect(req.thinking).toEqual({ type: 'disabled' })
+    expect(req.messages[0].content).toContain('酒和藿香正气水能一起吃吗')
   })
 })
 

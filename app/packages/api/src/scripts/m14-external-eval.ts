@@ -16,6 +16,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import * as baichuan from '../lib/ai/baichuan.js'
 import * as qwenText from '../lib/ai/qwen-text.js'
+import * as deepseek from '../lib/ai/deepseek.js'
 import {
   sanitizeExternalSections,
   shouldAnswerExternalKnowledge,
@@ -58,6 +59,7 @@ type ExternalOutput = { sections: Parameters<typeof sanitizeExternalSections>[0]
 const MODELS: Array<{ label: string; fn: (q: string) => Promise<ExternalOutput> }> = [
   { label: 'baichuan-m3-plus', fn: (q) => baichuan.externalKnowledge(q) },
   { label: process.env.CONSULT_MODEL || 'qwen3.8-flash', fn: (q) => qwenText.externalKnowledge(q) },
+  { label: process.env.DEEPSEEK_MODEL || 'deepseek-flash', fn: (q) => deepseek.externalKnowledge(q) },
 ]
 
 // ---------------------------------------------------------------- 工具

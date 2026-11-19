@@ -5,10 +5,15 @@
  * （DeepSeek 官方默认思考 + effort=high，漏关即用推理模型做抄写：又慢又越权）。
  * prompt 复用 baichuan.ts 的 buildConsultRequest（同一套 prompt，对打可比）。
  */
-import { AIUnavailableError, type ConsultPromptPayload, type ConsultRawSections } from './types.js'
+import {
+  AIUnavailableError,
+  type ConsultExternalKnowledgeOutput,
+  type ConsultPromptPayload,
+  type ConsultRawSections,
+} from './types.js'
 import { callJson, extractChatContentStrict, parseModelJson, type ChatResponse } from './http.js'
 import { ConsultRawSectionsSchema } from './schemas.js'
-import { buildConsultRequest } from './baichuan.js'
+import { buildConsultRequest, buildExternalKnowledgePrompt } from './baichuan.js'
 
 /** 对照请求体（纯函数，可测）：同 prompt，model/temperature/思考关闭按 DeepSeek 契约覆盖。 */
 export function buildDeepseekConsultRequest(payload: ConsultPromptPayload) {
@@ -42,4 +47,40 @@ export async function consultAnswer(payload: ConsultPromptPayload): Promise<Cons
     throw new AIUnavailableError('deepseek', `咨询回答输出不符合约定：${parsed.error.message}`)
   }
   return parsed.data
+}
+
+/**
+ * 外部知识兜底（A12 对打用，暂未接入产品默认链）：与百川/千问同一套 prompt 与 schema，
+ * 非思考、温度 0。接入产品的选择逻辑见 lib/ai/index.ts（外部知识默认 百川 → 千问）。
+ */
+export function buildDeepseekExternalKnowledgeRequest(question: string) {
+  return {
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
+    temperature: 0,
+    thinking: { type: 'disabled' as const },
+    messages: [{ role: 'user' as const, content: buildExternalKnowledgePrompt(question) }],
+  }
+}
+
+export async function externalKnowledge(question: string): Promise<ConsultExternalKnowledgeOutput> {
+  const baseUrl = process.env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com'
+  const key = process.env.DEEPSEEK_API_KEY
+  if (!key) {
+    throw new AIUnavailableError('deepseek', '缺少 DEEPSEEK_API_KEY 配置（外部知识对打）')
+  }
+  const res = await callJson<ChatResponse>(
+    `${baseUrl.replace(/\/$/, '')}/chat/completions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(buildDeepseekExternalKnowledgeRequest(question)),
+    },
+    { client: 'deepseek' },
+  )
+  const raw = parseModelJson(extractChatContentStrict(res, 'deepseek'), 'deepseek')
+  const parsed = ConsultRawSectionsSchema.safeParse(raw)
+  if (!parsed.success) {
+    throw new AIUnavailableError('deepseek', `外部知识输出不符合约定：${parsed.error.message}`)
+  }
+  return { sections: parsed.data, modelLabel: process.env.DEEPSEEK_MODEL || 'deepseek-flash' }
 }
