@@ -2,7 +2,7 @@
  * T7 · 患者下钻打卡时序图表卡片冒烟测试。
  *
  * jsdom 无 canvas：mock @antv/g2（Chart 链式 API）与 @anxin/core 传输层；
- * 断言数据链路（query → 两张图数据 + 汇总文案）、窗口切换触发重查、空态与错误态可见。
+ * 断言数据链路（query → 两张图数据）、窗口切换触发重查、空态与错误态可见。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
@@ -82,11 +82,12 @@ afterEach(() => {
 })
 
 describe('PatientAdherenceCharts', () => {
-  it('加载后渲染两张图 + 窗口执行率汇总文案，G2 收到按日堆叠数据', async () => {
+  it('加载后渲染两张图，G2 收到按日堆叠数据（重复的执行率汇总文案已移除）', async () => {
     renderCard()
     await waitFor(() => expect(screen.getByRole('img', { name: '按日打卡堆叠柱状图' })).toBeTruthy())
     expect(screen.getByRole('img', { name: '按药品打卡数量水平条形图' })).toBeTruthy()
-    expect(screen.getByText(/近 30 天执行率 75%（已服 3\/4）/)).toBeTruthy()
+    // 窗口执行率在「依从性」卡已展示，图表卡下方不再重复文字（specs/25 UI 精简）。
+    expect(screen.queryByText(/近 30 天执行率/)).toBeNull()
     // interval mark 至少各收到一次 data（按日图 + 按药品图），且编码了 color=kind
     expect(chartInstance.interval).toHaveBeenCalled()
     expect(chartInstance.encode).toHaveBeenCalledWith('color', 'kind')

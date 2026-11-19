@@ -216,9 +216,6 @@ export function PatientAdherenceCharts({ patientId }: { patientId: string }) {
         ) : (
           <>
             <DailyCheckinChart series={data.series} height={260} />
-            <p className="text-xs text-muted-foreground">
-              近 {data.days} 天执行率 {data.adherence.rate}%（已服 {data.adherence.taken}/{data.adherence.total}）。
-            </p>
             {data.byDrug.length > 0 ? (
               <ByDrugChart byDrug={data.byDrug} />
             ) : (
