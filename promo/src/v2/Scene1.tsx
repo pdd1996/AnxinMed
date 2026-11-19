@@ -35,7 +35,7 @@ const MID = [
 const MID_SRC = [1, 0, 2];
 const MID_SRC_BG = [COLOR.ink, COLOR.green, COLOR.orange];
 // 药物形态：中景三盒 = 胶囊/铝塑板(hero)/圆片；远近景混合形态作景深环境
-const MID_FORMS: MedForm[] = ['capsule', 'blister', 'tablet'];
+const MID_FORMS: MedForm[] = ['capsule', 'blister', 'bottle'];
 const FAR_FORMS: MedForm[] = ['tablet', 'capsule', 'blister'];
 const NEAR_FORMS: MedForm[] = ['capsule', 'tablet'];
 // 近景 2 盒（放大掠过镜头，景深虚化）

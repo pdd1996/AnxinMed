@@ -49,6 +49,8 @@ v1（`src/Film.tsx` + `src/scenes/`）未改，仍可渲染；`public/score.wav`
     药物形态（lib/film：capsuleItems 双色胶囊 / tabletItems 刻痕圆片 / blisterItems 铝塑泡罩 / cartonItems 带十字+胶囊图标药盒 /
     bottle），PaperBox 增 form prop；8 药分配 MED_FORMS（hero=铝塑板，与扫描单/中景一致），S1 远中近景混合形态。
     v1 的 medBoxItems 不动（v1 保持原样）。删除 flock 偶数盒灰衬底（圆片后垫灰卡显脏）。重渲双版本。
+16. **网购代表形态改药瓶（用户反馈裁决）**：S1 中景右（网购）由刻痕圆片改 bottle（橙瓶+白标签），与左参考瓶同形；
+    PaperBox 对 bottle 按包围盒高等比缩放（自然高195）避免溢出/压来源戳。中景三来源 = 胶囊/泡罩/药瓶。重渲双版本。
 
 ## 1. 镜头 → demo / 组件映射（P4：一种手法只当一次主角）
 
