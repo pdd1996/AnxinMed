@@ -23,14 +23,11 @@ import {
 import { queryClient } from "@/lib/query";
 import { isHHMM } from "@/lib/time";
 import { HealthCard, WhoCard } from "@/components/domain/draft/HealthCard";
-import { ExpiryCard } from "@/components/domain/draft/ExpiryCard";
 import { IdentityCard } from "@/components/domain/draft/IdentityCard";
-import { NoPlanCard } from "@/components/domain/draft/NoPlanCard";
 import { OriginalPanel } from "@/components/domain/draft/OriginalPanel";
 import {
   ConfirmResultDialog,
   DosageRangeCard,
-  InteractionCard,
   type ConfirmResult,
 } from "@/components/domain/draft/RiskCards";
 import { SigCard, TimesCard } from "@/components/domain/draft/SigCard";
@@ -46,9 +43,9 @@ import { Text } from "@/components/ui/text";
 /**
  * 草稿确认页（05e §2-T6-c / §2-T6-d）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
  * 表单初值、缺项判定、闸门清单与 confirm 入参一律走 core，本文件只做渲染与 IO。
- * 区块组成与渲染顺序逐块对齐 web：原文对照 → 药品身份 → 有效期/开封日期
- * →（有计划：医嘱/时间点｜无计划：仅建档）
- * → 健康建议 → 相互作用 →（有计划：说明书范围校验）→（处方笺：使用人）→ 闸门。
+ * 区块组成与渲染顺序逐块对齐 web（2026-11-19 演示前 UI 收紧后）：原文对照 → 药品身份
+ * →（有计划：医嘱/时间点）→ 健康建议 →（有计划：说明书范围校验）→（处方笺：使用人）→ 闸门。
+ * 有效期/开封日期卡、无计划说明卡与相互作用卡已按用户要求从本页移除（web 同口径）。
  *
  * 入口 B 的 `planDraft` 恒为 null，走「仅建档」分支；入口 A 走医嘱 + 时间点 + 范围校验 + 使用人。
  * 确认后端上不带计划时跳 `/box?plan=<drugId>` 由药箱页直接弹建计划弹窗（两步式录入，
@@ -141,8 +138,6 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
   const statusMeta = CONFIRM_STATUS_META[payload.drugDraft.confirmStatus ?? "manual"];
   const drugName =
     state.manual.genericName || payload.drugDraft.genericName || payload.item?.drugName || "本药";
-  // 深链/冷启动直达本页时栈里没有录入屏，「回到上一步还能核对其它草稿」不成立（05e §2-T6-e）。
-  const canGoBack = router.canGoBack();
 
   /** 确认/拒绝都会改动药箱、计划、今日任务与健康档 —— 五个键一起失效（web Draft.tsx:98-102 同口径）。 */
   const invalidate = () => {
@@ -247,9 +242,6 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         <Text className="mt-1 text-2xl font-bold text-foreground">
           草稿确认{payload.item ? `：${payload.item.drugName}` : ""}
         </Text>
-        <Text className="mt-1 text-sm leading-5 text-muted-foreground">
-          凡进档案，最后一道门是你 —— 用量、频次、疗程三项无差别逐项核对，不因识别置信度高而跳过。
-        </Text>
 
         <View className="mt-3 flex-row items-center gap-2">
           <View className="rounded-full bg-secondary px-3 py-1">
@@ -273,17 +265,13 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         <View className="mt-4 gap-4">
           <OriginalPanel payload={payload} imageUrl={imageUrl} />
           <IdentityCard payload={payload} state={state} patch={patch} />
-          <ExpiryCard state={state} patch={patch} />
           {payload.planDraft ? (
             <>
               <SigCard payload={payload} state={state} patch={patch} />
               <TimesCard payload={payload} state={state} patch={patch} />
             </>
-          ) : (
-            <NoPlanCard payload={payload} />
-          )}
+          ) : null}
           <HealthCard payload={payload} state={state} patch={patch} />
-          <InteractionCard result={payload.interactions ?? null} />
           {payload.planDraft ? <DosageRangeCard result={payload.dosageRange ?? null} /> : null}
           {payload.type === "prescription" ? <WhoCard state={state} patch={patch} /> : null}
         </View>
@@ -316,24 +304,10 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
               }`}
             >
               <Text className="text-lg font-semibold text-primary-foreground">
-                {busy === "confirm"
-                  ? "正在写入…"
-                  : payload.planDraft
-                    ? "确认建档并生效计划"
-                    : "确认建档（计划稍后手动创建）"}
+                {busy === "confirm" ? "正在写入…" : "确认建档"}
               </Text>
             </Pressable>
           </View>
-          <Text className="mt-3 text-xs leading-5 text-muted-foreground">
-            确认即留痕：药品 ID、确认时间、确认方式与关键字段快照写入来源记录；
-            医嘱字段若被你修正，标注会从「抄录」降为「自填」。
-          </Text>
-          {/* §6 第 15 条：物理返回的语义要在界面上说一句，别让人猜。 */}
-          <Text className="mt-1 text-xs leading-5 text-muted-foreground">
-            {canGoBack
-              ? "按返回键不会丢掉这份草稿，回到上一步还能继续核对其它草稿；但这页上还没提交的修改不会保留。"
-              : "按返回键不会丢掉这份草稿，草稿仍在服务端等待确认；但这页上还没提交的修改不会保留。"}
-          </Text>
         </View>
 
         <Stack.Screen options={{ title: "草稿确认" }} />

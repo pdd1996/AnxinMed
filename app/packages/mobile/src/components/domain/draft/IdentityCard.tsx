@@ -114,9 +114,6 @@ export function IdentityCard({
         <View className="flex-row items-center gap-2">
           <Icon as={Pill} size={20} color={primary} />
           <CardTitle className="text-lg text-card-foreground">药品身份</CardTitle>
-          <Text className="text-xs text-muted-foreground">
-            身份线 · 药名 + 规格 + 剂型三项严格核对
-          </Text>
         </View>
       </CardHeader>
       <CardContent className="gap-3">

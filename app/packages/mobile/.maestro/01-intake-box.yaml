@@ -21,12 +21,6 @@ appId: com.anxin.mobile
     timeout: 120000
 - scrollUntilVisible:
     element:
-      text: ".*已理解.*"
-    direction: DOWN
-    timeout: 30000
-- tapOn: ".*已理解.*"
-- scrollUntilVisible:
-    element:
       text: ".*确认建档.*"
     direction: DOWN
     timeout: 30000
