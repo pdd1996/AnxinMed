@@ -211,12 +211,8 @@ export default function IntakeScreen({
     dispatch({ type: "handoff", pending: useIntakeSession.getState().pendingImage });
   }, []);
 
-  // 处理中阶段文案推进（PRD §10.1「处理中状态明确」）；下标归零由状态机负责。
-  useEffect(() => {
-    if (state.step !== "processing") return;
-    const timer = setInterval(() => dispatch({ type: "stage_tick" }), 900);
-    return () => clearInterval(timer);
-  }, [state.step]);
+  // 上传中只显示「正在识别（药品 / 处方笺）」+ 转圈（2026-11-20 用户要求删掉四/五条阶段文案与 900ms 阶段定时器）。
+  // 状态机与 stageCount 契约不变（core intakeFlow 仍支持 stage_tick），只是本端不再推进下标。
 
   async function start(from: "camera" | "library") {
     const picked =
@@ -344,28 +340,6 @@ export default function IntakeScreen({
               accessibilityLabel="待识别照片"
             />
           ) : null}
-          <View className="mt-4 gap-2">
-            {STAGE_TEXT[entry].map((stage, i) => (
-              <View key={stage} className="flex-row items-center gap-2">
-                {i < state.stageIdx ? (
-                  <Text className="text-base text-risk-l1">✓</Text>
-                ) : i === state.stageIdx ? (
-                  <ActivityIndicator size="small" />
-                ) : (
-                  <Text className="text-base text-muted-foreground">·</Text>
-                )}
-                <Text
-                  className={
-                    i === state.stageIdx
-                      ? "flex-1 text-base font-semibold text-foreground"
-                      : "flex-1 text-base text-muted-foreground"
-                  }
-                >
-                  {stage}
-                </Text>
-              </View>
-            ))}
-          </View>
         </StepCard>
       )}
 

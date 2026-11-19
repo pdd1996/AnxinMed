@@ -172,28 +172,8 @@ export function IdentityCard({
           </View>
         ) : candidates.length > 0 ? (
           <View className="gap-3">
-            <Note tone="l3">
-              冲突清单 —— 系统不选边。请核对药品实物（包装盒上的规格 / 剂型 / 厂家）后选择一致的一条。
-            </Note>
-            {(payload.conflicts ?? [])
-              .filter((c) => (c.candidates ?? []).length > 0)
-              .map((conflict, idx) => (
-                <View key={`${conflict.type}-${idx}`} className="gap-1">
-                  <View className="flex-row items-center gap-2">
-                    <View className="rounded-full bg-secondary px-2 py-0.5">
-                      <Text className="text-xs font-semibold text-secondary-foreground">
-                        {conflict.type === "spec" ? "规格冲突" : conflict.type === "form" ? "剂型冲突" : "多候选"}
-                      </Text>
-                    </View>
-                    <Text className="flex-1 text-sm leading-5 text-foreground">{conflict.note}</Text>
-                  </View>
-                  {conflict.extracted || conflict.library ? (
-                    <Text className="text-xs leading-5 text-muted-foreground">
-                      提取值：{conflict.extracted || "—"} ｜ 药品库：{conflict.library || "—"}
-                    </Text>
-                  ) : null}
-                </View>
-              ))}
+            {/* 2026-11-20：冲突清单的两段提示文案（「系统不选边」横幅 + 每条冲突说明）按用户要求删除，
+                只保留候选单选列表；「不选边」由 core 初值保证（selectedCandidateId 恒为 ''），不依赖文案。 */}
             {/* 批准文号选填（2026-11-19）：只作候选定位辅助——不校验、不落库、不阻塞确认 */}
             <View className="gap-1 rounded-xl border-2 border-dashed border-border bg-muted p-3">
               <Text className="text-sm font-semibold text-foreground">批准文号（选填）</Text>

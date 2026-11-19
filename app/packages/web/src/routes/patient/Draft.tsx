@@ -242,7 +242,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
               ) : (
                 <Check className="size-4" aria-hidden />
               )}
-              {payload.planDraft ? '确认建档并生效计划' : '确认建档（计划稍后手动创建）'}
+              {payload.planDraft ? '确认建档并生效计划' : '确认建档'}
             </Button>
           </div>
         </CardContent>

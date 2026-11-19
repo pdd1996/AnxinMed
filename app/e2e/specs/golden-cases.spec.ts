@@ -5,7 +5,7 @@
  * 草稿 → 确认页 → 单事务落库；模型 I/O 由 FixtureAiClients 回放 app/e2e/fixtures/<scenario>.json 冻结。
  *
  * 断言四层（不只看 UI）：
- *   1. UI：冲突清单可见 / needsManual 输入框恒空 / 标签提示 / 「不支持」文案 / 确认后跳转；
+ *   1. UI：冲突候选不预选（不选边）/ needsManual 输入框恒空 / 标签提示 / 「不支持」文案 / 确认后跳转；
  *   2. DB：直连测试库验证确认事务落库（drugs/plans/sources/health_profiles + drafts.status=confirmed）；
  *   3. 结构（PRD 红线）：drug-box payload 无任何用法用量字段；rx-redacted 人工补字段值为空（防预填/标签抄录）；
  *   4. unsupported-loose-pills：fixture 客户端调用日志断言 OCR 未被调用。
@@ -123,10 +123,13 @@ test.describe('golden case E2E（fixture 回放）', () => {
     const page = await openScenario(browser, 'rx-spec-conflict')
     await uploadToDraft(page, 'rx-spec-conflict')
 
-    // UI：冲突清单 + 规格冲突徽章 + 「系统不选边」提示
-    await expect(page.getByText(/冲突清单/).first()).toBeVisible()
-    await expect(page.getByText('规格冲突').first()).toBeVisible()
-    await expect(page.getByText(/系统不选边/)).toBeVisible()
+    // UI：候选列表可见、一条都不预选（2026-11-20 起「系统不选边」横幅与冲突说明已删，不再断言文案）
+    const radios = page.getByRole('radio')
+    await expect(radios.first()).toBeVisible()
+    const radioCount = await radios.count()
+    expect(radioCount).toBeGreaterThanOrEqual(2)
+    for (let i = 0; i < radioCount; i++) await expect(radios.nth(i)).not.toBeChecked()
+    await expect(page.getByRole('button', { name: /都不符 · 改用手动建档/ })).toBeVisible()
 
     // 结构：conflict + drugMasterId=null（不自动裁决）
     const payload = await latestPayload()

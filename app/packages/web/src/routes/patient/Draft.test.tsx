@@ -127,8 +127,7 @@ describe('冲突清单不自动选择', () => {
     renderDraft(rxConflictPayload)
     const radios = (await screen.findAllByRole('radio')) as HTMLInputElement[]
     expect(radios).toHaveLength(2)
-    expect(radios.every((r) => !r.checked)).toBe(true) // 系统不选边
-    expect(screen.getByText(/冲突清单 —— 系统不选边/)).toBeTruthy()
+    expect(radios.every((r) => !r.checked)).toBe(true) // 系统不选边（2026-11-20 起不再有提示文案，靠 core 初值保证）
     const button = screen.getByRole('button', { name: /确认建档并生效计划/ })
     expect(button.hasAttribute('disabled')).toBe(true)
 
@@ -301,7 +300,7 @@ describe('原文对照与入口B', () => {
     expect(screen.queryByLabelText('每日几次')).toBeNull()
     expect(screen.queryByLabelText('我已确认本药的使用人')).toBeNull() // 无处方前记语义 → 不弹使用人核对
     mocks.confirmDraft.mockResolvedValue({ ...CONFIRM_OK, planId: null })
-    fireEvent.click(screen.getByRole('button', { name: /确认建档（计划稍后手动创建）/ }))
+    fireEvent.click(screen.getByRole('button', { name: '确认建档' }))
     await waitFor(() => expect(mocks.confirmDraft).toHaveBeenCalledTimes(1))
     expect(mocks.confirmDraft.mock.calls[0][1].plan).toBeUndefined()
     expect(await screen.findByText('药箱页')).toBeTruthy()

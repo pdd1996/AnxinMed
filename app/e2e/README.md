@@ -53,7 +53,7 @@ pnpm --filter @anxin/e2e make-fixtures
 
 | 层 | 内容 |
 |----|------|
-| UI | 冲突清单可见、needsManual 输入框恒空、标签提示、「不支持」文案、确认后跳转 |
+| UI | 冲突候选不预选（不选边）、needsManual 输入框恒空、标签提示、「不支持」文案、确认后跳转 |
 | DB | 直连测试库验证确认事务落库（drugs/plans/sources/health_profiles + drafts.status=confirmed） |
 | 结构（PRD 红线） | drug-box payload 无任何 dose/frequency/usage；rx-redacted 人工补字段值为空 |
 | 调用日志 | unsupported-loose-pills 的 `runOcr` 计数 = 0（散装药片绝不进 OCR） |

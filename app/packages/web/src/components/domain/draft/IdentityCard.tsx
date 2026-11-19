@@ -1,4 +1,4 @@
-import { CircleAlert, Hand, Pill, ShieldCheck, Undo2 } from 'lucide-react'
+import { Hand, Pill, ShieldCheck, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -123,10 +123,8 @@ export function IdentityCard({
           </div>
         ) : candidates.length > 0 ? (
           <div className="space-y-3">
-            <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-3 text-sm text-risk-l3">
-              <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
-              <span>冲突清单 —— 系统不选边。请核对药品实物（包装盒上的规格 / 剂型 / 厂家）后选择一致的一条。</span>
-            </p>
+            {/* 2026-11-20：冲突清单的两段提示文案（「系统不选边」横幅 + 每条冲突说明）按用户要求删除，
+                只保留候选单选列表；「不选边」由 core 初值保证（selectedCandidateId 恒为 ''），不依赖文案。 */}
             {/* 批准文号选填（2026-11-19）：批号会随规格/注册变更而不同，且常印在包装侧面；
                 因此不做身份核对字段，只作「候选定位」辅助——不校验、不落库、不阻塞确认。 */}
             <div className="space-y-1 rounded-lg border border-dashed border-input bg-muted/40 p-3">
@@ -151,23 +149,6 @@ export function IdentityCard({
                   </p>
                 ))}
             </div>
-            {(payload.conflicts ?? [])
-              .filter((c) => (c.candidates ?? []).length > 0)
-              .map((conflict, idx) => (
-                <div key={`${conflict.type}-${idx}`} className="space-y-2">
-                  <p className="text-sm">
-                    <span className="mr-2 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
-                      {conflict.type === 'spec' ? '规格冲突' : conflict.type === 'form' ? '剂型冲突' : '多候选'}
-                    </span>
-                    {conflict.note}
-                  </p>
-                  {(conflict.extracted || conflict.library) && (
-                    <p className="text-xs text-muted-foreground">
-                      提取值：{conflict.extracted || '—'} ｜ 药品库：{conflict.library || '—'}
-                    </p>
-                  )}
-                </div>
-              ))}
             <div className="space-y-2">
               {candidates.map((c) => (
                 <label

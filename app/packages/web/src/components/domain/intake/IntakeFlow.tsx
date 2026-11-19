@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import {
   AlertTriangle,
   Camera,
-  Check,
   ChevronRight,
   FileText,
   Hand,
@@ -64,7 +63,7 @@ export interface IntakeCopy {
  *
  * M5-T2 接缝 #8：六步流转的**决策**已抽到 @anxin/core 的 intakeFlow 状态机（纯函数、可单测）；
  * 本组件只做两件事——渲染 state，以及执行状态机给出的动作清单
- * （网络请求、FileReader、canvas 像素统计、navigate、toast、内存会话读写、900ms 阶段定时器）。
+ * （网络请求、FileReader、canvas 像素统计、navigate、toast、内存会话读写）。
  */
 export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
   const navigate = useNavigate()
@@ -123,13 +122,8 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
     runActions(next.actions)
   }
 
-  // 上传中阶段文案推进（处理中状态明确，PRD §10.1）；下标归零由状态机负责
-  useEffect(() => {
-    if (state.step !== 'processing') return
-    const timer = window.setInterval(() => dispatch({ type: 'stage_tick' }), 900)
-    return () => window.clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.step, stages.length])
+  // 上传中只显示「正在识别（药品 / 处方笺）」+ 转圈（2026-11-20 用户要求删掉四/五条阶段文案与 900ms 阶段定时器）。
+  // 状态机与 stageCount 契约不变（core intakeFlow 仍支持 stage_tick），只是本端不再推进下标。
 
   /** 层检测纠偏的跨入口交接：对方入口页留下原图时，本页直接重跑（用户不必重新选文件）。 */
   useEffect(() => {
@@ -262,26 +256,6 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
             <p className="flex items-center gap-2 text-lg font-bold">
               <LoaderCircle className="size-5 animate-spin text-primary" aria-hidden /> 正在识别（{copy.entry === 'A' ? '处方笺' : '药品'}）
             </p>
-            <ol className="space-y-1.5">
-              {stages.map((stage, i) => (
-                <li
-                  key={stage}
-                  className={cn(
-                    'flex items-center gap-2 text-sm',
-                    i < state.stageIdx ? 'text-muted-foreground' : i === state.stageIdx ? 'font-semibold' : 'text-muted-foreground/60',
-                  )}
-                >
-                  {i < state.stageIdx ? (
-                    <Check className="size-4 shrink-0 text-risk-l1" aria-hidden />
-                  ) : i === state.stageIdx ? (
-                    <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
-                  ) : (
-                    <span className="size-4 shrink-0 rounded-full border" aria-hidden />
-                  )}
-                  {stage}
-                </li>
-              ))}
-            </ol>
           </CardContent>
         </Card>
       )}
