@@ -17,12 +17,15 @@ const mocks = vi.hoisted(() => ({
   intakePrescription: vi.fn(),
   intakeDrug: vi.fn(),
   computeImageStats: vi.fn(),
+  shrinkDataUrlForUpload: vi.fn(),
 }))
 vi.mock('@anxin/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@anxin/core')>()
   return { ...actual, ...mocks } // 只替换传输层两函数，状态机与 store 走真代码
 })
 vi.mock('@/lib/imageStats', () => ({ computeImageStats: mocks.computeImageStats }))
+// 上传前压缩单独单测（lib/uploadImage.test.ts）；本文件只验「接线」：上网络的是压缩图、会话里是原图。
+vi.mock('@/lib/uploadImage', () => ({ shrinkDataUrlForUpload: mocks.shrinkDataUrlForUpload }))
 
 const COPY_A: IntakeCopy = {
   entry: 'A',
@@ -81,6 +84,8 @@ beforeEach(() => {
   mocks.intakeDrug.mockReset()
   mocks.computeImageStats.mockReset()
   mocks.computeImageStats.mockResolvedValue(null) // jsdom 无 canvas → 跳过预检
+  mocks.shrinkDataUrlForUpload.mockReset()
+  mocks.shrinkDataUrlForUpload.mockImplementation(async (dataUrl: string) => dataUrl) // 默认原样（jsdom 无 canvas）
   useIntakeSession.getState().clear()
   useIntakeSession.getState().setPendingImage(null)
 })
@@ -243,6 +248,28 @@ describe('上传前置校验', () => {
     fireEvent.change(input, { target: { files: [new File([new Uint8Array(4)], 'a.gif', { type: 'image/gif' })] } })
     await waitFor(() => expect(mocks.intakePrescription).not.toHaveBeenCalled())
     expect(screen.getByText('上传平铺完整的处方笺照片')).toBeTruthy()
+  })
+})
+
+describe('上传前压缩：上网络的是压缩图，会话里留原图', () => {
+  it('入口B → shrink 收到原图与入口，intakeDrug 收到压缩图；会话 store 仍是原图（确认页原文对照）', async () => {
+    mocks.intakeDrug.mockResolvedValue(intakeOk([summary({ type: 'drug' })]))
+    mocks.shrinkDataUrlForUpload.mockResolvedValue('data:image/jpeg;base64,COMPRESSED')
+    renderFlow('B')
+    upload()
+    expect(await screen.findByText('确认页占位')).toBeTruthy()
+    expect(mocks.shrinkDataUrlForUpload).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png;base64,/), 'B')
+    expect(mocks.intakeDrug).toHaveBeenCalledWith('data:image/jpeg;base64,COMPRESSED')
+    expect(useIntakeSession.getState().imageByDraftId['d-1']).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('压缩失败（原样返回）→ 照常上传原图，流程不卡在识别中', async () => {
+    mocks.intakeDrug.mockResolvedValue(intakeOk([summary({ type: 'drug' })]))
+    renderFlow('B')
+    upload()
+    expect(await screen.findByText('确认页占位')).toBeTruthy()
+    const [sent] = mocks.intakeDrug.mock.calls[0]
+    expect(sent).toMatch(/^data:image\/png;base64,/)
   })
 })
 

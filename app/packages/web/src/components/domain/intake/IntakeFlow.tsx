@@ -38,6 +38,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { computeImageStats } from '@/lib/imageStats'
+import { shrinkDataUrlForUpload } from '@/lib/uploadImage'
 import { cn } from '@/lib/utils'
 
 /** 双入口 tab（PRD §7.2.1 A/B 平级展示）：药盒在前（默认档，2026-11-19 用户裁定），处方笺在后；
@@ -88,15 +89,17 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
           )
           break
         case 'intake':
-          void (action.entry === 'A' ? intakePrescription(action.dataUrl) : intakeDrug(action.dataUrl)).then(
-            (res) => {
-              if (!res.ok) {
-                dispatch({ type: 'intake_failed', failure: res })
-                return
-              }
-              dispatch({ type: 'intake_ok', dataUrl: action.dataUrl, result: res.data })
-            },
-          )
+          // 上网络的是压缩图（入口B 长边 1600 / q0.8，实测 4-8MB → 0.2MB 量级）；
+          // 原图仍留在内存里进会话 store，确认页「原文对照」看的是原图。压缩失败 = 原样上传。
+          void (async () => {
+            const upload = await shrinkDataUrlForUpload(action.dataUrl, action.entry)
+            const res = await (action.entry === 'A' ? intakePrescription(upload) : intakeDrug(upload))
+            if (!res.ok) {
+              dispatch({ type: 'intake_failed', failure: res })
+              return
+            }
+            dispatch({ type: 'intake_ok', dataUrl: action.dataUrl, result: res.data })
+          })()
           break
         case 'session_set_images':
           useIntakeSession.getState().setSession(action.draftIds, action.dataUrl)
