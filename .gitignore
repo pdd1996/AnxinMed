@@ -39,6 +39,9 @@ blob-report/
 playwright/.cache/
 app/e2e/shot-*.png
 
+# ── UI 走查临时截图（实现期用一次性 Playwright 脚本拍的比对图，只对本机有用）──
+.tmp-shots/
+
 # ── demo：嵌套 git 仓库，只读迁移参照物，不纳入本仓库跟踪（保留其独立历史）──
 demo/
 
