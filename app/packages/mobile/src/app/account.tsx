@@ -11,7 +11,7 @@ import { Text } from "@/components/ui/text";
 
 /**
  * 个人资料页（G8 增补 · App 侧）：只承载「身份资料」——当前是姓名，头像以后加在同一页。
- * 登录密码不在这里：密码是安全设置，入口在「设置 → 账号与安全 → 登录密码」（P1 增补起）。
+ * 登录密码不在这里：密码是安全设置，入口在「我的 → 登录密码」（2026-11-19 从「设置 → 账号与安全」上移）。
  *
  * 校验走 shared 的 `UpdateMeRequestSchema`（与服务端同一份契约）；保存成功后 router.back()
  * 回「我的」，头部读登录态 store 即是新名字。失败留在本页并给出中文原因（不静默当已保存）。
@@ -52,11 +52,7 @@ export default function AccountPage() {
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 }}
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-sm leading-6 text-muted-foreground">
-        「我的」页和医生端都显示这个名字，随时可以改。
-      </Text>
-
-      <Card className="mt-4 p-0">
+      <Card className="p-0">
         <CardContent className="gap-3 p-4">
           <Text className="text-sm font-semibold text-card-foreground">姓名</Text>
           <Input

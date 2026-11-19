@@ -1,22 +1,30 @@
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
+import { Stack } from "expo-router";
 import { toast } from "sonner-native";
 import { toUserMessage, updatePassword, useAuthStore } from "@anxin/core";
-import { PASSWORD_MIN_LENGTH, PasswordSetRequestSchema } from "@anxin/shared";
+import { PasswordSetRequestSchema } from "@anxin/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
 /**
- * 登录密码页（P1 增补 · 从「个人资料」迁出）：设置 → 账号与安全 → 登录密码（根 stack 全屏页）。
+ * 登录密码页（P1 增补 · 从「个人资料」迁出）：我的 → 登录密码（根 stack 全屏页；2026-11-19
+ * 从「设置 → 账号与安全」上移，理由与 web 一致：入口太深）。
  *
  * 为什么独立：密码是安全设置，不是身份资料；个人资料只放姓名/头像。后续手机号换绑、
- * 账号注销（G14）、登录设备管理也进「账号与安全」。
+ * 账号注销（G14）、登录设备管理也会在「我的」页给出入口或并入本页。
  *
  * 语义：手机号验证码注册的账号默认无密码，这里补设（账号名自动取手机号，之后可用
  * 「手机号 + 密码」登录）；已有密码的账号改密必须验证当前密码（与 API 同一契约）。
+ * 2026-11-19 用户裁定：验证码登录已够用，密码是可选能力——页头标题随状态显示「修改密码 /
+ * 设置密码」，无密码账号的说明写明「不设密码也可以」，不再暗示手机号账号必须补密码。
  * 校验走 shared 的 `PasswordSetRequestSchema`；失败留在本页内联展示（不静默当已保存）。
+ *
+ * 页头文案如实交代服务端的会话口径（specs/17 §2 D12）：改密后清**其他设备**会话、
+ * 保留当前这台——不踢自己（老年用户刚记的新密码，弹回登录页最容易卡死），也不能让用户
+ * 误以为「改完就要重新登录」，所以「其他设备会被退出、这台保持登录」必须在页面上讲明。
  */
 export default function PasswordPage() {
   const user = useAuthStore((s) => s.user);
@@ -47,7 +55,7 @@ export default function PasswordPage() {
       // 无密码账号（手机号注册）不传旧密码：登录态已证明手机号归属。
       await updatePassword(hasPassword ? oldPassword : undefined, parsed.data.password);
       toast.success(
-        hasPassword ? "密码已更新，请使用新密码登录" : "密码已设置，可用「手机号 + 密码」登录",
+        hasPassword ? "密码已更新" : "密码已设置，可用「手机号 + 密码」登录",
       );
       setOldPassword("");
       setNewPassword("");
@@ -65,10 +73,11 @@ export default function PasswordPage() {
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 }}
       keyboardShouldPersistTaps="handled"
     >
+      <Stack.Screen options={{ title: hasPassword ? "修改密码" : "设置密码" }} />
       <Text className="text-sm leading-6 text-muted-foreground">
         {hasPassword
-          ? "修改密码需要先输入当前密码；修改后请用新密码登录，当前登录不会被退出。"
-          : "手机号注册的账号还没有密码；设置后可用「手机号作为账号 + 密码」登录。"}
+          ? "修改后，其他设备会被退出登录，需要用新密码重新登录；这台设备保持登录。"
+          : "用手机号加验证码就能登录，不设密码也可以；设置后还能用「手机号 + 密码」登录。"}
       </Text>
 
       <Card className="mt-4 p-0">
@@ -103,10 +112,8 @@ export default function PasswordPage() {
               secureTextEntry
               autoComplete="new-password"
               textContentType="newPassword"
-              placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
               accessibilityLabel="新密码"
             />
-            <Text className="text-xs text-muted-foreground">至少 {PASSWORD_MIN_LENGTH} 位</Text>
           </View>
 
           <View className="gap-2">

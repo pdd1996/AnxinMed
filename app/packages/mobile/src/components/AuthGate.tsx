@@ -3,7 +3,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Pressable, ScrollView, View } from "react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { ShieldAlert } from "lucide-react-native";
-import { PASSWORD_MIN_LENGTH, PHONE_PATTERN, PasswordResetRequestSchema } from "@anxin/shared";
+import { PHONE_PATTERN, PasswordResetRequestSchema } from "@anxin/shared";
 import {
   bootstrapAuth,
   requestPhoneCode,
@@ -299,7 +299,6 @@ function LoginScreen() {
               <ShieldAlert size={24} color={iconOnPrimary} importantForAccessibility="no" />
             </View>
             <CardTitle className="text-2xl">登录安心用药</CardTitle>
-            <CardDescription className="text-base leading-7">请选择登录方式</CardDescription>
           </CardHeader>
           <CardContent className="gap-4">
             {resetMode ? (
@@ -320,9 +319,6 @@ function LoginScreen() {
 
                 <View className="gap-1">
                   <Text className="text-xl font-bold text-foreground">找回密码</Text>
-                  <Text className="text-sm leading-6 text-muted-foreground">
-                    用注册手机号收验证码，验证通过后设置新密码；重置成功会自动登录。
-                  </Text>
                 </View>
 
                 <View className="gap-2">
@@ -378,14 +374,12 @@ function LoginScreen() {
                     className="min-h-[52px] text-lg"
                     value={resetNewPassword}
                     onChangeText={setResetNewPassword}
-                    placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
                     secureTextEntry
                     autoComplete="new-password"
                     textContentType="newPassword"
                     editable={!resetPending}
                     accessibilityLabel="找回新密码"
                   />
-                  <Text className="text-xs text-muted-foreground">至少 {PASSWORD_MIN_LENGTH} 位</Text>
                 </View>
 
                 <View className="gap-2">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useUnstableNativeVariable } from "nativewind";
@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ClipboardList,
   IdCard,
+  KeyRound,
   Settings as SettingsIcon,
   UserRound,
   type LucideIcon,
@@ -16,9 +17,13 @@ import { Icon } from "@/components/ui/icon";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 
 /**
- * 我的页（M5-T5e）：账号头部 + 列表式入口行（健康信息 / 记录 / 设置）+ 底部账号区（退出登录）。
+ * 我的页（M5-T5e）：账号头部 + 分组的列表式入口行 + 底部账号区（退出登录）。
  * 健康信息自 2026-11-18 起是独立一级页（与服药记录同级），不再在「我的」页内嵌表单卡。
  * 退出登录是账号级动作，按「设置」与「账号」的层级归位到本页底部（password 模式才显示）。
+ * 入口与 web 同步按用途分组（2026-11-19 晚：单卡多行视觉不舒服）：账号（个人资料 / 登录密码）、
+ * 健康（健康信息 / 服药记录）；设置自成一组的「其他」；退出登录不进「其他」组。
+ * 「登录密码」自 2026-11-19 起与 web 同步从设置页的「账号与安全」区块上移到这里（password 模式）：
+ * 老人要先想到进设置、再滑到页底才可能发现，入口太深；设置页只留字号这类真正的设置项。
  * 处方抄录·已确认那一入口在草稿确认页（M2 线）。
  */
 export default function Profile() {
@@ -71,33 +76,37 @@ export default function Profile() {
         </View>
       </View>
 
-      <Card className="mt-5 p-0">
-        <CardContent className="p-0">
-          <EntryRow
-            icon={IdCard}
-            label="个人资料"
-            onPress={() => router.push("/account")}
-          />
-          <View className="border-b border-border" />
-          <EntryRow
-            icon={UserRound}
-            label="健康信息"
-            onPress={() => router.push("/health-info")}
-          />
-          <View className="border-b border-border" />
-          <EntryRow
-            icon={ClipboardList}
-            label="服药记录"
-            onPress={() => router.push("/records")}
-          />
-          <View className="border-b border-border" />
-          <EntryRow
-            icon={SettingsIcon}
-            label="设置"
-            onPress={() => router.push("/settings")}
-          />
-        </CardContent>
-      </Card>
+      <EntryGroup title="账号">
+        <EntryRow icon={IdCard} label="个人资料" onPress={() => router.push("/account")} />
+        {authMode === "password" ? (
+          <>
+            <View className="border-b border-border" />
+            <EntryRow
+              icon={KeyRound}
+              label="登录密码"
+              onPress={() => router.push("/password")}
+            />
+          </>
+        ) : null}
+      </EntryGroup>
+
+      <EntryGroup title="健康">
+        <EntryRow
+          icon={UserRound}
+          label="健康信息"
+          onPress={() => router.push("/health-info")}
+        />
+        <View className="border-b border-border" />
+        <EntryRow
+          icon={ClipboardList}
+          label="服药记录"
+          onPress={() => router.push("/records")}
+        />
+      </EntryGroup>
+
+      <EntryGroup title="其他">
+        <EntryRow icon={SettingsIcon} label="设置" onPress={() => router.push("/settings")} />
+      </EntryGroup>
 
       {authMode === "demo" ? null : (
         <Card className="mt-5 p-0">
@@ -117,6 +126,20 @@ export default function Profile() {
         </Card>
       )}
     </ScrollView>
+  );
+}
+
+/** 入口分组：小标签 + 一张入口卡（组标签缩进到图标列；组内分隔线由调用方插入）。 */
+function EntryGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View className="mt-5 gap-2">
+      <Text className="px-4 text-xs font-bold uppercase tracking-[2px] text-muted-foreground">
+        {title}
+      </Text>
+      <Card className="p-0">
+        <CardContent className="p-0">{children}</CardContent>
+      </Card>
+    </View>
   );
 }
 
