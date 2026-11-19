@@ -4,7 +4,7 @@
  *   入口A 拍处方笺：①detectLayers(硬闸门) → assertLayersForEntry → ②runOcr → ③cropBody →
  *                   ④parseWhitelist → ⑥resolveFallback(回链) → ⑤sanitizeScan(最终白名单) →
  *                   身份线 extractIdentity + 每条目 matchDrugMaster → ⑦buildDraft（N 条目拆 N 份）
- *   入口B 拍药品：  ①detectLayers(硬闸门) → assertLayersForEntry → 身份线 → ⑦buildDraft（1 份建档，无用法用量）
+ *   入口B 拍药品：  ①层检测+身份提取（合并单次视觉调用，硬闸门）→ ⑦buildDraft（1 份建档，无用法用量）
  *
  * 降级：单步失败转 needsManual / degraded 标记，不炸整体（除 ①detectLayers —— 入口硬闸门，
  * AIUnavailable 冒泡由 intake.service 映射 503）。OCR 原文只在内存流转（L3），落库仅脱敏白名单。
@@ -218,28 +218,33 @@ export async function runPrescription(
   return drafts
 }
 
-/** 入口B 仅身份线 → 1 份建档草稿（药盒层永不提取用法用量；医院标签层 → labelNotice）。 */
+/**
+ * 入口B 仅身份线 → 1 份建档草稿（药盒层永不提取用法用量；医院标签层 → labelNotice）。
+ *
+ * 「拍药品」延迟优化：层检测与身份提取合并为**单次**视觉调用（detectAndExtractIdentity），
+ * 比原「detectLayers → extractIdentity」串行少一次模型往返（live 实测约省 2–3s）。
+ * 闸门语义不变：先拿 layers 过 assertLayersForEntry，不支持/入口不符直接 409/422，
+ * 同一响应里的 identity 立即丢弃（不进入装配、不落库）；identity=null → needsManual 降级，不猜。
+ */
 export async function runDrug(
   image: ImageInput,
   clients: AiClients,
   ctx: PipelineContext,
   timing?: Stopwatch,
 ): Promise<DraftPayload> {
-  const layers = await phase(timing, 'detect', () => clients.detectLayers(image)) // 硬闸门
+  const { layers, identity } = await phase(timing, 'detectIdentity', () =>
+    clients.detectAndExtractIdentity(image),
+  ) // 硬闸门 + 身份一次取回
   assertLayersForEntry('B', layers)
   const labelNotice = layers.includes('医院标签层')
 
-  let identity: IdentityFields | null = null
-  let degraded: Degraded | null = null
-  try {
-    identity = await phase(timing, 'identity', () => clients.extractIdentity(image))
-  } catch (err) {
-    if (!(err instanceof AIUnavailableError)) throw err
-    degraded = {
-      code: ERR_CODES.AI_UNAVAILABLE,
-      message: '药品身份识别服务不可用，请核对药盒手动补全，或改用手动建档',
-    }
-  }
+  // 身份读不出（模型判定非药品包装层 / 字段非法）→ 全 needsManual 降级草稿，不猜
+  const degraded: Degraded | null = identity
+    ? null
+    : {
+        code: ERR_CODES.PARSE_FAILED,
+        message: '未能从照片读出药品身份信息，请核对药盒手动补全，或改用手动建档',
+      }
 
   const { match, interactions } = phaseSync(timing, 'build', () => {
     const m: MatchResult = identity ? matchDrugMaster(identity, ctx.candidates) : { status: 'no_match' }

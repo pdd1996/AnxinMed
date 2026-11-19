@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
+  buildDetectIdentityRequest,
   buildDetectLayersRequest,
   buildExtractIdentityRequest,
   buildFallbackParseRequest,
@@ -61,6 +62,15 @@ describe('请求体组装（纯函数，只含约定字段）', () => {
     expect(Object.keys(body).sort()).toEqual(['messages', 'model', 'temperature'])
   })
 
+  it('入口B 合并请求体同样只含 model/temperature/messages，prompt 写明层枚举、条件身份与禁用法用量', () => {
+    const body = buildDetectIdentityRequest(IMG)
+    expect(Object.keys(body).sort()).toEqual(['messages', 'model', 'temperature'])
+    const text = JSON.stringify(body)
+    expect(text).toContain('再提取药品身份字段放进 identity')
+    expect(text).toContain('禁止输出任何用法用量')
+    expect(text).toContain('data:image/png;base64,')
+  })
+
   it('baichuan 兜底请求体只含白名单文本与缺项字段，不含图像', () => {
     const body = buildFallbackParseRequest('Rp 苯磺酸氨氯地平片 5mg×14片', ['frequency'])
     const text = JSON.stringify(body)
@@ -90,6 +100,48 @@ describe('qwen 客户端', () => {
   it('extractIdentity 成功', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => chatRes({ genericName: '苯磺酸氨氯地平片', specification: '5mg' })))
     await expect(qwen.extractIdentity(IMG)).resolves.toMatchObject({ genericName: '苯磺酸氨氯地平片' })
+  })
+
+  it('detectAndExtractIdentity 成功：一次响应同时回 layers 与 identity（入口B 合并调用）', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        chatRes({ layers: ['药盒原装层'], identity: { genericName: '苯磺酸氨氯地平片', specification: '5mg' } }),
+      ),
+    )
+    await expect(qwen.detectAndExtractIdentity(IMG)).resolves.toEqual({
+      layers: ['药盒原装层'],
+      identity: { genericName: '苯磺酸氨氯地平片', specification: '5mg' },
+    })
+  })
+
+  it('detectAndExtractIdentity：identity=null（模型判定无药品包装层）→ 保留 layers，identity 为 null', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => chatRes({ layers: ['处方层'], identity: null })))
+    await expect(qwen.detectAndExtractIdentity(IMG)).resolves.toEqual({ layers: ['处方层'], identity: null })
+  })
+
+  it('detectAndExtractIdentity：identity 字段非法 → 视为 null 降级（不把层结果一起判成不可用）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => chatRes({ layers: ['药盒原装层'], identity: { specification: '5mg' } })))
+    await expect(qwen.detectAndExtractIdentity(IMG)).resolves.toEqual({ layers: ['药盒原装层'], identity: null })
+  })
+
+  it('detectAndExtractIdentity：layers 非法 → AIUnavailableError（闸门依据不猜）', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => chatRes({ layers: ['药盒层'], identity: { genericName: 'x' } })))
+    await expect(qwen.detectAndExtractIdentity(IMG)).rejects.toBeInstanceOf(AIUnavailableError)
+  })
+
+  it('detectAndExtractIdentity：身份字段即使被模型带回 dose/frequency 也被 zod 剥掉', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        chatRes({
+          layers: ['药盒原装层'],
+          identity: { genericName: '苯磺酸氨氯地平片', specification: '5mg', dose: '1片', frequency: '每日1次' },
+        }),
+      ),
+    )
+    const r = await qwen.detectAndExtractIdentity(IMG)
+    expect(r.identity).toEqual({ genericName: '苯磺酸氨氯地平片', specification: '5mg' })
   })
 
   it('缺 QWEN_API_KEY → AIUnavailableError', async () => {

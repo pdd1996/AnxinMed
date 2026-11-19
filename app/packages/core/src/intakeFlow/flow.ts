@@ -1,3 +1,4 @@
+import { ERR_CODES } from '@anxin/shared'
 import type { Entry, ImageStats, ImageStatsSource, IntakeFeedback, QualityIssue } from '../lib/intake'
 import { assessQuality, mapIntakeFailure } from '../lib/intake'
 import type { intakePrescription } from '../api/client'
@@ -14,6 +15,10 @@ import type { intakePrescription } from '../api/client'
  *
  * run() 的异步编排被拆成两半：「发起 IO」（动作）与「拿到 IO 结果后怎么迁移」（事件分支），
  * 六步流转 upload / quality / processing / mismatch / failure / drafts 全部由这里裁决。
+ *
+ * 2026-11-19 拍药延迟优化：**取消客户端层检测预检往返**——照片只发**一次** `/api/intake/*`，
+ * 服务端在同一请求内先层检测再过闸门（409/422 语义不变），省掉一次上传 + 一次模型调用。
+ * 因此 intake_failed 的 409 直接落到 mismatch 步（纠偏卡与动作逐字保留），其他失败仍走 failure 步。
  */
 
 /** 六步流转（与组件内原 Step 联合类型逐字一致）。 */
@@ -23,7 +28,7 @@ export type IntakeFlowStep = 'upload' | 'quality' | 'processing' | 'mismatch' | 
 export type IntakeRunResult = Extract<Awaited<ReturnType<typeof intakePrescription>>, { ok: true }>['data']
 export type IntakeDraftSummary = IntakeRunResult['drafts'][number]
 
-/** 传输失败的结构化字段（settle() 的失败分支 / 层检测不支持的合成失败同形）。 */
+/** 传输失败的结构化字段（settle() 的失败分支 / 平台层合成的网络失败同形）。 */
 export interface IntakeFailure {
   status: number
   code: string
@@ -66,7 +71,7 @@ export type IntakeFlowAction =
   | { type: 'toast'; message: string }
   /** 本地像素统计的输入：dataUrl 供 web（canvas），source 供 RN（本机文件 + 原图边长，M5-T6b）。 */
   | { type: 'compute_stats'; dataUrl: string; source?: ImageStatsSource }
-  | { type: 'detect'; entry: Entry; dataUrl: string }
+  /** 唯一一次上传：照片直接进服务端管线（层检测在管线内先判，无客户端预检往返）。 */
   | { type: 'intake'; entry: Entry; dataUrl: string }
   | { type: 'session_set_images'; draftIds: string[]; dataUrl: string }
   | { type: 'session_set_pending_image'; pending: IntakeHandoff }
@@ -80,10 +85,8 @@ export type IntakeFlowEvent =
   | { type: 'file_read'; dataUrl: string; source?: ImageStatsSource }
   /** 像素统计结果（null=本端不预检/不能预检 → 视为无问题，主流程照走）。 */
   | { type: 'stats_checked'; stats: ImageStats | null }
-  /** 「仍要上传」/「检测错了 · 按当前入口重试」。 */
+  /** 「仍要上传」/ 「检测错了 · 按当前入口重试」。 */
   | { type: 'retry' }
-  | { type: 'detect_ok'; dataUrl: string; layers: string[]; unsupported: boolean; mismatch: string | null }
-  | { type: 'detect_failed'; failure: IntakeFailure }
   | { type: 'intake_ok'; dataUrl: string; result: IntakeRunResult }
   | { type: 'intake_failed'; failure: IntakeFailure }
   /** 「重拍 / 换一张」「重新上传」「再传一张」。 */
@@ -128,11 +131,11 @@ function normalize(state: IntakeFlowState): IntakeFlowState {
   return state.step === 'processing' ? state : { ...state, stageIdx: 0 }
 }
 
-/** 进入 processing 并发起层检测（原 run() 的开头 + detectImage 调用）。 */
+/** 进入 processing 并发起唯一一次上传（服务端管线内含层检测闸门，无客户端预检往返）。 */
 function startRun(state: IntakeFlowState, ctx: IntakeFlowCtx, dataUrl: string): IntakeFlowTransition {
   return {
     state: { ...state, step: 'processing', stageIdx: 0 },
-    actions: [{ type: 'detect', entry: ctx.entry, dataUrl }],
+    actions: [{ type: 'intake', entry: ctx.entry, dataUrl }],
   }
 }
 
@@ -142,6 +145,18 @@ function toFailure(state: IntakeFlowState, failure: IntakeFailure): IntakeFlowTr
     state: normalize({ ...state, step: 'failure', feedback: mapIntakeFailure(failure) }),
     actions: [],
   }
+}
+
+/** 失败响应里携带的层标签（409/422 的 details.detected；非数组/非字符串一并忽略，不猜）。 */
+function detectedFrom(details: Record<string, unknown> | undefined): string[] {
+  const raw = details?.detected
+  return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : []
+}
+
+/** 服务端 409 的纠偏建议（优先 details.suggestion，回退 message）。 */
+function suggestionFrom(failure: IntakeFailure): string {
+  const suggestion = failure.details?.suggestion
+  return typeof suggestion === 'string' && suggestion.length > 0 ? suggestion : failure.message
 }
 
 /** 回到上传步：本次上下文全部清空（交接图一并清掉）。 */
@@ -189,37 +204,7 @@ export function transitionIntakeFlow(
       return startRun(state, ctx, dataUrl)
     }
 
-    // ── 层检测结果（原 run() 的前半段分支）──
-    case 'detect_ok': {
-      if (event.unsupported) {
-        return toFailure(state, {
-          status: 422,
-          code: 'UNSUPPORTED_OBJECT',
-          message: '层检测判定为不支持的对象（如散装药片），本次不进入提取管线。',
-          details: { detected: event.layers },
-        })
-      }
-      if (event.mismatch) {
-        return {
-          state: normalize({
-            ...state,
-            mismatch: { detected: event.layers, suggestion: event.mismatch },
-            step: 'mismatch',
-          }),
-          actions: [],
-        }
-      }
-      // 相符 → 仍处 processing，按入口发起管线
-      return {
-        state: { ...state, step: 'processing', stageIdx: 0 },
-        actions: [{ type: 'intake', entry: ctx.entry, dataUrl: event.dataUrl }],
-      }
-    }
-
-    case 'detect_failed':
-      return toFailure(state, event.failure)
-
-    // ── 管线结果（原 run() 的后半段）──
+    // ── 管线结果（层检测闸门在服务端管线内先判：409 → 纠偏卡；其余失败 → 失败卡）──
     case 'intake_ok': {
       const draftIds = event.result.draftIds
       const actions: IntakeFlowAction[] = [
@@ -239,8 +224,22 @@ export function transitionIntakeFlow(
       }
     }
 
-    case 'intake_failed':
+    case 'intake_failed': {
+      // 服务端 409（层检测与所选入口不符）→ 纠偏步，UI 与动作与旧「预检 detect」路径逐字一致；
+      // 其余失败（422 不支持 / 503 / 传输失败 / 其它）→ 失败卡。
+      if (event.failure.code === ERR_CODES.LAYER_MISMATCH || event.failure.status === 409) {
+        return {
+          state: normalize({
+            ...state,
+            feedback: null,
+            mismatch: { detected: detectedFrom(event.failure.details), suggestion: suggestionFrom(event.failure) },
+            step: 'mismatch',
+          }),
+          actions: [],
+        }
+      }
       return toFailure(state, event.failure)
+    }
 
     case 'retake':
       return backToUpload()
@@ -280,7 +279,7 @@ export function transitionIntakeFlow(
       // 对方入口留下的原图直接重跑（用户不必重新选文件）：先落图与交接说明，再进 processing
       return {
         state: { ...state, image: pending.dataUrl, handoffNote: pending.note, step: 'processing', stageIdx: 0 },
-        actions: [{ type: 'detect', entry: ctx.entry, dataUrl: pending.dataUrl }],
+        actions: [{ type: 'intake', entry: ctx.entry, dataUrl: pending.dataUrl }],
       }
     }
   }

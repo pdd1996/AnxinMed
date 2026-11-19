@@ -19,7 +19,6 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import {
-  detectImage,
   initialIntakeFlowState,
   intakeDrug,
   intakePrescription,
@@ -42,10 +41,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { computeImageStats } from '@/lib/imageStats'
 import { cn } from '@/lib/utils'
 
-/** 双入口 tab（PRD §7.2.1 A/B 平级展示）：标签图标固定在此，跳转路径仍由注入的 otherEntryPath 决定。 */
+/** 双入口 tab（PRD §7.2.1 A/B 平级展示）：药盒在前（默认档，2026-11-19 用户裁定），处方笺在后；
+ *  标签图标固定在此，跳转路径仍由注入的 otherEntryPath 决定。 */
 const ENTRY_TABS: { entry: Entry; label: string; icon: typeof FileText }[] = [
-  { entry: 'A', label: '拍处方笺', icon: FileText },
   { entry: 'B', label: '拍药品', icon: Package },
+  { entry: 'A', label: '拍处方笺', icon: FileText },
 ]
 
 export interface IntakeCopy {
@@ -58,7 +58,7 @@ export interface IntakeCopy {
 
 /**
  * 录入流程壳（M2-T8 · PRD §7.2.1 / §7.2.6 / §10.1）：上传 → 本地质量预检 → 层检测（可纠正）→ 管线 → 草稿。
- * 两入口共用；文案经 IntakeCopy 注入。上传步以平级 tab 呈现两入口（拍处方笺 / 拍药品），
+ * 两入口共用；文案经 IntakeCopy 注入。上传步以平级 tab 呈现两入口（拍药品 / 拍处方笺，药盒在前），
  * 切换即路由跳转；照片进入流程后 tab 收起，换入口只走纠偏/失败卡的显式动作（层检测不静默改道）。
  * 所有失败分支渲染成可见卡片 + 可行动作，禁止静默吞错。
  *
@@ -87,21 +87,6 @@ export function IntakeFlow({ copy }: { copy: IntakeCopy }) {
           void computeImageStats(action.dataUrl).then((stats) =>
             dispatch({ type: 'stats_checked', stats }),
           )
-          break
-        case 'detect':
-          void detectImage(action.dataUrl, action.entry).then((det) => {
-            if (!det.ok) {
-              dispatch({ type: 'detect_failed', failure: det })
-              return
-            }
-            dispatch({
-              type: 'detect_ok',
-              dataUrl: action.dataUrl,
-              layers: det.data.layers,
-              unsupported: det.data.unsupported,
-              mismatch: det.data.mismatch,
-            })
-          })
           break
         case 'intake':
           void (action.entry === 'A' ? intakePrescription(action.dataUrl) : intakeDrug(action.dataUrl)).then(

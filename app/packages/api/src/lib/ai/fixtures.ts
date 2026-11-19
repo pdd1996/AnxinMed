@@ -17,6 +17,7 @@ import {
   type AiClients,
   type ConsultPromptPayload,
   type ConsultRawSections,
+  type DetectIdentityResult,
   type FallbackFields,
   type IdentityFields,
   type ImageInput,
@@ -96,6 +97,18 @@ export class FixtureAiClients implements AiClients {
     const s = currentScenario()
     bump(s, 'detectLayers')
     return loadPack(s).detectLayers
+  }
+  /**
+   * 入口B 合并调用回放（拍药品延迟优化）：录制包是「层检测 + 身份」两份录制，
+   * 合并方法按同一场景包组合返回（合成的确定值，不是新造模型输出）。
+   * 计数仍落 detectLayers（e2e 的「层检测跑了 / OCR 没跑」结构断言口径不变）。
+   */
+  async detectAndExtractIdentity(_image: ImageInput): Promise<DetectIdentityResult> {
+    const s = currentScenario()
+    const pack = loadPack(s)
+    bump(s, 'detectLayers')
+    if (pack.extractIdentity) bump(s, 'extractIdentity')
+    return { layers: pack.detectLayers, identity: pack.extractIdentity ?? null }
   }
   async extractIdentity(_image: ImageInput): Promise<IdentityFields> {
     const s = currentScenario()

@@ -237,13 +237,25 @@ describe('管线 run.ts · 入口B（药盒，永不抄录用法用量）', () =
     expect(JSON.stringify(d)).not.toContain('"frequency"')
   })
 
-  it('身份识别不可用 → 降级：no_match + needsManual，不炸', async () => {
-    const clients = mockClients({ layers: ['药盒原装层'], extractIdentityError: new AIUnavailableError('qwen', 'down') })
+  it('身份读不出（合并调用 identity=null）→ 降级：no_match + needsManual，不炸', async () => {
+    const clients = mockClients({
+      layers: ['药盒原装层'],
+      extractIdentityError: new AIUnavailableError('qwen', 'down'),
+    })
     const d = await runDrug(IMG, clients, ctx())
-    expect(d.degraded?.code).toBe('AI_UNAVAILABLE')
+    expect(d.degraded?.code).toBe('PARSE_FAILED')
     expect(d.match?.status).toBe('no_match')
     expect(d.drugDraft.confirmStatus).toBe('manual')
     expect(d.needsManual).toContain('genericName')
+  })
+
+  it('合并调用只发一次视觉请求（detectIdentity=1，不再分别调 detectLayers/extractIdentity）', async () => {
+    const calls = newCalls()
+    const clients = mockClients({ layers: ['药盒原装层'], identity: IDENTITY, calls })
+    await runDrug(IMG, clients, ctx())
+    expect(calls.detectIdentity).toBe(1)
+    expect(calls.detectLayers).toBe(0)
+    expect(calls.extractIdentity).toBe(0)
   })
 })
 

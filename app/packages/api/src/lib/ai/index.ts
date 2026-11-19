@@ -40,6 +40,7 @@ export function createAiClients(): AiClients {
   const rest = provider === 'baichuan' ? baichuan : qwenText
   return {
     detectLayers: qwen.detectLayers,
+    detectAndExtractIdentity: qwen.detectAndExtractIdentity,
     extractIdentity: qwen.extractIdentity,
     runOcr: ocr.runOcr,
     fallbackParse: rest.fallbackParse,
@@ -92,7 +93,7 @@ async function externalKnowledgeClient(question: string): Promise<ConsultExterna
 }
 
 export * from './types.js'
-export { buildDetectLayersRequest, buildExtractIdentityRequest } from './qwen.js'
+export { buildDetectLayersRequest, buildDetectIdentityRequest, buildExtractIdentityRequest } from './qwen.js'
 export { buildOcrRequest } from './ocr.js'
 export {
   buildFallbackParseRequest,

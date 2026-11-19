@@ -50,12 +50,18 @@ function rethrowMapped(err: unknown): never {
 }
 
 /**
- * 结构化打点日志（M3-T5 · spec §T5.1）：单行 JSON，含入口/草稿数/总墙钟/各阶段耗时。
+ * 结构化打点日志（M3-T5 · spec §T5.1）：单行 JSON，含入口/草稿数/图片字节数/总墙钟/各阶段耗时。
+ * imageBytes 是客户端上传的**压缩后**字节数（拍药慢排查：判断是不是图片体积拖慢上传/上游模型）。
  * 不含用户数据/原文（执行总纲 §0.5）；测试环境静默（避免噪音），dev/prod 恒输出供 P50/P95 采样。
  */
-function logIntakeTiming(entry: 'A' | 'B', summary: TimingSummary, drafts: number): void {
+function logIntakeTiming(entry: 'A' | 'B', summary: TimingSummary, drafts: number, imageBytes: number): void {
   if (process.env.NODE_ENV === 'test') return
-  console.log(`[intake:timing] ${JSON.stringify({ entry, drafts, ...summary })}`)
+  console.log(`[intake:timing] ${JSON.stringify({ entry, drafts, imageBytes, ...summary })}`)
+}
+
+/** base64 长度 → 原始字节数（4 字符编码 3 字节；末尾 padding 忽略不计的误差约 ≤2B）。 */
+function imageBytesOf(image: ImageInput): number {
+  return Math.floor((image.base64.length * 3) / 4)
 }
 
 /** 组管线上下文：drug_master 候选 / 规则 / 说明书切片 / 用户现有生效计划的 masterIds（相互作用生效集合基线）。 */
@@ -147,7 +153,7 @@ export async function intakePrescription(
     rethrowMapped(err)
   }
   const result = await timing.measureAsync('persist', () => persistDrafts(userId, payloads))
-  logIntakeTiming('A', timing.summarize(), result.drafts.length)
+  logIntakeTiming('A', timing.summarize(), result.drafts.length, imageBytesOf(image))
   return result
 }
 
@@ -166,6 +172,6 @@ export async function intakeDrug(
     rethrowMapped(err)
   }
   const result = await timing.measureAsync('persist', () => persistDrafts(userId, [payload]))
-  logIntakeTiming('B', timing.summarize(), result.drafts.length)
+  logIntakeTiming('B', timing.summarize(), result.drafts.length, imageBytesOf(image))
   return result
 }

@@ -162,8 +162,8 @@ test.describe('golden case E2E（fixture 回放）', () => {
     const page = await openScenario(browser, 'drug-box-labeled')
     await uploadToDraft(page, 'drug-box-labeled')
 
-    // UI：标签提示
-    await expect(page.getByText(/检测到医院标签层：标签用法不会被自动抄录/)).toBeVisible()
+    // UI：标签提示（文案与 web OriginalPanel 现行措辞对齐：标签上的用法不会被自动抄录）
+    await expect(page.getByText(/检测到医院标签层：标签上的用法不会被自动抄录/)).toBeVisible()
 
     // 结构（PRD 红线）：payload 不存在任何 dose/frequency/usage 字段
     const payload = await latestPayload()

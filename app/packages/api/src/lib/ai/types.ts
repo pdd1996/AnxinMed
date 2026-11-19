@@ -45,6 +45,18 @@ export interface IdentityFields {
   approvalNumber?: string
 }
 
+/**
+ * 入口B 合并视觉调用结果（「拍药品」延迟优化）：层检测 + 身份提取一次模型调用完成。
+ *
+ * 闸门语义不变：pipeline 先拿 layers 过 assertLayersForEntry，不支持/入口不符照样 409/422，
+ * identity 立刻丢弃、绝不进入装配/落库。identity=null = 模型判定图中没有可识别的药品包装层，
+ * 或身份字段读不出（上层按 needsManual 降级，不猜）。
+ */
+export interface DetectIdentityResult {
+  layers: LayerLabel[]
+  identity: IdentityFields | null
+}
+
 /** 兜底解析（Baichuan）产出：字段键 → 值（须过回链校验才可用）。 */
 export type FallbackFields = Record<string, string>
 
@@ -165,6 +177,11 @@ export interface ConsultExternalKnowledgeOutput {
 export interface AiClients {
   /** 层检测：返回检测到的层标签数组（多选）。 */
   detectLayers(image: ImageInput): Promise<LayerLabel[]>
+  /**
+   * 入口B 专用：层检测 + 身份提取合并为单次视觉调用（「拍药品」少一次模型往返，约省 2–3s）。
+   * 闸门仍由 pipeline 用返回的 layers 判定；身份字段永不含用法用量。
+   */
+  detectAndExtractIdentity(image: ImageInput): Promise<DetectIdentityResult>
   /** 身份线：VLM 提取身份字段。 */
   extractIdentity(image: ImageInput): Promise<IdentityFields>
   /** 医嘱线 OCR：行级转录（qwen3.5-ocr，无字符级置信度/坐标）。 */

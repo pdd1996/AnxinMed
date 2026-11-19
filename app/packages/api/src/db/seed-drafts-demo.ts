@@ -67,6 +67,10 @@ function fakeClients(o: FakeOptions): AiClients {
     async detectLayers() {
       return o.layers
     },
+    // 入口B 合并调用（拍药品延迟优化）：按同一份伪造 I/O 组合返回，seed 场景与拆开时等价
+    async detectAndExtractIdentity() {
+      return { layers: o.layers, identity: o.identity ?? null }
+    },
     async runOcr() {
       if (o.ocrDown) throw new AIUnavailableError('ocr', '演示：OCR 服务不可用')
       return o.ocr ?? { lines: [] }

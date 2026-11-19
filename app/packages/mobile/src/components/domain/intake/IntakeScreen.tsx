@@ -12,7 +12,6 @@ import { FileText, Package, TriangleAlert } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { toast } from "sonner-native";
 import {
-  detectImage,
   initialIntakeFlowState,
   intakeDrug,
   intakePrescription,
@@ -134,25 +133,6 @@ export default function IntakeScreen({
           );
           break;
 
-        case "detect":
-          void callTransport(
-            () => detectImage(action.dataUrl, action.entry),
-            TIMEOUT_MS.detect,
-          ).then((det) => {
-            if (!det.ok) {
-              dispatch({ type: "detect_failed", failure: det });
-              return;
-            }
-            dispatch({
-              type: "detect_ok",
-              dataUrl: action.dataUrl,
-              layers: det.data.layers,
-              unsupported: det.data.unsupported,
-              mismatch: det.data.mismatch,
-            });
-          });
-          break;
-
         case "intake":
           void callTransport(
             () =>
@@ -237,7 +217,8 @@ export default function IntakeScreen({
   }, [state.step]);
 
   async function start(from: "camera" | "library") {
-    const picked = from === "camera" ? await takePhoto() : await pickFromLibrary();
+    const picked =
+      from === "camera" ? await takePhoto(entry) : await pickFromLibrary(entry);
     if (picked.ok) {
       const { dataUrl, uri, width, height } = picked.photo;
       if (onPicked) {

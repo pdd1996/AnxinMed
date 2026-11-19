@@ -8,15 +8,33 @@ import { LayerLabelSchema } from '@anxin/shared'
 /** 层检测：模型输出标签数组（多选）。 */
 export const LayersOutputSchema = z.array(LayerLabelSchema)
 
-/** 身份线提取：药名必填，其余可选；结构上不含任何用法用量字段（药盒层永不抄录）。 */
+/**
+ * 入口B 合并调用（detectAndExtractIdentity）的模型输出信封：
+ *   - layers：严格（闸门依据，非法即 safeParse 失败 → AIUnavailableError，不猜）；
+ *   - identity：unknown（由 qwen.ts 再走 IdentityExtractSchema.safeParse；非法/缺省 → 视为 null 降级，
+ *     而不是把整次调用判成不可用——层结果仍可支撑 409/422 闸门与 unsupported 提示）。
+ */
+export const DetectIdentityEnvelopeSchema = z.object({
+  layers: LayersOutputSchema,
+  identity: z.unknown(),
+})
+
+/**
+ * 身份线提取：药名必填，其余可选；结构上不含任何用法用量字段（药盒层永不抄录）。
+ *
+ * 可选字段用 nullish（null → undefined）：真实模型对「看不见的字段」既可能省略、也可能显式给 null
+ * （合并调用实测 2026-11-19 会输出 "otcFlag":null）。null 不是值，按「未提供」归一化，
+ * 不能因一个空字段把整份身份判成非法（否则可读出的药名/规格被连带降级）。
+ */
+const optionalString = z.string().nullish().transform((v) => v ?? undefined)
 export const IdentityExtractSchema = z.object({
   genericName: z.string().min(1),
-  brandName: z.string().optional(),
-  specification: z.string().optional(),
-  form: z.string().optional(),
-  manufacturer: z.string().optional(),
-  otcFlag: z.boolean().optional(),
-  approvalNumber: z.string().optional(),
+  brandName: optionalString,
+  specification: optionalString,
+  form: optionalString,
+  manufacturer: optionalString,
+  otcFlag: z.boolean().nullish().transform((v) => v ?? undefined),
+  approvalNumber: optionalString,
 })
 
 /**

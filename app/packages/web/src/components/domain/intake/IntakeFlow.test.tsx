@@ -1,8 +1,11 @@
 /**
  * M2-T8 · 录入页组件断言：五个 golden case 场景在 UI 上可达且反馈正确（任务书完成标准，mock 管线响应）。
  *
- * 只 mock 传输层（@anxin/core 的三个 intake 函数）与像素统计（本端 canvas 实现，jsdom 无 canvas）；
+ * 只 mock 传输层（@anxin/core 的两个 intake 函数）与像素统计（本端 canvas 实现，jsdom 无 canvas）；
  * 流程状态机（M5-T2 起在 @anxin/core）、失败映射、会话 store 交接全走真代码。
+ *
+ * 2026-11-19 拍药延迟优化：客户端不再先调 /api/intake/detect 预检——照片只上传一次，
+ * 层检测闸门在服务端管线内先判，409 直接落纠偏卡（本文件按新形态断言）。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
@@ -11,14 +14,13 @@ import { IntakeFlow, type IntakeCopy } from './IntakeFlow'
 import { SAFETY_NOTE, useIntakeSession } from '@anxin/core'
 
 const mocks = vi.hoisted(() => ({
-  detectImage: vi.fn(),
   intakePrescription: vi.fn(),
   intakeDrug: vi.fn(),
   computeImageStats: vi.fn(),
 }))
 vi.mock('@anxin/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@anxin/core')>()
-  return { ...actual, ...mocks } // 只替换传输层三函数，状态机与 store 走真代码
+  return { ...actual, ...mocks } // 只替换传输层两函数，状态机与 store 走真代码
 })
 vi.mock('@/lib/imageStats', () => ({ computeImageStats: mocks.computeImageStats }))
 
@@ -31,10 +33,6 @@ const COPY_A: IntakeCopy = {
 }
 const COPY_B: IntakeCopy = { ...COPY_A, entry: 'B', pageTitle: '拍药品建档', otherEntryLabel: '拍处方笺', otherEntryPath: '/intake/rx' }
 
-const detectOk = (layers: string[], mismatch: string | null = null) => ({
-  ok: true,
-  data: { layers, unsupported: false, mismatch },
-})
 const summary = (over: Record<string, unknown> = {}) => ({
   id: 'd-1',
   type: 'prescription',
@@ -48,6 +46,14 @@ const summary = (over: Record<string, unknown> = {}) => ({
 const intakeOk = (drafts: Record<string, unknown>[]) => ({
   ok: true,
   data: { draftIds: drafts.map((d) => d.id as string), drafts },
+})
+/** 失败响应（settle() 的失败分支形状：status/code/message/details）。 */
+const intakeFail = (status: number, code: string, message: string, details: Record<string, unknown> = {}) => ({
+  ok: false,
+  status,
+  code,
+  message,
+  details,
 })
 
 function renderFlow(entry: 'A' | 'B' = 'A') {
@@ -71,7 +77,6 @@ function upload() {
 }
 
 beforeEach(() => {
-  mocks.detectImage.mockReset()
   mocks.intakePrescription.mockReset()
   mocks.intakeDrug.mockReset()
   mocks.computeImageStats.mockReset()
@@ -82,21 +87,18 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('golden case ① rx-normal：单草稿直接进确认页', () => {
-  it('detect 相符 → 跑入口A 管线 → 原图进会话 store → 跳转 /drafts/:id', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
+  it('上传即跑入口A 管线 → 原图进会话 store → 跳转 /drafts/:id（只发一次请求）', async () => {
     mocks.intakePrescription.mockResolvedValue(intakeOk([summary()]))
     renderFlow('A')
     upload()
     expect(await screen.findByText('确认页占位')).toBeTruthy()
-    const [dataUrl, entry] = mocks.detectImage.mock.calls[0]
+    expect(mocks.intakePrescription).toHaveBeenCalledTimes(1) // 无预检往返
+    const [dataUrl] = mocks.intakePrescription.mock.calls[0]
     expect(dataUrl).toMatch(/^data:image\/png;base64,/)
-    expect(entry).toBe('A')
-    expect(mocks.intakePrescription).toHaveBeenCalledTimes(1)
     expect(useIntakeSession.getState().imageByDraftId['d-1']).toMatch(/^data:image\/png;base64,/)
   })
 
   it('golden ② rx-spec-conflict / ③ rx-redacted：单草稿同样直达确认页（冲突与人工补在确认页处理）', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
     mocks.intakePrescription.mockResolvedValue(intakeOk([summary({ matchStatus: 'conflict', needsManual: 2 })]))
     renderFlow('A')
     upload()
@@ -106,7 +108,6 @@ describe('golden case ① rx-normal：单草稿直接进确认页', () => {
 
 describe('多草稿：一张处方笺拆 N 份 → 列表逐个确认', () => {
   it('2 份草稿 → 列表卡 + 每份徽章（冲突/需人工补）+ 逐个去确认 + 原图共享', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
     mocks.intakePrescription.mockResolvedValue(
       intakeOk([summary({ id: 'd-1', matchStatus: 'conflict' }), summary({ id: 'd-2', needsManual: 2 })]),
     )
@@ -125,7 +126,6 @@ describe('多草稿：一张处方笺拆 N 份 → 列表逐个确认', () => {
 
 describe('golden case ④ drug-box-labeled：入口B 仅身份线', () => {
   it('走 intakeDrug（不走 prescription），标签提示草稿直达确认页', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['医院标签层', '药盒原装层']))
     mocks.intakeDrug.mockResolvedValue(intakeOk([summary({ type: 'drug', labelNotice: true })]))
     renderFlow('B')
     upload()
@@ -136,24 +136,30 @@ describe('golden case ④ drug-box-labeled：入口B 仅身份线', () => {
 })
 
 describe('golden case ⑤ unsupported-loose-pills：不支持对象不进入提取', () => {
-  it('detect 判不支持 → 不支持卡 + 统一安全提示 + 手动建档兜底，且不调管线', async () => {
-    mocks.detectImage.mockResolvedValue({ ok: true, data: { layers: ['不支持'], unsupported: true, mismatch: null } })
+  it('服务端 422 → 不支持卡 + 统一安全提示 + 手动建档兜底（不自动重试）', async () => {
+    mocks.intakePrescription.mockResolvedValue(
+      intakeFail(422, 'UNSUPPORTED_OBJECT', '层检测不支持该对象（如散装药片）。请勿根据无法识别的内容服药。', {
+        detected: ['不支持'],
+      }),
+    )
     renderFlow('A')
     upload()
     expect(await screen.findByText('该对象暂不支持')).toBeTruthy()
     expect(screen.getByText(SAFETY_NOTE)).toBeTruthy()
-    expect(mocks.intakePrescription).not.toHaveBeenCalled()
+    expect(mocks.intakePrescription).toHaveBeenCalledTimes(1) // 一次请求即得闸门结论
     fireEvent.click(screen.getByRole('button', { name: /手动建档（不经识别）/ }))
     expect(await screen.findByText('药箱页')).toBeTruthy()
   })
 })
 
 describe('层检测纠偏：不静默改道', () => {
-  it('detect 返回 mismatch → 纠偏卡（建议 + 层标签 + 三动作）；切换入口把原图交接给对方入口直接重跑', async () => {
+  it('服务端 409 → 纠偏卡（建议 + 层标签 + 三动作）；切换入口把原图交接给对方入口直接重跑', async () => {
     const suggestion = '检测到药盒原装层，未检测到处方层。你选择的是「拍处方笺」，是否切换到「拍药品」入口？'
-    // 按入口给响应（比按调用次序的 once 队列稳）：A 恒纠偏、B 恒相符
-    mocks.detectImage.mockImplementation((_img: string, entry: 'A' | 'B') =>
-      Promise.resolve(entry === 'A' ? detectOk(['药盒原装层'], suggestion) : detectOk(['药盒原装层'])),
+    mocks.intakePrescription.mockResolvedValue(
+      intakeFail(409, 'LAYER_MISMATCH', '层检测结果与所选入口不符，请确认或切换入口', {
+        detected: ['药盒原装层'],
+        suggestion,
+      }),
     )
     mocks.intakeDrug.mockResolvedValue(intakeOk([summary({ type: 'drug' })]))
     renderFlow('A')
@@ -161,42 +167,42 @@ describe('层检测纠偏：不静默改道', () => {
     expect(await screen.findByText('检测结果与所选入口不符')).toBeTruthy()
     expect(screen.getByText(suggestion)).toBeTruthy()
     expect(screen.getByText('药盒原装层')).toBeTruthy()
-    expect(mocks.intakePrescription).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: /切换到「拍药品」重跑/ }))
-    // 对方入口挂载后自动用交接图重跑（entry=B）
+    // 对方入口挂载后自动用交接图重跑（entry=B，一次请求）
     expect(await screen.findByText('确认页占位')).toBeTruthy()
-    expect(mocks.detectImage).toHaveBeenCalledTimes(2)
-    expect(mocks.detectImage.mock.calls[1][1]).toBe('B')
+    expect(mocks.intakeDrug).toHaveBeenCalledTimes(1)
     expect(useIntakeSession.getState().pendingImage).toBeNull() // 交接用完即清
   })
 
-  it('服务端 409（detect 与 intake 判定不一致）→ 同样落在纠偏卡而非静默失败', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
-    mocks.intakePrescription.mockResolvedValue({
-      ok: false,
-      status: 409,
-      code: 'LAYER_MISMATCH',
-      message: '层检测结果与所选入口不符，请确认或切换入口',
-      details: { detected: ['说明书层'], suggestion: '未检测到处方层，请确认拍摄对象。' },
-    })
+  it('409 缺 suggestion → 纠偏卡用服务端 message 兜底，不出现空建议', async () => {
+    mocks.intakePrescription.mockResolvedValue(
+      intakeFail(409, 'LAYER_MISMATCH', '请确认拍摄对象后重试', { detected: ['说明书层'] }),
+    )
     renderFlow('A')
     upload()
-    expect(await screen.findByText(/无法可靠识别|检测结果与所选入口不符/)).toBeTruthy()
-    expect(screen.getAllByText(/未检测到处方层/).length).toBeGreaterThan(0)
+    expect(await screen.findByText('检测结果与所选入口不符')).toBeTruthy()
+    expect(screen.getByText('请确认拍摄对象后重试')).toBeTruthy()
+  })
+
+  it('纠偏卡「检测错了 · 按当前入口重试」→ 重新上传识别（仍只发一次请求）', async () => {
+    mocks.intakePrescription
+      .mockResolvedValueOnce(intakeFail(409, 'LAYER_MISMATCH', '不符', { detected: ['药盒原装层'], suggestion: '换入口？' }))
+      .mockResolvedValueOnce(intakeOk([summary()]))
+    renderFlow('A')
+    upload()
+    expect(await screen.findByText('检测结果与所选入口不符')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /按当前入口重试/ }))
+    expect(await screen.findByText('确认页占位')).toBeTruthy()
+    expect(mocks.intakePrescription).toHaveBeenCalledTimes(2)
   })
 })
 
 describe('AI 不可用 → 明确降级引导', () => {
   it('503 → 降级卡：手动建档兜底 + 说明照片不必重拍', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
-    mocks.intakePrescription.mockResolvedValue({
-      ok: false,
-      status: 503,
-      code: 'AI_UNAVAILABLE',
-      message: '识别服务暂不可用，请稍后重试，或改用「手动建档」录入',
-      details: {},
-    })
+    mocks.intakePrescription.mockResolvedValue(
+      intakeFail(503, 'AI_UNAVAILABLE', '识别服务暂不可用，请稍后重试，或改用「手动建档」录入'),
+    )
     renderFlow('A')
     upload()
     expect(await screen.findByText('识别服务暂不可用')).toBeTruthy()
@@ -209,13 +215,12 @@ describe('AI 不可用 → 明确降级引导', () => {
 describe('本地质量预检：具体重拍建议且不拦用户', () => {
   it('过暗照片 → 建议卡（过暗 + 重拍话术）；点「仍要上传」照常跑管线', async () => {
     mocks.computeImageStats.mockResolvedValue({ meanLuma: 30, clippedRatio: 0.01, sharpness: 0.1, width: 1600, height: 1200 })
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
     mocks.intakePrescription.mockResolvedValue(intakeOk([summary()]))
     renderFlow('A')
     upload()
     expect(await screen.findByText('照片质量可能影响识别')).toBeTruthy()
     expect(screen.getByText(/环境过暗：到光线充足处重拍/)).toBeTruthy()
-    expect(mocks.detectImage).not.toHaveBeenCalled() // 预检阶段不下传
+    expect(mocks.intakePrescription).not.toHaveBeenCalled() // 预检阶段不下传
     fireEvent.click(screen.getByRole('button', { name: /仍要上传/ }))
     expect(await screen.findByText('确认页占位')).toBeTruthy()
   })
@@ -227,7 +232,7 @@ describe('本地质量预检：具体重拍建议且不拦用户', () => {
     expect(await screen.findByText('照片质量可能影响识别')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /重拍 \/ 换一张/ }))
     expect(await screen.findByText('上传平铺完整的处方笺照片')).toBeTruthy()
-    expect(mocks.detectImage).not.toHaveBeenCalled()
+    expect(mocks.intakePrescription).not.toHaveBeenCalled()
   })
 })
 
@@ -236,7 +241,7 @@ describe('上传前置校验', () => {
     renderFlow('A')
     const input = screen.getByLabelText('上传照片') as HTMLInputElement
     fireEvent.change(input, { target: { files: [new File([new Uint8Array(4)], 'a.gif', { type: 'image/gif' })] } })
-    await waitFor(() => expect(mocks.detectImage).not.toHaveBeenCalled())
+    await waitFor(() => expect(mocks.intakePrescription).not.toHaveBeenCalled())
     expect(screen.getByText('上传平铺完整的处方笺照片')).toBeTruthy()
   })
 })
@@ -254,7 +259,6 @@ describe('双入口平级 tab：拍药盒是一等入口', () => {
   })
 
   it('照片进入流程后 tab 收起：换入口只能走纠偏/失败卡的显式动作，不留静默改道口子', async () => {
-    mocks.detectImage.mockResolvedValue(detectOk(['处方层']))
     mocks.intakePrescription.mockResolvedValue(intakeOk([summary()]))
     renderFlow('A')
     upload()
