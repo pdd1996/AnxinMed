@@ -1,4 +1,4 @@
-﻿/**
+/**
  * M2-T7 · 确认页组件断言（任务书完成标准：needsManual 字段无法被预填值、冲突清单不自动选择）。
  *
  * 只 mock 传输层（@anxin/core 的三个函数），页面/纯逻辑/组件全走真代码：
@@ -354,6 +354,9 @@ describe('批准文号口径（2026-11-19 现场反馈：批号不是身份核�
   it('多规格合并候选：出现「批准文号（选填）」；填对号命中候选、填错给可见提示', async () => {
     renderDraft(MERGED_CONFLICT)
     const input = (await screen.findByLabelText('批准文号（选填）')) as HTMLInputElement
+    // 2026-11-20 用户定调：字段要用户自己填，只把「填什么」讲清楚——占位符给数字样例，提示行说字母不用填
+    expect(input.placeholder).toBe('如 20138002')
+    expect(screen.getByText(/字母（H \/ Z \/ S…）不用填/)).toBeTruthy()
     expect(await screen.findByText(/多规格库条目 · 规格以实物为准/)).toBeTruthy()
 
     fireEvent.change(input, { target: { value: '国药准字H20138002' } })

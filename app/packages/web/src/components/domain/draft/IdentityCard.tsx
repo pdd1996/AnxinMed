@@ -135,13 +135,13 @@ export function IdentityCard({
                 id="id-approval"
                 value={state.approvalInput}
                 onChange={(e) => patch({ approvalInput: e.target.value })}
-                placeholder="如 国药准字H20138002"
+                placeholder="如 20138002"
               />
               <p className="text-xs leading-5 text-muted-foreground">
-                填包装上的<strong>批准文号</strong>（不是生产批号）；只填后面那串数字也行。
+                盒子上的批准文号长这样：<span className="whitespace-nowrap">国药准字H20138002</span>。字母（H / Z / S…）不用填，只填后面那串数字；它不是生产批号。
               </p>
               <p className="text-xs leading-5 text-muted-foreground">
-                帮你在候选里定位对应记录，<strong>不做官方校验</strong>；以包装/说明书为准。
+                填了只帮你在候选里定位记录，<strong>不做官方校验</strong>；以包装/说明书为准。
               </p>
               {state.approvalInput.trim() &&
                 (candidates.some((c) => approvalMatchesCandidate(c, state.approvalInput)) ? (

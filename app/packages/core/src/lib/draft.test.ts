@@ -282,10 +282,11 @@ describe('批准文号选填（2026-11-19：仅辅助候选定位，不做官方
     expect(initialConfirmState(MULTI_PAYLOAD).approvalInput).toBe('')
   })
 
-  it('命中判定：全号/只填编号后缀/全角数字都算命中；别的号不命中；过短输入不命中', () => {
+  it('命中判定：全号/只填编号后缀/只填 8 位数字/全角数字都算命中；别的号不命中；过短输入不命中', () => {
     const c = selectableCandidates(MULTI_PAYLOAD)[0]!
     expect(approvalMatchesCandidate(c, '国药准字H20138002')).toBe(true) // 240mg 的号
     expect(approvalMatchesCandidate(c, 'H20138002')).toBe(true) // 只填编号后缀
+    expect(approvalMatchesCandidate(c, '20138002')).toBe(true) // 只填数字——界面就按这个教用户（字母不用填）
     expect(approvalMatchesCandidate(c, 'ｈ２０１３８００２')).toBe(true) // 全角
     expect(approvalMatchesCandidate(c, '国药准字H99999999')).toBe(false)
     expect(approvalMatchesCandidate(c, 'H2013')).toBe(false) // 过短不作命中依据

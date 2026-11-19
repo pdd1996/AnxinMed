@@ -183,15 +183,15 @@ export function IdentityCard({
               <TextInput
                 value={state.approvalInput}
                 onChangeText={(v) => patch({ approvalInput: v })}
-                placeholder="如 国药准字H20138002"
+                placeholder="如 20138002"
                 accessibilityLabel="批准文号（选填）"
                 className={INPUT_CLASS}
               />
               <Text className="text-xs leading-5 text-muted-foreground">
-                填包装上的批准文号（不是生产批号）；只填后面那串数字也行。
+                盒子上的批准文号长这样：国药准字H20138002。字母（H / Z / S…）不用填，只填后面那串数字；它不是生产批号。
               </Text>
               <Text className="text-xs leading-5 text-muted-foreground">
-                帮你在候选里定位对应记录，不做官方校验；以包装/说明书为准。
+                填了只帮你在候选里定位记录，不做官方校验；以包装/说明书为准。
               </Text>
               {state.approvalInput.trim() ? (
                 candidates.some((c) => approvalMatchesCandidate(c, state.approvalInput)) ? (
