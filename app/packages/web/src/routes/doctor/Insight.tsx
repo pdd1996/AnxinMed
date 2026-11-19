@@ -842,19 +842,6 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
         </CardContent>
       </Card>
 
-      {/* 免责声明 */}
-      <Card className="border-risk-l3/30 bg-risk-l3/5">
-        <CardContent className="flex items-start gap-3 p-4">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-risk-l3" aria-hidden />
-          <div>
-            <strong className="text-sm text-risk-l3">仅供参考</strong>
-            <p className="mt-1 text-xs text-muted-foreground">
-              本摘要基于患者自报数据与 Mock 演示数据，由 Agent 调用只读工具并经安全守门生成，不构成诊疗或用药调整依据。请向患者核实后依处方判断。
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* 医生问答（T7）：患者维度追问 */}
       <SectionHeading title="向 Agent 追问该患者" />
       <AskPanel patientId={patient.id} />
