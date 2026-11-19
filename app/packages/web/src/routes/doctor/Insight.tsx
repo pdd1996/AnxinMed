@@ -276,10 +276,10 @@ function CohortTable({ queue, onPick }: { queue: InsightQueueDto; onPick: (id: s
           <thead>
             <tr className="text-left text-xs text-muted-foreground">
               <th className="px-2 py-2 font-medium">患者</th>
-              <th className="px-2 py-2 font-medium">诊断</th>
-              <th className="px-2 py-2 text-center font-medium">在服</th>
+              <th className="hidden px-2 py-2 font-medium sm:table-cell">诊断</th>
+              <th className="hidden px-2 py-2 text-center font-medium sm:table-cell">在服</th>
               <th className="px-2 py-2 text-center font-medium">执行率（30 天）</th>
-              <th className="px-2 py-2 font-medium">最近活跃</th>
+              <th className="hidden px-2 py-2 font-medium sm:table-cell">最近活跃</th>
               <th className="w-8 px-2 py-2" aria-hidden />
             </tr>
           </thead>
@@ -307,10 +307,10 @@ function CohortTable({ queue, onPick }: { queue: InsightQueueDto; onPick: (id: s
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-2.5 text-xs text-muted-foreground">
+                  <td className="hidden px-2 py-2.5 text-xs text-muted-foreground sm:table-cell">
                     {p.conditions.length > 0 ? p.conditions.join('、') : '—'}
                   </td>
-                  <td className="px-2 py-2.5 text-center text-xs">{p.drugCount} 种</td>
+                  <td className="hidden px-2 py-2.5 text-center text-xs sm:table-cell">{p.drugCount} 种</td>
                   <td className="px-2 py-2.5">
                     <div className="flex items-center justify-center gap-1.5">
                       <span className="text-xs font-semibold">{p.adherenceRate != null ? `${p.adherenceRate}%` : '—'}</span>
@@ -319,7 +319,7 @@ function CohortTable({ queue, onPick }: { queue: InsightQueueDto; onPick: (id: s
                       </span>
                     </div>
                   </td>
-                  <td className="px-2 py-2.5 text-xs text-muted-foreground">{p.lastActiveAt ?? '无记录'}</td>
+                  <td className="hidden px-2 py-2.5 text-xs text-muted-foreground sm:table-cell">{p.lastActiveAt ?? '无记录'}</td>
                   <td className="px-2 py-2.5">
                     <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
                   </td>
