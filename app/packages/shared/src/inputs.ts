@@ -8,6 +8,17 @@
 import { z } from 'zod'
 import { CycleTypeSchema, PlanStatusSchema, RecordStatusSchema } from './enums.js'
 import { DoseSchema } from './dto.js'
+import { isIsoDate } from './lib.js'
+
+// ── 通用日期入参 ──
+
+/**
+ * ISO 日期（YYYY-MM-DD 且为真实日历日）——用户录入的有效期/开封日期。
+ * 允许过去日期（已过期药也要能录、能纠正），这里只拦格式与乱填；临期/过期判定在读取侧做。
+ */
+export const IsoDateSchema = z.string().refine(isIsoDate, {
+  message: '日期需为 YYYY-MM-DD 且为真实日期，如 2027-03-01',
+})
 
 // ── 药箱（手动建档 / 编辑）──
 
@@ -19,8 +30,8 @@ export const DrugCreateSchema = z.object({
   form: z.string().nullish(),
   manufacturer: z.string().nullish(),
   stock: DoseSchema.nullish(),
-  openedAt: z.string().nullish(), // ISO date
-  expiry: z.string().nullish(), // ISO date
+  openedAt: IsoDateSchema.nullish(), // ISO date（用户对照药盒录入；null=未录入）
+  expiry: IsoDateSchema.nullish(), // ISO date（同 openedAt）
 })
 export type DrugCreate = z.infer<typeof DrugCreateSchema>
 

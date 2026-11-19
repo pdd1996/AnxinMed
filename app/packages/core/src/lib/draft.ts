@@ -53,6 +53,11 @@ export interface ConfirmFormState {
   healthValue: Record<string, string>
   /** 「这是给谁用的药」已确认（处方草稿恒需勾选，见 WhoCard）。 */
   whoConfirmed: boolean
+  // ── 效期线（用户对照药盒录入；不是模型输出，不预填）──
+  /** 有效期（YYYY-MM-DD）；'' = 未录入（稍后可在药箱补录）。 */
+  expiry: string
+  /** 开封日期（YYYY-MM-DD）；'' = 未录入（首次服药时服务端也会补记）。 */
+  openedAt: string
 }
 
 const MEALS = ['无特殊要求', '饭前', '饭后', '随餐', '睡前']
@@ -165,6 +170,9 @@ export function initialConfirmState(p: DraftPayload): ConfirmFormState {
     healthChecked: {},
     healthValue: Object.fromEntries((p.healthSuggestions ?? []).map((s) => [s.field, s.value])),
     whoConfirmed: false,
+    // 效期是用户看药盒填的：管线不产出，初始恒空（红线①同样适用，不预填猜测）
+    expiry: '',
+    openedAt: '',
   }
 }
 
@@ -283,6 +291,8 @@ export function buildConfirm(p: DraftPayload, s: ConfirmFormState): DraftConfirm
         drugMasterId: null,
         confirmStatus: 'manual',
         stock: { value: Number(s.manual.stockValue) || 0, unit: s.manual.stockUnit },
+        expiry: s.expiry || null,
+        openedAt: s.openedAt || null,
       }
     : {
         genericName: chosen?.genericName ?? p.drugDraft.genericName ?? '',
@@ -294,6 +304,9 @@ export function buildConfirm(p: DraftPayload, s: ConfirmFormState): DraftConfirm
         // 初判由管线给出（transcribed/ocr_matched）；缺失时按有无计划兜底
         confirmStatus: p.drugDraft.confirmStatus ?? (plan ? 'transcribed' : 'ocr_matched'),
         stock: null,
+        // 效期/开封日期与身份是否唯一匹配无关：都取确认页上用户录入的值（留空 = null，药箱稍后补录）
+        expiry: s.expiry || null,
+        openedAt: s.openedAt || null,
       }
 
   const health = (p.healthSuggestions ?? [])

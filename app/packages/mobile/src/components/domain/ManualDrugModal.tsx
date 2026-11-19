@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { DOSE_UNITS } from "@anxin/shared";
+import { DateField } from "@/components/domain/DateField";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +21,10 @@ export interface ManualDrugForm {
   form: string;
   stock: number;
   stockUnit: string;
+  /** 有效期（YYYY-MM-DD）；'' = 未录入（可稍后在药箱补录）。 */
+  expiry: string;
+  /** 开封日期（YYYY-MM-DD）；'' = 未录入。 */
+  openedAt: string;
 }
 
 /**
@@ -47,15 +52,20 @@ export function ManualDrugModal({
   const [formValue, setFormValue] = useState("");
   const [stock, setStock] = useState("1");
   const [stockUnit, setStockUnit] = useState<string>("片");
+  const [expiry, setExpiry] = useState("");
+  const [openedAt, setOpenedAt] = useState("");
 
-  // 每次打开按 prefillName 重置（web ManualDrugModal 同语义）：只预填药名，其余字段保持空
+  // 每次打开按 prefillName 重置（web ManualDrugModal 同语义）：只预填药名，其余字段保持空。
+  // 关闭时也清空：DateField 的年 / 月 / 日是本地输入态，若留到下次打开才重置，
+  // 弹窗首帧会闪出上一次填的日期（日期规范串由 DateField 自己在合法后拼）。
   useEffect(() => {
-    if (!open) return;
-    setGenericName(prefillName ?? "");
+    setGenericName(open ? (prefillName ?? "") : "");
     setSpecification("");
     setFormValue("");
     setStock("1");
     setStockUnit("片");
+    setExpiry("");
+    setOpenedAt("");
   }, [open, prefillName]);
 
   const valid =
@@ -143,6 +153,31 @@ export function ManualDrugModal({
                 ))}
               </View>
             </View>
+            <View className="gap-1">
+              <Label className="text-base">有效期至</Label>
+              <DateField
+                value={expiry}
+                onChange={setExpiry}
+                labelPrefix="有效期"
+                optional
+              />
+              <Text className="mt-1 text-xs leading-5 text-muted-foreground">
+                照药盒包装上的具体到期日填；留空 = 还没录入，建档后可在药箱补录。
+              </Text>
+            </View>
+            <View className="gap-1">
+              <Label className="text-base">开封日期（可选）</Label>
+              <DateField
+                value={openedAt}
+                onChange={setOpenedAt}
+                labelPrefix="开封日期"
+                optional
+              />
+            </View>
+            <Text className="text-xs leading-5 text-muted-foreground">
+              说明书通常只写通用保质期（如 24 个月），不能代替这盒药包装上的具体到期日；
+              允许填已过期日期，录错或换新盒后可回药箱修改。
+            </Text>
           </View>
         </ScrollView>
 
@@ -156,6 +191,8 @@ export function ManualDrugModal({
               form: formValue.trim(),
               stock: Number(stock) || 0,
               stockUnit,
+              expiry,
+              openedAt,
             })
           }
         >

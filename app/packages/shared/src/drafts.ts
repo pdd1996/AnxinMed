@@ -8,6 +8,7 @@
 import { z } from 'zod'
 import { ConfirmStatusSchema, CycleTypeSchema } from './enums.js'
 import { DoseSchema, PlanTagsSchema } from './dto.js'
+import { IsoDateSchema } from './inputs.js'
 
 // ── 草稿枚举 ──
 
@@ -108,8 +109,9 @@ export const DraftConfirmDrugSchema = z.object({
   drugMasterId: z.string().nullish(),
   confirmStatus: ConfirmStatusSchema,
   stock: DoseSchema.nullish(),
-  openedAt: z.string().nullish(),
-  expiry: z.string().nullish(),
+  /** 用户对照药盒录入的效期/开封日期（可选；留空 = 未录入，稍后可在药箱补录）。 */
+  openedAt: IsoDateSchema.nullish(),
+  expiry: IsoDateSchema.nullish(),
 })
 export type DraftConfirmDrug = z.infer<typeof DraftConfirmDrugSchema>
 

@@ -6,6 +6,7 @@ import { useUnstableNativeVariable } from "nativewind";
 import {
   AlertTriangle,
   Bot,
+  CalendarDays,
   Camera,
   FileText,
   Hand,
@@ -20,6 +21,7 @@ import {
 import { client, fetchDrugs, fetchPlans, unwrap } from "@anxin/core";
 import { CONFIRM_STATUS_META, type CycleType, type PlanStatus } from "@anxin/shared";
 import { DeleteDrugDialog } from "@/components/domain/DeleteDrugDialog";
+import { ExpiryDialog, type ExpiryFormResult } from "@/components/domain/ExpiryDialog";
 import { ManualDrugModal, type ManualDrugForm } from "@/components/domain/ManualDrugModal";
 import { PlanModal, type PlanFormResult } from "@/components/domain/PlanModal";
 import { Icon } from "@/components/ui/icon";
@@ -49,7 +51,7 @@ function openedOverdue(drug: DrugItem): boolean {
 
 /**
  * 药箱页（M5-T5c，照 web `routes/patient/Box.tsx` 全量重写渲染层）。
- * 数据 = ['drugs'] + ['plans'] 两份查询；写操作四个 mutation 统一 invalidate
+ * 数据 = ['drugs'] + ['plans'] 两份查询；写操作五个 mutation 统一 invalidate
  * drugs/plans/tasks,today 三键（建计划会立刻改变今日任务）。
  * `md:` 断点的两列布局按 05 任务书 T5 第 3 条直接删成单列；
  * web 卡上的「问这个药」在 T7 起接入（深链 /consult?drugId=…，不做页内选药器）。
@@ -63,6 +65,7 @@ export default function Box() {
   const [showManual, setShowManual] = useState(false);
   const [planTarget, setPlanTarget] = useState<{ drug: DrugItem; plan?: PlanItem } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DrugItem | null>(null);
+  const [expiryTarget, setExpiryTarget] = useState<DrugItem | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const drugsQuery = useQuery({ queryKey: ["drugs"], queryFn: fetchDrugs });
@@ -115,7 +118,7 @@ export default function Box() {
   };
 
   /**
-   * 四个写操作共见的守卫：失败除了 core 的 toast，还要落一条页内红条——
+   * 五个写操作共见的守卫：失败除了 core 的 toast，还要落一条页内红条——
    * 建计划 / 删药都在 Dialog 里提交，toast 与 Portal 的层级未实测（T5-b §2.6 风险 1）。
    */
   const visibleFailure = {
@@ -197,8 +200,35 @@ export default function Box() {
     },
   });
 
+  /**
+   * 编辑效期 / 开封日期（PATCH /api/drugs/:id）：只提交这两个用户域字段，
+   * '' → null 表示「清空 = 未录入」（与手动建档 / 确认页 buildConfirm 同一口径）。
+   * 成功后关弹窗并复用同一 invalidate：药箱行与今日任务提醒（临期/过期）都可能随之变化。
+   */
+  const patchExpiry = useMutation({
+    mutationFn: async (input: { drugId: string } & ExpiryFormResult) => {
+      const res = await client.api.drugs[":id"].$patch({
+        param: { id: input.drugId },
+        json: {
+          expiry: input.expiry || null,
+          openedAt: input.openedAt || null,
+        },
+      });
+      return unwrap(res);
+    },
+    ...visibleFailure,
+    onSuccess: () => {
+      setExpiryTarget(null);
+      invalidate();
+    },
+  });
+
   const busy =
-    createDrug.isPending || savePlan.isPending || patchStatus.isPending || deleteDrug.isPending;
+    createDrug.isPending ||
+    savePlan.isPending ||
+    patchStatus.isPending ||
+    deleteDrug.isPending ||
+    patchExpiry.isPending;
 
   async function reload() {
     await Promise.all([drugsQuery.refetch(), plansQuery.refetch()]);
@@ -391,6 +421,13 @@ export default function Box() {
                       busy={busy}
                       onPress={() => setPlanTarget({ drug, plan })}
                     />
+                    <CardAction
+                      label="编辑效期"
+                      icon={CalendarDays}
+                      tint={mutedForeground}
+                      busy={busy}
+                      onPress={() => setExpiryTarget(drug)}
+                    />
                     {plan && plan.status === "active" ? (
                       <CardAction
                         label="暂停"
@@ -473,6 +510,17 @@ export default function Box() {
           }
         />
       ) : null}
+      {expiryTarget ? (
+        <ExpiryDialog
+          open
+          drugName={expiryTarget.genericName}
+          initialExpiry={expiryTarget.expiry ?? ""}
+          initialOpenedAt={expiryTarget.openedAt ?? ""}
+          busy={patchExpiry.isPending}
+          onClose={() => setExpiryTarget(null)}
+          onSave={(data) => patchExpiry.mutate({ drugId: expiryTarget.id, ...data })}
+        />
+      ) : null}
       <DeleteDrugDialog
         drugName={deleteTarget?.genericName ?? null}
         busy={deleteDrug.isPending}
@@ -484,18 +532,15 @@ export default function Box() {
 }
 
 /** POST /api/drugs 的请求体（手动建档路径；confirmStatus 由服务端固定 manual，客户端不传）。 */
-function toDrugPayload(form: {
-  genericName: string;
-  specification: string;
-  form: string;
-  stock: number;
-  stockUnit: string;
-}) {
+function toDrugPayload(form: ManualDrugForm) {
   return {
     genericName: form.genericName,
     specification: form.specification,
     form: form.form,
     stock: { value: form.stock, unit: form.stockUnit },
+    // 效期是用户对照药盒录入的可选字段：'' → null（未录入）
+    expiry: form.expiry || null,
+    openedAt: form.openedAt || null,
   };
 }
 

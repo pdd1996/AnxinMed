@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { OriginalPanel } from '@/components/domain/draft/OriginalPanel'
 import { IdentityCard } from '@/components/domain/draft/IdentityCard'
+import { ExpiryCard } from '@/components/domain/draft/ExpiryCard'
 import { NoPlanCard, SigCard, TimesCard } from '@/components/domain/draft/SigCard'
 import { HealthCard, WhoCard } from '@/components/domain/draft/HealthCard'
 import {
@@ -210,6 +211,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
 
         <div className="space-y-4">
           <IdentityCard payload={payload} state={state} patch={patch} />
+          <ExpiryCard state={state} patch={patch} />
           {payload.planDraft ? (
             <>
               <SigCard payload={payload} state={state} patch={patch} />

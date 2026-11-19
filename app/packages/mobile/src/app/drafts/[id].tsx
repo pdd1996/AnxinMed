@@ -23,6 +23,7 @@ import {
 import { queryClient } from "@/lib/query";
 import { isHHMM } from "@/lib/time";
 import { HealthCard, WhoCard } from "@/components/domain/draft/HealthCard";
+import { ExpiryCard } from "@/components/domain/draft/ExpiryCard";
 import { IdentityCard } from "@/components/domain/draft/IdentityCard";
 import { NoPlanCard } from "@/components/domain/draft/NoPlanCard";
 import { OriginalPanel } from "@/components/domain/draft/OriginalPanel";
@@ -45,7 +46,8 @@ import { Text } from "@/components/ui/text";
 /**
  * 草稿确认页（05e §2-T6-c / §2-T6-d）——录入主线的**唯一闸门**，语义与 web 端 `Draft.tsx` 同源：
  * 表单初值、缺项判定、闸门清单与 confirm 入参一律走 core，本文件只做渲染与 IO。
- * 区块组成与渲染顺序逐块对齐 web：原文对照 → 药品身份 →（有计划：医嘱/时间点｜无计划：仅建档）
+ * 区块组成与渲染顺序逐块对齐 web：原文对照 → 药品身份 → 有效期/开封日期
+ * →（有计划：医嘱/时间点｜无计划：仅建档）
  * → 健康建议 → 相互作用 →（有计划：说明书范围校验）→（处方笺：使用人）→ 闸门。
  *
  * 入口 B 的 `planDraft` 恒为 null，走「仅建档」分支；入口 A 走医嘱 + 时间点 + 范围校验 + 使用人。
@@ -262,6 +264,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
         <View className="mt-4 gap-4">
           <OriginalPanel payload={payload} imageUrl={imageUrl} />
           <IdentityCard payload={payload} state={state} patch={patch} />
+          <ExpiryCard state={state} patch={patch} />
           {payload.planDraft ? (
             <>
               <SigCard payload={payload} state={state} patch={patch} />

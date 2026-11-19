@@ -29,6 +29,22 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((b.getTime() - a.getTime()) / 86_400_000)
 }
 
+/**
+ * 是否为合法日历日（"YYYY-MM-DD"，月/日真实存在）。
+ * 注意：`new Date('2026-02-31')` 会被 JS 宽容进位成 3 月，故必须用 UTC 三元组回读校验。
+ * 只校验形态，不校验业务语义（是否已过期、是否未来）——后者由读取侧判定。
+ */
+export function isIsoDate(value: string): boolean {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const year = Number(value.slice(0, 4))
+  const month = Number(value.slice(5, 7))
+  const day = Number(value.slice(8, 10))
+  const probe = new Date(Date.UTC(year, month - 1, day))
+  return (
+    probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day
+  )
+}
+
 /** 库存按次扣减下的预计可用天数（推算标注）；每日用量 ≤ 0 返回 0 */
 export function estimateStockDays(stock: number, doseValue: number, frequency: number): number {
   const perDay = (doseValue || 0) * (frequency || 0)

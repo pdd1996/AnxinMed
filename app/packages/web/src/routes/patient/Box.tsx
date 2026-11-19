@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
-import { AlertTriangle, Box as BoxIcon, Bot, FileText, Hand, Pause, Pencil, Pill, Play, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, Box as BoxIcon, Bot, CalendarDays, FileText, Hand, Pause, Pencil, Pill, Play, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
 import { client, fetchDrugs, fetchPlans, unwrap } from '@anxin/core'
 import { ManualDrugModal, type ManualDrugForm } from '@/components/domain/ManualDrugModal'
+import { ExpiryDialog, type ExpiryForm } from '@/components/domain/ExpiryDialog'
 import { PlanModal, type PlanFormResult } from '@/components/domain/PlanModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -37,6 +38,8 @@ export default function Box() {
   const [showManual, setShowManual] = useState(false)
   const [manualPrefillName, setManualPrefillName] = useState<string | null>(null)
   const [planTarget, setPlanTarget] = useState<{ drug: DrugItem; plan?: PlanItem } | null>(null)
+  /** 正在编辑效期的药品（null = 弹窗关闭）。 */
+  const [expiryTarget, setExpiryTarget] = useState<DrugItem | null>(null)
 
   const drugsQuery = useQuery({ queryKey: ['drugs'], queryFn: fetchDrugs })
   const plansQuery = useQuery({ queryKey: ['plans'], queryFn: fetchPlans })
@@ -85,12 +88,34 @@ export default function Box() {
           specification: form.specification,
           form: form.form,
           stock: { value: form.stock, unit: form.stockUnit },
+          // 效期是用户对照药盒自填的；'' → null（未录入，之后可编辑补录）
+          expiry: form.expiry || null,
+          openedAt: form.openedAt || null,
         },
       })
       return unwrap(res)
     },
     onSuccess: () => {
       setShowManual(false)
+      invalidate()
+    },
+  })
+
+  /**
+   * 编辑效期（PATCH /api/drugs/:id）：补录/纠正有效期与开封日期。
+   * 失败经 core.unwrap → ApiNotifier（sonner toast）可见，弹窗保持打开可重试（不静默吞错）。
+   */
+  const saveExpiry = useMutation({
+    mutationFn: async (input: { drugId: string } & ExpiryForm) => {
+      const res = await client.api.drugs[':id'].$patch({
+        param: { id: input.drugId },
+        // '' → null：清空即「未录入」，供用户改错/换新盒后如实置空
+        json: { expiry: input.expiry || null, openedAt: input.openedAt || null },
+      })
+      return unwrap(res)
+    },
+    onSuccess: () => {
+      setExpiryTarget(null)
       invalidate()
     },
   })
@@ -238,6 +263,9 @@ export default function Box() {
                         <Bot className="size-4" aria-hidden /> 问这个药
                       </Link>
                     </Button>
+                    <Button variant="outline" size="sm" className="min-h-11" onClick={() => setExpiryTarget(drug)}>
+                      <CalendarDays className="size-4" aria-hidden /> 编辑效期
+                    </Button>
                     <Button variant="outline" size="sm" className="min-h-10" onClick={() => setPlanTarget({ drug, plan })}>
                       <Pencil className="size-4" aria-hidden /> {plan ? '编辑计划' : '创建计划'}
                     </Button>
@@ -273,6 +301,19 @@ export default function Box() {
         onClose={() => setShowManual(false)}
         onSave={(form) => createDrug.mutate(form)}
       />
+      {expiryTarget && (
+        <ExpiryDialog
+          open
+          drugName={expiryTarget.genericName}
+          initialExpiry={expiryTarget.expiry}
+          initialOpenedAt={expiryTarget.openedAt}
+          busy={saveExpiry.isPending}
+          onClose={() => {
+            if (!saveExpiry.isPending) setExpiryTarget(null)
+          }}
+          onSave={(data) => saveExpiry.mutate({ drugId: expiryTarget.id, ...data })}
+        />
+      )}
       {planTarget && (
         <PlanModal
           open

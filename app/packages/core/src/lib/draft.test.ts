@@ -218,3 +218,33 @@ describe('入口B（药盒建档）· 结构上无用法用量', () => {
     expect(unmetReasons(drugBoxPayload, s)).toEqual([])
   })
 })
+
+describe('效期线（用户对照药盒录入，管线不产出、不预填）', () => {
+  it('初始态恒为空串（有效期/开封日期都不预填猜测）', () => {
+    for (const payload of [rxUniquePayload, drugBoxPayload, degradedPayload]) {
+      const s = initialConfirmState(payload)
+      expect(s.expiry).toBe('')
+      expect(s.openedAt).toBe('')
+    }
+  })
+
+  it('录入后进入 confirm 入参（唯一匹配路径与手动建档路径都带）', () => {
+    const s = { ...initialConfirmState(rxUniquePayload), expiry: '2027-03-01', openedAt: '2026-11-01' }
+    expect(buildConfirm(rxUniquePayload, s).drug).toMatchObject({
+      expiry: '2027-03-01',
+      openedAt: '2026-11-01',
+    })
+    const manual = {
+      ...initialConfirmState(degradedPayload),
+      manual: { genericName: '测试药', specification: '5mg', form: '片剂', stockValue: '1', stockUnit: '片' },
+      expiry: '2020-01-01', // 已过期也允许录（用于过期提示）
+      openedAt: '',
+    }
+    expect(buildConfirm(degradedPayload, manual).drug).toMatchObject({ expiry: '2020-01-01', openedAt: null })
+  })
+
+  it('留空 → null（不是空串，空串会被服务端 zod 日期校验拒绝）', () => {
+    const s = initialConfirmState(rxUniquePayload)
+    expect(buildConfirm(rxUniquePayload, s).drug).toMatchObject({ expiry: null, openedAt: null })
+  })
+})

@@ -169,6 +169,47 @@ describe('POST /api/drafts/:id/confirm · 单事务原子写四表', () => {
     expect(planRows).toHaveLength(0)
   })
 
+  it('确认页录入了有效期/开封日期 → 写进 drugs 并进确认留痕快照（用户对照药盒自填）', async () => {
+    const id = 'draft-t6b-confirm-expiry'
+    await seedDraft(id, 'drug', drugPayload)
+    const res = await req('POST', `/api/drafts/${id}/confirm`, {
+      drug: {
+        genericName: '玻璃酸钠滴眼液',
+        specification: '0.1%',
+        form: '滴眼液',
+        drugMasterId: DM_HYCOSAN,
+        confirmStatus: 'ocr_matched',
+        expiry: '2027-03-01',
+        openedAt: '2026-11-01',
+      },
+    })
+    expect(res.status).toBe(200)
+
+    const drugRows = await db.select().from(drugs).where(eq(drugs.id, res.body.drugId))
+    expect(drugRows[0]).toMatchObject({ expiry: '2027-03-01', openedAt: '2026-11-01' })
+
+    const srcRows = await db.select().from(sources).where(eq(sources.id, res.body.sourceId))
+    expect((srcRows[0].confirmTrace as any).keyFieldsSnapshot).toMatchObject({
+      有效期: '2027-03-01',
+      开封日期: '2026-11-01',
+    })
+  })
+
+  it('确认页效期入参非法（日历不存在）→ 400 VALIDATION，草稿仍 pending 且不落药品', async () => {
+    const id = 'draft-t6b-confirm-expiry-bad'
+    await seedDraft(id, 'drug', drugPayload)
+    const before = await counts()
+    const res = await req('POST', `/api/drafts/${id}/confirm`, {
+      drug: { genericName: '效期非法测试药', confirmStatus: 'ocr_matched', expiry: '2026-02-31' },
+    })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('VALIDATION')
+    const after = await counts()
+    expect(after).toEqual(before)
+    const dRows = await db.select().from(drafts).where(eq(drafts.id, id))
+    expect(dRows[0].status).toBe('pending')
+  })
+
   it('中途失败（plans 非法日期 → DB 错误）→ 整个事务回滚：四表行数不变、无脏数据、draft 仍 pending', async () => {
     const id = 'draft-t6b-rollback'
     await seedDraft(id, 'prescription', rxPayload)

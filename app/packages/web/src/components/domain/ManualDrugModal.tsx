@@ -18,6 +18,10 @@ export interface ManualDrugForm {
   form: string
   stock: number
   stockUnit: string
+  /** 有效期（YYYY-MM-DD）；'' = 未录入（可稍后在药箱补录）。 */
+  expiry: string
+  /** 开封日期（YYYY-MM-DD）；'' = 未录入。 */
+  openedAt: string
 }
 
 /**
@@ -38,13 +42,29 @@ export function ManualDrugModal({
   /** 打开时预填的药名（建议卡「手动建档」路径传入）；每次打开以该值重置药名框。 */
   initialGenericName?: string | null
 }) {
-  const [form, setForm] = useState({ genericName: '', specification: '', form: '', stock: '1', stockUnit: '片' })
+  const [form, setForm] = useState({
+    genericName: '',
+    specification: '',
+    form: '',
+    stock: '1',
+    stockUnit: '片',
+    expiry: '',
+    openedAt: '',
+  })
   const valid = form.genericName.trim() && form.specification.trim() && form.form.trim()
 
   // 每次打开按 initialGenericName 重置药名（仅预填名，其余字段保持用户上次输入的干净态为空）
   useEffect(() => {
     if (open) {
-      setForm({ genericName: initialGenericName ?? '', specification: '', form: '', stock: '1', stockUnit: '片' })
+      setForm({
+        genericName: initialGenericName ?? '',
+        specification: '',
+        form: '',
+        stock: '1',
+        stockUnit: '片',
+        expiry: '',
+        openedAt: '',
+      })
     }
   }, [open, initialGenericName])
 
@@ -111,6 +131,32 @@ export function ManualDrugModal({
               </select>
             </div>
           </div>
+          {/* 效期线：用户对照药盒自填（不是模型输出，不预填）；留空 = 未录入，之后可在药箱补录 */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="md-expiry">有效期至</Label>
+              <Input
+                id="md-expiry"
+                type="date"
+                className="min-h-11"
+                value={form.expiry}
+                onChange={(e) => setForm({ ...form, expiry: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="md-opened">开封日期（可选）</Label>
+              <Input
+                id="md-opened"
+                type="date"
+                className="min-h-11"
+                value={form.openedAt}
+                onChange={(e) => setForm({ ...form, openedAt: e.target.value })}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            按药盒包装如实填写「有效期至」；两个日期都可留空，确认后可在药箱「编辑效期」补录。系统不替你推算效期。
+          </p>
         </div>
         <Button
           className="min-h-11 w-full"

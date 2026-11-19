@@ -10,6 +10,7 @@ import {
   estimateStockDays,
   suggestTimes,
   isPlanActiveOn,
+  isIsoDate,
   gradeAdherence,
   ADHERENCE_GRADE_THRESHOLDS,
   ADHERENCE_GRADE_LABEL,
@@ -132,5 +133,28 @@ describe('gradeAdherence（T7 · ADR #17 分档阈值边界）', () => {
     expect(ADHERENCE_GRADE_LABEL.good).toBe('优')
     expect(ADHERENCE_GRADE_LABEL.fair).toBe('中')
     expect(ADHERENCE_GRADE_LABEL.poor).toBe('差')
+  })
+})
+
+describe('isIsoDate（有效期/开封日期入参）', () => {
+  it('合法日期（含闰年 2 月 29）', () => {
+    expect(isIsoDate('2027-03-01')).toBe(true)
+    expect(isIsoDate('2024-02-29')).toBe(true)
+    expect(isIsoDate('2026-12-31')).toBe(true)
+  })
+  it('格式不符（斜杠/无补零/带时间/空串）一律拒绝', () => {
+    expect(isIsoDate('2027/03/01')).toBe(false)
+    expect(isIsoDate('2027-3-1')).toBe(false)
+    expect(isIsoDate('2027-03-01T00:00:00Z')).toBe(false)
+    expect(isIsoDate('')).toBe(false)
+  })
+  it('日历上不存在的日期拒绝（new Date 会静默进位，不能只靠正则）', () => {
+    expect(isIsoDate('2026-02-31')).toBe(false)
+    expect(isIsoDate('2026-13-01')).toBe(false)
+    expect(isIsoDate('2025-02-29')).toBe(false)
+    expect(isIsoDate('2026-04-31')).toBe(false)
+  })
+  it('过去日期合法（已过期药也要能录）', () => {
+    expect(isIsoDate('2020-01-01')).toBe(true)
   })
 })

@@ -68,13 +68,15 @@ async function loadPendingDraft(userId: string, id: string): Promise<DraftRow> {
   return draft
 }
 
-/** 关键字段快照（确认留痕）：药名/规格/剂型 + 有计划的用量/频次/疗程/结束日期。 */
+/** 关键字段快照（确认留痕）：药名/规格/剂型 + 效期/开封日期（用户录入时）+ 有计划的用量/频次/疗程/结束日期。 */
 function buildKeySnapshot(input: DraftConfirm): Record<string, string> {
   const snap: Record<string, string> = {
     药名: input.drug.genericName,
     规格: input.drug.specification ?? '',
     剂型: input.drug.form ?? '',
   }
+  if (input.drug.expiry) snap.有效期 = input.drug.expiry
+  if (input.drug.openedAt) snap.开封日期 = input.drug.openedAt
   const p = input.plan
   if (p) {
     snap.用量 = `${p.dose.value} ${p.dose.unit}`

@@ -13,6 +13,7 @@ import {
   type CycleChoice,
   type DraftPayload,
 } from "@anxin/core";
+import { DateField } from "@/components/domain/DateField";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,28 +48,6 @@ const CYCLES: { value: CycleChoice; title: string; desc: (days: number) => strin
   },
   { value: "custom", title: "自定义天数", desc: () => "封闭式 · 结束日期自动推算" },
 ];
-
-function pad2(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-/** 三个数字框 → ISO 日期；不完整 / 不存在的日期返回空串（空串会被 core 闸门拦住）。 */
-function composeDate(year: string, month: string, day: string): string {
-  if (!/^\d{4}$/.test(year) || !/^\d{1,2}$/.test(month) || !/^\d{1,2}$/.test(day)) return "";
-  const y = Number(year);
-  const m = Number(month);
-  const d = Number(day);
-  if (m < 1 || m > 12 || d < 1 || d > 31) return "";
-  const probe = new Date(Date.UTC(y, m - 1, d));
-  if (
-    probe.getUTCFullYear() !== y ||
-    probe.getUTCMonth() !== m - 1 ||
-    probe.getUTCDate() !== d
-  ) {
-    return "";
-  }
-  return `${y}-${pad2(m)}-${pad2(d)}`;
-}
 
 /** 核对行外壳：标签 + 标注 + 「已核对」勾选框（抄录值必须逐项勾，PRD §7.2.5）。 */
 function VerifyRow({
@@ -152,60 +131,6 @@ function UnitChips({ value, onPress }: { value: string; onPress: (unit: string) 
           : null}
       </View>
     </ScrollView>
-  );
-}
-
-/** 开始日期：年 / 月 / 日三个数字框，拼成 ISO 串交给 core（web 用原生 date 控件）。 */
-function DateField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
-  const [year, setYear] = useState(() => value.slice(0, 4));
-  const [month, setMonth] = useState(() => value.slice(5, 7));
-  const [day, setDay] = useState(() => value.slice(8, 10));
-  const complete = Boolean(composeDate(year, month, day));
-
-  function apply(nextYear: string, nextMonth: string, nextDay: string) {
-    setYear(nextYear);
-    setMonth(nextMonth);
-    setDay(nextDay);
-    onChange(composeDate(nextYear, nextMonth, nextDay));
-  }
-
-  return (
-    <View className="gap-1">
-      <View className="flex-row items-center gap-2">
-        <Input
-          className="min-h-[48px] w-20 text-center"
-          value={year}
-          keyboardType="number-pad"
-          maxLength={4}
-          onChangeText={(next) => apply(next, month, day)}
-          accessibilityLabel="开始日期 年"
-        />
-        <Text className="text-base text-foreground">年</Text>
-        <Input
-          className="min-h-[48px] w-12 text-center"
-          value={month}
-          keyboardType="number-pad"
-          maxLength={2}
-          onChangeText={(next) => apply(year, next, day)}
-          accessibilityLabel="开始日期 月"
-        />
-        <Text className="text-base text-foreground">月</Text>
-        <Input
-          className="min-h-[48px] w-12 text-center"
-          value={day}
-          keyboardType="number-pad"
-          maxLength={2}
-          onChangeText={(next) => apply(year, month, next)}
-          accessibilityLabel="开始日期 日"
-        />
-        <Text className="text-base text-foreground">日</Text>
-      </View>
-      {complete ? null : (
-        <Text className="text-xs leading-5 text-risk-l4">
-          请填写完整的年 / 月 / 日（如 2026 / 10 / 21），否则无法确认
-        </Text>
-      )}
-    </View>
   );
 }
 
@@ -346,7 +271,11 @@ export function SigCard({
               : undefined
           }
         >
-          <DateField value={state.startDate} onChange={(next) => patch({ startDate: next })} />
+          <DateField
+            value={state.startDate}
+            onChange={(next) => patch({ startDate: next })}
+            labelPrefix="开始日期"
+          />
         </VerifyRow>
 
         <VerifyRow

@@ -257,6 +257,38 @@ describe('唯一闸门：逐项核对 + 使用人 + 提交后跳转', () => {
   })
 })
 
+describe('效期线：用户对照药盒自填（系统不识别、不预填）', () => {
+  it('填写有效期/开封日期 → 确认入参带上用户录入的日期', async () => {
+    renderDraft(rxUniquePayload)
+    const expiry = (await screen.findByLabelText('有效期至')) as HTMLInputElement
+    const openedAt = screen.getByLabelText('开封日期（可选）') as HTMLInputElement
+    // 红线：管线不产出效期 → 初始恒空，不预填猜测
+    expect(expiry.value).toBe('')
+    expect(openedAt.value).toBe('')
+    expect(screen.getByText(/你自己对照药盒包装/)).toBeTruthy()
+    fireEvent.change(expiry, { target: { value: '2027-03-01' } })
+    fireEvent.change(openedAt, { target: { value: '2026-11-01' } })
+    mocks.confirmDraft.mockResolvedValue(CONFIRM_OK)
+    await passGates()
+    fireEvent.click(screen.getByRole('button', { name: /确认建档并生效计划/ }))
+    await waitFor(() => expect(mocks.confirmDraft).toHaveBeenCalledTimes(1))
+    expect(mocks.confirmDraft.mock.calls[0][1].drug).toMatchObject({
+      expiry: '2027-03-01',
+      openedAt: '2026-11-01',
+    })
+  })
+
+  it('留空 → 确认入参 expiry/openedAt 为 null（未录入，药箱可稍后补录）', async () => {
+    renderDraft(rxUniquePayload)
+    await screen.findByLabelText('有效期至')
+    mocks.confirmDraft.mockResolvedValue(CONFIRM_OK)
+    await passGates()
+    fireEvent.click(screen.getByRole('button', { name: /确认建档并生效计划/ }))
+    await waitFor(() => expect(mocks.confirmDraft).toHaveBeenCalledTimes(1))
+    expect(mocks.confirmDraft.mock.calls[0][1].drug).toMatchObject({ expiry: null, openedAt: null })
+  })
+})
+
 describe('原文对照与入口B', () => {
   it('会话内有原图 → 整图 object-contain 渲染；裁剪视图与低置信红框已随行级契约退役', async () => {
     const url = 'data:image/png;base64,AAAA'
