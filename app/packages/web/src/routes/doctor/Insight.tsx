@@ -29,7 +29,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { DoctorBindCodeCard } from '@/components/domain/DoctorBindCodeCard'
+import { DoctorBindDialog } from '@/components/domain/DoctorBindDialog'
 import { RiskBadge } from '@/components/domain/RiskBadge'
 import { PatientAdherenceCharts } from '@/components/domain/insight/PatientAdherenceCharts'
 import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventType } from '@anxin/shared'
@@ -148,17 +148,17 @@ function QueueView({
   const authMode = useAuthStore((s) => s.mode)
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold">患者队列</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold sm:text-2xl">患者队列</h1>
+          {/* 人数放到标题下方（原来悬在右上角、与标题脱节）；近 N 天为分档统计窗口。 */}
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {queue ? `共 ${queue.total} 名患者 · 近 ${queue.dateRange} 天` : '正在加载…'}
+          </p>
         </div>
-        <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold">
-          {queue ? `${queue.total} 名患者` : '—'}
-        </span>
+        {/* specs/25：绑定是低频动作，收进弹窗，不再占据队列页首屏（password 模式才出现）。 */}
+        {authMode === 'password' && <DoctorBindDialog />}
       </div>
-
-      {/* specs/25：仅真实账号（password 模式）显示绑定入口；demo 模式保持页面逐字不变（E2E 零回归）。 */}
-      {authMode === 'password' && <DoctorBindCodeCard />}
 
       {loading && (
         <p className="flex items-center justify-center gap-2 py-16 text-muted-foreground">

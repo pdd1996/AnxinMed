@@ -3,16 +3,24 @@ import { useMutation } from '@tanstack/react-query'
 import { KeyRound, LoaderCircle, RefreshCw } from 'lucide-react'
 import { createDoctorBindCode, toUserMessage, type DoctorBindCodeDto } from '@anxin/core'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 /**
- * 医生端「邀请患者绑定」卡片（specs/25 · 演示最小闭环）。
+ * 医生端「邀请患者绑定」入口（specs/25）。
  *
- * - 点「生成绑定码」→ POST /api/doctor/bind-code（旧未使用码自动作废）；
- * - 展示 6 位数字 + 剩余有效时间倒计时；
- * - 绑定码一次性、10 分钟有效；不写入任何患者数据，只建立授权关系。
+ * 从页面内嵌大卡片改为**顶栏小按钮 + 弹窗**：
+ * - 队列页的主体是患者数据，绑定只是低频动作，不应占据首屏（用户反馈「患者队列变成了绑定码」）；
+ * - 打开弹窗才生成/展示一次性绑定码（10 分钟、仅可核销一次）；
+ * - 关闭弹窗即清空本地码状态，下次重新生成。
  */
-export function DoctorBindCodeCard() {
+export function DoctorBindDialog() {
+  const [open, setOpen] = useState(false)
   const [bindCode, setBindCode] = useState<DoctorBindCodeDto | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
@@ -24,7 +32,7 @@ export function DoctorBindCodeCard() {
     },
   })
 
-  // 倒计时：仅在有码时每秒刷新；卸载/换码时清理，避免离开页面后 setState。
+  // 倒计时：仅在有码时每秒刷新；关闭弹窗/卸载时清理。
   useEffect(() => {
     if (!bindCode) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -38,18 +46,30 @@ export function DoctorBindCodeCard() {
   const expired = bindCode !== null && remainingSec <= 0
   const errorText = mutation.error ? toUserMessage(mutation.error, '绑定码生成失败，请重试') : ''
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      // 关闭即重置：避免下次打开看到上一次的旧码/旧错误。
+      setBindCode(null)
+      mutation.reset()
+    }
+  }
+
   return (
-    <Card className="border-primary/25 bg-primary/5">
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-start gap-2">
-          <KeyRound className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="font-bold">邀请患者绑定</p>
-          </div>
-        </div>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="min-h-10 shrink-0 whitespace-nowrap">
+          <KeyRound className="size-4" aria-hidden />
+          邀请患者绑定
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-xl">邀请患者绑定</DialogTitle>
+        </DialogHeader>
 
         {bindCode && (
-          <div className="rounded-xl border border-primary/30 bg-card px-4 py-3 text-center">
+          <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-4 text-center">
             <p className="text-xs font-medium text-muted-foreground">绑定码</p>
             <p className="mt-1 font-mono text-3xl font-bold tracking-[0.35em] text-primary" aria-live="polite">
               {bindCode.code}
@@ -66,11 +86,7 @@ export function DoctorBindCodeCard() {
           </p>
         )}
 
-        <Button
-          className="min-h-11 w-full"
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-        >
+        <Button className="min-h-11 w-full" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
           {mutation.isPending ? (
             <>
               <LoaderCircle className="size-4 animate-spin" aria-hidden /> 正在生成…
@@ -83,7 +99,7 @@ export function DoctorBindCodeCard() {
             '生成绑定码'
           )}
         </Button>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   )
 }
