@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -30,7 +29,6 @@ export interface ExpiryFormResult {
  */
 export function ExpiryDialog({
   open,
-  drugName,
   initialExpiry,
   initialOpenedAt,
   busy,
@@ -38,7 +36,6 @@ export function ExpiryDialog({
   onSave,
 }: {
   open: boolean;
-  drugName: string;
   initialExpiry?: string | null;
   initialOpenedAt?: string | null;
   busy: boolean;
@@ -53,11 +50,6 @@ export function ExpiryDialog({
       <DialogContent className="max-h-[88vh]">
         <DialogHeader>
           <DialogTitle className="text-xl">编辑效期</DialogTitle>
-          <DialogDescription>
-            <Text className="text-base text-muted-foreground">
-              当前药品：{drugName}。请对照药盒包装填写日期，留空表示未录入。
-            </Text>
-          </DialogDescription>
         </DialogHeader>
 
         <ScrollView keyboardShouldPersistTaps="handled">
@@ -79,15 +71,6 @@ export function ExpiryDialog({
                 labelPrefix="开封日期"
                 optional
               />
-            </View>
-            <View className="gap-2 rounded-xl border border-dashed border-border bg-muted p-3">
-              <Text className="text-sm leading-5 text-foreground">
-                以药盒包装上的具体到期日为准。说明书通常只写通用保质期（如 24
-                个月），不能代替这盒药的到期日。
-              </Text>
-              <Text className="text-xs leading-5 text-muted-foreground">
-                留空 = 还没录入，可之后回来补。允许填已过期日期（用于提示弃药）；录错或换新盒可随时修改。
-              </Text>
             </View>
           </View>
         </ScrollView>

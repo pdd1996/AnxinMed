@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupTasksByPlan, duePendingSlots, type TodayTaskItem } from './tasks'
+import { planMetaSegments, groupTasksByPlan, duePendingSlots, type TodayTaskItem } from './tasks'
 
 const base = {
   drugId: 'd1',
@@ -44,5 +44,25 @@ describe('duePendingSlots', () => {
     ])
     const due = duePendingSlots(groups[0], '10:00')
     expect(due.map((s) => s.time)).toEqual(['09:00'])
+  })
+})
+
+describe('planMetaSegments', () => {
+  const group = {
+    specification: '5mg',
+    dose: { value: 1, unit: '片' },
+    frequency: 1,
+    route: '口服',
+  }
+
+  it('四段按 规格 / 每次 / 每日 / 途径 拆分（渲染端逐段不换行）', () => {
+    expect(planMetaSegments(group)).toEqual(['5mg', '每次 1 片', '每日 1 次', '口服'])
+  })
+
+  it('specification / route 缺省时整段跳过', () => {
+    expect(planMetaSegments({ ...group, specification: null, route: null })).toEqual([
+      '每次 1 片',
+      '每日 1 次',
+    ])
   })
 })

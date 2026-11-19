@@ -524,7 +524,6 @@ export default function Box() {
       {expiryTarget ? (
         <ExpiryDialog
           open
-          drugName={expiryTarget.genericName}
           initialExpiry={expiryTarget.expiry ?? ""}
           initialOpenedAt={expiryTarget.openedAt ?? ""}
           busy={patchExpiry.isPending}

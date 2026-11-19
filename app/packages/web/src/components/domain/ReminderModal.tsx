@@ -1,4 +1,4 @@
-import { Bell, Check, Clock3, Pause, Pill, Volume2 } from 'lucide-react'
+import { Bell, Check, Clock3, Pause, Volume2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { speak, type PlanGroup, type TaskStatus } from '@anxin/core'
+import { speak, planMetaSegments, type PlanGroup, type TaskStatus } from '@anxin/core'
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   pending: '待服用',
@@ -26,7 +26,7 @@ const STATUS_ICON: Record<TaskStatus, typeof Check> = {
 
 /**
  * 服药提醒弹窗（任务书 T9）：到点提醒，提供 已服 / 稍后 / 跳过 与播报。
- * 记录来自用户操作，不代表系统已医学验证；库存按次扣减（服务端事务）。
+ * 记录为【用户操作】留痕，非医学验证（PRD §7.4）；库存按次扣减在服务端事务内。
  */
 export function ReminderModal({
   group,
@@ -50,9 +50,16 @@ export function ReminderModal({
             <Bell className="size-5 text-primary" aria-hidden />
             该服药了
           </DialogTitle>
-          <DialogDescription>
-            {group.drugName} · {group.specification ?? ''} · 每次 {group.dose.value} {group.dose.unit} · 每日{' '}
-            {group.frequency} 次{group.route ? ` · ${group.route}` : ''}
+          {/* 两行：药名单独成行做视觉锚点；用法按段折行，不在「每日 1 次」中间断开 */}
+          <DialogDescription className="text-left">
+            <span className="block text-base font-semibold text-foreground">{group.drugName}</span>
+            <span className="mt-1 flex flex-wrap">
+              {planMetaSegments(group).map((segment, index, all) => (
+                <span key={segment} className="mr-1.5 whitespace-nowrap">
+                  {index < all.length - 1 ? `${segment} ·` : segment}
+                </span>
+              ))}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
@@ -101,11 +108,6 @@ export function ReminderModal({
             </Button>
           </div>
         </div>
-
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Pill className="size-4 shrink-0" aria-hidden />
-          记录来自你的操作，不代表系统已医学验证实际服药；库存按次扣减。
-        </p>
       </DialogContent>
     </Dialog>
   )

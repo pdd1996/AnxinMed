@@ -3,7 +3,6 @@ import { CalendarDays, LoaderCircle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -31,7 +30,6 @@ export interface ExpiryForm {
  */
 export function ExpiryDialog({
   open,
-  drugName,
   initialExpiry,
   initialOpenedAt,
   busy = false,
@@ -39,7 +37,6 @@ export function ExpiryDialog({
   onSave,
 }: {
   open: boolean
-  drugName: string
   /** 当前药品已录入的值；null/undefined → 空（未录入）。 */
   initialExpiry?: string | null
   initialOpenedAt?: string | null
@@ -68,9 +65,6 @@ export function ExpiryDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl">编辑有效期与开封日期</DialogTitle>
-          <DialogDescription>
-            当前药品：{drugName}。请照着药盒包装填写这一盒的具体日期，系统不替你推算或识别效期。
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -98,10 +92,6 @@ export function ExpiryDialog({
             />
             <p className="text-xs text-muted-foreground">第一次打开包装的日期；不记得可留空，之后也能补。</p>
           </div>
-          <p className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
-            说明书上只有通用保质期（如「24 个月」），推不出这一盒的具体到期日，请以药盒包装为准。两个日期都可留空 =
-            未录入（卡片显示「待录入」）；录错或换了一盒新药，随时回来改即可。
-          </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">

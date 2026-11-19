@@ -19,6 +19,9 @@ import { cn } from "@/lib/utils";
  * —— 与咨询 S2、医生端同源一份真相，渲染层不再写死天数。
  * `null`（未录入/非法日期）既不是「临期」也不是「正常」：这里不提醒，但绝不计入 ok（不得误报「全部正常」）。
  * `today` 可选注入，便于测试跨日边界（第 30 天算临期、第 31 天不算）。
+ *
+ * 排版（2026-11-19 演示前收紧）：标题 + 分段计数两行；明细每条「药名一行 + 到期日/状态一行」，
+ * 药名 numberOfLines=1、状态行原文不折行，窄屏不再出现半个词换行。
  */
 
 export interface ExpiryDrug {
@@ -54,20 +57,30 @@ function splitByExpiry(drugs: ExpiryDrug[], today: string) {
   return { expired, expiring };
 }
 
-/** 「N 种药已过期」/「M 种药 30 天内到期」，只拼非空桶。 */
-function summaryText(expiredCount: number, expiringCount: number, separator: string): string {
-  const parts: string[] = [];
-  if (expiredCount > 0) parts.push(`${expiredCount} 种药已过期`);
-  if (expiringCount > 0) parts.push(`${expiringCount} 种药 ${EXPIRY_WARNING_DAYS} 天内到期`);
-  return parts.join(separator);
+/** 明细第二行：到期日 + 状态（「已过期 5 天」不折行）。 */
+function metaText(expiry: string | null | undefined, days: number): string {
+  if (days < 0) return `${expiry} 到期 · 已过期 ${-days} 天`;
+  if (days === 0) return `${expiry} 到期 · 今天到期`;
+  return `${expiry} 到期 · 剩 ${days} 天`;
 }
 
-/** 明细里的到期描述：已过期（X 天前）/ 今天到期 / 剩 X 天。 */
-function detailText(entry: ExpiryEntry): string {
-  const date = entry.drug.expiry ?? "";
-  if (entry.days < 0) return `${date} 到期，已过期（${-entry.days} 天前）`;
-  if (entry.days === 0) return `${date} 到期（今天到期）`;
-  return `${date} 到期（剩 ${entry.days} 天）`;
+/** 计数摘要（标题下第二行）：已过期 / 临期各一段。 */
+function ExpirySummary({ expiredCount, expiringCount }: { expiredCount: number; expiringCount: number }) {
+  return (
+    <View className="mt-0.5 flex-row flex-wrap items-center gap-x-2">
+      {expiredCount > 0 ? (
+        <Text className="text-xs font-semibold text-risk-l4">已过期 {expiredCount} 种</Text>
+      ) : null}
+      {expiredCount > 0 && expiringCount > 0 ? (
+        <Text className="text-xs text-muted-foreground">·</Text>
+      ) : null}
+      {expiringCount > 0 ? (
+        <Text className="text-xs font-semibold text-risk-l3">
+          {EXPIRY_WARNING_DAYS} 天内到期 {expiringCount} 种
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 /**
@@ -93,36 +106,41 @@ export function ExpiryAlert({
     <View className="mt-4 rounded-2xl border-2 border-risk-l3 bg-risk-l3-tint p-4">
       <View className="flex-row items-center gap-2">
         <Icon as={TriangleAlert} size={20} color={warn} />
-        <Text className="text-base font-bold text-foreground">效期提醒</Text>
+        <View className="min-w-0 flex-1">
+          <Text className="text-base font-bold text-foreground">效期提醒</Text>
+          <ExpirySummary expiredCount={expired.length} expiringCount={expiring.length} />
+        </View>
       </View>
-      <Text className="mt-1 text-sm font-semibold leading-5 text-foreground">
-        {summaryText(expired.length, expiring.length, "、")}
-      </Text>
 
-      <View className="mt-3 gap-1.5">
+      <View className="mt-3 gap-2">
         {entries.map((entry) => (
           <View key={entry.drug.id} className="flex-row items-start gap-2">
             <View
               className={cn(
-                "mt-1.5 size-2 rounded-full",
+                "mt-1.5 size-1.5 rounded-full",
                 entry.days < 0 ? "bg-risk-l4" : "bg-risk-l3",
               )}
             />
-            <Text className="flex-1 text-sm leading-5 text-foreground">
-              {`${entry.drug.genericName} · ${detailText(entry)}`}
-            </Text>
+            <View className="min-w-0 flex-1">
+              <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                {entry.drug.genericName}
+              </Text>
+              <Text
+                className={cn(
+                  "text-xs font-semibold",
+                  entry.days < 0 ? "text-risk-l4" : "text-risk-l3",
+                )}
+                numberOfLines={1}
+              >
+                {metaText(entry.drug.expiry, entry.days)}
+              </Text>
+            </View>
           </View>
         ))}
         {overflow > 0 ? (
-          <Text className="text-xs leading-5 text-foreground">
-            …等 {overflow} 种，去药箱逐条查看
-          </Text>
+          <Text className="text-xs leading-5 text-foreground">…等 {overflow} 种，去药箱逐条查看</Text>
         ) : null}
       </View>
-
-      <Text className="mt-3 text-xs leading-5 text-foreground">
-        过期药请勿继续服用，请按说明书或药师指导处理。
-      </Text>
     </View>
   );
 }
@@ -144,19 +162,25 @@ export function ExpiryBanner({
   const total = expired.length + expiring.length;
   if (total === 0) return null;
 
-  const summary = summaryText(expired.length, expiring.length, " / ");
+  const summaryLabel = [
+    expired.length > 0 ? `已过期 ${expired.length} 种` : null,
+    expiring.length > 0 ? `${EXPIRY_WARNING_DAYS} 天内到期 ${expiring.length} 种` : null,
+  ]
+    .filter(Boolean)
+    .join("，");
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`效期提醒：${summary}。去药箱查看`}
+      accessibilityLabel={`效期提醒：${summaryLabel}。去药箱`}
       onPress={() => router.push("/box")}
       className="mt-4 min-h-[48px] flex-row items-center gap-3 rounded-2xl border-2 border-risk-l3 bg-risk-l3-tint px-4 py-3 active:opacity-80"
     >
       <Icon as={TriangleAlert} size={20} color={warn} />
-      <Text className="flex-1 text-sm font-semibold leading-5 text-foreground">
-        {`效期提醒：${summary}`}
-      </Text>
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-bold text-foreground">效期提醒</Text>
+        <ExpirySummary expiredCount={expired.length} expiringCount={expiring.length} />
+      </View>
       <Text className="text-sm font-semibold text-foreground">去药箱</Text>
       <Icon as={ChevronRight} size={18} color={warn} />
     </Pressable>

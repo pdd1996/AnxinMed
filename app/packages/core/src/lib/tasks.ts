@@ -71,3 +71,21 @@ export function nowHHMM(): string {
 export function duePendingSlots(group: PlanGroup, now = nowHHMM()): TaskSlot[] {
   return group.slots.filter((s) => s.status === 'pending' && s.time <= now)
 }
+
+/**
+ * 用法摘要分段（规格 / 每次 / 每日 / 途径），缺省项跳过。
+ *
+ * 分段而不是拼成一整句：渲染端按段包「不换行」盒子，折行只发生在段与段之间，
+ * 不会把「每日 1 次」拆成「每日 1 / 次」或「每 / 日 1 次」（375px + 大字档实测踩过）。
+ * web/mobile 提醒弹窗共用。
+ */
+export function planMetaSegments(
+  group: Pick<PlanGroup, 'specification' | 'dose' | 'frequency' | 'route'>,
+): string[] {
+  return [
+    group.specification,
+    `每次 ${group.dose.value} ${group.dose.unit}`,
+    `每日 ${group.frequency} 次`,
+    group.route,
+  ].filter((item): item is string => Boolean(item))
+}

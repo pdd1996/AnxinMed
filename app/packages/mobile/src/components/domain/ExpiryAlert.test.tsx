@@ -35,21 +35,25 @@ const MIXED: ExpiryDrug[] = [
 ];
 
 describe("ExpiryAlert · 药箱顶部汇总卡", () => {
-  it("混合场景：计数、明细、安全提示齐全，第 30 天算临期、第 31 天与未录入不计", async () => {
+  it("混合场景：计数、明细齐全，第 30 天算临期、第 31 天与未录入不计（安全提示已按用户要求移除）", async () => {
     const view = await render(<ExpiryAlert drugs={MIXED} today={TODAY} />);
 
     expect(view.getByText("效期提醒")).toBeTruthy();
     // 30 来自 shared.EXPIRY_WARNING_DAYS，渲染层不写死
-    expect(view.getByText("2 种药已过期、3 种药 30 天内到期")).toBeTruthy();
-    // 明细：已过期（X 天前）/ 今天到期 / 剩 X 天
-    expect(view.getByText(/过过期药甲 · 2026-10-01 到期，已过期（49 天前）/)).toBeTruthy();
-    expect(view.getByText(/临期药丙 · 2026-11-19 到期（今天到期）/)).toBeTruthy();
-    expect(view.getByText(/临期药戊 · 2026-12-19 到期（剩 30 天）/)).toBeTruthy();
+    expect(view.getByText("已过期 2 种")).toBeTruthy();
+    expect(view.getByText("30 天内到期 3 种")).toBeTruthy();
+    // 明细：药名一行、到期日/状态一行
+    expect(view.getByText("过过期药甲")).toBeTruthy();
+    expect(view.getByText("2026-10-01 到期 · 已过期 49 天")).toBeTruthy();
+    expect(view.getByText("临期药丙")).toBeTruthy();
+    expect(view.getByText("2026-11-19 到期 · 今天到期")).toBeTruthy();
+    expect(view.getByText("临期药戊")).toBeTruthy();
+    expect(view.getByText("2026-12-19 到期 · 剩 30 天")).toBeTruthy();
     // 正常（+31 天）与未录入（null）都不进提醒
     expect(view.queryByText(/正常药己/)).toBeNull();
     expect(view.queryByText(/未录入药庚/)).toBeNull();
-    // 安全提示
-    expect(view.getByText(/过期药请勿继续服用，请按说明书或药师指导处理/)).toBeTruthy();
+    // 过期安全提示段已删除（用户 2026-11-19 要求）
+    expect(view.queryByText(/过期药请勿继续服用/)).toBeNull();
   });
 
   it("全正常 / 空药箱 → 不渲染（null），未录入也不当作「正常」来提醒", async () => {
@@ -67,8 +71,8 @@ describe("ExpiryAlert · 药箱顶部汇总卡", () => {
     const day30 = await render(
       <ExpiryAlert drugs={[drug("b1", "边界药", addDaysStr(TODAY, 30))]} today={TODAY} />,
     );
-    expect(day30.getByText("1 种药 30 天内到期")).toBeTruthy();
-    expect(day30.getByText(/到期（剩 30 天）/)).toBeTruthy();
+    expect(day30.getByText("30 天内到期 1 种")).toBeTruthy();
+    expect(day30.getByText(/到期 · 剩 30 天/)).toBeTruthy();
 
     const day31 = await render(
       <ExpiryAlert drugs={[drug("b1", "边界药", addDaysStr(TODAY, 31))]} today={TODAY} />,
@@ -82,7 +86,7 @@ describe("ExpiryAlert · 药箱顶部汇总卡", () => {
     );
     const view = await render(<ExpiryAlert drugs={many} today={TODAY} />);
 
-    expect(view.getAllByText(/到期（/)).toHaveLength(6);
+    expect(view.getAllByText(/到期 · /)).toHaveLength(6);
     expect(view.getByText(/等 2 种/)).toBeTruthy();
   });
 });
@@ -92,11 +96,12 @@ describe("ExpiryBanner · 今日页横幅", () => {
     mockPush.mockClear();
   });
 
-  it("过期 + 临期都有 → 文案含两桶计数，点击跳药箱", async () => {
+  it("过期 + 临期都有 → 标题 + 分段计数，点击跳药箱", async () => {
     const view = await render(<ExpiryBanner drugs={MIXED} today={TODAY} />);
 
-    const banner = view.getByText("效期提醒：2 种药已过期 / 3 种药 30 天内到期");
+    const banner = view.getByLabelText("效期提醒：已过期 2 种，30 天内到期 3 种。去药箱");
     expect(banner).toBeTruthy();
+    expect(view.getByText("效期提醒")).toBeTruthy();
     expect(view.getByText("去药箱")).toBeTruthy();
 
     fireEvent.press(banner);
@@ -107,7 +112,8 @@ describe("ExpiryBanner · 今日页横幅", () => {
     const onlyExpiring = await render(
       <ExpiryBanner drugs={[drug("e1", "临期药", "2026-11-25")]} today={TODAY} />,
     );
-    expect(onlyExpiring.getByText("效期提醒：1 种药 30 天内到期")).toBeTruthy();
+    expect(onlyExpiring.getByText("30 天内到期 1 种")).toBeTruthy();
+    expect(onlyExpiring.queryByText(/已过期/)).toBeNull();
 
     const none = await render(
       <ExpiryBanner drugs={[drug("n1", "正常药", "2026-12-20")]} today={TODAY} />,

@@ -1,4 +1,4 @@
-import { isSpeechSupported, speak, type PlanGroup } from "@anxin/core";
+import { isSpeechSupported, planMetaSegments, speak, type PlanGroup } from "@anxin/core";
 import { Bell } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import { View } from "react-native";
@@ -44,12 +44,16 @@ export function ReminderModal({
             <Icon as={Bell} size={22} color={primary} />
             该服药了
           </DialogTitle>
+          {/* 两行：药名单独成行做视觉锚点；用法按段折行，不在「每日 1 次」中间断开 */}
           <DialogDescription>
-            <Text className="text-base text-muted-foreground">
-              {group.drugName} · {group.specification ?? ""} · 每次 {group.dose.value}{" "}
-              {group.dose.unit} · 每日 {group.frequency} 次
-              {group.route ? ` · ${group.route}` : ""}
-            </Text>
+            <Text className="text-foreground text-lg font-semibold">{group.drugName}</Text>
+            <View className="mt-1 flex-row flex-wrap">
+              {planMetaSegments(group).map((segment, index, all) => (
+                <Text key={segment} className="text-muted-foreground mr-1.5 text-base">
+                  {index < all.length - 1 ? `${segment} ·` : segment}
+                </Text>
+              ))}
+            </View>
           </DialogDescription>
         </DialogHeader>
 
@@ -101,10 +105,6 @@ export function ReminderModal({
             </Button>
           </View>
         </View>
-
-        <Text className="text-sm text-muted-foreground">
-          记录来自你的操作，不代表系统已医学验证实际服药；库存按次扣减。
-        </Text>
       </DialogContent>
     </Dialog>
   );

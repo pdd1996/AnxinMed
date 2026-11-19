@@ -20,7 +20,7 @@ function drug(id: string, genericName: string, expiry: string | null) {
 afterEach(cleanup)
 
 describe('ExpiryAlert · 药箱顶部汇总卡', () => {
-  it('已过期 + 临期混合：计数/30 天文案/明细/安全提示齐全，正常与未录入不列出', () => {
+  it('已过期 + 临期混合：计数/30 天文案/明细齐全，正常与未录入不列出（安全提示已按用户要求移除）', () => {
     render(
       <ExpiryAlert
         today={TODAY}
@@ -36,13 +36,19 @@ describe('ExpiryAlert · 药箱顶部汇总卡', () => {
     )
 
     expect(screen.getByText('效期提醒')).toBeTruthy()
-    expect(screen.getByText(`2 种药已过期、2 种药 ${EXPIRY_WARNING_DAYS} 天内到期`)).toBeTruthy()
-    // 明细：过期在前（过期最久优先），临期在后
-    expect(screen.getByText('二甲双胍片 · 2026-10-01 到期（已过期 49 天）')).toBeTruthy()
-    expect(screen.getByText('阿司匹林肠溶片 · 2026-11-10 到期（已过期 9 天）')).toBeTruthy()
-    expect(screen.getByText('辛伐他汀片 · 2026-11-19 到期（剩 0 天）')).toBeTruthy()
-    expect(screen.getByText('玻璃酸钠滴眼液 · 2026-11-30 到期（剩 11 天）')).toBeTruthy()
-    expect(screen.getByText(/过期药请勿继续服用，请按说明书或药师指导处理/)).toBeTruthy()
+    expect(screen.getByText('已过期 2 种')).toBeTruthy()
+    expect(screen.getByText(`${EXPIRY_WARNING_DAYS} 天内到期 2 种`)).toBeTruthy()
+    // 明细：药名一行、到期日/状态一行；过期在前（过期最久优先），临期在后
+    expect(screen.getByText('二甲双胍片')).toBeTruthy()
+    expect(screen.getByText('2026-10-01 到期 · 已过期 49 天')).toBeTruthy()
+    expect(screen.getByText('阿司匹林肠溶片')).toBeTruthy()
+    expect(screen.getByText('2026-11-10 到期 · 已过期 9 天')).toBeTruthy()
+    expect(screen.getByText('辛伐他汀片')).toBeTruthy()
+    expect(screen.getByText('2026-11-19 到期 · 今天到期')).toBeTruthy()
+    expect(screen.getByText('玻璃酸钠滴眼液')).toBeTruthy()
+    expect(screen.getByText('2026-11-30 到期 · 剩 11 天')).toBeTruthy()
+    // 过期安全提示段已删除（用户 2026-11-19 要求）
+    expect(screen.queryByText(/过期药请勿继续服用/)).toBeNull()
     // 正常 / 未录入的药不出现
     expect(screen.queryByText(/维生素C片/)).toBeNull()
     expect(screen.queryByText(/待补效期药/)).toBeNull()
@@ -78,7 +84,8 @@ describe('ExpiryAlert · 药箱顶部汇总卡', () => {
     const day30 = render(
       <ExpiryAlert today={TODAY} drugs={[drug('d30', '第30天到期药', '2026-12-19')]} />,
     )
-    expect(screen.getByText(`第30天到期药 · 2026-12-19 到期（剩 ${EXPIRY_WARNING_DAYS} 天）`)).toBeTruthy()
+    expect(screen.getByText('第30天到期药')).toBeTruthy()
+    expect(screen.getByText(`2026-12-19 到期 · 剩 ${EXPIRY_WARNING_DAYS} 天`)).toBeTruthy()
     day30.unmount()
 
     const day31 = render(
@@ -92,7 +99,7 @@ describe('ExpiryAlert · 药箱顶部汇总卡', () => {
       drug(`many-${i}`, `过期药${i + 1}`, `2026-10-${String(i + 1).padStart(2, '0')}`),
     )
     render(<ExpiryAlert today={TODAY} drugs={many} />)
-    expect(screen.getByText('8 种药已过期')).toBeTruthy()
+    expect(screen.getByText('已过期 8 种')).toBeTruthy()
     expect(screen.getAllByRole('listitem')).toHaveLength(6)
     expect(screen.getByText('等 2 种')).toBeTruthy()
     expect(screen.queryByText(/过期药7/)).toBeNull()
@@ -101,7 +108,7 @@ describe('ExpiryAlert · 药箱顶部汇总卡', () => {
 })
 
 describe('ExpiryBanner · 首页横幅', () => {
-  it('混合 → 一行文案（30 天来自常量）+ 去药箱查看链接', () => {
+  it('混合 → 标题 + 分段计数（30 天来自常量）+ 去药箱链接', () => {
     render(
       <MemoryRouter>
         <ExpiryBanner
@@ -114,10 +121,10 @@ describe('ExpiryBanner · 首页横幅', () => {
         />
       </MemoryRouter>,
     )
-    expect(
-      screen.getByText(`效期提醒：1 种药已过期 / 1 种药 ${EXPIRY_WARNING_DAYS} 天内到期`),
-    ).toBeTruthy()
-    const link = screen.getByRole('link', { name: /去药箱查看/ })
+    expect(screen.getByText('效期提醒')).toBeTruthy()
+    expect(screen.getByText('已过期 1 种')).toBeTruthy()
+    expect(screen.getByText(`${EXPIRY_WARNING_DAYS} 天内到期 1 种`)).toBeTruthy()
+    const link = screen.getByRole('link', { name: /去药箱/ })
     expect(link.getAttribute('href')).toBe('/box')
   })
 })

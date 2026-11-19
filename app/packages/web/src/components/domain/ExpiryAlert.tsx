@@ -19,7 +19,7 @@ interface ExpiryBucket {
   days: number
 }
 
-/** 药箱汇总卡最多展示的明细条数；更多折叠为「等 N 种」。 */
+/** 汇总卡最多展示的明细条数；更多折叠为「等 N 种」。 */
 const MAX_DETAIL_ROWS = 6
 
 /**
@@ -43,24 +43,50 @@ function bucketize(drugs: readonly ExpiryDrug[], today: string): { expired: Expi
   return { expired, expiring }
 }
 
-/** 摘要文案：只列非空桶；30 天阈值来自 EXPIRY_WARNING_DAYS，不写死。 */
-function summaryText(expiredCount: number, expiringCount: number, separator: string): string {
-  const parts: string[] = []
-  if (expiredCount > 0) parts.push(`${expiredCount} 种药已过期`)
-  if (expiringCount > 0) parts.push(`${expiringCount} 种药 ${EXPIRY_WARNING_DAYS} 天内到期`)
-  return parts.join(separator)
+/** 明细第二行：到期日 + 状态（「已过期 5 天」不拆行由调用方 nowrap 保证）。 */
+function metaText(expiry: string | null | undefined, days: number): string {
+  if (days < 0) return `${expiry} 到期 · 已过期 ${-days} 天`
+  if (days === 0) return `${expiry} 到期 · 今天到期`
+  return `${expiry} 到期 · 剩 ${days} 天`
 }
 
-function detailText(drug: ExpiryDrug, days: number): string {
-  return days < 0
-    ? `${drug.genericName} · ${drug.expiry} 到期（已过期 ${-days} 天）`
-    : `${drug.genericName} · ${drug.expiry} 到期（剩 ${days} 天）`
+/**
+ * 计数摘要（标题下第二行）：已过期 / 临期各一段，**段内 nowrap**——
+ * 窄屏只会在两段之间换行，不会出现「30 天 / 内到期」被拆开。30 天阈值来自 EXPIRY_WARNING_DAYS。
+ */
+function ExpirySummary({
+  expiredCount,
+  expiringCount,
+  className,
+}: {
+  expiredCount: number
+  expiringCount: number
+  className?: string
+}) {
+  return (
+    <p className={cn('flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold', className)}>
+      {expiredCount > 0 && <span className="whitespace-nowrap text-risk-l4">已过期 {expiredCount} 种</span>}
+      {expiredCount > 0 && expiringCount > 0 && (
+        <span aria-hidden className="text-muted-foreground">
+          ·
+        </span>
+      )}
+      {expiringCount > 0 && (
+        <span className="whitespace-nowrap text-risk-l3">
+          {EXPIRY_WARNING_DAYS} 天内到期 {expiringCount} 种
+        </span>
+      )}
+    </p>
+  )
 }
 
 /**
  * 药箱页顶部「效期提醒」汇总卡（30 天临期 / 已过期）。
  * 数据全部来自用户自填的 expiry（见 core 的确认页 / 药箱编辑效期），阈值与咨询 S2、医生端同一份真相。
  * 两桶皆空 → 不渲染（未录入不算正常，但也不制造噪音）。`today` 可注入以便测试确定性，缺省 todayStr()。
+ *
+ * 排版：图标 + 标题/计数两行；明细每条「药名（粗体）+ 到期日/状态（小字）」，长药名截断、
+ * 状态行 nowrap —— 窄屏不再出现「到期（已过期 5 / 天）」这类半个词换行。
  */
 export function ExpiryAlert({ drugs, today }: { drugs: readonly ExpiryDrug[]; today?: string }) {
   const { expired, expiring } = bucketize(drugs, today ?? todayStr())
@@ -73,34 +99,55 @@ export function ExpiryAlert({ drugs, today }: { drugs: readonly ExpiryDrug[]; to
 
   return (
     <Card className={cn('border', hasExpired ? 'border-risk-l4/40 bg-risk-l4/10' : 'border-risk-l3/40 bg-risk-l3/10')}>
-      <CardContent className="space-y-2 py-4">
+      <CardContent className="space-y-3 py-4">
         <div className="flex items-center gap-2">
-          <AlertTriangle
-            className={cn('size-5 shrink-0', hasExpired ? 'text-risk-l4' : 'text-risk-l3')}
-            aria-hidden
-          />
-          <h2 className="text-lg font-bold">效期提醒</h2>
+          <span
+            className={cn(
+              'grid size-8 shrink-0 place-items-center rounded-xl',
+              hasExpired ? 'bg-risk-l4/15 text-risk-l4' : 'bg-risk-l3/15 text-risk-l3',
+            )}
+          >
+            <AlertTriangle className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold">效期提醒</h2>
+            <ExpirySummary expiredCount={expired.length} expiringCount={expiring.length} />
+          </div>
         </div>
-        <p className="text-sm font-bold">{summaryText(expired.length, expiring.length, '、')}</p>
-        <ul className="list-disc space-y-1 pl-5 text-sm">
-          {shown.map(({ drug, days }) => (
-            <li key={drug.id} className={cn('break-words', days < 0 ? 'text-risk-l4' : 'text-risk-l3')}>
-              {detailText(drug, days)}
-            </li>
-          ))}
+
+        <ul className="space-y-2">
+          {shown.map(({ drug, days }) => {
+            const isExpired = days < 0
+            return (
+              <li key={drug.id} className="flex min-w-0 items-start gap-2">
+                <span
+                  className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', isExpired ? 'bg-risk-l4' : 'bg-risk-l3')}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{drug.genericName}</p>
+                  <p
+                    className={cn(
+                      'whitespace-nowrap text-xs font-semibold',
+                      isExpired ? 'text-risk-l4' : 'text-risk-l3',
+                    )}
+                  >
+                    {metaText(drug.expiry, days)}
+                  </p>
+                </div>
+              </li>
+            )
+          })}
         </ul>
         {rest > 0 && <p className="text-xs font-semibold text-muted-foreground">等 {rest} 种</p>}
-        <p className="rounded-lg border bg-background/60 p-2 text-xs font-semibold">
-          过期药请勿继续服用，请按说明书或药师指导处理。
-        </p>
       </CardContent>
     </Card>
   )
 }
 
 /**
- * 首页「效期提醒」横幅（单行卡片）：有已过期或 30 天内到期的药才出现，给「去药箱查看」入口。
- * 与 ExpiryAlert 共用分桶与文案口径；两桶皆空 → 不渲染。
+ * 首页「效期提醒」横幅（单行卡片）：有已过期或 30 天内到期的药才出现，给「去药箱」入口。
+ * 排版：图标 + 两行文案（标题 / 分段计数）+ 右侧紧凑链接；与 ExpiryAlert 共用分桶与阈值口径。
  */
 export function ExpiryBanner({ drugs, today }: { drugs: readonly ExpiryDrug[]; today?: string }) {
   const { expired, expiring } = bucketize(drugs, today ?? todayStr())
@@ -109,17 +156,22 @@ export function ExpiryBanner({ drugs, today }: { drugs: readonly ExpiryDrug[]; t
   const hasExpired = expired.length > 0
   return (
     <Card className={cn('border', hasExpired ? 'border-risk-l4/40 bg-risk-l4/10' : 'border-risk-l3/40 bg-risk-l3/10')}>
-      <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
-        <p className="flex min-w-0 items-start gap-2 text-sm font-bold">
-          <AlertTriangle
-            className={cn('mt-0.5 size-5 shrink-0', hasExpired ? 'text-risk-l4' : 'text-risk-l3')}
-            aria-hidden
-          />
-          效期提醒：{summaryText(expired.length, expiring.length, ' / ')}
-        </p>
-        <Button asChild variant="outline" className="min-h-11 shrink-0">
-          <Link to="/box">
-            去药箱查看 <ChevronRight className="size-4" aria-hidden />
+      <CardContent className="flex items-center gap-3 py-3">
+        <span
+          className={cn(
+            'grid size-9 shrink-0 place-items-center rounded-xl',
+            hasExpired ? 'bg-risk-l4/15 text-risk-l4' : 'bg-risk-l3/15 text-risk-l3',
+          )}
+        >
+          <AlertTriangle className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold">效期提醒</p>
+          <ExpirySummary expiredCount={expired.length} expiringCount={expiring.length} className="mt-0.5" />
+        </div>
+        <Button asChild variant="ghost" size="sm" className="min-h-11 shrink-0 px-2">
+          <Link to="/box" className="flex items-center gap-0.5 whitespace-nowrap">
+            去药箱 <ChevronRight className="size-4" aria-hidden />
           </Link>
         </Button>
       </CardContent>
