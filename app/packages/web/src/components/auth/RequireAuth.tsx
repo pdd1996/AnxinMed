@@ -7,18 +7,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
  * 登录守卫（G7）：包裹患者端与医生端路由。
  *
  * - idle/loading：启动恢复中 → 全屏「正在检查登录状态」，避免先闪一下业务页再跳登录；
- * - anonymous：跳 /login，并把当前路径放进 state.from（登录成功后回原页）；
+ * - anonymous：跳 `loginPath`（患者端 /login；医生端 /doctor/login），并把当前路径放进 state.from；
+ * - requireDoctor（specs/25）：password 模式下非医生账号访问医生端 → 跳 `loginPath` 并带
+ *   state.reason='not-doctor'（医生登录页据此提示「当前账号不是医生账号」）；demo 模式旁路，
+ *   保证既有演示与 fixtures E2E 逐字不变；
  * - error：登录态检查本身失败（网络/服务异常）→ 明确展示 + 重试，不静默当作未登录；
  * - authenticated：渲染子路由。
- *
- * error 在 core/bootstrapAuth 写入 store 前已归成中文（G8）；这里再过一次 toUserMessage
- * 只作兜底，保证任何来源的技术英文都不会直接上屏（store.error 为 null 时也给中文提示）。
  *
  * demo 模式（AUTH_MODE=demo）下 /api/auth/me 返回 p-001 → 直接 authenticated，不出现登录页，
  * 既有 fixtures E2E 与本地开发行为不变。
  */
-export function RequireAuth() {
+export function RequireAuth({
+  loginPath = '/login',
+  requireDoctor = false,
+}: {
+  loginPath?: string
+  requireDoctor?: boolean
+} = {}) {
   const status = useAuthStore((s) => s.status)
+  const mode = useAuthStore((s) => s.mode)
+  const user = useAuthStore((s) => s.user)
   const error = useAuthStore((s) => s.error)
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
@@ -52,7 +60,12 @@ export function RequireAuth() {
   }
 
   if (status === 'anonymous') {
-    return <Navigate to="/login" replace state={{ from }} />
+    return <Navigate to={loginPath} replace state={{ from }} />
+  }
+
+  // specs/25：医生端角色闸门（仅 password 模式生效；demo 模式保持既有旁路）。
+  if (requireDoctor && mode !== 'demo' && user?.role !== 'doctor') {
+    return <Navigate to={loginPath} replace state={{ from, reason: 'not-doctor' }} />
   }
 
   return <Outlet />

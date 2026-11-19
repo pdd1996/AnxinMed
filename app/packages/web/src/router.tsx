@@ -1,7 +1,6 @@
 import { lazy, Suspense, type ReactElement } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router'
 import { RequireAuth } from '@/components/auth/RequireAuth'
-import { RequireDoctor } from '@/components/auth/RequireDoctor'
 import { PatientLayout } from '@/components/layout/PatientLayout'
 import { DoctorLayout } from '@/components/layout/DoctorLayout'
 import { RouteFallback } from '@/components/layout/RouteFallback'
@@ -22,16 +21,22 @@ const Settings = lazy(() => import('@/routes/patient/Settings'))
 const PasswordSettings = lazy(() => import('@/routes/patient/PasswordSettings'))
 const NotFound = lazy(() => import('@/routes/patient/NotFound'))
 const Insight = lazy(() => import('@/routes/doctor/Insight'))
+const DoctorLogin = lazy(() => import('@/routes/doctor/DoctorLogin'))
 
 const page = (node: ReactElement) => <Suspense fallback={<RouteFallback />}>{node}</Suspense>
 
 /**
- * 路由表（技术方案 §8 / 任务书 T8；G7 增补登录）。
- * /login 在守卫之外；患者端/医生端挂在 RequireAuth 之下（未登录跳 /login，demo 模式直接放行）。
- * 患者端患者布局 PatientLayout（底部导航 5 项）；/doctor/* 挂 DoctorLayout（独立分支，无底部导航）。
+ * 路由表（技术方案 §8 / 任务书 T8；G7 增补登录；specs/25 医生端独立登录入口）。
+ *
+ * - `/login`：患者端登录；`/doctor/login`：医生端专用登录入口（公开路由，未登录可达）；
+ * - 患者端挂在 `<RequireAuth />` 下（未登录跳 /login，demo 模式直接放行）；
+ * - `/doctor/*` 挂在 `<RequireAuth loginPath="/doctor/login" requireDoctor />` 下：
+ *   未登录跳医生端登录页；password 模式下非医生账号跳回医生端登录页并提示（demo 模式旁路）；
+ * - 患者端 PatientLayout（底部导航 5 项）；医生端 DoctorLayout（独立分支，无底部导航）。
  */
 export const router = createBrowserRouter([
   { path: '/login', element: page(<Login />) },
+  { path: '/doctor/login', element: page(<DoctorLogin />) },
   {
     element: <RequireAuth />,
     children: [
@@ -53,18 +58,18 @@ export const router = createBrowserRouter([
           { path: '*', element: page(<NotFound />) },
         ],
       },
+    ],
+  },
+  {
+    // 医生端：独立登录入口 + 角色闸门（specs/25；权限最终以服务端 403 兜底）。
+    element: <RequireAuth loginPath="/doctor/login" requireDoctor />,
+    children: [
       {
-        // specs/25：医生端角色守卫（demo 模式放行；password 模式仅 role='doctor'）。
-        element: <RequireDoctor />,
+        path: '/doctor',
+        element: <DoctorLayout />,
         children: [
-          {
-            path: '/doctor',
-            element: <DoctorLayout />,
-            children: [
-              { index: true, element: <Navigate to="/doctor/insight" replace /> },
-              { path: 'insight', element: page(<Insight />) },
-            ],
-          },
+          { index: true, element: <Navigate to="/doctor/insight" replace /> },
+          { path: 'insight', element: page(<Insight />) },
         ],
       },
     ],

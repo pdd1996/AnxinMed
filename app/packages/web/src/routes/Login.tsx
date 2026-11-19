@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate, useLocation } from 'react-router'
+import { Link, Navigate, useLocation } from 'react-router'
 import { PASSWORD_MIN_LENGTH, PHONE_PATTERN, PasswordResetRequestSchema } from '@anxin/shared'
 import {
   requestPhoneCode,
@@ -472,6 +472,14 @@ export default function Login() {
           )}
         </CardContent>
       </Card>
+
+      {/* specs/25：医生端专用登录入口（同一账号体系，入口与心智分开）。 */}
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        医生用户请走
+        <Link to="/doctor/login" className="font-semibold text-primary underline underline-offset-4">
+          医生端登录
+        </Link>
+      </p>
     </div>
   )
 }
