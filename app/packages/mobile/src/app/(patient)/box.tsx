@@ -19,13 +19,21 @@ import {
   Trash2,
 } from "lucide-react-native";
 import { client, fetchDrugs, fetchPlans, unwrap } from "@anxin/core";
-import { CONFIRM_STATUS_META, type CycleType, type PlanStatus } from "@anxin/shared";
+import {
+  CONFIRM_STATUS_META,
+  daysUntilExpiry,
+  expiryState,
+  type CycleType,
+  type PlanStatus,
+} from "@anxin/shared";
 import { DeleteDrugDialog } from "@/components/domain/DeleteDrugDialog";
+import { ExpiryAlert } from "@/components/domain/ExpiryAlert";
 import { ExpiryDialog, type ExpiryFormResult } from "@/components/domain/ExpiryDialog";
 import { ManualDrugModal, type ManualDrugForm } from "@/components/domain/ManualDrugModal";
 import { PlanModal, type PlanFormResult } from "@/components/domain/PlanModal";
 import { Icon } from "@/components/ui/icon";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
+import { cn } from "@/lib/utils";
 
 type DrugItem = Awaited<ReturnType<typeof fetchDrugs>>[number];
 type PlanItem = Awaited<ReturnType<typeof fetchPlans>>[number];
@@ -280,6 +288,9 @@ export default function Box() {
         </Pressable>
       </View>
 
+      {/* 30 天临期/过期汇总（阈值在 shared；两桶皆空时组件返回 null，不占位） */}
+      <ExpiryAlert drugs={drugs} />
+
       {loading ? (
         <Text className="mt-6 text-base text-muted-foreground">正在读取药箱…</Text>
       ) : loadError ? (
@@ -364,7 +375,7 @@ export default function Box() {
                           : "—"
                       }
                     />
-                    <Row label="有效期" value={drug.expiry ?? "待录入"} />
+                    <ExpiryRow expiry={drug.expiry} />
                     {drug.openedAt ? <Row label="开封" value={drug.openedAt} /> : null}
                   </View>
 
@@ -549,6 +560,42 @@ function Row({ label, value }: { label: string; value: string }) {
     <View className="flex-row items-baseline justify-between gap-3">
       <Text className="text-sm text-muted-foreground">{label}</Text>
       <Text className="flex-1 text-right text-sm font-semibold text-card-foreground">{value}</Text>
+    </View>
+  );
+}
+
+/**
+ * 有效期行：临期/过期时补一枚状态徽章（正常不显示；未录入 ≠ 正常，只是无可提醒）。
+ * 文案与药箱顶部汇总卡同源（shared 的 expiryState / daysUntilExpiry，阈值 30 天）。
+ */
+function ExpiryRow({ expiry }: { expiry?: string | null }) {
+  const state = expiryState(expiry);
+  const days = daysUntilExpiry(expiry);
+  let badge: { label: string; shell: string; tone: string } | null = null;
+  if (state === "expired") {
+    badge = {
+      label: "已过期",
+      shell: "border-risk-l4 bg-risk-l4-tint",
+      tone: "text-risk-l4",
+    };
+  } else if (state === "expiring" && days !== null) {
+    badge = {
+      label: days === 0 ? "今天到期" : `剩 ${days} 天`,
+      shell: "border-risk-l3 bg-risk-l3-tint",
+      tone: "text-foreground",
+    };
+  }
+  return (
+    <View className="flex-row items-center justify-between gap-3">
+      <Text className="text-sm text-muted-foreground">有效期</Text>
+      <View className="flex-1 flex-row items-center justify-end gap-2">
+        <Text className="text-sm font-semibold text-card-foreground">{expiry || "待录入"}</Text>
+        {badge ? (
+          <View className={cn("rounded-full border px-2 py-0.5", badge.shell)}>
+            <Text className={cn("text-xs font-semibold", badge.tone)}>{badge.label}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -5,6 +5,7 @@ import { Bell, Camera, Check, ChevronRight, Clock3, PackageCheck, Pause, Pill, S
 import {
   client,
   duePendingSlots,
+  fetchDrugs,
   fetchTodayTasks,
   groupTasksByPlan,
   unwrap,
@@ -14,6 +15,7 @@ import {
 } from '@anxin/core'
 import { ReminderModal } from '@/components/domain/ReminderModal'
 import { ConfirmRecordDialog, type PendingRecord } from '@/components/domain/ConfirmRecordDialog'
+import { ExpiryBanner } from '@/components/domain/ExpiryAlert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -56,6 +58,8 @@ export default function Home() {
     queryFn: fetchTodayTasks,
     refetchInterval: 30_000, // 页面打开期间轮询（提醒比对）
   })
+  // 效期横幅的独立查询：与今日任务解耦，失败时 data 为空 → 横幅不渲染，不阻塞主流程
+  const drugsQuery = useQuery({ queryKey: ['drugs'], queryFn: fetchDrugs })
   const groups = useMemo(() => groupTasksByPlan(data?.items ?? []), [data])
 
   // 记录服药：乐观更新 today 缓存；失败回滚（unwrap 已 toast 错误，409=重复操作）。
@@ -140,6 +144,9 @@ export default function Home() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 30 天临期 / 已过期横幅：两桶皆空或拉取失败（data 为空）时不渲染，不影响下方今日任务 */}
+      <ExpiryBanner drugs={drugsQuery.data ?? []} />
 
       {/* 任务列表 / 空态 */}
       {groups.length === 0 ? (

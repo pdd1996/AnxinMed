@@ -33,6 +33,7 @@ import {
   type InteractionResult,
   type InteractionRuleInput,
 } from '../rules/index.js'
+import { EXPIRY_WARNING_DAYS } from '@anxin/shared'
 import { dbCitation } from './citations.js'
 import { getTodayTasks, type TodayTask } from '../tasks.service.js'
 import type { QueryIntent } from './intent.js'
@@ -176,7 +177,7 @@ export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpirySto
   const { expiring, expired, lowStock } = status
   const expiryParts: string[] = []
   if (expired.length > 0) expiryParts.push(`${expired.length} 种已过期`)
-  if (expiring.length > 0) expiryParts.push(`${expiring.length} 种 30 天内到期`)
+  if (expiring.length > 0) expiryParts.push(`${expiring.length} 种 ${EXPIRY_WARNING_DAYS} 天内到期`)
   const hasExpiry = expiryParts.length > 0
   const hasStock = lowStock.length > 0
   const stockPart = `${lowStock.length} 种库存不足`
@@ -240,7 +241,7 @@ export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpirySto
       summary = `你的药箱有 ${expiryParts.join('、')}的药品。`
       if (hasStock) summary += stockAside()
     } else {
-      summary = `你的药箱里没有过期或 30 天内到期的药品。${stockAside()}`
+      summary = `你的药箱里没有过期或 ${EXPIRY_WARNING_DAYS} 天内到期的药品。${stockAside()}`
     }
     const nextAction =
       !hasExpiry && hasStock ? '前往「药箱」页面补充库存不足的药品。' : '前往「药箱」页面处理过期/临期药品。'
@@ -277,7 +278,7 @@ export function renderExpiryStockSections(status: ExpiryStatus, focus: ExpirySto
   // both：两桶都明确作答（空桶也明说，不静默跳过）
   if (!hasExpiry && !hasStock) {
     return {
-      summary: '暂无过期、30 天内到期或库存不足的药品提醒。',
+      summary: `暂无过期、${EXPIRY_WARNING_DAYS} 天内到期或库存不足的药品提醒。`,
       keyPoints: ['药品效期与库存为建档快照，请以实际包装为准。'],
       risks: [],
       nextAction: IDLE_NEXT,

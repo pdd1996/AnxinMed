@@ -45,6 +45,40 @@ export function isIsoDate(value: string): boolean {
   )
 }
 
+// ---------------------------------------------------------------------------
+// 效期状态（三条时间线之一）：阈值一份真相，患者端提醒 / 咨询 S2 / 医生端共用
+// ---------------------------------------------------------------------------
+
+/** 临期预警阈值（天）：距到期 ≤30 天为「临期」，已过期为「已过期」（用户 2026-11-19 拍板 30 天）。 */
+export const EXPIRY_WARNING_DAYS = 30
+
+/** 效期状态：已过期 / 临期（含当天）/ 正常。 */
+export type ExpiryState = 'expired' | 'expiring' | 'ok'
+
+/** 距到期天数（to − today，负 = 已过期）；无/非法日期 → null（未录入 ≠ 没有过期，调用方必须分开处理）。 */
+export function daysUntilExpiry(
+  expiry: string | null | undefined,
+  today: string = todayStr(),
+): number | null {
+  if (!expiry || !isIsoDate(expiry)) return null
+  return daysBetween(today, expiry)
+}
+
+/**
+ * 有效期状态（纯函数，阈值 EXPIRY_WARNING_DAYS）。
+ * 返回 null 表示「未录入/非法日期」——调用方不得把它当成 ok（与 M14 库存 unknownStock 同口径）。
+ */
+export function expiryState(
+  expiry: string | null | undefined,
+  today: string = todayStr(),
+): ExpiryState | null {
+  const days = daysUntilExpiry(expiry, today)
+  if (days === null) return null
+  if (days < 0) return 'expired'
+  if (days <= EXPIRY_WARNING_DAYS) return 'expiring'
+  return 'ok'
+}
+
 /** 库存按次扣减下的预计可用天数（推算标注）；每日用量 ≤ 0 返回 0 */
 export function estimateStockDays(stock: number, doseValue: number, frequency: number): number {
   const perDay = (doseValue || 0) * (frequency || 0)

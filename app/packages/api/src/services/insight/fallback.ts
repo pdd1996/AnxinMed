@@ -6,6 +6,7 @@
  *
  * ⚠️ 降级路径的 riskLevel 由 guardSummary 二次守门决定（fallback 产物也可能命中 L4/L3/L2）。
  */
+import { EXPIRY_WARNING_DAYS } from '@anxin/shared'
 import type { PatientListItem } from '../../repositories/insight.repo.js'
 import type { InsightTools } from './types.js'
 import type { RawSummarySections } from './guards.js'
@@ -36,7 +37,7 @@ export function fallbackPatientSummary(
     risks.push(interactions.items[0]?.note || '部分药品联用需关注')
   }
   if (expiry.expiring.length > 0) {
-    keyPoints.push(`${expiry.expiring.length} 种药品临期（≤30 天）`)
+    keyPoints.push(`${expiry.expiring.length} 种药品临期（≤${EXPIRY_WARNING_DAYS} 天）`)
     risks.push('临期药品需确认是否继续使用')
   }
   if (riskEvents.hasL4) {

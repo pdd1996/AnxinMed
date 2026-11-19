@@ -11,6 +11,9 @@ import {
   suggestTimes,
   isPlanActiveOn,
   isIsoDate,
+  daysUntilExpiry,
+  expiryState,
+  EXPIRY_WARNING_DAYS,
   gradeAdherence,
   ADHERENCE_GRADE_THRESHOLDS,
   ADHERENCE_GRADE_LABEL,
@@ -156,5 +159,42 @@ describe('isIsoDate（有效期/开封日期入参）', () => {
   })
   it('过去日期合法（已过期药也要能录）', () => {
     expect(isIsoDate('2020-01-01')).toBe(true)
+  })
+})
+
+describe('效期状态 · 30 天临期口径（患者端提醒 / 咨询 S2 / 医生端一份真相）', () => {
+  const TODAY = '2026-11-19'
+
+  it('阈值常量为 30 天（用户 2026-11-19 拍板；promo 的 90 天口径不再采用）', () => {
+    expect(EXPIRY_WARNING_DAYS).toBe(30)
+  })
+
+  it('已过期：昨天起任何过去日期 → expired，剩余天数为负', () => {
+    expect(expiryState('2026-11-18', TODAY)).toBe('expired')
+    expect(daysUntilExpiry('2026-11-18', TODAY)).toBe(-1)
+    expect(expiryState('2020-01-01', TODAY)).toBe('expired')
+  })
+
+  it('临期边界：当天 / 第 30 天 → expiring；第 31 天 → ok（阈值含边界）', () => {
+    expect(expiryState(TODAY, TODAY)).toBe('expiring')
+    expect(expiryState('2026-12-19', TODAY)).toBe('expiring')
+    expect(daysUntilExpiry('2026-12-19', TODAY)).toBe(30)
+    expect(expiryState('2026-12-20', TODAY)).toBe('ok')
+    expect(daysUntilExpiry('2026-12-20', TODAY)).toBe(31)
+  })
+
+  it('未录入 / 非法日期 → null（必须明说「未知」，不得当成「没有过期」）', () => {
+    expect(expiryState(null, TODAY)).toBeNull()
+    expect(expiryState(undefined, TODAY)).toBeNull()
+    expect(expiryState('', TODAY)).toBeNull()
+    expect(expiryState('2026-02-31', TODAY)).toBeNull()
+    expect(daysUntilExpiry(null, TODAY)).toBeNull()
+  })
+
+  it('today 可注入（测试确定性），缺省取本地今日', () => {
+    const today = todayStr()
+    expect(expiryState(today)).toBe('expiring')
+    expect(expiryState(addDaysStr(today, -1))).toBe('expired')
+    expect(expiryState(addDaysStr(today, 31))).toBe('ok')
   })
 })

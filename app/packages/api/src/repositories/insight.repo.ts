@@ -17,7 +17,7 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '../db/client.js'
 import { drugs, healthProfiles, insightAskLogs, plans, records, riskEvents, users } from '../db/schema.js'
-import { todayStr, addDaysStr, gradeAdherence, isPlanActiveOn } from '@anxin/shared'
+import { todayStr, addDaysStr, gradeAdherence, isPlanActiveOn, EXPIRY_WARNING_DAYS } from '@anxin/shared'
 
 // ---------------------------------------------------------------------------
 // 1. 患者列表（users + health_profiles + 生效计划数 + 最近活跃 + T7 依从性分档）
@@ -336,7 +336,7 @@ export interface ExpiryStatus {
   stocked?: MedicationItem[]
 }
 
-/** 临期/过期/低库存分类（照搬 demo:1163-1179，阈值：临期 ≤30 天、低库存 ≤10）。 */
+/** 临期/过期/低库存分类（阈值：临期取 shared.EXPIRY_WARNING_DAYS=30 天、低库存 ≤10）——与患者端提醒同一口径。 */
 export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
   const today = todayStr()
   const meds = await getMedicationList(userId)
@@ -350,7 +350,7 @@ export async function getExpiryStatus(userId: string): Promise<ExpiryStatus> {
     if (m.expiry) {
       const days = daysBetween(today, m.expiry)
       if (days < 0) expired.push({ ...m, days })
-      else if (days <= 30) expiring.push({ ...m, days })
+      else if (days <= EXPIRY_WARNING_DAYS) expiring.push({ ...m, days })
     }
     if (m.stock) {
       stocked.push(m)

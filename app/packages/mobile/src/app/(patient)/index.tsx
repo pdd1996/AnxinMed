@@ -6,6 +6,7 @@ import { Bell, Check, PackageCheck, Pill } from "lucide-react-native";
 import {
   client,
   duePendingSlots,
+  fetchDrugs,
   fetchTodayTasks,
   groupTasksByPlan,
   unwrap,
@@ -16,6 +17,7 @@ import { todayStr, type RecordStatus } from "@anxin/shared";
 import { TAB_BAR_BOTTOM_PAD } from "@/lib/layout";
 import { API_URL_MISSING_HINT, isApiConfigured } from "@/lib/wiring";
 import { ConfirmRecordDialog, type PendingRecord } from "@/components/domain/ConfirmRecordDialog";
+import { ExpiryBanner } from "@/components/domain/ExpiryAlert";
 import { ReminderModal } from "@/components/domain/ReminderModal";
 import { TaskSlotChip } from "@/components/domain/task-slot";
 import { Icon } from "@/components/ui/icon";
@@ -72,6 +74,15 @@ export default function Today() {
     enabled: configured,
   });
   const groups = useMemo(() => groupTasksByPlan(data?.items ?? []), [data]);
+
+  // 效期横幅的药品数据：与药箱页共享 ['drugs'] 缓存（药箱变更会 invalidate 本键）。
+  // 只服务横幅：拉取失败/未配置时 data 为空 → 横幅不渲染，绝不影响下方今日任务主流程。
+  const drugsQuery = useQuery({
+    queryKey: ["drugs"],
+    queryFn: fetchDrugs,
+    enabled: configured,
+  });
+  const drugs = drugsQuery.data ?? [];
 
   // 记录服药：乐观改 today 缓存 → 失败回滚（unwrap 已经 ApiNotifier 弹 toast，页内再落一条可见错误）。
   const recordMutation = useMutation({
@@ -162,7 +173,8 @@ export default function Today() {
         configured ? (
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={() => void refetch()}
+            // 下拉同时补拉药品：任务轮询不覆盖效期横幅，手动刷新时一并更新（失败不影响今日主流程）
+            onRefresh={() => void Promise.all([refetch(), drugsQuery.refetch()])}
             tintColor={mutedForeground}
           />
         ) : undefined
@@ -170,6 +182,9 @@ export default function Today() {
     >
       <Text className="text-xs font-bold uppercase tracking-[2px] text-primary">今日</Text>
       <Text className="mt-1 text-2xl font-bold text-foreground">安心用药</Text>
+
+      {/* 30 天临期/过期横幅（阈值在 shared）：无提醒或药品数据没拉到 → 不渲染，不阻塞今日任务 */}
+      <ExpiryBanner drugs={drugs} />
 
       {/* 服务器地址诊断卡（M5-T4）自 G8 交付起从患者可见界面移除：
           正式包地址在构建期内联、用户改不了，展示内网 IP 只会造成困惑。

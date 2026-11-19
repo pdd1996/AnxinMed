@@ -5,11 +5,12 @@ import { toast } from 'sonner'
 import { AlertTriangle, Box as BoxIcon, Bot, CalendarDays, FileText, Hand, Pause, Pencil, Pill, Play, Plus, ShieldCheck, Square, Trash2 } from 'lucide-react'
 import { client, fetchDrugs, fetchPlans, unwrap } from '@anxin/core'
 import { ManualDrugModal, type ManualDrugForm } from '@/components/domain/ManualDrugModal'
+import { ExpiryAlert } from '@/components/domain/ExpiryAlert'
 import { ExpiryDialog, type ExpiryForm } from '@/components/domain/ExpiryDialog'
 import { PlanModal, type PlanFormResult } from '@/components/domain/PlanModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { CONFIRM_STATUS_META, type CycleType, type PlanStatus } from '@anxin/shared'
+import { CONFIRM_STATUS_META, daysUntilExpiry, expiryState, type CycleType, type PlanStatus } from '@anxin/shared'
 
 type DrugItem = Awaited<ReturnType<typeof fetchDrugs>>[number]
 type PlanItem = Awaited<ReturnType<typeof fetchPlans>>[number]
@@ -176,6 +177,9 @@ export default function Box() {
         </div>
       </header>
 
+      {/* 30 天临期 / 已过期汇总（两桶皆空不渲染；阈值与咨询 S2、医生端同一份真相） */}
+      <ExpiryAlert drugs={drugs} />
+
       {drugs.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -194,6 +198,9 @@ export default function Box() {
           {drugs.map((drug) => {
             const plan = plans.find((p) => p.drugId === drug.id)
             const meta = CONFIRM_STATUS_META[drug.confirmStatus]
+            // 效期状态徽章：阈值走 shared 的 30 天口径（未录入 → null，不显示徽章）
+            const exState = expiryState(drug.expiry)
+            const exDays = daysUntilExpiry(drug.expiry)
             return (
               <Card key={drug.id}>
                 <CardContent className="space-y-3">
@@ -225,7 +232,19 @@ export default function Box() {
                     </div>
                     <div className="flex justify-between gap-3">
                       <dt className="text-muted-foreground">有效期</dt>
-                      <dd className="font-semibold">{drug.expiry ?? '待录入'}</dd>
+                      <dd className="flex flex-wrap items-center justify-end gap-2 font-semibold">
+                        <span>{drug.expiry ?? '待录入'}</span>
+                        {exState === 'expired' && (
+                          <span className="rounded-full bg-risk-l4/10 px-2 py-0.5 text-xs font-semibold text-risk-l4">
+                            已过期
+                          </span>
+                        )}
+                        {exState === 'expiring' && exDays !== null && (
+                          <span className="rounded-full bg-risk-l3/10 px-2 py-0.5 text-xs font-semibold text-risk-l3">
+                            {exDays === 0 ? '今天到期' : `剩 ${exDays} 天`}
+                          </span>
+                        )}
+                      </dd>
                     </div>
                     {drug.openedAt && (
                       <div className="flex justify-between gap-3">
