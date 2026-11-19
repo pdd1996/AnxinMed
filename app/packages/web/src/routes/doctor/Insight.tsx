@@ -33,7 +33,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { DoctorBindDialog } from '@/components/domain/DoctorBindDialog'
-import { RiskBadge, RISK_BADGE_META } from '@/components/domain/RiskBadge'
+import { RiskBadge } from '@/components/domain/RiskBadge'
+import { RISK_BADGE_META } from '@/components/domain/riskMeta'
 import { PatientAdherenceCharts } from '@/components/domain/insight/PatientAdherenceCharts'
 import { ADHERENCE_GRADE_LABEL, type AdherenceGrade, type RiskEventLevel, type RiskEventType } from '@anxin/shared'
 import { cn } from '@/lib/utils'
@@ -353,9 +354,9 @@ function CohortTable({ queue, onPick }: { queue: InsightQueueDto; onPick: (id: s
  *
  * 版式：原来「日期 + 等级 + 起数」逐行平铺，同一天重复三次、等级顺序随库序，宽屏下右侧大片留白。
  * 现改为「汇总条 + 按日分组」两层：
- *   - 汇总条：总起数 / 有记录天数 + 分级构成，L4 直接标「需优先跟进」；
- *   - 每日一行：日期列 → 各等级徽章 + 起数 → 当日小计（右对齐，形成表格节奏）；
- *   - <sm 自动堆叠（日期在徽章上方、隐藏当日小计），不做横向滚动。
+ *   - 汇总条：总起数 / 有记录天数 + 分级构成（L4 用红色强调，不再叠「需优先跟进」）；
+ *   - 每日一行：日期列 → 各等级徽章 + 起数；含 L4 的日期在右侧标「需优先跟进」；
+ *   - <sm 自动堆叠（日期在徽章上方），不做横向滚动。
  * 风险不单靠颜色传达：每枚徽章都是图标 + 中文等级名。
  */
 function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
@@ -388,51 +389,54 @@ function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
     level,
     count: timeline.filter((t) => t.level === level).reduce((sum, t) => sum + t.count, 0),
   })).filter((l) => l.count > 0)
-  const hasUrgent = levelTotals.some((l) => l.level === 'L4')
 
   return (
     <Card className="gap-0 py-0">
-      {/* 汇总条：总起数 + 分级构成（原版要在逐行里心算总览） */}
+      {/* 汇总条：总起数 + 分级构成（原版要在逐行里心算总览）；「需优先跟进」下沉到具体日期行 */}
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border px-4 py-3">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-xl font-bold leading-none tabular-nums">{total}</span>
           <span className="text-sm text-muted-foreground">起 · {days.length} 天有记录</span>
         </p>
-        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" aria-label="按风险等级构成">
+        <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm" aria-label="按风险等级构成">
           {levelTotals.map(({ level, count }) => (
             <li
               key={level}
               className={cn('inline-flex items-center gap-1.5 text-muted-foreground', level === 'L4' && 'text-risk-l4')}
             >
-              <span className={cn('size-1.5 rounded-full', RISK_LEVEL_DOT[level])} aria-hidden />
+              <span className={cn('size-2 rounded-full', RISK_LEVEL_DOT[level])} aria-hidden />
               <span>{RISK_BADGE_META[level].label}</span>
               <span className="font-semibold tabular-nums">{count}</span>
             </li>
           ))}
-          {hasUrgent && <li className="font-semibold text-risk-l4">需优先跟进</li>}
         </ul>
       </div>
 
       <ul className="divide-y divide-border">
-        {days.map((day) => (
-          <li
-            key={day.date}
-            className="flex flex-col gap-2 px-4 py-3 sm:grid sm:grid-cols-[6.5rem_1fr_auto] sm:items-center sm:gap-4"
-          >
-            <time dateTime={day.date} className="text-xs font-medium tabular-nums text-muted-foreground">
-              {day.date}
-            </time>
-            <ul className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              {day.rows.map((row) => (
-                <li key={row.level} className="inline-flex items-center gap-1.5">
-                  <RiskBadge level={row.level} showHint={false} />
-                  <span className="text-sm font-semibold tabular-nums">{row.count} 起</span>
-                </li>
-              ))}
-            </ul>
-            <span className="hidden text-xs text-muted-foreground sm:block sm:text-right">共 {day.count} 起</span>
-          </li>
-        ))}
+        {days.map((day) => {
+          const needsFollowUp = day.rows.some((row) => row.level === 'L4')
+          return (
+            <li
+              key={day.date}
+              className="flex flex-col gap-2 px-4 py-3 sm:grid sm:grid-cols-[7rem_1fr_auto] sm:items-center sm:gap-4"
+            >
+              <time dateTime={day.date} className="text-sm font-medium tabular-nums text-muted-foreground">
+                {day.date}
+              </time>
+              <ul className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {day.rows.map((row) => (
+                  <li key={row.level} className="inline-flex items-center gap-1.5">
+                    <RiskBadge level={row.level} showHint={false} />
+                    <span className="text-sm font-semibold tabular-nums">{row.count} 起</span>
+                  </li>
+                ))}
+              </ul>
+              {needsFollowUp && (
+                <span className="text-xs font-semibold text-risk-l4 sm:text-right">需优先跟进</span>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </Card>
   )
