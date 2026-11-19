@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { DOSE_UNITS } from '@anxin/shared'
 import {
+  approvalMatchesCandidate,
   identityNeedsManual,
   infoConflicts,
   isManualMode,
@@ -126,6 +127,30 @@ export function IdentityCard({
               <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
               <span>冲突清单 —— 系统不选边。请核对药品实物（包装盒上的规格 / 剂型 / 厂家）后选择一致的一条。</span>
             </p>
+            {/* 批准文号选填（2026-11-19）：批号会随规格/注册变更而不同，且常印在包装侧面；
+                因此不做身份核对字段，只作「候选定位」辅助——不校验、不落库、不阻塞确认。 */}
+            <div className="space-y-1 rounded-lg border border-dashed border-input bg-muted/40 p-3">
+              <Label htmlFor="id-approval">批准文号（选填）</Label>
+              <Input
+                id="id-approval"
+                value={state.approvalInput}
+                onChange={(e) => patch({ approvalInput: e.target.value })}
+                placeholder="如 国药准字H20138002（可只填 H 后面的编号）"
+              />
+              <p className="text-xs leading-5 text-muted-foreground">
+                只在包装上印了才需要填：帮你从候选里定位对应记录，<strong>不做官方校验</strong>；以包装/说明书为准。
+              </p>
+              {state.approvalInput.trim() &&
+                (candidates.some((c) => approvalMatchesCandidate(c, state.approvalInput)) ? (
+                  <p className="text-xs leading-5 text-risk-l2">
+                    已命中下方带「批号命中」的候选（用户填写·未校验），请核对实物规格后点选。
+                  </p>
+                ) : (
+                  <p className="text-xs leading-5 text-risk-l3">
+                    填写的批号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
+                  </p>
+                ))}
+            </div>
             {(payload.conflicts ?? [])
               .filter((c) => (c.candidates ?? []).length > 0)
               .map((conflict, idx) => (
@@ -165,9 +190,17 @@ export function IdentityCard({
                       {c.brandName ? `${c.brandName} · ` : ''}
                       {c.specification} · {c.form}
                     </span>
-                    <span className="block text-xs text-muted-foreground">
-                      厂家：{c.manufacturer || '—'} · 批准文号：{c.approvalNumber || '—'}
-                    </span>
+                    <span className="block text-xs text-muted-foreground">厂家：{c.manufacturer || '—'}</span>
+                    {c.multiSpec && (
+                      <span className="mt-1 inline-block rounded-full bg-risk-l3/15 px-2 py-0.5 text-xs font-semibold text-risk-l3">
+                        多规格库条目 · 规格以实物为准
+                      </span>
+                    )}
+                    {state.approvalInput.trim() && approvalMatchesCandidate(c, state.approvalInput) && (
+                      <span className="mt-1 ml-1 inline-block rounded-full bg-risk-l2/15 px-2 py-0.5 text-xs font-semibold text-risk-l2">
+                        批号命中（用户填写·未校验）
+                      </span>
+                    )}
                   </span>
                 </label>
               ))}
@@ -189,7 +222,8 @@ export function IdentityCard({
                 <FieldRow label="规格" value={unique.specification} />
                 <FieldRow label="剂型" value={unique.form} />
                 <FieldRow label="厂家" value={unique.manufacturer} />
-                <FieldRow label="批准文号" value={unique.approvalNumber} />
+                {/* 批准文号不再作为身份核对字段：批号随规格/注册变更不同，且多印在包装侧面，
+                    展示库里的"主批号"会让人误以为是识别出来的、甚至张冠李戴（2026-11-19 现场反馈）。 */}
               </dl>
             )}
             {payload.match?.resolutionNote && (
@@ -212,7 +246,8 @@ export function IdentityCard({
             <FieldRow label="规格" value={identityNeedsManual(payload, 'specification') ? '' : identity.specification} />
             <FieldRow label="剂型" value={identityNeedsManual(payload, 'form') ? '' : identity.form} />
             <FieldRow label="厂家" value={identity.manufacturer} />
-            <FieldRow label="批准文号" value={identity.approvalNumber} />
+            {/* 批号只在照片里真的读到才显示（识别值可核对；默认不显示「—」占位，避免误以为是身份字段） */}
+            {identity.approvalNumber && <FieldRow label="批准文号（照片抄录）" value={identity.approvalNumber} />}
             {identity.otcFlag && <FieldRow label="类别" value="非处方药（OTC）" />}
           </dl>
         )}

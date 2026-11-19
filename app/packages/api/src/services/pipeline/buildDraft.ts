@@ -20,7 +20,7 @@ import {
 import type { IdentityFields } from '../../lib/ai/types.js'
 import { parseSig } from '../sanitize/whitelist.js'
 import { nameMatches } from '../identity/normalize.js'
-import type { DrugMasterCandidate, MatchResult } from '../identity/match.js'
+import { isMultiSpecEntry, type DrugMasterCandidate, type MatchResult } from '../identity/match.js'
 import type { DrugDraft } from './types.js'
 
 /**
@@ -112,6 +112,9 @@ function toDrugCandidate(c: DrugMasterCandidate): DrugCandidate {
     form: c.form,
     manufacturer: c.manufacturer ?? null,
     approvalNumber: c.approvalNumber ?? null,
+    approvalNumbers: c.approvalNumbers ?? null,
+    // 多规格合并/多批准文号条目：确认页提示"须按实物规格选择"，选定后规格以识别抄录值为准
+    multiSpec: isMultiSpecEntry(c),
   }
 }
 
@@ -134,7 +137,8 @@ export function toDraftConflicts(match: MatchResult | null): DraftConflict[] {
     return [
       {
         type: 'multi',
-        note: '识别到多个候选，系统不自动选择，请核对药品实物后从候选中选择，或改用手动建档',
+        // 多规格合并条目：把「不能唯一确认」的原因透传成用户可读说明（P1 匹配止血）
+        note: match.note ?? '识别到多个候选，系统不自动选择，请核对药品实物后从候选中选择，或改用手动建档',
         candidates: (match.candidates ?? []).map(toDrugCandidate),
       },
     ]

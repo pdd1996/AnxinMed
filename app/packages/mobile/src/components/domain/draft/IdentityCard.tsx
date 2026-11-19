@@ -3,6 +3,7 @@ import { CircleAlert, Hand, Pill, ShieldCheck, Undo2 } from "lucide-react-native
 import { useUnstableNativeVariable } from "nativewind";
 import { DOSE_UNITS } from "@anxin/shared";
 import {
+  approvalMatchesCandidate,
   identityNeedsManual,
   infoConflicts,
   isManualMode,
@@ -193,9 +194,35 @@ export function IdentityCard({
                   ) : null}
                 </View>
               ))}
+            {/* 批准文号选填（2026-11-19）：只作候选定位辅助——不校验、不落库、不阻塞确认 */}
+            <View className="gap-1 rounded-xl border-2 border-dashed border-border bg-muted p-3">
+              <Text className="text-sm font-semibold text-foreground">批准文号（选填）</Text>
+              <TextInput
+                value={state.approvalInput}
+                onChangeText={(v) => patch({ approvalInput: v })}
+                placeholder="如 国药准字H20138002（可只填 H 后面的编号）"
+                accessibilityLabel="批准文号（选填）"
+                className={INPUT_CLASS}
+              />
+              <Text className="text-xs leading-5 text-muted-foreground">
+                只在包装上印了才需要填：帮你从候选里定位对应记录，不做官方校验；以包装/说明书为准。
+              </Text>
+              {state.approvalInput.trim() ? (
+                candidates.some((c) => approvalMatchesCandidate(c, state.approvalInput)) ? (
+                  <Text className="text-xs leading-5 text-risk-l2">
+                    已命中下方带「批号命中」的候选（用户填写·未校验），请核对实物规格后点选。
+                  </Text>
+                ) : (
+                  <Text className="text-xs leading-5 text-risk-l3">
+                    填写的批号在候选中没有命中，请核对后重填；也可以直接按实物规格选择，或改用手动建档。
+                  </Text>
+                )
+              ) : null}
+            </View>
             <View className="gap-2">
               {candidates.map((cand) => {
                 const active = state.selectedCandidateId === cand.id;
+                const hit = Boolean(state.approvalInput.trim()) && approvalMatchesCandidate(cand, state.approvalInput);
                 return (
                   <Pressable
                     key={cand.id}
@@ -215,8 +242,18 @@ export function IdentityCard({
                       {cand.specification} · {cand.form}
                     </Text>
                     <Text className={cn("mt-1 text-xs", active ? "text-primary-foreground" : "text-muted-foreground")}>
-                      厂家：{cand.manufacturer || "—"} · 批准文号：{cand.approvalNumber || "—"}
+                      厂家：{cand.manufacturer || "—"}
                     </Text>
+                    {cand.multiSpec ? (
+                      <Text className={cn("mt-1 text-xs font-semibold", active ? "text-primary-foreground" : "text-risk-l3")}>
+                        多规格库条目 · 规格以实物为准
+                      </Text>
+                    ) : null}
+                    {hit ? (
+                      <Text className={cn("mt-1 text-xs font-semibold", active ? "text-primary-foreground" : "text-risk-l2")}>
+                        批号命中（用户填写·未校验）
+                      </Text>
+                    ) : null}
                   </Pressable>
                 );
               })}
@@ -233,7 +270,8 @@ export function IdentityCard({
                 <FieldRow label="规格" value={unique.specification} />
                 <FieldRow label="剂型" value={unique.form} />
                 <FieldRow label="厂家" value={unique.manufacturer} />
-                <FieldRow label="批准文号" value={unique.approvalNumber} />
+                {/* 批准文号不再作为身份核对字段（批号随规格/注册变更不同，且多印在包装侧面；
+                    展示库里的"主批号"会张冠李戴——2026-11-19 现场反馈）。 */}
               </View>
             ) : null}
             {payload.match?.resolutionNote ? (
@@ -258,7 +296,8 @@ export function IdentityCard({
             />
             <FieldRow label="剂型" value={identityNeedsManual(payload, "form") ? "" : identity.form} />
             <FieldRow label="厂家" value={identity.manufacturer} />
-            <FieldRow label="批准文号" value={identity.approvalNumber} />
+            {/* 批号只在照片里真的读到才显示（识别值可核对；默认不显示「—」占位） */}
+            {identity.approvalNumber ? <FieldRow label="批准文号（照片抄录）" value={identity.approvalNumber} /> : null}
             {identity.otcFlag ? <FieldRow label="类别" value="非处方药（OTC）" /> : null}
           </View>
         ) : null}

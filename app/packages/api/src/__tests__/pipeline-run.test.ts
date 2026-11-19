@@ -237,6 +237,32 @@ describe('管线 run.ts · 入口B（药盒，永不抄录用法用量）', () =
     expect(JSON.stringify(d)).not.toContain('"frequency"')
   })
 
+  it('多规格合并库条目 → 不判 unique；冲突清单带可读说明，候选标记 multiSpec（2026-11-19 止血）', async () => {
+    const MERGED = {
+      id: 'dm-alishatan-merged',
+      genericName: '阿利沙坦酯片',
+      brandName: '信立坦',
+      specification: '80mg，240mg',
+      form: '片',
+      manufacturer: '深圳信立泰药业股份有限公司',
+      approvalNumber: '国药准字H20138001',
+      approvalNumbers: ['国药准字H20138001', '国药准字H20138002'],
+    }
+    const clients = mockClients({
+      layers: ['药盒原装层'],
+      identity: { genericName: '阿利沙坦酯片', specification: '240mg×7片', form: '片' },
+    })
+    const d = await runDrug(IMG, clients, ctx({ candidates: [MERGED] }))
+    expect(d.match?.status).toBe('ambiguous')
+    expect(d.drugDraft.drugMasterId).toBeNull()
+    expect(String(d.conflicts[0]?.note)).toContain('多规格合并')
+    expect(d.conflicts[0]?.candidates?.[0]).toMatchObject({
+      id: 'dm-alishatan-merged',
+      multiSpec: true,
+      approvalNumbers: ['国药准字H20138001', '国药准字H20138002'],
+    })
+  })
+
   it('身份读不出（合并调用 identity=null）→ 降级：no_match + needsManual，不炸', async () => {
     const clients = mockClients({
       layers: ['药盒原装层'],

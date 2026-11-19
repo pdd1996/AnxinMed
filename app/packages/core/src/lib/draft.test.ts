@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest'
 import { addDaysStr } from '@anxin/shared'
 import {
+  approvalMatchesCandidate,
   buildConfirm,
   finalTags,
   initialConfirmState,
@@ -21,6 +22,7 @@ import {
   selectableCandidates,
   sigNeedsManual,
   unmetReasons,
+  type DraftPayload,
 } from './draft'
 import {
   degradedPayload,
@@ -246,5 +248,59 @@ describe('效期线（用户对照药盒录入，管线不产出、不预填）'
   it('留空 → null（不是空串，空串会被服务端 zod 日期校验拒绝）', () => {
     const s = initialConfirmState(rxUniquePayload)
     expect(buildConfirm(rxUniquePayload, s).drug).toMatchObject({ expiry: null, openedAt: null })
+  })
+})
+
+describe('批准文号选填（2026-11-19：仅辅助候选定位，不做官方校验、不落库）', () => {
+  /** 多规格合并库条目（现场真实脏数据形态）：80mg/240mg 合一行，两个批准文号。 */
+  const MERGED_CANDIDATE = {
+    id: 'dm-alishatan-merged',
+    genericName: '阿利沙坦酯片',
+    brandName: '信立坦',
+    specification: '80mg，240mg',
+    form: '片',
+    manufacturer: '深圳信立泰药业股份有限公司',
+    approvalNumber: '国药准字H20138001',
+    approvalNumbers: ['国药准字H20138001', '国药准字H20138002'],
+    multiSpec: true,
+  }
+  const MULTI_PAYLOAD = {
+    ...rxConflictPayload,
+    identity: { genericName: '阿利沙坦酯片', specification: '240mg×7片', form: '片' },
+    match: { status: 'ambiguous', candidates: [MERGED_CANDIDATE], note: '多规格合并，请按实物规格选择' },
+    conflicts: [
+      {
+        type: 'multi' as const,
+        note: '多规格合并，请按实物规格选择',
+        candidates: [MERGED_CANDIDATE],
+      },
+    ],
+    drugDraft: { ...rxConflictPayload.drugDraft, drugMasterId: null },
+  } satisfies DraftPayload
+
+  it('初始态 approvalInput 恒为空串（不预填、不猜）', () => {
+    expect(initialConfirmState(MULTI_PAYLOAD).approvalInput).toBe('')
+  })
+
+  it('命中判定：全号/只填编号后缀/全角数字都算命中；别的号不命中；过短输入不命中', () => {
+    const c = selectableCandidates(MULTI_PAYLOAD)[0]!
+    expect(approvalMatchesCandidate(c, '国药准字H20138002')).toBe(true) // 240mg 的号
+    expect(approvalMatchesCandidate(c, 'H20138002')).toBe(true) // 只填编号后缀
+    expect(approvalMatchesCandidate(c, 'ｈ２０１３８００２')).toBe(true) // 全角
+    expect(approvalMatchesCandidate(c, '国药准字H99999999')).toBe(false)
+    expect(approvalMatchesCandidate(c, 'H2013')).toBe(false) // 过短不作命中依据
+    expect(approvalMatchesCandidate(c, '   ')).toBe(false)
+  })
+
+  it('选定多规格合并候选 → 药箱规格取识别抄录值（不把「80mg，240mg」写进用户档案）', () => {
+    const s = { ...initialConfirmState(MULTI_PAYLOAD), selectedCandidateId: 'dm-alishatan-merged', whoConfirmed: true }
+    const input = buildConfirm(MULTI_PAYLOAD, s)
+    expect(input.drug.drugMasterId).toBe('dm-alishatan-merged')
+    expect(input.drug.specification).toBe('240mg×7片')
+  })
+
+  it('普通（单规格）候选仍取候选规格，行为不变', () => {
+    const s = { ...initialConfirmState(rxConflictPayload), selectedCandidateId: 'dm-hycosan-02', whoConfirmed: true }
+    expect(buildConfirm(rxConflictPayload, s).drug.specification).toBe('0.2%（10mL:20mg）')
   })
 })

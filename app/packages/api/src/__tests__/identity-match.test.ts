@@ -4,7 +4,12 @@
  * 另加：多规格库命中其一、缺规格不猜、缺剂型不阻塞、g↔mg 换算、全角归一、批准文号不阻塞/命中多条、复合规格拆解。
  */
 import { describe, it, expect } from 'vitest'
-import { matchDrugMaster, parseStrengthTokens, type DrugMasterCandidate } from '../services/identity/index.js'
+import {
+  hasMultiStrengthSpec,
+  matchDrugMaster,
+  parseStrengthTokens,
+  type DrugMasterCandidate,
+} from '../services/identity/index.js'
 
 const AMLO: DrugMasterCandidate = { id: 'drug-amlodipine-5', genericName: '苯磺酸氨氯地平片', specification: '5mg', form: '片剂', approvalNumber: '国药准字H10950224' }
 const AMLO_B: DrugMasterCandidate = { id: 'drug-amlodipine-5b', genericName: '苯磺酸氨氯地平片', specification: '5mg', form: '片剂', manufacturer: '乙厂', approvalNumber: '国药准字H20000000' }
@@ -117,5 +122,80 @@ describe('matchDrugMaster · 三项严格匹配', () => {
     expect(parseStrengthTokens('0.1%（10mL:10mg）')).toEqual({ pct: [0.1], mg: [10] })
     expect(parseStrengthTokens('0.25g')).toEqual({ pct: [], mg: [250] })
     expect(parseStrengthTokens('')).toEqual({ pct: [], mg: [] })
+  })
+})
+
+describe('matchDrugMaster · 多规格合并/多批准文号条目不得唯一确认（2026-11-19 止血）', () => {
+  /** 现场截图那条真实脏数据：一行合并 80mg/240mg，主批号只是 80mg 的。 */
+  const ALISHATAN_MERGED: DrugMasterCandidate = {
+    id: 'drug-alishatanzhi-pian-80mg',
+    genericName: '阿利沙坦酯片',
+    brandName: '信立坦',
+    specification: '80mg，240mg',
+    form: '片',
+    manufacturer: '深圳信立泰药业股份有限公司',
+    approvalNumber: '国药准字H20138001',
+    approvalNumbers: ['国药准字H20138001', '国药准字H20138002'],
+  }
+  /** 单规格但多批号（分包装/进口+境内）：同样不能唯一确认（批号无法对应包装）。 */
+  const EZETIMIBE_MULTI_APPROVAL: DrugMasterCandidate = {
+    id: 'drug-yizhemaibu-pian-10mg-j20160181',
+    genericName: '依折麦布片',
+    specification: '10mg',
+    form: '片',
+    approvalNumber: 'J20160181',
+    approvalNumbers: ['J20160181', 'J20171017'],
+  }
+
+  it('合并规格行：240mg 盒子不再被"唯一匹配"成库里的合并行（降级为候选，带多规格说明）', () => {
+    const r = matchDrugMaster(
+      { genericName: '阿利沙坦酯片', specification: '240mg×7片', form: '片' },
+      [ALISHATAN_MERGED],
+    )
+    expect(r.status).toBe('ambiguous')
+    expect(r.match).toBeUndefined()
+    expect(r.candidates?.map((c) => c.id)).toEqual(['drug-alishatanzhi-pian-80mg'])
+    expect(String(r.note)).toContain('多规格合并')
+    expect(String(r.note)).toContain('批准文号')
+  })
+
+  it('单规格 + 多批准文号：同样不判 unique（候选交用户选择）', () => {
+    const r = matchDrugMaster({ genericName: '依折麦布片', specification: '10mg', form: '片' }, [EZETIMIBE_MULTI_APPROVAL])
+    expect(r.status).toBe('ambiguous')
+    expect(r.candidates?.map((c) => c.id)).toEqual(['drug-yizhemaibu-pian-10mg-j20160181'])
+  })
+
+  it('单规格单批号条目不受影响：仍按三项严格匹配 unique', () => {
+    const r = matchDrugMaster({ genericName: '阿托伐他汀钙片', specification: '20mg', form: '片剂' }, [ATORVA])
+    expect(r.status).toBe('unique')
+    expect(r.match?.id).toBe('drug-atorvastatin-20')
+  })
+
+  it('hasMultiStrengthSpec 判定口径：命中"合并规格"样本，放过"单规格复合配方/浓度+装量"', () => {
+    // 真·多规格（来自全库真实数据样本）
+    for (const spec of [
+      '80mg，240mg', // 阿利沙坦酯片
+      '0.2mg，0.3mg', // 伏格列波糖片
+      '75mg，0.15g', // 厄贝沙坦片（g↔mg 换算后同类）
+      '1mg、2mg', // 利培酮片
+      '80mg/240mg', // 斜杠并列
+      '1）50mg 2）200mg', // 伏立康唑片（枚举式）
+      '①每支装2ml②每支装5ml③每支装10ml', // 参麦注射液（枚举式）
+    ]) {
+      expect(hasMultiStrengthSpec(spec), spec).toBe(true)
+    }
+    // 单规格复合配方 / 浓度+装量 / 包装规格：不得误判
+    for (const spec of [
+      '0.1%（10mL:10mg）', // 玻璃酸钠滴眼液
+      '10万IU(200μg)/20g/支', // 人表皮生长因子凝胶
+      '每片含盐酸二甲双胍500mg与恩格列净5mg', // 复方单规格
+      '100ml：丁苯酞25mg与氯化钠0.9g', // 复方单规格
+      '667mg/ml（5ml：3.3g；15ml：10g）', // 乳果糖口服溶液（多种装量）
+      '5mg×20片', // 单规格 + 包装数量
+      '0.5g',
+      '',
+    ]) {
+      expect(hasMultiStrengthSpec(spec), spec).toBe(false)
+    }
   })
 })

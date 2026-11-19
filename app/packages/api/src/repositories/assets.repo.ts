@@ -20,6 +20,8 @@ export interface DrugMasterCandidateRow {
   form: string
   manufacturer: string | null
   approvalNumber: string | null
+  /** 全部批准文号（主批号 + 分包装/多规格）；>1 的条目不能据此唯一确认身份。 */
+  approvalNumbers: string[] | null
 }
 
 /** 全量 drug_master 候选（MVP 精选库规模小；正式版可按名预筛）。供身份线三项严格匹配。 */
@@ -33,6 +35,7 @@ export function listDrugMasterCandidates(): Promise<DrugMasterCandidateRow[]> {
       form: drugMaster.form,
       manufacturer: drugMaster.manufacturer,
       approvalNumber: drugMaster.approvalNumber,
+      approvalNumbers: drugMaster.approvalNumbers,
     })
     .from(drugMaster)
 }

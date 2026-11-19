@@ -12,6 +12,7 @@ import type { IdentityFields } from '../../lib/ai/types.js'
 import {
   approvalKey,
   formMatches,
+  hasMultiStrengthSpec,
   hasStrength,
   nameMatches,
   parseStrengthTokens,
@@ -27,6 +28,8 @@ export interface DrugMasterCandidate {
   form: string
   manufacturer?: string | null
   approvalNumber?: string | null
+  /** 该条目登记的全部批准文号（主批号 + 分包装/多规格）；>1 即不能据此唯一确认身份。 */
+  approvalNumbers?: string[] | null
 }
 
 export type MatchStatus = 'unique' | 'ambiguous' | 'conflict' | 'no_match'
@@ -49,7 +52,27 @@ export interface MatchResult {
   conflict?: MatchConflict
   /** 批准文号平局裁决说明（unique 且经裁决时）。 */
   resolutionNote?: string
+  /** ambiguous 的补充说明（如"库条目为多规格合并，无法唯一确认"）；透传到确认页冲突清单 note。 */
+  note?: string
 }
+
+/**
+ * 库条目是否「多规格合并 / 多批准文号」——这类条目**禁止判 unique**（2026-11-19 身份展示止血）。
+ *
+ * 起因（现场截图）：一条 PDF 抽取的库记录把 80mg/240mg 合并成一行、只保留"主批号"H20138001，
+ * 结果 240mg 的盒子被展示成 80mg 的批准文号。根因是"一行 = 一个规格"的前提被违反。
+ * 因此：多批准文号（分包装/多规格）或多强度规格文本的条目，只能作为候选让用户按实物选择。
+ */
+export function isMultiSpecEntry(
+  candidate: Pick<DrugMasterCandidate, 'specification' | 'approvalNumbers'>,
+): boolean {
+  return (candidate.approvalNumbers?.length ?? 0) > 1 || hasMultiStrengthSpec(candidate.specification)
+}
+
+/** 多规格合并条目的候选说明（确认页冲突清单 note，用户可见）。 */
+export const MULTI_SPEC_MATCH_NOTE =
+  '库中命中的条目是「多规格合并 / 多批准文号」记录（规格写成类似「80mg，240mg」），无法按规格唯一确认。' +
+  '请对照实物包装选择，或在下方填写包装上的批准文号辅助定位（选填·不做官方校验），也可改用手动建档。'
 
 /** 去重拼接候选的某字段（用于冲突详情展示）。 */
 function joinUnique(list: DrugMasterCandidate[], pick: (d: DrugMasterCandidate) => string): string {
@@ -94,15 +117,18 @@ export function matchDrugMaster(
     strengthOverlap(parseStrengthTokens(d.specification), identityTokens),
   )
 
-  if (specMatches.length === 1) {
-    return { status: 'unique', match: specMatches[0] }
+  // ③b 多规格合并/多批准文号条目不得唯一确认（P1 匹配止血）：先剔除，干净候选才可 unique。
+  const cleanMatches = specMatches.filter((d) => !isMultiSpecEntry(d))
+
+  if (cleanMatches.length === 1) {
+    return { status: 'unique', match: cleanMatches[0] }
   }
 
-  if (specMatches.length > 1) {
+  if (cleanMatches.length > 1) {
     // 多候选 → 批准文号平局裁判（有则一锤定音，无/仍多条则不阻塞进冲突清单）
     if (identity.approvalNumber) {
       const wanted = approvalKey(identity.approvalNumber)
-      const byApproval = specMatches.filter((d) => approvalKey(d.approvalNumber ?? '') === wanted)
+      const byApproval = cleanMatches.filter((d) => approvalKey(d.approvalNumber ?? '') === wanted)
       if (byApproval.length === 1) {
         return {
           status: 'unique',
@@ -111,7 +137,12 @@ export function matchDrugMaster(
         }
       }
     }
-    return { status: 'ambiguous', candidates: specMatches }
+    return { status: 'ambiguous', candidates: cleanMatches }
+  }
+
+  // 命中的全部是「多规格合并/多批准文号」条目 → 不判唯一，交用户按实物规格选择
+  if (specMatches.length > 0) {
+    return { status: 'ambiguous', candidates: specMatches, note: MULTI_SPEC_MATCH_NOTE }
   }
 
   // specMatches 为空：药名+剂型命中但规格未确证

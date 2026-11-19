@@ -313,3 +313,55 @@ describe('原文对照与入口B', () => {
     expect(screen.queryByRole('button', { name: /确认建档/ })).toBeNull()
   })
 })
+
+describe('批准文号口径（2026-11-19 现场反馈：批号不是身份核对字段）', () => {
+  /** 多规格合并库条目：80mg/240mg 合一行、两个批准文号（现场真实脏数据形态）。 */
+  const MERGED_CANDIDATE = {
+    id: 'dm-alishatan-merged',
+    genericName: '阿利沙坦酯片',
+    brandName: '信立坦',
+    specification: '80mg，240mg',
+    form: '片',
+    manufacturer: '深圳信立泰药业股份有限公司',
+    approvalNumber: '国药准字H20138001',
+    approvalNumbers: ['国药准字H20138001', '国药准字H20138002'],
+    multiSpec: true,
+  }
+  const MERGED_CONFLICT: DraftPayload = {
+    ...rxConflictPayload,
+    match: { status: 'ambiguous', candidates: [MERGED_CANDIDATE], note: '库条目为多规格合并，请按实物规格选择' },
+    conflicts: [
+      {
+        type: 'multi',
+        note: '库条目为多规格合并，请按实物规格选择',
+        candidates: [MERGED_CANDIDATE],
+      },
+    ],
+    drugDraft: { ...rxConflictPayload.drugDraft, drugMasterId: null },
+  }
+
+  it('唯一匹配身份块不再展示批准文号（含「—」占位也不出现）', async () => {
+    renderDraft(rxUniquePayload)
+    expect(await screen.findByText('药品库唯一匹配 · 仍需你核对实物后确认')).toBeTruthy()
+    expect(screen.queryByText('批准文号')).toBeNull()
+  })
+
+  it('识别抄录值里照片没读到批号 → 不显示占位行（读到才显示「照片抄录」）', async () => {
+    renderDraft(rxUniquePayload)
+    await screen.findByText('识别抄录值（供对照）')
+    expect(screen.queryByText('批准文号（照片抄录）')).toBeNull()
+  })
+
+  it('多规格合并候选：出现「批准文号（选填）」；填对号命中候选、填错给可见提示', async () => {
+    renderDraft(MERGED_CONFLICT)
+    const input = (await screen.findByLabelText('批准文号（选填）')) as HTMLInputElement
+    expect(await screen.findByText(/多规格库条目 · 规格以实物为准/)).toBeTruthy()
+
+    fireEvent.change(input, { target: { value: '国药准字H20138002' } })
+    expect(await screen.findByText(/批号命中（用户填写·未校验）/)).toBeTruthy()
+
+    fireEvent.change(input, { target: { value: '国药准字H99999999' } })
+    expect(await screen.findByText(/填写的批号在候选中没有命中/)).toBeTruthy()
+    expect(screen.queryByText(/批号命中（用户填写·未校验）/)).toBeNull()
+  })
+})

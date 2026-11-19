@@ -74,3 +74,59 @@ export function formMatches(identityForm: string | undefined, drugForm: string):
   const b = normalizeToken(drugForm)
   return Boolean(a && b && (b.includes(a) || a.includes(b)))
 }
+
+// ── 多规格合并判定（2026-11-19 身份展示止血）────────────────────────────────
+
+/** 规格强度的度量类：只有同类数值才可能是"并列的多个规格"。 */
+function strengthClass(unit: string): 'mass' | 'volume' | 'pct' | 'potency' | 'other' {
+  const u = unit.toLowerCase()
+  if (u === '%') return 'pct'
+  if (['mg', '毫克', 'g', '克', 'μg', 'ug'].includes(u)) return 'mass'
+  if (['ml', '毫升'].includes(u)) return 'volume'
+  if (u === 'iu' || u.includes('国际单位')) return 'potency'
+  return 'other'
+}
+
+/** 单个"纯强度"片段：`80mg` / `0.15g` / `2ml` / `0.1%`（前后可有枚举序号）。 */
+const PURE_STRENGTH_RE = /^[①②③④⑤⑥⑦⑧⑨⑩]?(\d+(?:\.\d+)?)(mg|毫克|g|克|μg|ug|ml|毫升|%|万国际单位|国际单位|iu)$/i
+
+/** 规格文本里出现的任一强度 token（仅用于"枚举式多规格"计数）。 */
+const ANY_STRENGTH_RE = /(\d+(?:\.\d+)?)(mg|毫克|g|克|μg|ug|ml|毫升|%|万国际单位|国际单位|iu)/gi
+
+/**
+ * 判断一条库条目的规格文本是否为**多个规格被合并成一行**（PDF 抽取常见）。
+ *
+ * 背景（2026-11-19）：全库 1588 行 drug_master 均为 crawled（未人工核对），其中一批是
+ * 「一行 = 多个规格」的合并条目（如 `80mg，240mg`，其批准文号其实是两个：80mg=H…001、
+ * 240mg=H…002）。这类条目按 token 重叠会误判成"唯一匹配"，并把某一规格的批准文号配给另一个规格。
+ * 因此身份线必须先识别它们，禁止判 unique（降级为让用户按实物规格选择/手动建档）。
+ *
+ * 判定口径（保守、宁可漏判不可误判为多规格）：
+ *   ① 逗号/顿号/分号并列的「纯强度」片段 ≥2 且存在同类（如 `80mg，240mg`、`75mg，0.15g`、`1mg、2mg`）；
+ *   ② 斜杠并列且两侧同类（如 `80mg/240mg`）——`10万IU/20g/支` 这类单规格配比两侧不同类，不判；
+ *   ③ 枚举标记 ≥2 且强度 ≥2（如 `1）50mg 2）200mg`、`①2ml②5ml`）。
+ * 括号内容先整体剔除（多为单规格的组成/装量说明，如 `0.1%（10mL:10mg）`）。
+ */
+export function hasMultiStrengthSpec(specification: string | null | undefined): boolean {
+  if (!specification) return false
+  const withoutParens = toHalfWidth(String(specification)).replace(/[（(][^）)]*[）)]/g, '')
+  const s = withoutParens.replace(/[\s×*]/g, '')
+  if (!s) return false
+
+  // ① 纯强度片段并列（同度量类才可能是"多个规格"）
+  const pureClasses = s
+    .split(/[，,、；;]/)
+    .map((seg) => PURE_STRENGTH_RE.exec(seg))
+    .filter((m): m is RegExpExecArray => Boolean(m))
+    .map((m) => strengthClass(m[2]))
+  if (pureClasses.length >= 2 && new Set(pureClasses).size < pureClasses.length) return true
+
+  // ② 斜杠并列的同类强度对（80mg/240mg）
+  const slash = /^(\d+(?:\.\d+)?)(mg|毫克|g|克|μg|ug|ml|毫升|%)\/(\d+(?:\.\d+)?)(mg|毫克|g|克|μg|ug|ml|毫升|%)$/i.exec(s)
+  if (slash && strengthClass(slash[2]) === strengthClass(slash[4])) return true
+
+  // ③ 枚举式多规格（1）50mg 2）200mg ／ ①2ml②5ml③10ml）
+  const markerCount = (s.match(/[①②③④⑤⑥⑦⑧⑨⑩]|[（(]?[1-9][）)]/g) ?? []).length
+  const strengthCount = (s.match(ANY_STRENGTH_RE) ?? []).length
+  return markerCount >= 2 && strengthCount >= 2
+}

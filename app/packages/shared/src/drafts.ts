@@ -70,7 +70,18 @@ export const DrugCandidateSchema = z.object({
   specification: z.string(),
   form: z.string(),
   manufacturer: z.string().nullish(),
+  /** 主批准文号（仅内部平局裁判用；确认页不作为身份核对字段展示）。 */
   approvalNumber: z.string().nullish(),
+  /**
+   * 该库条目登记的全部批准文号（主批号 + 分包装/多规格）。
+   * 只用于确认页「选填批号 → 候选命中」的辅助定位，**不作为官方校验依据、不落库**。
+   */
+  approvalNumbers: z.array(z.string()).nullish(),
+  /**
+   * 库条目为「多规格合并 / 多批准文号」条目（如一行规格写成「80mg，240mg」）：
+   * 不能据此唯一确认身份，确认页须由用户按实物规格选择；选定后规格以识别抄录值为准。
+   */
+  multiSpec: z.boolean().nullish(),
 })
 export type DrugCandidate = z.infer<typeof DrugCandidateSchema>
 

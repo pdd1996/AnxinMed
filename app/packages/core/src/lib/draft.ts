@@ -32,6 +32,11 @@ export interface ConfirmFormState {
   /** 用户在冲突清单里改走「手动建档」。 */
   useManual: boolean
   manual: ManualDrugForm
+  /**
+   * 批准文号（选填，2026-11-19 现场反馈后加）：只在包装上印了时由用户对照填写，
+   * 用于在冲突候选中「命中定位」——不做官方校验、不落库、不参与 confirmStatus 判定。
+   */
+  approvalInput: string
   // ── 医嘱线 ──
   doseValue: string
   doseUnit: string
@@ -124,6 +129,35 @@ export function selectedCandidate(p: DraftPayload, s: ConfirmFormState): Candida
   return selectableCandidates(p).find((c) => c.id === s.selectedCandidateId) ?? null
 }
 
+/**
+ * 批准文号归一（只服务于"用户选填 → 候选命中"）：全角转半角、去空白/连字符、转大写，
+ * 并剥掉「国药准字」前缀（用户可能只填 H20138002 这类编号）。
+ */
+function approvalLooseKey(value: string): string {
+  return value
+    .replace(/[\uFF01-\uFF5E]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/[\s\-—－·]/g, '')
+    .toUpperCase()
+    .replace(/^国药准字/, '')
+}
+
+/**
+ * 用户填写的批准文号是否命中某候选（**仅辅助定位**，不做官方校验、不落库）。
+ *
+ * 背景（2026-11-19）：库里有「多规格合并 / 多批准文号」条目，不能唯一确认身份；
+ * 现场允许用户对照包装把批准文号（选填）填进来，帮他在候选里找对应记录。命中只高亮/提示，
+ * 仍由用户点选确认——系统不替用户做选边（PRD §8.2）。
+ */
+export function approvalMatchesCandidate(candidate: Candidate, input: string): boolean {
+  const needle = approvalLooseKey(input)
+  // 过短的输入容易误命中，不作为命中依据（H 后 8 位编号长度远大于此）
+  if (needle.length < 6) return false
+  const keys = [candidate.approvalNumber, ...(candidate.approvalNumbers ?? [])]
+    .filter((k): k is string => Boolean(k && k.trim()))
+    .map(approvalLooseKey)
+  return keys.some((key) => key === needle || key.endsWith(needle))
+}
+
 /** 人工补用量时的默认单位（按剂型归一，属「默认」标注，用户可改）；无线索回落「片」。 */
 export function defaultDoseUnit(p: DraftPayload): string {
   const text = `${p.drugDraft.form ?? ''}${p.identity?.form ?? ''}${p.drugDraft.genericName ?? ''}`
@@ -155,6 +189,7 @@ export function initialConfirmState(p: DraftPayload): ConfirmFormState {
   return {
     selectedCandidateId: '',
     useManual: false,
+    approvalInput: '',
     manual,
     doseValue: plan?.dose && !sigNeedsManual(p, 'dose') ? String(plan.dose.value) : '',
     doseUnit: unit,
@@ -297,7 +332,11 @@ export function buildConfirm(p: DraftPayload, s: ConfirmFormState): DraftConfirm
     : {
         genericName: chosen?.genericName ?? p.drugDraft.genericName ?? '',
         brandName: chosen?.brandName ?? p.drugDraft.brandName ?? null,
-        specification: chosen?.specification ?? p.drugDraft.specification ?? null,
+        // 多规格合并库条目（如一行写成「80mg，240mg」）：选定的只是"哪条库记录"，
+        // 实物规格以识别抄录值为准，否则会把合并规格原样写进用户药箱。
+        specification: chosen?.multiSpec
+          ? (p.identity?.specification || chosen?.specification || p.drugDraft.specification || null)
+          : (chosen?.specification ?? p.drugDraft.specification ?? null),
         form: chosen?.form ?? p.drugDraft.form ?? null,
         manufacturer: chosen?.manufacturer ?? p.drugDraft.manufacturer ?? null,
         drugMasterId: chosen?.id ?? p.drugDraft.drugMasterId ?? null,
