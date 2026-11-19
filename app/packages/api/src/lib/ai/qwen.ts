@@ -12,7 +12,9 @@ const DETECT_PROMPT =
   '["处方层","医院标签层","药盒原装层","说明书层","不支持"]。不要输出其它内容。'
 
 const IDENTITY_PROMPT =
-  '你是药品身份提取器。从图像提取药品身份字段，只输出一个 JSON 对象：' +
+  '你是药品身份提取器。从图像提取药品身份字段，所有字段必须来自图像中**可见文字**；' +
+  '图像里看不到的字段一律省略，禁止凭记忆、常识或训练知识补全（尤其批准文号/厂家/规格），不输出 null。' +
+  '只输出一个 JSON 对象：' +
   '{"genericName":string 必填,"brandName"?:string,"specification"?:string,"form"?:string,' +
   '"manufacturer"?:string,"otcFlag"?:boolean,"approvalNumber"?:string}。' +
   '禁止输出任何用法用量/剂量/频次字段。不要输出其它内容。'
@@ -31,6 +33,8 @@ const DETECT_IDENTITY_PROMPT =
   '["处方层","医院标签层","药盒原装层","说明书层","不支持"]。' +
   '注意：「不支持」指散装药片、裸药片、无包装信息的物体；处方笺是「处方层」。' +
   '若 layers 含「药盒原装层」或「医院标签层」，再提取药品身份字段放进 identity，否则 identity 为 null。' +
+  'identity 所有字段必须来自图像中**可见文字**；图像里看不到的字段一律省略，' +
+  '禁止凭记忆、常识或训练知识补全（尤其批准文号/厂家/规格），不输出 null。' +
   '只输出一个 JSON 对象：{"layers":[...],"identity":{"genericName":string 必填,"brandName"?:string,' +
   '"specification"?:string,"form"?:string,"manufacturer"?:string,"otcFlag"?:boolean,' +
   '"approvalNumber"?:string} 或 null}。禁止输出任何用法用量/剂量/频次字段。不要输出其它内容。'

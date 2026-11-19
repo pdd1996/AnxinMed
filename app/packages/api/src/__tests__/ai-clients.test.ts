@@ -57,9 +57,10 @@ describe('请求体组装（纯函数，只含约定字段）', () => {
     expect(content.some((c) => c.type === 'image_url' && c.image_url!.url.startsWith('data:image/png;base64,'))).toBe(true)
   })
 
-  it('qwen 身份提取请求体不含用法用量字样于图像之外（结构无剂量字段）', () => {
+  it('qwen 身份提取请求体：结构无剂量字段，且 prompt 禁止凭记忆补全不可见字段（防批准文号幻觉）', () => {
     const body = buildExtractIdentityRequest(IMG)
     expect(Object.keys(body).sort()).toEqual(['messages', 'model', 'temperature'])
+    expect(JSON.stringify(body)).toContain('禁止凭记忆')
   })
 
   it('入口B 合并请求体同样只含 model/temperature/messages，prompt 写明层枚举、条件身份与禁用法用量', () => {
@@ -67,6 +68,7 @@ describe('请求体组装（纯函数，只含约定字段）', () => {
     expect(Object.keys(body).sort()).toEqual(['messages', 'model', 'temperature'])
     const text = JSON.stringify(body)
     expect(text).toContain('再提取药品身份字段放进 identity')
+    expect(text).toContain('禁止凭记忆')
     expect(text).toContain('禁止输出任何用法用量')
     expect(text).toContain('data:image/png;base64,')
   })
