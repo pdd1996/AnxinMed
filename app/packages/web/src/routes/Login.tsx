@@ -258,7 +258,6 @@ export default function Login() {
                   inputMode="numeric"
                   autoComplete="tel"
                   maxLength={11}
-                  placeholder="请输入 11 位手机号"
                   className="min-h-12 text-lg"
                   value={resetPhone}
                   onChange={(e) => setResetPhone(e.target.value.replace(/\D/g, ''))}
@@ -277,7 +276,6 @@ export default function Login() {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     maxLength={8}
-                    placeholder="请输入验证码"
                     className="min-h-12 min-w-0 flex-1 text-lg"
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
@@ -418,7 +416,6 @@ export default function Login() {
                   inputMode="numeric"
                   autoComplete="tel"
                   maxLength={11}
-                  placeholder="请输入 11 位手机号"
                   className="min-h-12 text-lg"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
@@ -437,7 +434,6 @@ export default function Login() {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     maxLength={8}
-                    placeholder="请输入验证码"
                     className="min-h-12 min-w-0 flex-1 text-lg"
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
