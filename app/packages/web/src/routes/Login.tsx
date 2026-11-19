@@ -209,7 +209,8 @@ export default function Login() {
       aria-selected={tab === key}
       onClick={() => switchTab(key)}
       className={cn(
-        'min-h-11 rounded-md px-3 text-base font-medium transition-colors',
+        // whitespace-nowrap：窄屏（440px）下两项 tab 必须单行，换行会撑破登录卡。
+        'min-h-11 whitespace-nowrap rounded-md px-3 text-base font-medium transition-colors',
         tab === key
           ? 'bg-background text-foreground shadow-sm'
           : 'text-muted-foreground hover:text-foreground',
@@ -220,7 +221,7 @@ export default function Login() {
   )
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">登录安心用药</CardTitle>
@@ -277,7 +278,7 @@ export default function Login() {
                     autoComplete="one-time-code"
                     maxLength={8}
                     placeholder="请输入验证码"
-                    className="min-h-12 flex-1 text-lg"
+                    className="min-h-12 min-w-0 flex-1 text-lg"
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
                     disabled={resetPending}
@@ -437,7 +438,7 @@ export default function Login() {
                     autoComplete="one-time-code"
                     maxLength={8}
                     placeholder="请输入验证码"
-                    className="min-h-12 flex-1 text-lg"
+                    className="min-h-12 min-w-0 flex-1 text-lg"
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                     disabled={phonePending}
@@ -445,7 +446,7 @@ export default function Login() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-12 shrink-0 px-4 text-base"
+                    className="min-h-12 whitespace-nowrap px-4 text-base"
                     onClick={() => void handleSendCode()}
                     disabled={sending || cooldown > 0 || phonePending}
                   >
@@ -473,13 +474,18 @@ export default function Login() {
         </CardContent>
       </Card>
 
-      {/* specs/25：医生端专用登录入口（同一账号体系，入口与心智分开）。 */}
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        医生用户请走
-        <Link to="/doctor/login" className="font-semibold text-primary underline underline-offset-4">
-          医生端登录
+      {/* specs/25：医生端专用登录入口（同一账号体系，入口与心智分开）。
+          注意必须放在卡片下方、且父容器是 flex-col：此前作为 flex 行兄弟节点会把卡片挤窄
+          （窄屏下 tab 换行、验证码输入框被截断）。 */}
+      <div className="mt-4 w-full max-w-md rounded-xl border border-border bg-card/70 px-4 py-3 text-center text-sm text-muted-foreground">
+        医生用户？
+        <Link
+          to="/doctor/login"
+          className="ml-1 font-semibold text-primary underline-offset-4 hover:underline"
+        >
+          去医生端登录
         </Link>
-      </p>
+      </div>
     </div>
   )
 }
