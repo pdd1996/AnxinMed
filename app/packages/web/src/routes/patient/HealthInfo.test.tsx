@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ageFromBirthMonth } from '@anxin/shared'
 import HealthInfo from './HealthInfo'
 
 const mocks = vi.hoisted(() => {
@@ -77,7 +78,7 @@ describe('健康信息页 · 字段常驻', () => {
 })
 
 describe('健康信息页 · 补充与编辑弹窗', () => {
-  it('点待补充行 → 补充弹窗 → 填值保存 → PATCH 收到 upserts', async () => {
+  it('点待补充行 → 补充弹窗 → 填值保存 → PATCH 收到出生年月 + 联动算出的年龄', async () => {
     renderHealthInfo()
     await screen.findByText('青霉素')
     fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
@@ -86,9 +87,17 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     fireEvent.change(input, { target: { value: '1958-06' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
+    // 当前日期决定周岁；用 shared 纯函数算期望值，跨年跑测试也不写死数字。
+    const age = ageFromBirthMonth('1958-06')
+    expect(age).not.toBeNull()
     await waitFor(() =>
       expect(mocks.patchProfile).toHaveBeenCalledWith({
-        json: { upserts: [{ fieldKey: '出生年月', value: '1958-06' }] },
+        json: {
+          upserts: [
+            { fieldKey: '出生年月', value: '1958-06' },
+            { fieldKey: '年龄', value: String(age) },
+          ],
+        },
       }),
     )
   })
@@ -120,5 +129,68 @@ describe('健康信息页 · 补充与编辑弹窗', () => {
     expect(mocks.patchProfile).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
     await waitFor(() => expect(mocks.patchProfile).toHaveBeenCalledWith({ json: { deletes: ['过敏史'] } }))
+  })
+})
+
+/**
+ * 「年龄」与「出生年月」联动（2026-11-19 用户反馈：两栏各填各的）。
+ * 口径：有出生年月时年龄是派生只读值；手动改年龄请改出生年月；未填出生年月时年龄仍可手填。
+ */
+describe('健康信息页 · 年龄与出生年月联动', () => {
+  const BIRTH_ITEMS = [
+    { id: 'b1', fieldKey: '出生年月', value: '1958-06', sourceMeta: { source: 'self_reported', confirmedAt: '2026-11-01T00:00:00.000Z' } },
+    // 旧的手填年龄故意留个不一致的值：联动后应以出生年月算出的为准。
+    { id: 'b2', fieldKey: '年龄', value: '70', sourceMeta: { source: 'self_reported', confirmedAt: '2026-11-01T00:00:00.000Z' } },
+  ]
+
+  it('有出生年月：年龄行只读展示自动计算值，旧手填值不再显示', async () => {
+    mocks.fetchProfile.mockResolvedValue({ items: BIRTH_ITEMS })
+    renderHealthInfo()
+    const age = ageFromBirthMonth('1958-06')
+    expect(age).not.toBeNull()
+    expect(await screen.findByText('按出生年月自动计算')).toBeTruthy()
+    expect(screen.getByText(String(age))).toBeTruthy()
+    expect(screen.queryByText('70')).toBeNull()
+  })
+
+  it('点年龄行：说明由出生年月算出，并直达出生年月编辑', async () => {
+    mocks.fetchProfile.mockResolvedValue({ items: BIRTH_ITEMS })
+    renderHealthInfo()
+    // 等数据回来再点：加载中行是「待补充」，点开会进补录而不是派生说明。
+    await screen.findByText('按出生年月自动计算')
+    const age = ageFromBirthMonth('1958-06')
+    fireEvent.click(screen.getByRole('button', { name: /年龄/ }))
+    expect(await screen.findByText(new RegExp(`自动算出 ${age} 岁`))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '修改出生年月' }))
+    expect(await screen.findByText('编辑「出生年月」')).toBeTruthy()
+  })
+
+  it('未填出生年月：年龄仍可手填（只知年龄的老人有退路）', async () => {
+    renderHealthInfo() // 默认 ITEMS 没有出生年月
+    await screen.findByText('青霉素')
+    fireEvent.click(screen.getByRole('button', { name: /年龄/ }))
+    expect(await screen.findByText('编辑「年龄」')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('年龄（内容）'), { target: { value: '70' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(mocks.patchProfile).toHaveBeenCalledWith({ json: { upserts: [{ fieldKey: '年龄', value: '70' }] } }),
+    )
+  })
+
+  it('未来出生年月：提示且保存按钮禁用（算不出年龄，也不该写库）', async () => {
+    renderHealthInfo()
+    await screen.findByText('青霉素')
+    fireEvent.click(screen.getByRole('button', { name: /出生年月/ }))
+    fireEvent.change(screen.getByLabelText('出生年月（内容）'), { target: { value: '2999-01' } })
+    expect(await screen.findByText(/不能晚于当前月份/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: '保存' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('补充进度：只有出生年月时，派生的年龄也算已补充', async () => {
+    mocks.fetchProfile.mockResolvedValue({
+      items: [{ id: 'x1', fieldKey: '出生年月', value: '1958-06', sourceMeta: null }],
+    })
+    renderHealthInfo()
+    expect(await screen.findByText('2 / 7 项')).toBeTruthy()
   })
 })

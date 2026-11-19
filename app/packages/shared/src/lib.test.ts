@@ -13,6 +13,7 @@ import {
   isIsoDate,
   daysUntilExpiry,
   expiryState,
+  ageFromBirthMonth,
   EXPIRY_WARNING_DAYS,
   gradeAdherence,
   ADHERENCE_GRADE_THRESHOLDS,
@@ -196,5 +197,41 @@ describe('效期状态 · 30 天临期口径（患者端提醒 / 咨询 S2 / 医
     expect(expiryState(today)).toBe('expiring')
     expect(expiryState(addDaysStr(today, -1))).toBe('expired')
     expect(expiryState(addDaysStr(today, 31))).toBe('ok')
+  })
+})
+
+describe('ageFromBirthMonth · 出生年月 → 周岁（年龄联动）', () => {
+  /** 固定「今天」= 2026-11-19，跨年/跨月边界可复现。 */
+  const today = new Date(2026, 10, 19)
+
+  it('出生月份已过 / 就是本月 → 年龄 = 年差（1958-06 → 68，同月 1958-11 → 68）', () => {
+    expect(ageFromBirthMonth('1958-06', today)).toBe(68)
+    expect(ageFromBirthMonth('1958-11', today)).toBe(68)
+  })
+
+  it('出生月份还没到 → 今年生日未到，年龄 = 年差 − 1（1958-12 → 67）', () => {
+    expect(ageFromBirthMonth('1958-12', today)).toBe(67)
+    expect(ageFromBirthMonth('1958-01', today)).toBe(68)
+  })
+
+  it('跨年边界：1 月看去年 12 月出生 = 0 岁；去年 1 月出生 = 1 岁', () => {
+    const janFirst = new Date(2027, 0, 1)
+    expect(ageFromBirthMonth('2026-12', janFirst)).toBe(0)
+    expect(ageFromBirthMonth('2026-01', janFirst)).toBe(1)
+  })
+
+  it('未来年月 / 非法形态 → null（调用方不得当作 0 岁或任何默认值）', () => {
+    expect(ageFromBirthMonth('2026-12', today)).toBeNull() // 今年 12 月：尚未发生
+    expect(ageFromBirthMonth('2999-01', today)).toBeNull()
+    expect(ageFromBirthMonth('1958-13', today)).toBeNull()
+    expect(ageFromBirthMonth('1958', today)).toBeNull()
+    expect(ageFromBirthMonth('1958-6-1', today)).toBeNull()
+    expect(ageFromBirthMonth('', today)).toBeNull()
+  })
+
+  it('月份不补零也接受（老数据可能存 1958-6）；超高龄（>150）拒绝', () => {
+    expect(ageFromBirthMonth('1958-6', today)).toBe(68)
+    expect(ageFromBirthMonth('1900-01', today)).toBe(126)
+    expect(ageFromBirthMonth('1800-01', today)).toBeNull()
   })
 })

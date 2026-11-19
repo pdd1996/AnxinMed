@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUnstableNativeVariable } from "nativewind";
 import { Check, ChevronRight, Trash2, UserRound } from "lucide-react-native";
 import { client, fetchProfile, unwrap } from "@anxin/core";
-import { HEALTH_FIELDS, type HealthField } from "@anxin/shared";
+import { HEALTH_FIELDS, ageFromBirthMonth, type HealthField } from "@anxin/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -40,6 +40,9 @@ const pad2 = (value: string) => value.padStart(2, "0");
  * 删除走弹窗内二次确认（行上一键即删已移除，防误触）。
  * 写入一律 `PATCH /api/profile`，来源标注由服务端定（手动保存 = self_reported，见 profiles.service:32）。
  *
+ * 「年龄」与「出生年月」联动（2026-11-19，照 web）：填了出生年月即按周岁自动算年龄，年龄行改只读展示
+ * 「按出生年月自动计算」，避免同一件事填两遍；未填出生年月时才允许手填年龄（只知年龄的老人）。
+ *
  * `showHeader=false` 用于「健康信息」一级页：页头已给出标题与说明，卡内不再重复标题行。
  *
  * 两处平台适配（语义不变，见 T5-真机验收.md §2.9 差异清单）：
@@ -68,6 +71,10 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
     return map;
   }, [entries]);
 
+  // 出生年月 → 周岁联动：有出生年月时，年龄由它算出来（改出生年月后自动更新，不用重填）。
+  const birthEntry = byField.get("出生年月") ?? null;
+  const derivedAge = ageFromBirthMonth(birthEntry?.value ?? "");
+
   const [editing, setEditing] = useState<{ field: HealthField; entry: HealthEntry | null } | null>(
     null,
   );
@@ -75,6 +82,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
   const [birthYear, setBirthYear] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [showingDerivedAge, setShowingDerivedAge] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
   const patch = useMutation({
@@ -91,13 +99,20 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
   });
 
   const isBirth = editing?.field === "出生年月";
-  const birthValid = /^\d{4}$/.test(birthYear) && /^(0?[1-9]|1[0-2])$/.test(birthMonth);
-  const draft = isBirth ? (birthValid ? `${birthYear}-${pad2(birthMonth)}` : "") : value.trim();
+  const birthCandidate =
+    /^\d{4}$/.test(birthYear) && /^(0?[1-9]|1[0-2])$/.test(birthMonth)
+      ? `${birthYear}-${pad2(birthMonth)}`
+      : "";
+  // 形态合法还不够：未来月份算不出周岁，同样判不通过（否则年龄联动失效、且落无意义数据）。
+  const birthAge = birthCandidate ? ageFromBirthMonth(birthCandidate) : null;
+  const birthValid = birthCandidate !== "" && birthAge !== null;
+  const draft = isBirth ? (birthValid ? birthCandidate : "") : value.trim();
 
   function openEditor(field: HealthField, entry: HealthEntry | null) {
     setEditing({ field, entry });
     setFailure(null);
     setConfirmingDelete(false);
+    setShowingDerivedAge(false);
     const current = entry?.value ?? "";
     if (field === "出生年月") {
       const [year = "", month = ""] = current.split("-");
@@ -113,12 +128,18 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
   function closeEditor() {
     setEditing(null);
     setConfirmingDelete(false);
+    setShowingDerivedAge(false);
     setFailure(null);
     setValue("");
   }
   function handleSave() {
     if (!editing || !draft) return;
-    patch.mutate({ upserts: [{ fieldKey: editing.field, value: draft }] }, { onSuccess: closeEditor });
+    const upserts = [{ fieldKey: editing.field, value: draft }];
+    // 保存出生年月时把算出的年龄一并写库：换端/换页读到的年龄与出生年月一致（同为用户自述派生）。
+    if (editing.field === "出生年月" && birthAge !== null) {
+      upserts.push({ fieldKey: "年龄", value: String(birthAge) });
+    }
+    patch.mutate({ upserts }, { onSuccess: closeEditor });
   }
   function handleDelete() {
     if (!editing) return;
@@ -157,13 +178,25 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
         ) : (
           HEALTH_FIELDS.map((field, index) => {
             const entry = byField.get(field) ?? null;
-            const filled = Boolean(entry && entry.value?.trim());
-            const confirmed = entry?.sourceMeta?.source === "prescription_confirmed";
+            const isAge = field === "年龄";
+            // 有出生年月时年龄只读展示派生值（出生年月是唯一真相），没填时才允许手填。
+            const derived = isAge && derivedAge !== null ? derivedAge : null;
+            const displayValue = derived !== null ? String(derived) : entry?.value ?? "";
+            const filled = Boolean(displayValue.trim());
+            const confirmed =
+              derived === null && entry?.sourceMeta?.source === "prescription_confirmed";
             return (
               <Pressable
                 key={field}
                 accessibilityRole="button"
-                onPress={() => openEditor(field, entry)}
+                onPress={() => {
+                  if (derived !== null) {
+                    setEditing(null);
+                    setShowingDerivedAge(true);
+                  } else {
+                    openEditor(field, entry);
+                  }
+                }}
                 className={`min-h-[64px] flex-row items-center gap-3 px-4 py-3 active:opacity-80 ${
                   index === HEALTH_FIELDS.length - 1 ? "" : "border-b border-border"
                 }`}
@@ -175,7 +208,7 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
                       className="text-right text-sm font-medium text-card-foreground"
                       numberOfLines={2}
                     >
-                      {entry?.value ?? ""}
+                      {displayValue}
                     </Text>
                     <Text
                       className={cn(
@@ -183,7 +216,11 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
                         confirmed ? "font-medium text-primary" : "text-muted-foreground",
                       )}
                     >
-                      {confirmed ? "处方笺抄录 · 已确认" : "用户自述"}
+                      {derived !== null
+                        ? "按出生年月自动计算"
+                        : confirmed
+                          ? "处方笺抄录 · 已确认"
+                          : "用户自述"}
                     </Text>
                   </View>
                 ) : (
@@ -196,7 +233,10 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
         )}
       </CardContent>
 
-      <Dialog open={editing !== null} onOpenChange={(next) => !next && closeEditor()}>
+      <Dialog
+        open={editing !== null || showingDerivedAge}
+        onOpenChange={(next) => !next && closeEditor()}
+      >
         <DialogContent className="max-h-[88vh]">
           {editing && confirmingDelete ? (
             <>
@@ -234,11 +274,6 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
                 <DialogTitle>
                   {editing.entry ? "编辑" : "补充"}「{editing.field}」
                 </DialogTitle>
-                <DialogDescription>
-                  <Text className="text-base text-muted-foreground">
-                    保存后将标注为「用户自述」，AI 仅将其视为你提供的、未经医学验证的参考。
-                  </Text>
-                </DialogDescription>
               </DialogHeader>
 
               {editing.field === "性别" ? (
@@ -307,7 +342,11 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
               )}
 
               {isBirth && (birthYear.length > 0 || birthMonth.length > 0) && !birthValid ? (
-                <Text className="text-xs text-risk-l4">填 4 位年份与 1–12 的月份，例如 1958 年 5 月。</Text>
+                <Text className="text-xs text-risk-l4">
+                  {birthCandidate
+                    ? "出生年月不能晚于当前月份，否则算不出年龄。"
+                    : "填 4 位年份与 1–12 的月份，例如 1958 年 5 月。"}
+                </Text>
               ) : null}
               {failure ? <FailureLine message={failure} /> : null}
 
@@ -342,6 +381,28 @@ export function HealthInfoCard({ showHeader = true }: { showHeader?: boolean }) 
                     <Text>{patch.isPending ? "保存中…" : "保存"}</Text>
                   </Button>
                 </View>
+              </DialogFooter>
+            </>
+          ) : showingDerivedAge && derivedAge !== null ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>年龄</DialogTitle>
+                <DialogDescription>
+                  <Text className="text-base text-muted-foreground">
+                    「出生年月 {birthEntry?.value ?? ""}」自动算出 {derivedAge} 岁。改年龄请直接改出生年月，两项会同步。
+                  </Text>
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex-row justify-end gap-2">
+                <Button variant="outline" className="min-h-[48px] px-5" onPress={closeEditor}>
+                  <Text>取消</Text>
+                </Button>
+                <Button
+                  className="min-h-[48px] px-5"
+                  onPress={() => openEditor("出生年月", birthEntry)}
+                >
+                  <Text>修改出生年月</Text>
+                </Button>
               </DialogFooter>
             </>
           ) : null}

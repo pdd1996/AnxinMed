@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchProfile } from '@anxin/core'
-import { HEALTH_FIELDS } from '@anxin/shared'
+import { HEALTH_FIELDS, ageFromBirthMonth } from '@anxin/shared'
 import { HealthInfoCard } from '@/components/domain/profile/HealthInfoCard'
 import { BackLink } from '@/components/layout/BackLink'
 
@@ -12,8 +12,12 @@ import { BackLink } from '@/components/layout/BackLink'
 export default function HealthInfo() {
   const { data } = useQuery({ queryKey: ['profile'], queryFn: fetchProfile })
   const entries = data?.items ?? []
-  const filled = HEALTH_FIELDS.filter((field) =>
-    entries.some((entry) => entry.fieldKey === field && entry.value?.trim()),
+  // 「年龄」与出生年月联动：有出生年月时年龄自动派生，也算已补充（老数据可能只存了出生年月）。
+  const derivedAge = ageFromBirthMonth(entries.find((entry) => entry.fieldKey === '出生年月')?.value ?? '')
+  const filled = HEALTH_FIELDS.filter(
+    (field) =>
+      entries.some((entry) => entry.fieldKey === field && entry.value?.trim()) ||
+      (field === '年龄' && derivedAge !== null),
   ).length
   const total = HEALTH_FIELDS.length
   const pct = Math.round((filled / total) * 100)

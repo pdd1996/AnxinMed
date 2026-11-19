@@ -46,6 +46,34 @@ export function isIsoDate(value: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// 健康信息：出生年月 → 周岁（「年龄」跟着「出生年月」联动，一份真相）
+// ---------------------------------------------------------------------------
+
+/** 出生年月形态："YYYY-MM"（月允许 1–2 位；web 的 month 控件输出补零形态，用户可能手敲不补零）。 */
+const BIRTH_MONTH_PATTERN = /^(\d{4})-(\d{1,2})$/
+
+/**
+ * 由出生年月估算周岁（用户自述字段「年龄」与「出生年月」联动；两栏不再各填各的）。
+ *
+ * 口径：按「出生月份是否已到」判定周岁满没满 —— 出生月 > 当前月 → 今年生日还没到，年龄 = 年差 − 1；
+ * 否则 = 年差（同月按生日已到估算）。出生年月不含「日」，故同月存在 ±1 岁的粒度误差，
+ * 仅供档案展示与兜底，不用于任何剂量/风险判定。
+ *
+ * 非法或未来年月 → null（调用方据此提示，并禁止把未来出生年月写库）。
+ */
+export function ageFromBirthMonth(birthMonth: string, today: Date = new Date()): number | null {
+  const match = BIRTH_MONTH_PATTERN.exec((birthMonth ?? '').trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return null
+  const nowYear = today.getFullYear()
+  const nowMonth = today.getMonth() + 1
+  const age = nowYear - year - (nowMonth < month ? 1 : 0)
+  return age >= 0 && age <= 150 ? age : null
+}
+
+// ---------------------------------------------------------------------------
 // 效期状态（三条时间线之一）：阈值一份真相，患者端提醒 / 咨询 S2 / 医生端共用
 // ---------------------------------------------------------------------------
 
