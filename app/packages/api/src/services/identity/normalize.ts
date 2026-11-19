@@ -67,11 +67,59 @@ export function nameMatches(a: string, b: string): boolean {
   return Boolean(na && nb && (na.includes(nb) || nb.includes(na)))
 }
 
+/**
+ * 剂型英文/别名词表（2026-11-19 现场实测补）：真实药盒正面常印英文剂型（如 `Allisartan Isoproxil
+ * Tablets`），VLM 可能把 form 抄成 `Tablets`；而库内 dish 型是中文「片」。逐字比对会误报「剂型冲突」，
+ * 演示现场就是被这个卡住（提取 Tablets vs 库 片）。这里把英文/常见别名归一到中文基形，再走双向子串比对。
+ * 顺序有意义：长词在前（eyedrop 先于 drop、injection 先于 drop 等）。
+ */
+const FORM_SYNONYMS: ReadonlyArray<readonly [needle: string, canonical: string]> = [
+  ['eyedrop', '滴眼液'],
+  ['eardrop', '滴耳液'],
+  ['nasalspray', '鼻喷剂'],
+  ['tablet', '片'],
+  ['capsul', '胶囊'],
+  ['granul', '颗粒'],
+  ['inject', '注射液'],
+  ['infusion', '输液'],
+  ['suppositor', '栓剂'],
+  ['ointment', '软膏'],
+  ['cream', '乳膏'],
+  ['lotion', '洗剂'],
+  ['liniment', '搽剂'],
+  ['tincture', '酊剂'],
+  ['suspension', '混悬剂'],
+  ['emulsion', '乳剂'],
+  ['solution', '溶液剂'],
+  ['syrup', '糖浆'],
+  ['powder', '散剂'],
+  ['patch', '贴剂'],
+  ['aerosol', '气雾剂'],
+  ['inhal', '吸入剂'],
+  ['lozenge', '含片'],
+  ['granule', '颗粒'],
+  ['pill', '丸'],
+  ['drop', '滴剂'],
+  ['spray', '喷雾剂'],
+  ['gel', '凝胶'],
+  ['film', '膜剂'],
+]
+
+/** 剂型归一：英文/别名 → 中文基形；已是中文的（片/片剂/滴眼液…）原样返回，靠双向子串兼容。 */
+export function canonicalForm(form: string | null | undefined): string {
+  const t = normalizeToken(String(form ?? ''))
+  if (!t) return ''
+  for (const [needle, canonical] of FORM_SYNONYMS) {
+    if (t.includes(needle)) return canonical
+  }
+  return t
+}
+
 /** 剂型匹配（照搬 demo formMatches）：identity 缺剂型 → 不阻塞（true）；否则归一后双向子串。 */
 export function formMatches(identityForm: string | undefined, drugForm: string): boolean {
   if (!identityForm) return true
-  const a = normalizeToken(identityForm)
-  const b = normalizeToken(drugForm)
+  const a = canonicalForm(identityForm)
+  const b = canonicalForm(drugForm)
   return Boolean(a && b && (b.includes(a) || a.includes(b)))
 }
 

@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  canonicalForm,
   hasMultiStrengthSpec,
   matchDrugMaster,
   parseStrengthTokens,
@@ -197,5 +198,54 @@ describe('matchDrugMaster · 多规格合并/多批准文号条目不得唯一�
     ]) {
       expect(hasMultiStrengthSpec(spec), spec).toBe(false)
     }
+  })
+})
+
+describe('剂型匹配兼容英文剂型（2026-11-19 现场实测：真实药盒印英文 Tablets）', () => {
+  const ALISHATAN_MERGED: DrugMasterCandidate = {
+    id: 'drug-alishatanzhi-pian-80mg',
+    genericName: '阿利沙坦酯片',
+    specification: '80mg，240mg',
+    form: '片',
+    approvalNumber: '国药准字H20138001',
+    approvalNumbers: ['国药准字H20138001', '国药准字H20138002'],
+  }
+
+  it('canonicalForm：英文/别名归一到中文基形，未知词原样小写', () => {
+    expect(canonicalForm('Tablets')).toBe('片')
+    expect(canonicalForm('Allisartan Isoproxil Tablets')).toBe('片') // 整词包含也能命中
+    expect(canonicalForm('Eye drops')).toBe('滴眼液')
+    expect(canonicalForm('Capsules')).toBe('胶囊')
+    expect(canonicalForm('Injection')).toBe('注射液')
+    expect(canonicalForm('片剂')).toBe('片剂') // 中文原样，靠双向子串兼容「片剂↔片」
+    expect(canonicalForm('')).toBe('')
+  })
+
+  it('提取 form=Tablets + 库 form=片：不再误报剂型冲突（走向规格/多规格判定）', () => {
+    const r = matchDrugMaster(
+      { genericName: '阿利沙坦酯片', specification: '240mg×7片', form: 'Tablets' },
+      [ALISHATAN_MERGED],
+    )
+    // 剂型不再冲突；因库条目是多规格合并行 → 降级为候选（而不是唯一匹配）
+    expect(r.status).toBe('ambiguous')
+    expect(r.conflict).toBeUndefined()
+    expect(r.candidates?.map((c) => c.id)).toEqual(['drug-alishatanzhi-pian-80mg'])
+  })
+
+  it('英文剂型 + 单规格库条目：正常 unique（Tablets ↔ 片剂）', () => {
+    const r = matchDrugMaster(
+      { genericName: '阿托伐他汀钙片', specification: '20mg', form: 'Tablets' },
+      [{ ...ATORVA, form: '片剂' }],
+    )
+    expect(r.status).toBe('unique')
+  })
+
+  it('剂型真不一致仍然拦截（Tablets vs 胶囊 → form conflict，不放过）', () => {
+    const r = matchDrugMaster(
+      { genericName: '阿莫西林胶囊', specification: '0.25g', form: 'Tablets' },
+      [AMOX],
+    )
+    expect(r.status).toBe('conflict')
+    expect(r.conflict?.field).toBe('form')
   })
 })
