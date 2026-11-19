@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, History, LoaderCircle, MessageSquarePlus, Send, ShieldCheck, X } from 'lucide-react'
+import { AlertTriangle, History, LoaderCircle, MessageSquarePlus, Send, X } from 'lucide-react'
 import {
   fetchConsultSession,
   fetchConsultSessions,
@@ -176,10 +176,10 @@ export default function Consult() {
   const lastResponse = [...messages].reverse().find((m) => m.role === 'assistant' && m.response)?.response
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_320px]">
+    <div>
       {/* 主列：min-h 用 dvh 算满视口（100dvh - 顶栏56 - main pt24 - main pb112），
           内容不足一屏时 Card(flex-1) 撑开、输入区贴底；百分比 min-h 在 auto 高度父链下会算成 0，故不用 */}
-      <div className="flex min-h-[calc(100dvh-192px)] min-w-0 flex-col gap-4 lg:col-span-1">
+      <div className="flex min-h-[calc(100dvh-192px)] min-w-0 flex-col gap-4">
         <Card className="flex-1">
           <CardContent className="space-y-4 p-4">
             {/* 薄头部：标题 + 会话操作（播放最新回答 / 历史会话列表入口 / 开新会话）；
@@ -390,39 +390,6 @@ export default function Consult() {
 
         </div>
       </div>
-
-      {/* 侧列：边界说明（照搬 demo/src/pages/Consult.tsx:123-126） */}
-      <aside className="hidden space-y-4 lg:block">
-        <Card>
-          <CardContent className="space-y-2 p-4">
-            <div className="flex items-center gap-2 text-risk-l1">
-              <ShieldCheck className="size-5" aria-hidden />
-              <h2 className="text-sm font-bold">我能帮你</h2>
-            </div>
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              <li>· 解释说明书字段与药理机制</li>
-              <li>· 说明常见注意事项</li>
-              <li>· 提示生效计划中的相互作用</li>
-              <li>· 查询你的药箱数据（清单 / 依从性 / 效期库存 / 联用冲突）</li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card className="border-risk-l3/30">
-          <CardContent className="space-y-2 p-4">
-            <div className="flex items-center gap-2 text-risk-l3">
-              <AlertTriangle className="size-5" aria-hidden />
-              <h2 className="text-sm font-bold">我不会做</h2>
-            </div>
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              <li>· 诊断疾病或开处方</li>
-              <li>· 建议停药、换药或改剂量</li>
-              <li>· 预测"对你效果如何"</li>
-              <li>· 替代医生处理急症</li>
-            </ul>
-          </CardContent>
-        </Card>
-      </aside>
     </div>
   )
 }
