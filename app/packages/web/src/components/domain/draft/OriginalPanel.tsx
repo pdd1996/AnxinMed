@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, FileText, ImageOff, Lock } from 'lucide-react'
+import { AlertTriangle, FileText, ImageOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DraftPayload } from '@anxin/core'
 
@@ -17,13 +17,12 @@ const NEED_META: Record<string, { label: string; original: (p: DraftPayload) => 
 
 /**
  * 原文对照面板（PRD §10.2 第 1 条 / §7.2.5）：原文整图 ↔ 结构化字段并排（qwen3.5-ocr 行级契约，
- * 无字符级置信度与裁剪几何，不再做 CSS 裁剪/红框叠加），附脱敏四层执行状态与层检测结果。
- * 取不到会话内原图（刷新/直接打开链接）→ 降级为文字原文对照，明确告知。
+ * 无字符级置信度与裁剪几何，不再做 CSS 裁剪/红框叠加）。取不到会话内原图（刷新/直接打开链接）→
+ * 降级为文字原文对照，明确告知。隐私四步说明卡与照片类型卡已按 2026-11-19 用户要求从本页移除；
+ * 「与原文比对拦下模型补值」「兜底解析不可用」「检测到医院标签层」三类告警仍按条件显示，不静默。
  */
 export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; imageUrl?: string }) {
   const w = payload.whitelist ?? null
-  const audit = payload.sanitizeAudit ?? {}
-  const auditHits = Object.entries(audit).filter(([, n]) => n > 0)
   const needs = payload.needsManual ?? []
 
   return (
@@ -120,45 +119,6 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
               </ul>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Lock className="size-4 text-primary" aria-hidden />
-            隐私处理
-            <span className="text-xs font-normal text-muted-foreground">四步程序 · 拿不准时一律按更安全的一侧处理</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <ul className="space-y-1.5 text-sm">
-            <li className="flex items-start gap-2">
-              <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>第一步 裁版面 —— 处方前记（患者信息）/ 后记（签名）整块丢弃，只留正文行</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>第二步 只留固定几类 —— 医院 / 处方号 / 日期 / 科室 / 诊断 / 条目，装不下别的身份信息</span>
-            </li>
-            <li className="flex items-start gap-2">
-              {auditHits.length > 0 ? (
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-risk-l3" aria-hidden />
-              ) : (
-                <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              )}
-              <span>
-                第三步 兜底扫描 ——{' '}
-                {auditHits.length > 0
-                  ? `命中 ${auditHits.reduce((sum, [, n]) => sum + n, 0)} 项（${auditHits.map(([t, n]) => `${t}×${n}`).join('、')}），已替换为 [已脱敏]`
-                  : '未命中敏感模式'}
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Check className="mt-0.5 size-4 shrink-0 text-risk-l1" aria-hidden />
-              <span>第四步 出口约束 —— 识别原文用完即弃，只把上面那几类正文发给第三方模型；日志只记类型与次数，不记原文</span>
-            </li>
-          </ul>
           {(payload.backlinkIntercepted ?? 0) > 0 && (
             <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-2 text-xs text-risk-l3">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -168,35 +128,15 @@ export function OriginalPanel({ payload, imageUrl }: { payload: DraftPayload; im
           {payload.fallbackStatus === 'unavailable' && (
             <p className="text-xs text-muted-foreground">兜底解析服务本次不可用：缺项保留人工补（不影响已抄录字段）。</p>
           )}
-          <p className="text-xs text-muted-foreground">
-            原图仅在本次会话的浏览器内存中显示，不上传保存；服务端只保留上面列出的那几类字段。
-          </p>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="space-y-2 py-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">照片类型</p>
-          <p className="flex flex-wrap gap-2">
-            {(payload.layers ?? []).map((layer) => (
-              <span key={layer} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
-                {layer}
-              </span>
-            ))}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {payload.type === 'prescription'
-              ? '处方层：医嘱线只抄录原文，不生成用法用量。'
-              : '药盒/标签层：结构上不含医嘱用法用量，本次仅建档。'}
-          </p>
-          {payload.labelNotice && (
-            <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-2 text-sm text-risk-l3">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-              检测到医院标签层：标签上的用法<strong>不会</strong>被自动抄录（V2.1 已删除该能力）。本次仅建档，请到药箱手动创建计划。
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {payload.labelNotice && (
+        <p className="flex items-start gap-2 rounded-lg border border-risk-l3/40 bg-risk-l3/10 p-2 text-sm text-risk-l3">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          检测到医院标签层：标签上的用法<strong>不会</strong>被自动抄录（V2.1 已删除该能力）。本次仅建档，请到药箱手动创建计划。
+        </p>
+      )}
     </div>
   )
 }

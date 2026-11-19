@@ -50,7 +50,6 @@ export function IdentityCard({
         <CardTitle className="flex items-center gap-2 text-lg">
           <Pill className="size-5 text-primary" aria-hidden />
           药品身份
-          <span className="text-xs font-normal text-muted-foreground">身份线 · 药名 + 规格 + 剂型三项严格核对</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
-import { AlertTriangle, Check, ChevronRight, Hand, ListChecks, LoaderCircle, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Hand, LoaderCircle, X } from 'lucide-react'
 import {
   buildConfirm,
   confirmDraft,
@@ -25,13 +25,11 @@ import {
 } from '@/components/ui/dialog'
 import { OriginalPanel } from '@/components/domain/draft/OriginalPanel'
 import { IdentityCard } from '@/components/domain/draft/IdentityCard'
-import { ExpiryCard } from '@/components/domain/draft/ExpiryCard'
-import { NoPlanCard, SigCard, TimesCard } from '@/components/domain/draft/SigCard'
+import { SigCard, TimesCard } from '@/components/domain/draft/SigCard'
 import { HealthCard, WhoCard } from '@/components/domain/draft/HealthCard'
 import {
   ConfirmResultDialog,
   DosageRangeCard,
-  InteractionCard,
   type ConfirmResult,
 } from '@/components/domain/draft/RiskCards'
 import { CONFIRM_STATUS_META } from '@anxin/shared'
@@ -40,7 +38,7 @@ import { CONFIRM_STATUS_META } from '@anxin/shared'
  * 草稿确认页（M2-T7 · PRD §7.2.5 / §10.2）—— 录入主线的**唯一闸门**。
  *
  * 左列原文对照（会话内原图整图展示 + 文字原文对照；取不到图则纯文字降级），
- * 右列结构化字段逐项核对（身份 / 医嘱 / 时间点 / 健康建议 / 规则检查 / 使用人）。
+ * 右列结构化字段逐项核对（身份 / 医嘱 / 时间点 / 健康建议 / 说明书范围 / 使用人）。
  * 确认走 POST /api/drafts/:id/confirm（服务端单事务原子写四表 + 确认留痕，并对最终确认值重跑规则检查）；
  * 「信息不符」走 POST /api/drafts/:id/reject 后回重拍或手动建档（PRD §7.2.6）。
  */
@@ -179,12 +177,7 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
           逐项核对 · {payload.entry === 'A' ? '处方笺' : '药盒'}
         </p>
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">草稿确认{payload.item ? `：${payload.item.drugName}` : ''}</h1>
-            <p className="text-sm text-muted-foreground">
-              凡进档案，最后一道门是你 —— 用量、频次、疗程三项<strong>无差别逐项核对</strong>，不因识别置信度高而跳过。
-            </p>
-          </div>
+          <h1 className="text-2xl font-bold">草稿确认{payload.item ? `：${payload.item.drugName}` : ''}</h1>
           <span
             className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground"
             title={statusMeta.hint}
@@ -211,17 +204,13 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
 
         <div className="space-y-4">
           <IdentityCard payload={payload} state={state} patch={patch} />
-          <ExpiryCard state={state} patch={patch} />
-          {payload.planDraft ? (
+          {payload.planDraft && (
             <>
               <SigCard payload={payload} state={state} patch={patch} />
               <TimesCard payload={payload} state={state} patch={patch} />
             </>
-          ) : (
-            <NoPlanCard payload={payload} />
           )}
           <HealthCard payload={payload} state={state} patch={patch} />
-          <InteractionCard result={payload.interactions ?? null} />
           {payload.planDraft && <DosageRangeCard result={payload.dosageRange ?? null} />}
           {payload.type === 'prescription' && <WhoCard state={state} patch={patch} />}
         </div>
@@ -256,11 +245,6 @@ function DraftConfirm({ draft }: { draft: DraftDto }) {
               {payload.planDraft ? '确认建档并生效计划' : '确认建档（计划稍后手动创建）'}
             </Button>
           </div>
-          <p className="flex items-start gap-2 text-xs text-muted-foreground">
-            <ListChecks className="mt-0.5 size-4 shrink-0" aria-hidden />
-            确认即留痕：药品 ID、确认时间、确认方式与关键字段快照写入来源记录；
-            医嘱字段若被你修正，标注会从「抄录」降为「自填」。
-          </p>
         </CardContent>
       </Card>
 

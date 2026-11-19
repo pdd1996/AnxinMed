@@ -257,30 +257,12 @@ describe('唯一闸门：逐项核对 + 使用人 + 提交后跳转', () => {
   })
 })
 
-describe('效期线：用户对照药盒自填（系统不识别、不预填）', () => {
-  it('填写有效期/开封日期 → 确认入参带上用户录入的日期', async () => {
+describe('效期线：确认页不再收录（2026-11-19 用户要求删除该卡，改由药箱「编辑效期」补录）', () => {
+  it('确认页不再渲染有效期/开封日期输入；确认入参 expiry/openedAt 为 null（未录入）', async () => {
     renderDraft(rxUniquePayload)
-    const expiry = (await screen.findByLabelText('有效期至')) as HTMLInputElement
-    const openedAt = screen.getByLabelText('开封日期（可选）') as HTMLInputElement
-    // 红线：管线不产出效期 → 初始恒空，不预填猜测
-    expect(expiry.value).toBe('')
-    expect(openedAt.value).toBe('')
-    expect(screen.getByText(/你自己对照药盒包装/)).toBeTruthy()
-    fireEvent.change(expiry, { target: { value: '2027-03-01' } })
-    fireEvent.change(openedAt, { target: { value: '2026-11-01' } })
-    mocks.confirmDraft.mockResolvedValue(CONFIRM_OK)
-    await passGates()
-    fireEvent.click(screen.getByRole('button', { name: /确认建档并生效计划/ }))
-    await waitFor(() => expect(mocks.confirmDraft).toHaveBeenCalledTimes(1))
-    expect(mocks.confirmDraft.mock.calls[0][1].drug).toMatchObject({
-      expiry: '2027-03-01',
-      openedAt: '2026-11-01',
-    })
-  })
-
-  it('留空 → 确认入参 expiry/openedAt 为 null（未录入，药箱可稍后补录）', async () => {
-    renderDraft(rxUniquePayload)
-    await screen.findByLabelText('有效期至')
+    await screen.findByRole('button', { name: /确认建档并生效计划/ })
+    expect(screen.queryByLabelText('有效期至')).toBeNull()
+    expect(screen.queryByLabelText('开封日期（可选）')).toBeNull()
     mocks.confirmDraft.mockResolvedValue(CONFIRM_OK)
     await passGates()
     fireEvent.click(screen.getByRole('button', { name: /确认建档并生效计划/ }))
@@ -311,9 +293,10 @@ describe('原文对照与入口B', () => {
     expect(screen.getByText('滴眼 每次1滴 每日4次 共7天')).toBeTruthy() // 用法原文行仍在
   })
 
-  it('入口B 药盒草稿 → 无任何用法用量输入，显示标签不抄录提示，确认后跳药箱建计划', async () => {
+  it('入口B 药盒草稿 → 无任何用法用量输入，标签不抄录提示仍在，确认后跳药箱建计划', async () => {
     renderDraft(drugBoxPayload)
-    expect(await screen.findByText(/标签用法不会被自动抄录/)).toBeTruthy()
+    const notice = await screen.findByText(/检测到医院标签层/)
+    expect(notice.closest('p')?.textContent).toContain('不会被自动抄录')
     expect(screen.queryByLabelText('每次用量')).toBeNull()
     expect(screen.queryByLabelText('每日几次')).toBeNull()
     expect(screen.queryByLabelText('我已确认本药的使用人')).toBeNull() // 无处方前记语义 → 不弹使用人核对
