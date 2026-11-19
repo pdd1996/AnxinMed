@@ -150,23 +150,12 @@ function QueueView({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">医生端 · 演示</p>
           <h1 className="text-xl font-bold">患者队列</h1>
         </div>
         <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold">
           {queue ? `${queue.total} 名患者` : '—'}
         </span>
       </div>
-
-      <Card className="border-risk-l2/30 bg-risk-l2/5">
-        <CardContent className="flex items-start gap-2 p-3 text-sm">
-          <Info className="mt-0.5 size-4 shrink-0 text-risk-l2" aria-hidden />
-          <p className="text-muted-foreground">
-            队列数据由语义化只读工具直查数据库（0 次大模型调用），分档口径为确定性阈值（优 ≥95% / 中 80–94% / 差 &lt;80%）。
-            点击患者行生成诊前摘要；摘要由 Agent 调用只读工具并过安全守门生成。本页仅供演示，不用于真实诊疗。
-          </p>
-        </CardContent>
-      </Card>
 
       {/* specs/25：仅真实账号（password 模式）显示绑定入口；demo 模式保持页面逐字不变（E2E 零回归）。 */}
       {authMode === 'password' && <DoctorBindCodeCard />}
@@ -211,11 +200,11 @@ function QueueView({
           <AdherenceHistogram queue={queue} />
 
           {/* 队列表格（患者下钻为显式动作） */}
-          <SectionHeading eyebrow="图表 · 队列表格" title="按患者下钻" />
+          <SectionHeading title="按患者下钻" />
           <CohortTable queue={queue} onPick={onPick} />
 
           {/* 风险事件时间线（固定模板） */}
-          <SectionHeading eyebrow="图表 · 事件时间线" title="近 30 天风险事件（L4/L3/manual-gate）" />
+          <SectionHeading title="近 30 天风险事件" />
           <RiskTimeline queue={queue} />
 
           {/* 队列摘要 */}
@@ -341,7 +330,7 @@ function RiskTimeline({ queue }: { queue: InsightQueueDto }) {
       <Card className="border-risk-l1/30 bg-risk-l1/5">
         <CardContent className="flex items-center gap-2 p-3 text-sm">
           <ShieldCheck className="size-4 shrink-0 text-risk-l1" aria-hidden />
-          <p className="text-muted-foreground">近 30 天全体患者无风险拦截事件（L4/L3/manual-gate）。</p>
+          <p className="text-muted-foreground">近 30 天全体患者无风险拦截事件。</p>
         </CardContent>
       </Card>
     )
@@ -814,7 +803,7 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
         <Card className="border-risk-l1/30 bg-risk-l1/5">
           <CardContent className="flex items-center gap-2 p-3 text-sm">
             <ShieldCheck className="size-4 text-risk-l1" aria-hidden />
-            <p className="text-muted-foreground">近 30 天无风险拦截事件（L4/L3/manual-gate）。</p>
+            <p className="text-muted-foreground">近 30 天无风险拦截事件。</p>
           </CardContent>
         </Card>
       )}
@@ -926,11 +915,11 @@ function PatientSummaryView({ summary, onBack }: { summary: InsightSummaryDto; o
 // 通用小组件
 // ---------------------------------------------------------------------------
 
-function SectionHeading({ eyebrow, title, chip }: { eyebrow: string; title: string; chip?: string }) {
+function SectionHeading({ eyebrow, title, chip }: { eyebrow?: string; title: string; chip?: string }) {
   return (
     <div className="flex items-center justify-between pt-2">
       <div>
-        <p className="text-xs font-medium text-muted-foreground">{eyebrow}</p>
+        {eyebrow && <p className="text-xs font-medium text-muted-foreground">{eyebrow}</p>}
         <h3 className="text-base font-bold">{title}</h3>
       </div>
       {chip && (

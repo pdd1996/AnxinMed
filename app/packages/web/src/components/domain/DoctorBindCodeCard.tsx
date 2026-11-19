@@ -45,9 +45,6 @@ export function DoctorBindCodeCard() {
           <KeyRound className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="font-bold">邀请患者绑定</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              生成 6 位绑定码，让患者在患者端「我的 → 我的医生」输入。绑定码 10 分钟内有效、仅可核销一次。
-            </p>
           </div>
         </div>
 
