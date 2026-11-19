@@ -46,11 +46,11 @@ const EMERGENCY_SECTIONS: NormalizedSections = {
 
 /** L3 拒答固定文案（照搬 demo/server/index.js:962-975，已实测）。 */
 const REFUSED_SECTIONS: NormalizedSections = {
-  summary: '我不能建议你自行增减剂量、停药或换药。',
-  keyPoints: ['用药调整需要结合诊断、检查结果和完整用药情况。'],
-  risks: ['自行调整可能导致治疗失败、不良反应或其他风险。'],
-  nextAction: '请联系开具处方的医生或药师。',
-  warning: '不要根据 AI 回答自行调整处方。',
+  summary: '我不能开具处方，也不能建议你自行增减剂量、停药或换药。',
+  keyPoints: ['开具处方、调整用药需要医生结合诊断、检查结果和完整用药情况判断。'],
+  risks: ['自行用药或调整处方可能导致治疗失败、不良反应或其他风险。'],
+  nextAction: '请到医院或正规药店，由医生/药师评估后开具或调整处方。',
+  warning: '不要根据 AI 回答自行购买处方药或调整处方。',
   limited: false,
 }
 

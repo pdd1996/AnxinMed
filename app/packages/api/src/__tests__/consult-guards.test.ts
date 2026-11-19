@@ -141,6 +141,16 @@ describe('detectProhibited · L3 拒答（PRD §7.5.2）', () => {
     expect(detectProhibited('能不能换成别的药')).toBe('能换')
   })
 
+  it('处方请求：「头孢的处方」「给我开头孢」「能开个处方吗」→ 命中 L3', () => {
+    expect(detectProhibited('头孢的处方')).not.toBeNull()
+    expect(detectProhibited('给我开头孢')).toBe('给我开')
+    expect(detectProhibited('能开个处方吗')).toBe('能开个处方')
+  })
+
+  it('信息询问「头孢是处方药吗」→ 不命中（不是开处方）', () => {
+    expect(detectProhibited('头孢是处方药吗')).toBeNull()
+  })
+
   it('正常咨询 "这个药的不良反应有哪些" → 不命中', () => {
     expect(detectProhibited('这个药的不良反应有哪些')).toBeNull()
   })
