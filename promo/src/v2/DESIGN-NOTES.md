@@ -45,6 +45,10 @@ v1（`src/Film.tsx` + `src/scenes/`）未改，仍可渲染；`public/score.wav`
 14. **flock 段可读性包（用户反馈裁决：7s「看不懂」）**：① C1 解说字幕 COPY.s2flock「医院、药店、网购——收进一个箱」
     60px 于 7.0–8.6s（退场让位 9s 品牌句）；② 站定间距 135→200（>盒宽190，8 盒水平完全分离可数）+ ±46 双排错开；
     ③ 收束提前 0.3s（CARD_OUT 50–60→47–57，RING_T0 同步），压缩哑巴窗口。数量守恒与落定计数不变。重渲双版本。
+15. **药物形态重做（用户反馈裁决：「药样子不明显」，提议圆/胶囊）**：原 medBox 剪影像信封。新增五种一眼可认的
+    药物形态（lib/film：capsuleItems 双色胶囊 / tabletItems 刻痕圆片 / blisterItems 铝塑泡罩 / cartonItems 带十字+胶囊图标药盒 /
+    bottle），PaperBox 增 form prop；8 药分配 MED_FORMS（hero=铝塑板，与扫描单/中景一致），S1 远中近景混合形态。
+    v1 的 medBoxItems 不动（v1 保持原样）。删除 flock 偶数盒灰衬底（圆片后垫灰卡显脏）。重渲双版本。
 
 ## 1. 镜头 → demo / 组件映射（P4：一种手法只当一次主角）
 

@@ -1,5 +1,5 @@
 // film.tsx — 本片的形状构建器（E##），模块级一次构建；变形双方同点数（96）。
-import {Item, Pt, toPath, shadeHex} from './motion';
+import {Item, Pt, circle, toPath, shadeHex} from './motion';
 import {BOX_HOME, COLOR, FONT_SANS, T} from '../spec';
 
 // 材质色板：0 墨绿 1 墨绿暗 2 卡面 3 深褐 4 暖橙 5 暖红 6 浅褐线 7 牛皮纸 8 牛皮暗 9 暖橙暗
@@ -82,3 +82,63 @@ export const boxParts = () =>
     pts: rectPts(i === SCAN_INDEX ? BOX_HOME.x : b.x, i === SCAN_INDEX ? BOX_HOME.y : b.y, b.w, b.h),
     arrive: T.arrivals[i], mass: 1, travel: 0.5,
   }));
+
+// ── v2 药物形态（用户反馈：原 medBox 剪影像信封，药物特征不明显）──
+// 胶囊/圆片/铝塑板/药盒/药瓶 五种一眼可认的药；纸感剪纸语法不变（实色+硬投影+粗糙边）。
+export type MedForm = 'carton' | 'capsule' | 'tablet' | 'blister' | 'bottle';
+const stadiumHalf = (cx: number, cy: number, w: number, h: number, side: 'L' | 'R') => {
+  const r = h / 2, x0 = cx - w / 2, x1 = cx + w / 2;
+  return side === 'L'
+    ? `M${cx} ${cy - r} L${x0 + r} ${cy - r} A${r} ${r} 0 0 0 ${x0 + r} ${cy + r} L${cx} ${cy + r} Z`
+    : `M${cx} ${cy - r} L${x1 - r} ${cy - r} A${r} ${r} 0 0 1 ${x1 - r} ${cy + r} L${cx} ${cy + r} Z`;
+};
+// 双色胶囊：左半身份色 + 右半纸白 + 中缝 + 高光
+export const capsuleItems = (cx: number, cy: number, w: number, h: number, c: number, shadeC: number): Item[] => {
+  const H = h * 0.46;
+  return [
+    {d: stadiumHalf(cx, cy, w, H, 'L'), c},
+    {d: stadiumHalf(cx, cy, w, H, 'R'), c: 2},
+    {d: toPath(rectPts(cx, cy, 3, H)), c: shadeC},
+    {d: toPath(rectPts(cx - w * 0.24, cy - H * 0.24, w * 0.2, H * 0.14)), c: 2},
+  ];
+};
+// 圆片：圆 + 中央刻痕 + 右下暗点（体积）
+export const tabletItems = (cx: number, cy: number, w: number, h: number, c: number, shadeC: number): Item[] => {
+  const r = Math.min(w, h) * 0.42;
+  return [
+    {d: toPath(circle(cx, cy, r)), c},
+    {d: toPath(rectPts(cx, cy, r * 1.25, 4)), c: 2},
+    {d: toPath(circle(cx + r * 0.36, cy + r * 0.36, r * 0.16)), c: shadeC},
+  ];
+};
+// 铝塑泡罩：纸白箔底 + 顶封边 + 2×3 身份色药粒
+export const blisterItems = (cx: number, cy: number, w: number, h: number, c: number, shadeC: number): Item[] => {
+  const W = w * 0.92, H = h * 0.8;
+  const items: Item[] = [
+    {d: toPath(rectPts(cx, cy, W, H)), c: 2},
+    {d: toPath(rectPts(cx, cy - H / 2 + H * 0.08, W, H * 0.16)), c: shadeC},
+  ];
+  for (let ry = 0; ry < 2; ry++) for (let k = 0; k < 3; k++) {
+    items.push({d: toPath(circle(cx - W / 2 + W * (0.2 + k * 0.3), cy - H / 2 + H * (0.42 + ry * 0.34), Math.min(W, H) * 0.13)), c});
+  }
+  return items;
+};
+// 药盒（改进）：盒身+盖缝+十字标+标签带（带胶囊图标），读作药盒而非信封
+export const cartonItems = (cx: number, cy: number, w: number, h: number, c: number, shadeC: number): Item[] => [
+  {d: toPath(rectPts(cx, cy, w, h)), c},
+  {d: toPath(rectPts(cx, cy - h / 2 + h * 0.09, w, h * 0.18)), c: shadeC},
+  {d: toPath(rectPts(cx - w * 0.3, cy - h * 0.15, w * 0.06, h * 0.2)), c: 2},
+  {d: toPath(rectPts(cx - w * 0.3, cy - h * 0.15, w * 0.2, h * 0.06)), c: 2},
+  {d: toPath(rectPts(cx + w * 0.1, cy + h * 0.12, w * 0.62, h * 0.42)), c: 2},
+  {d: stadiumHalf(cx + w * 0.1, cy + h * 0.06, w * 0.3, h * 0.16, 'L'), c},
+  {d: stadiumHalf(cx + w * 0.1, cy + h * 0.06, w * 0.3, h * 0.16, 'R'), c: shadeC},
+  {d: toPath(rectPts(cx + w * 0.1, cy + h * 0.26, w * 0.4, h * 0.05)), c: 3},
+];
+export const medItems = (form: MedForm, cx: number, cy: number, w: number, h: number, c: number, shadeC: number): Item[] =>
+  form === 'capsule' ? capsuleItems(cx, cy, w, h, c, shadeC)
+  : form === 'tablet' ? tabletItems(cx, cy, w, h, c, shadeC)
+  : form === 'blister' ? blisterItems(cx, cy, w, h, c, shadeC)
+  : form === 'bottle' ? bottleItems(cx, cy, c, shadeC, '')
+  : cartonItems(cx, cy, w, h, c, shadeC);
+// 8 种药的形态分配（hero=SCAN_INDEX=3 为铝塑板，与 S2 扫描单/S1 中景一致）
+export const MED_FORMS: MedForm[] = ['capsule', 'tablet', 'blister', 'blister', 'capsule', 'tablet', 'blister', 'bottle'];

@@ -8,7 +8,7 @@
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate} from 'remotion';
 import {COLOR} from '../spec';
-import {BOX_LAYOUT} from '../lib/film';
+import {BOX_LAYOUT, MED_FORMS, MedForm} from '../lib/film';
 import {alpha} from './polish';
 import {PaperBox} from './PaperBox';
 import {FLOCK_C} from './timeline';
@@ -41,11 +41,11 @@ const lerpPose = (a: Pose, b: Pose, t: number): Pose => {
 };
 
 // 8 盒：k0 侧棱薄边（散开）→ k1 翻飞中段 → k2 扇形阶梯站定；conv 吸入药箱中心
-const BOXES: {c: number; shadeC: number; k: [Pose, Pose, Pose]; conv: Pose}[] = BOX_LAYOUT.map((b, i) => {
+const BOXES: {c: number; shadeC: number; form: MedForm; k: [Pose, Pose, Pose]; conv: Pose}[] = BOX_LAYOUT.map((b, i) => {
   // 站定间距 200 > 盒宽 190 → 8 盒水平完全分离可数；±46 双排错开给景深（用户反馈：原 135 间距挤叠不可数）
   const sx = (i - 3.5) * 200, sy = i % 2 ? 46 : -46;
   return {
-    c: b.c, shadeC: b.shadeC,
+    c: b.c, shadeC: b.shadeC, form: MED_FORMS[i],
     k: [
       {x: sx * 1.7, y: i % 2 ? 150 : -150, rx: 9, ry: 88, rz: 12, s: 0.92},
       {x: sx * 1.25, y: i % 2 ? 60 : -60, rx: 14, ry: 42, rz: -7, s: 1.04},
@@ -104,11 +104,7 @@ export const CardFlock: React.FC<{t: number}> = ({t}) => {
                 position: 'absolute', opacity: op, zIndex: 10 + i,
                 transform: `translate3d(${pose.x.toFixed(2)}px, ${pose.y.toFixed(2)}px, 0) rotateX(${pose.rx.toFixed(2)}deg) rotateY(${pose.ry.toFixed(2)}deg) rotateZ(${pose.rz.toFixed(2)}deg) scale(${pose.s.toFixed(4)})`,
               }}>
-                <PaperBox w={BW} h={BH} c={c.c} shadeC={c.shadeC} edgeId={`flock-${i}`} />
-                {/* 叠层景深：后排（y+16）盒压暗一档 */}
-                {i % 2 === 1 && (
-                  <div style={{position: 'absolute', inset: 12, borderRadius: 6, background: COLOR.ink, opacity: 0.08, pointerEvents: 'none'}} />
-                )}
+                <PaperBox w={BW} h={BH} c={c.c} shadeC={c.shadeC} edgeId={`flock-${i}`} form={c.form} />
               </div>
             );
           })}

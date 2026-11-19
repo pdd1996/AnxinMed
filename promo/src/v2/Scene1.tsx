@@ -9,6 +9,7 @@ import {AbsoluteFill} from 'remotion';
 import {COLOR, COPY, FONT, FONT_SANS} from '../spec';
 import {EASE as PE, SpeedBlur, TextReveal, alpha, bezier, mix, ramp, type, velocity} from './polish';
 import {PaperBox} from './PaperBox';
+import {MedForm} from '../lib/film';
 import {FlyingWordsTunnel} from './FlyingWordsTunnel';
 import {T2} from './timeline';
 
@@ -33,6 +34,10 @@ const MID = [
 // 中景三盒 = 三来源各一盒（左药店/中医院/右网购），清晰来源戳早于主角浮起出现，语义闭合呼应标题「3 个来源」
 const MID_SRC = [1, 0, 2];
 const MID_SRC_BG = [COLOR.ink, COLOR.green, COLOR.orange];
+// 药物形态：中景三盒 = 胶囊/铝塑板(hero)/圆片；远近景混合形态作景深环境
+const MID_FORMS: MedForm[] = ['capsule', 'blister', 'tablet'];
+const FAR_FORMS: MedForm[] = ['tablet', 'capsule', 'blister'];
+const NEAR_FORMS: MedForm[] = ['capsule', 'tablet'];
 // 近景 2 盒（放大掠过镜头，景深虚化）
 const NEAR = [
   {x: 1800, y: 760, w: 272, h: 196, c: 0, shadeC: 1},
@@ -63,7 +68,7 @@ export const Scene1: React.FC<{t: number}> = ({t}) => {
       <div style={{position: 'absolute', left: 0, top: 0, transform: `translateX(${(-drive * 0.35).toFixed(2)}px)`, filter: 'blur(5px) saturate(0.7)', opacity: 0.75}}>
         {FAR.map((b, i) => (
           <div key={i} style={{position: 'absolute', left: b.x, top: b.y}}>
-            <PaperBox w={b.w} h={b.h} c={b.c} shadeC={b.shadeC} />
+            <PaperBox w={b.w} h={b.h} c={b.c} shadeC={b.shadeC} form={FAR_FORMS[i]} />
           </div>
         ))}
       </div>
@@ -83,7 +88,7 @@ export const Scene1: React.FC<{t: number}> = ({t}) => {
               transform: hero ? `translateY(${(-14 * lift).toFixed(2)}px) scale(${(1 + 0.035 * lift).toFixed(4)})` : undefined,
               boxShadow: hero ? `0 0 0 ${(2.5 * ring).toFixed(2)}px ${alpha(COLOR.orange, 0.9)}` : undefined,
             }}>
-              <PaperBox w={MID_W} h={MID_H} c={b.c} shadeC={b.shadeC} edgeId={hero ? 's1v2-hero' : `s1v2-mid${k}`} />
+              <PaperBox w={MID_W} h={MID_H} c={b.c} shadeC={b.shadeC} edgeId={hero ? 's1v2-hero' : `s1v2-mid${k}`} form={MID_FORMS[k]} />
               <div style={{
                 position: 'absolute', left: '50%', top: -56,
                 transform: `translateX(-50%) translateY(${((1 - sp) * 10).toFixed(1)}px)`,
@@ -101,7 +106,7 @@ export const Scene1: React.FC<{t: number}> = ({t}) => {
         <div style={{position: 'absolute', inset: 0, transform: `translateX(${(-drive * 1.4).toFixed(2)}px)`}}>
           {NEAR.map((b, i) => (
             <div key={`b${i}`} style={{position: 'absolute', left: b.x, top: b.y, filter: 'blur(7px)', opacity: 0.92}}>
-              <PaperBox w={b.w} h={b.h} c={b.c} shadeC={b.shadeC} shadow={10} />
+              <PaperBox w={b.w} h={b.h} c={b.c} shadeC={b.shadeC} shadow={10} form={NEAR_FORMS[i]} />
             </div>
           ))}
           {PILLS.map((p) => (

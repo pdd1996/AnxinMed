@@ -9,7 +9,7 @@ import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {EASE, prog} from '../lib/motion';
 import {MaterialLayer} from '../lib/motion';
-import {PALETTE, medBoxItems} from '../lib/film';
+import {PALETTE, medItems} from '../lib/film';
 import {COLOR, COPY, FONT_SANS} from '../spec';
 import {DesignStage, EASE as PE, mix} from './polish';
 import {T2} from './timeline';
@@ -86,7 +86,7 @@ export const ScanBracketDoc: React.FC<{t: number}> = ({t}) => {
 
               {/* 左：被扫描的药盒（剪纸，静止） */}
               <svg width={100} height={80} viewBox="0 0 100 80" style={{position: 'absolute', left: 14, top: 52}}>
-                <MaterialLayer items={medBoxItems(50, 40, 96, 70, 0, 1)} material={{kind: 'paper', shadow: 3, shadowOpacity: 0.16}} palette={PALETTE} />
+                <MaterialLayer items={medItems('blister', 50, 40, 96, 70, 0, 1)} material={{kind: 'paper', shadow: 3, shadowOpacity: 0.16}} palette={PALETTE} />
               </svg>
 
               {/* 右：身份字段三行（光芯经过时整行被轻微照亮，文档本身不动） */}
