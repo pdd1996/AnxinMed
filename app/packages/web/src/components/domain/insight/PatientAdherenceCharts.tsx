@@ -42,6 +42,15 @@ function DailyCheckinChart({ series, height }: { series: InsightAdherenceSeriesD
     [series],
   )
   const expectLine = useMemo(() => series.map((d) => ({ date: d.date, count: d.expected })), [series])
+  /** 纵轴最多到几（整数刻度用）：柱高与应服虚线的较大者，至少 1。 */
+  const maxCount = useMemo(
+    () =>
+      Math.max(
+        1,
+        ...series.map((d) => Math.max(d.expected, d.taken + d.skipped + d.later)),
+      ),
+    [series],
+  )
 
   useEffect(() => {
     const el = ref.current
@@ -59,7 +68,16 @@ function DailyCheckinChart({ series, height }: { series: InsightAdherenceSeriesD
         domain: [...KINDS],
         range: KIND_VARS.map((v) => cssVar(v, '#888')),
       })
-      .axis('x', { labelFormatter: (v: string) => (typeof v === 'string' ? v.slice(5) : String(v)) })
+      // 坐标轴不显示英文轴名（date/count），纵轴只保留整数刻度（打卡次数没有小数）。
+      .axis('x', { title: false, labelFormatter: (v: string) => (typeof v === 'string' ? v.slice(5) : String(v)) })
+      .axis('y', {
+        title: false,
+        tickCount: Math.min(maxCount + 1, 6),
+        labelFormatter: (v: number | string) => {
+          const n = Number(v)
+          return Number.isInteger(n) ? String(n) : ''
+        },
+      })
       .legend('color', { position: 'top' })
     if (expectLine.some((r) => r.count > 0)) {
       chart
@@ -80,7 +98,7 @@ function DailyCheckinChart({ series, height }: { series: InsightAdherenceSeriesD
       disposed = true
       chart.destroy()
     }
-  }, [bars, expectLine, height])
+  }, [bars, expectLine, height, maxCount])
 
   if (renderError) {
     return <p className="text-sm text-risk-l3">图表渲染失败，请刷新重试。</p>
@@ -103,6 +121,11 @@ function ByDrugChart({ byDrug }: { byDrug: InsightAdherenceSeriesDto['byDrug'] }
       ]),
     [byDrug],
   )
+  /** 横轴最多到几（整数刻度用）。 */
+  const maxCount = useMemo(
+    () => Math.max(1, ...byDrug.map((d) => d.taken + d.skipped + d.later)),
+    [byDrug],
+  )
 
   useEffect(() => {
     const el = ref.current
@@ -121,6 +144,16 @@ function ByDrugChart({ byDrug }: { byDrug: InsightAdherenceSeriesDto['byDrug'] }
         domain: [...KINDS],
         range: KIND_VARS.map((v) => cssVar(v, '#888')),
       })
+      // 坐标轴不显示英文轴名；计数轴只保留整数刻度。
+      .axis('x', { title: false })
+      .axis('y', {
+        title: false,
+        tickCount: Math.min(maxCount + 1, 6),
+        labelFormatter: (v: number | string) => {
+          const n = Number(v)
+          return Number.isInteger(n) ? String(n) : ''
+        },
+      })
       .legend('color', { position: 'top' })
     let disposed = false
     chart.render().catch(() => {
@@ -130,7 +163,7 @@ function ByDrugChart({ byDrug }: { byDrug: InsightAdherenceSeriesDto['byDrug'] }
       disposed = true
       chart.destroy()
     }
-  }, [bars, height])
+  }, [bars, height, maxCount])
 
   if (renderError) {
     return <p className="text-sm text-risk-l3">图表渲染失败，请刷新重试。</p>
