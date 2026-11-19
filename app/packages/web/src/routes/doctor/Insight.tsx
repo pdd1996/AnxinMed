@@ -575,7 +575,6 @@ function PatientSummarySkeleton({ patientName, onBack }: { patientName: string; 
       <p className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
         <LoaderCircle className="size-6 animate-spin" aria-hidden />
         正在为 {patientName} 生成诊前摘要…
-        <span className="text-xs">Agent 正在调用只读工具并组装摘要</span>
       </p>
     </div>
   )
