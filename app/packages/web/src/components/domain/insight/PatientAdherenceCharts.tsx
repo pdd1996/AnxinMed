@@ -184,7 +184,6 @@ export function PatientAdherenceCharts({ patientId }: { patientId: string }) {
           <>
             <DailyCheckinChart series={data.series} height={260} />
             <p className="text-xs text-muted-foreground">
-              柱为打卡记录（已服/漏服/延后），虚线为当日应服（生效计划 × 计划时间点）。
               近 {data.days} 天执行率 {data.adherence.rate}%（已服 {data.adherence.taken}/{data.adherence.total}）。
             </p>
             {data.byDrug.length > 0 ? (
