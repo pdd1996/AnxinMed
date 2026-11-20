@@ -112,3 +112,7 @@ tools/ocr-bench/sample-prescription.png
 # 含生成脚本、SVG 源页、设计清单、确认页 JSON、中间渲染与导出副本；
 # 交付物只留 promo/ 下的 pptx / pdf / docx / md 四件（见 commit 4588df7）。
 .tmp-ppt/
+
+# ── 本地临时 PostgreSQL 数据目录 / 临时查询脚本（一次性调试产物，不入库）──
+.tmp-pg/
+.tmp-demo/

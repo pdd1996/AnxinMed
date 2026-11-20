@@ -6,7 +6,6 @@ import {
   ChevronRight,
   ChevronUp,
   Info,
-  ShieldAlert,
   ShieldCheck,
 } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
@@ -77,8 +76,6 @@ export function AnswerCard({
   answer,
   sections,
   notice,
-  l0Notice,
-  citations,
   blocked,
   clarifyOptions,
   onPickDrug,
@@ -88,26 +85,9 @@ export function AnswerCard({
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const riskL2 = useUnstableNativeVariable("--risk-l2");
   const riskL3 = useUnstableNativeVariable("--risk-l3");
-  // L0 资料查询（manual 档 / 说明书未核验）：原文摘录，不是个性化回答。
-  const isL0 = Boolean(l0Notice);
-  // 只有 manual-gate（L0 原文卡）用「说明书原文」语义标签；可用性回答仍是普通小结。
-  const isRawLeaflet = isL0 && status === "manual-gate";
-  const source = citations[0];
-  const reviewText =
-    source?.reviewStatus === "reviewed"
-      ? "已人工核验"
-      : source?.reviewStatus
-        ? "未人工核验"
-        : null;
-  const identityLine = source
-    ? `${[source.drugName, source.specification].filter(Boolean).join(" · ")} · ${source.source}（版本 ${source.version}）`
-    : null;
-  const metaLine = [
-    source?.approvalNumbers?.length ? `批准文号：${source.approvalNumbers.join("、")}` : null,
-    reviewText ? `核验状态：${reviewText}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // L0 原文卡（manual-gate）：原文语义标签；不渲染顶部未核验 banner（2026-11-20 用户裁定删除），
+  // 未核验/来源信息只在「查看完整说明书」分段页展示。
+  const isRawLeaflet = status === "manual-gate";
 
   return (
     <View
@@ -116,20 +96,6 @@ export function AnswerCard({
         blocked ? "border-risk-l3" : "border-border",
       )}
     >
-      {isL0 ? (
-        <View className="mb-3 gap-1 rounded-xl border border-risk-l2 bg-risk-l2-tint p-2.5">
-          <View className="flex-row items-start gap-1.5">
-            <Icon as={ShieldAlert} size={16} color={riskL2} />
-            <Text className="flex-1 text-sm font-medium leading-5 text-risk-l2">{l0Notice}</Text>
-          </View>
-          {identityLine ? (
-            <Text className="pl-5 text-xs leading-4 text-muted-foreground">{identityLine}</Text>
-          ) : null}
-          {metaLine ? (
-            <Text className="pl-5 text-xs leading-4 text-muted-foreground">{metaLine}</Text>
-          ) : null}
-        </View>
-      ) : null}
 
       {sections ? (
         <View className="gap-3">

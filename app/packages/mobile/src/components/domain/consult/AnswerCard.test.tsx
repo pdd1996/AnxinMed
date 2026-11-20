@@ -65,7 +65,7 @@ describe("AnswerCard · 状态分支", () => {
     expect(view.getByText("我不能建议你自行增减剂量、停药或换药。")).toBeTruthy();
   });
 
-  it("manual-gate 渲染 l0Notice（状态徽章已移除）", async () => {
+  it("manual-gate 不渲染 l0Notice banner（2026-11-20 用户裁定删除）", async () => {
     const view = await render(
       <AnswerCard
         riskLevel="L1"
@@ -78,11 +78,13 @@ describe("AnswerCard · 状态分支", () => {
     );
 
     expect(view.queryByText("仅资料查询")).toBeNull();
-    expect(view.getByText("仅可查询药品资料。")).toBeTruthy();
+    expect(view.queryByText("仅可查询药品资料。")).toBeNull();
+    expect(view.getByText("回答")).toBeTruthy();
   });
 
-  // 2026-11-20 排版优化：L0 先交代「未核验 + 身份/来源」，标题改成原文语义，长原文进展开区
-  it("L0（manual-gate）→ 顶部未核验提示 + 身份/来源/核验状态 + 原文版式 + 展开原文", async () => {
+  // 2026-11-20 排版优化 + 用户裁定删除顶部 banner：L0 卡只保留原文语义标签/展开/查看入口
+  it("L0（manual-gate）→ 无顶部 banner，原文版式 + 展开原文 + 查看入口", async () => {
+    const onViewLeaflet = jest.fn();
     const view = await render(
       <AnswerCard
         riskLevel="L1"
@@ -110,14 +112,15 @@ describe("AnswerCard · 状态分支", () => {
           },
         ]}
         l0Notice="该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。"
+        onViewLeaflet={onViewLeaflet}
         blocked
       />,
     );
 
-    // 顶部提示 + 身份/来源/批准文号/核验状态
-    expect(view.getByText(/尚未人工核验/)).toBeTruthy();
-    expect(view.getByText(/玻璃酸钠滴眼液 · 0.1%（10mL:10mg） · 丁香园用药助手/)).toBeTruthy();
-    expect(view.getByText(/批准文号：国药准字H20240001 · 核验状态：未人工核验/)).toBeTruthy();
+    // 顶部 banner 已删除（未核验/身份/来源只在分段落页展示）
+    expect(view.queryByText(/暂不能提供个性化解释/)).toBeNull();
+    expect(view.queryByText(/核验状态：/)).toBeNull();
+    expect(view.queryByText(/批准文号：/)).toBeNull();
     // 原文语义标题
     expect(view.getByText("说明书原文")).toBeTruthy();
     expect(view.getByText("注意事项")).toBeTruthy();
@@ -129,6 +132,9 @@ describe("AnswerCard · 状态分支", () => {
     await fireEvent.press(view.getByText("展开原文（1 条）"));
     expect(view.getByText("适应症段（原文）")).toBeTruthy();
     expect(view.getByText("适应症原文全文")).toBeTruthy();
+    // 查看入口
+    await fireEvent.press(view.getByText("查看完整说明书"));
+    expect(onViewLeaflet).toHaveBeenCalledTimes(1);
   });
 
   it("L0 带查看入口 → 点「查看完整说明书」回调（2026-11-20）", async () => {

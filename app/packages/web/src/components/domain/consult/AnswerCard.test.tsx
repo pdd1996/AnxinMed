@@ -106,24 +106,25 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('请联系开具处方的医生或药师')).toBeTruthy()
   })
 
-  it('manual-gate → l0Notice（状态徽章已移除）', () => {
+  it('manual-gate → 不渲染 l0Notice banner（2026-11-20 用户裁定删除）', () => {
     render(
       <AnswerCard
         riskLevel="L1"
         status="manual-gate"
-        answer="手动建档药仅可 L0 资料查询"
-        sections={mkSections({ summary: '手动建档药仅可 L0 资料查询' })}
+        answer="手动建档药仅可查看说明书原文"
+        sections={mkSections({ summary: '手动建档药仅可查看说明书原文' })}
         citations={[]}
         l0Notice="该药品为用户手动建档（未经 OCR 确认），AI 个性化咨询不可用，仅可查询药品资料（L0）。"
         blocked
       />,
     )
     expect(screen.queryByText('仅资料查询')).toBeNull()
-    expect(screen.getByText(/未经 OCR 确认/)).toBeTruthy()
+    expect(screen.queryByText(/未经 OCR 确认/)).toBeNull()
+    expect(screen.getByText('手动建档药仅可查看说明书原文')).toBeTruthy()
   })
 
-  // 2026-11-20 排版优化：L0 先交代「未核验 + 身份/来源」，标题改成原文语义，长原文进折叠区
-  it('L0（manual-gate）→ 顶部未核验提示 + 身份/来源/核验状态 + 原文版式 + 查看入口', () => {
+  // 2026-11-20 排版优化 + 用户裁定删除顶部 banner：L0 卡只保留原文语义标签/折叠/查看入口
+  it('L0（manual-gate）→ 无顶部 banner，原文版式 + 展开原文 + 查看入口', () => {
     render(
       <MemoryRouter>
         <AnswerCard
@@ -153,10 +154,10 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         />
       </MemoryRouter>,
     )
-    // 顶部提示 + 身份/来源/批准文号/核验状态（不再等用户滚到卡片底部才看到）
-    expect(screen.getByText(/尚未人工核验/)).toBeTruthy()
-    expect(screen.getByText(/玻璃酸钠滴眼液 · 0.1%（10mL:10mg） · 丁香园用药助手（版本 2024-01）/)).toBeTruthy()
-    expect(screen.getByText(/批准文号：国药准字H20240001 · 核验状态：未人工核验/)).toBeTruthy()
+    // 顶部 banner 已删除（未核验/身份/来源只在「查看完整说明书」页展示）
+    expect(screen.queryByText(/暂不能提供个性化解释/)).toBeNull()
+    expect(screen.queryByText(/核验状态：/)).toBeNull()
+    expect(screen.queryByText(/批准文号：/)).toBeNull()
     // 原文语义标题（不再写「简明结论/需要知道/注意风险」）
     expect(screen.getByText('说明书原文')).toBeTruthy()
     expect(screen.getByText('注意事项')).toBeTruthy()
@@ -168,7 +169,7 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
   })
 
-  it('说明书可用性回答（未核验）→ 顶部 banner + 身份/来源 + 查看入口（首屏可见）', () => {
+  it('说明书可用性回答（未核验）→ 无顶部 banner；结论里保留核验状态 + 查看入口', () => {
     render(
       <MemoryRouter>
         <AnswerCard
@@ -196,11 +197,10 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
         />
       </MemoryRouter>,
     )
-    // 顶部 banner 首屏可见：未核验 + 身份 + 来源 + 批准文号 + 核验状态（summary 也含「未核验」，用 getAll）
-    expect(screen.getAllByText(/尚未人工核验/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/暂不能提供个性化解释/)).toBeTruthy()
-    expect(screen.getByText(/玻璃酸钠滴眼液 · 0.1%（10mL:10mg） · 说明书 PDF（本地资料库）/)).toBeTruthy()
-    expect(screen.getByText(/批准文号：国药准字H20240001 · 核验状态：未人工核验/)).toBeTruthy()
+    // 顶部 banner 已删除；核验状态由结论句承担（不再重复身份/来源/批准文号）
+    expect(screen.queryByText(/暂不能提供个性化解释/)).toBeNull()
+    expect(screen.queryByText(/核验状态：/)).toBeNull()
+    expect(screen.getByText(/但尚未人工核验/)).toBeTruthy()
     expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
     // 可用性回答不是原文卡：标题仍是「简明结论」（原文卡才用「说明书原文」）
     expect(screen.getByText('简明结论')).toBeTruthy()

@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight, Info, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
 import type { ConsultClarifyOption, ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { Card, CardContent } from '@/components/ui/card'
@@ -69,49 +69,18 @@ export function AnswerCard({
   answer,
   sections,
   notice,
-  l0Notice,
-  citations,
   blocked,
   clarifyOptions,
   onPickDrug,
   leafletHref,
 }: AnswerCardProps) {
-  // L0 资料查询（manual 档 / 说明书未核验）：原文摘录，不是个性化回答——
-  // 顶部先交代「未核验 + 身份/来源」，再用短摘要渲染；完整原文去「查看完整说明书」分段页。
-  const isL0 = Boolean(l0Notice)
-  // 只有 manual-gate（L0 原文卡）用「说明书原文」语义标签；可用性回答仍是普通小结。
-  const isRawLeaflet = isL0 && status === 'manual-gate'
-  const source = citations[0]
-  const reviewText =
-    source?.reviewStatus === 'reviewed'
-      ? '已人工核验'
-      : source?.reviewStatus
-        ? '未人工核验'
-        : null
-  const identityLine = source
-    ? `${[source.drugName, source.specification].filter(Boolean).join(' · ')} · ${source.source}（版本 ${source.version}）`
-    : null
-  const metaLine = [
-    source?.approvalNumbers?.length ? `批准文号：${source.approvalNumbers.join('、')}` : null,
-    reviewText ? `核验状态：${reviewText}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  // L0 原文卡（manual-gate）：原文语义标签；不渲染顶部未核验 banner（2026-11-20 用户裁定删除），
+  // 未核验/来源信息只在「查看完整说明书」分段页展示。
+  const isRawLeaflet = status === 'manual-gate'
   return (
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
       <CardContent className="space-y-3 p-4">
-        {isL0 && (
-          <div className="space-y-1 rounded-md border border-risk-l2/30 bg-risk-l2/10 p-2.5">
-            <p className="flex items-start gap-1.5 text-xs font-medium text-risk-l2">
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              {l0Notice}
-            </p>
-            {identityLine && <p className="pl-5 text-xs text-muted-foreground">{identityLine}</p>}
-            {metaLine && <p className="pl-5 text-xs text-muted-foreground">{metaLine}</p>}
-          </div>
-        )}
-
         {/* 中部：sections 结构化（如有）；否则仅 answer 一句话 */}
         {sections ? (
           <div className="space-y-3">

@@ -68,10 +68,9 @@ function logToChatMessages(log: ConsultSessionDetailDto['messages'][number]): Ch
     answer: snapshot?.summary ?? log.question,
     sections: snapshot,
     citations: (log.citations ?? null) as ConsultResponseDto['citations'],
-    // L0（manual/未核验）的提示在落库时并入 notice（无独立列）：回放时还原成 l0Notice，
-    // 让历史回答卡也按「未核验 + 原文摘录」版式渲染（2026-11-20 排版优化）。
-    notice: log.status === 'manual-gate' ? null : log.notice,
-    l0Notice: log.status === 'manual-gate' ? log.notice : null,
+    // 咨询卡不再渲染未核验 banner（2026-11-20 用户裁定删除）；l0Notice 仍随日志留痕，不改回放数据面。
+    notice: log.notice,
+    l0Notice: null,
     blocked: log.blockedAt != null,
     toolUsed: log.status === 'data-answered' ? log.intent : null,
     consultLogId: log.consultLogId,
