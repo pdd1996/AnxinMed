@@ -495,9 +495,22 @@ export function fallbackSectionsFromInsert(question: string, insert: InsertSlice
         .map((item) => digestLeafletItem(item, 64))
     : []
 
+  // 人话解释层（2026-11-20 用户反馈「这句话什么意思」）：只解释原文措辞的含义与适用边界，
+  // 不改写医学结论；「上市后经验」这类行话必须翻译，否则患者读不懂。
+  const headingNote =
+    excerpt?.heading === '上市后经验'
+      ? '「上市后经验」是药品上市后医生/患者自发上报的不良事件，发生频率无法估计，不等于每个人都会出现。'
+      : excerpt?.heading
+        ? `「${excerpt.heading}」里的数据来自受试者/研究，不能直接推断到个人。`
+        : null
+  const safetyHint =
+    excerpt && excerpt.segments.length > 0 && relevantPrecautions.length === 0
+      ? '如有相关基础疾病，或正在同时使用其他药物，建议先咨询医生。'
+      : null
+
   const summary = excerpt
     ? excerpt.segments.length > 0
-      ? `说明书不良反应${excerpt.heading ? `（${excerpt.heading}）` : ''}：${excerpt.segments.join('；')}。`
+      ? `说明书在不良反应${excerpt.heading ? `的「${excerpt.heading}」` : ''}中列有：${excerpt.segments.join('；')}。`
       : relevantPrecautions.length > 0
         ? `说明书注意事项：${relevantPrecautions[0]}`
         : `本地说明书的「不良反应」段未见与「${excerpt.label}」相关的描述。`
@@ -505,7 +518,7 @@ export function fallbackSectionsFromInsert(question: string, insert: InsertSlice
 
   const keyPoints = excerpt
     ? excerpt.segments.length > 0
-      ? relevantPrecautions
+      ? [...(headingNote ? [headingNote] : []), ...relevantPrecautions, ...(safetyHint ? [safetyHint] : [])]
       : relevantPrecautions.slice(1)
     : precautionItems.slice(0, 3).map((item) => digestLeafletItem(item, 64))
 

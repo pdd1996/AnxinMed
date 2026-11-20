@@ -399,7 +399,10 @@ describe('fallbackSectionsFromInsert · 段内锚定摘录（伤肝/伤肾/犯�
     expect(s.summary).toContain('肝炎')
     expect(s.summary).toContain('上市后经验')
     expect(s.summary).not.toContain('临床试验')
-    expect(s.keyPoints).toEqual(['严重肝功能不全者慎用，需监测肝功能。'])
+    // 人话解释层：先解释「上市后经验」，再给相关注意事项
+    expect(s.keyPoints[0]).toContain('上市后经验')
+    expect(s.keyPoints[0]).toContain('发生频率无法估计')
+    expect(s.keyPoints.join('')).toContain('严重肝功能不全者慎用')
     expect(s.keyPoints.join('')).not.toContain('精神神经')
     // 原文仍可追溯
     expect(s.details?.[0]?.title).toBe('不良反应段（原文）')
