@@ -6,7 +6,6 @@ import {
   ChevronRight,
   ChevronUp,
   Info,
-  ShieldCheck,
 } from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import type {
@@ -187,13 +186,6 @@ export function AnswerCard({
                 {sections.nextAction}
               </Text>
             </View>
-          </View>
-
-          <View className="flex-row items-start gap-1.5">
-            <Icon as={ShieldCheck} size={16} color={mutedForeground} />
-            <Text className="flex-1 text-sm leading-5 text-muted-foreground">
-              {sections.warning}
-            </Text>
           </View>
         </View>
       ) : (

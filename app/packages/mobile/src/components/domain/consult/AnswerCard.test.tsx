@@ -30,7 +30,8 @@ describe("AnswerCard · 状态分支", () => {
     expect(view.getByText("注意风险")).toBeTruthy();
     expect(view.getByText("风险一")).toBeTruthy();
     expect(view.getByText("下一步")).toBeTruthy();
-    expect(view.getByText("警示语")).toBeTruthy();
+    // 2026-11-20 用户裁定：卡内不再渲染「不要根据 AI 回答自行调整处方」警示语
+    expect(view.queryByText("警示语")).toBeNull();
   });
 
   it("说明书分段摘要目录（kind=leaflet-overview）→ 标题用摘要语义", async () => {

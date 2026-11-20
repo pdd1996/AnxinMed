@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Info } from 'lucide-react'
 import { Link } from 'react-router'
 import type { ConsultClarifyOption, ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { Card, CardContent } from '@/components/ui/card'
@@ -152,11 +152,6 @@ export function AnswerCard({
                 <p className="text-sm font-semibold text-foreground">{sections.nextAction}</p>
               </div>
             </div>
-
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              {sections.warning}
-            </p>
           </div>
         ) : (
           <p className="text-sm text-foreground">{answer}</p>

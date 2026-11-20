@@ -48,6 +48,8 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('偶见眼部刺激感')).toBeTruthy()
     expect(screen.getByText('下一步')).toBeTruthy()
     expect(screen.getByText('如症状持续请咨询眼科医生')).toBeTruthy()
+    // 2026-11-20 用户裁定：卡内不再渲染「不要根据 AI 回答自行调整处方」警示语
+    expect(screen.queryByText('不要自行调整处方')).toBeNull()
   })
 
   it('M11-T2：提示卡短摘要 + details 展开原文（逐字 note 不进摘要）', () => {
