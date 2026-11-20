@@ -55,7 +55,7 @@ export const SECTION_ROUTES: ReadonlyArray<{
   },
   {
     key: 'adverse',
-    re: /不良|副作用|反应|不适|犯困|嗜睡|伤肝|肝损|肝功能|伤肾|肾损|肾功能/,
+    re: /不良|副作用|反应|不适|犯困|嗜睡|伤肝|肝损|肝功能|肝痛|肝区|肝疼|肝病|伤肾|肾损|肾功能/,
     label: '不良反应段',
   },
   { key: 'pregnancy', re: /孕|怀孕|备孕|哺乳|喂奶|母乳/, label: '孕妇及哺乳期用药' },

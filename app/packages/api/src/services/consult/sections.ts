@@ -257,7 +257,7 @@ interface TopicAnchor {
 }
 
 const TOPIC_ANCHORS: ReadonlyArray<TopicAnchor> = [
-  { label: '肝', query: /伤肝|肝损|肝功能|肝脏|肝炎|对肝/, text: /肝/ },
+  { label: '肝', query: /伤肝|肝损|肝功能|肝脏|肝炎|对肝|肝痛|肝区|肝疼|肝病/, text: /肝/ },
   { label: '肾', query: /伤肾|肾损|肾功能|肾脏|对肾/, text: /肾/ },
   {
     label: '胃肠',
@@ -438,16 +438,24 @@ export function fallbackSectionsFromInsert(question: string, insert: InsertSlice
       : relevantPrecautions.slice(1)
     : precautionItems.slice(0, 3).map((item) => digestLeafletItem(item, 64))
 
+  // 症状类问句（「肝痛能服用吗」）：说明书不构成用药条件，下一步先引导就医，
+  // 不给「能不能吃」的结论，避免把症状误当适应症或自行用药的理由。
+  const symptomatic = /痛|疼|不舒服|胀|酸/.test(String(question ?? ''))
+  const nextAction =
+    excerpt && excerpt.segments.length > 0 && symptomatic
+      ? '说明书未把您描述的症状列为用药条件；请先就医明确原因，是否服用请遵医嘱。'
+      : leafletNextAction(
+          excerpt
+            ? [...excerpt.segments, ...relevantPrecautions]
+            : [sectionText, ...precautionItems.slice(0, 3), ...contraItems],
+        )
+
   const sections = normalizeSections(
     {
       summary,
       keyPoints,
       risks: contraItems.slice(0, 2).map((item) => digestShortText(item, 50)),
-      nextAction: leafletNextAction(
-        excerpt
-          ? [...excerpt.segments, ...relevantPrecautions]
-          : [sectionText, ...precautionItems.slice(0, 3), ...contraItems],
-      ),
+      nextAction,
       warning: '不要根据 AI 回答自行调整处方。',
     },
     {

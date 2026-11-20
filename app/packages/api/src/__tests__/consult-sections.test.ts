@@ -424,6 +424,21 @@ describe('fallbackSectionsFromInsert · 段内锚定摘录（伤肝/伤肾/犯�
     expect(s.keyPoints[0]).toContain('避免驾车')
   })
 
+  it('「这个药 肝痛能服用吗」→ 仍取肝相关原文，且下一步先引导就医（不给能不能吃的结论）', () => {
+    expect(pickInsertSections('这个药 肝痛能服用吗', olsetamivir).key).toBe('adverse')
+    const s = fallbackSectionsFromInsert('这个药 肝痛能服用吗', olsetamivir)
+
+    expect(s.summary).toContain('肝炎')
+    expect(s.nextAction).toContain('就医')
+    expect(s.nextAction).toContain('未把')
+    expect(s.nextAction).not.toContain('具体是否适用')
+  })
+
+  it('非症状问句（伤肝吗）→ 下一步仍是通用就医/药师提示', () => {
+    const s = fallbackSectionsFromInsert('这个药伤肝吗', olsetamivir)
+    expect(s.nextAction).toContain('具体是否适用')
+  })
+
   it('非锚定问题（副作用）→ 行为不变，仍是段首摘要 + 注意事项前 3 条', () => {
     const s = fallbackSectionsFromInsert('有什么副作用', olsetamivir)
 
