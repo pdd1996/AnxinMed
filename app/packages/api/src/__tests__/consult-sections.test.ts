@@ -381,7 +381,16 @@ describe('citations · 引用三件套', () => {
       source: '丁香园用药助手',
       version: '2024-01',
       unverified: false,
+      // 2026-11-20：本地引用补核验状态与身份字段（L0 顶部 banner / 来源卡展示）
+      reviewStatus: 'reviewed',
+      specification: '0.1%（10mL:10mg）',
     })
+  })
+
+  it('insertCitation：crawled 说明书 → reviewStatus=crawled（界面标「未经人工核验」）', () => {
+    const c = insertCitation(mkInsert({ curationStatus: 'crawled', approvalNumbers: ['国药准字H20213670'] }))
+    expect(c.reviewStatus).toBe('crawled')
+    expect(c.approvalNumbers).toEqual(['国药准字H20213670'])
   })
 
   it('insertCitation：source/version 缺失 → "未标注"兜底，不留空', () => {

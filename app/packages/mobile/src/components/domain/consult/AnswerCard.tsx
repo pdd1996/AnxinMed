@@ -44,6 +44,8 @@ export interface AnswerCardProps {
   /** 对象澄清选项（仅 status='clarify'，M13-P1）：点选后由页面带 drugId 重发原问题。 */
   clarifyOptions?: ConsultClarifyOption[] | null;
   onPickDrug?: (drugId: string) => void;
+  /** 说明书分段落页入口（2026-11-20）：有值时渲染「查看完整说明书」按钮。 */
+  onViewLeaflet?: () => void;
 }
 
 /** 组装中文播报文本（照 web `buildSpeakText`，web 冻结不抽公共，05f §0-6）。 */
@@ -71,6 +73,7 @@ export function buildSpeakText(
 }
 
 export function AnswerCard({
+  status,
   answer,
   sections,
   notice,
@@ -79,6 +82,7 @@ export function AnswerCard({
   blocked,
   clarifyOptions,
   onPickDrug,
+  onViewLeaflet,
 }: AnswerCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
@@ -86,7 +90,24 @@ export function AnswerCard({
   const riskL3 = useUnstableNativeVariable("--risk-l3");
   // L0 资料查询（manual 档 / 说明书未核验）：原文摘录，不是个性化回答。
   const isL0 = Boolean(l0Notice);
+  // 只有 manual-gate（L0 原文卡）用「说明书原文」语义标签；可用性回答仍是普通小结。
+  const isRawLeaflet = isL0 && status === "manual-gate";
   const source = citations[0];
+  const reviewText =
+    source?.reviewStatus === "reviewed"
+      ? "已人工核验"
+      : source?.reviewStatus
+        ? "未人工核验"
+        : null;
+  const identityLine = source
+    ? `${[source.drugName, source.specification].filter(Boolean).join(" · ")} · ${source.source}（版本 ${source.version}）`
+    : null;
+  const metaLine = [
+    source?.approvalNumbers?.length ? `批准文号：${source.approvalNumbers.join("、")}` : null,
+    reviewText ? `核验状态：${reviewText}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <View
@@ -101,10 +122,11 @@ export function AnswerCard({
             <Icon as={ShieldAlert} size={16} color={riskL2} />
             <Text className="flex-1 text-sm font-medium leading-5 text-risk-l2">{l0Notice}</Text>
           </View>
-          {source ? (
-            <Text className="pl-5 text-xs leading-4 text-muted-foreground">
-              来源：{source.drugName} · {source.source}（版本 {source.version}）
-            </Text>
+          {identityLine ? (
+            <Text className="pl-5 text-xs leading-4 text-muted-foreground">{identityLine}</Text>
+          ) : null}
+          {metaLine ? (
+            <Text className="pl-5 text-xs leading-4 text-muted-foreground">{metaLine}</Text>
           ) : null}
         </View>
       ) : null}
@@ -113,7 +135,7 @@ export function AnswerCard({
         <View className="gap-3">
           <View className="gap-1">
             <Text className="text-sm font-medium text-muted-foreground">
-              {isL0 ? "说明书要点" : "简明结论"}
+              {isRawLeaflet ? "说明书原文" : "简明结论"}
             </Text>
             <Text className="text-lg font-semibold leading-7 text-card-foreground">
               {sections.summary}
@@ -125,7 +147,7 @@ export function AnswerCard({
               <View className="flex-row items-center gap-1.5">
                 <Icon as={Info} size={16} color={mutedForeground} />
                 <Text className="text-sm font-medium text-muted-foreground">
-                  {isL0 ? "注意事项" : "需要知道"}
+                  {isRawLeaflet ? "注意事项" : "需要知道"}
                 </Text>
               </View>
               <View className="gap-1.5 pl-1">
@@ -175,7 +197,7 @@ export function AnswerCard({
               <View className="flex-row items-center gap-1.5">
                 <Icon as={AlertTriangle} size={16} color={riskL3} />
                 <Text className="text-sm font-medium text-risk-l3">
-                  {isL0 ? "禁忌" : "注意风险"}
+                  {isRawLeaflet ? "禁忌" : "注意风险"}
                 </Text>
               </View>
               <View className="gap-1.5 pl-1">
@@ -209,6 +231,17 @@ export function AnswerCard({
       ) : (
         <Text className="text-base leading-6 text-card-foreground">{answer}</Text>
       )}
+
+      {onViewLeaflet ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onViewLeaflet}
+          className="mt-3 min-h-[44px] flex-row items-center justify-between rounded-xl border border-primary bg-primary-tint px-3 active:opacity-80"
+        >
+          <Text className="text-base font-medium text-primary">查看完整说明书</Text>
+          <Icon as={ChevronRight} size={18} color={mutedForeground} />
+        </Pressable>
+      ) : null}
 
       {notice ? (
         <View className="mt-3 flex-row items-start gap-1.5 rounded-xl border border-risk-l2 bg-risk-l2-tint p-2.5">

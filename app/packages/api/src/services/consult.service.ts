@@ -34,6 +34,7 @@ import { PII_ASSERT_PATTERNS, scrubWithPatterns } from './sanitize/scan.js'
 import { nameMatches } from './identity/normalize.js'
 import * as profilesRepo from '../repositories/profiles.repo.js'
 import { runConsult } from './consult/run.js'
+import { buildInsertAvailabilityResult, isInsertAvailabilityQuestion } from './consult/availability.js'
 import { runDataQuery } from './consult/dataquery.js'
 import { formatSkillRoute, resolveSkillRoute } from './consult/registry.js'
 import {
@@ -56,7 +57,8 @@ import { allergyOverlay, extractAllergyKeywords } from './consult/allergy.js'
 import { extractConditions } from './consult/conditions.js'
 import { validateCitationCoverage } from './consult/coverage.js'
 import { matchAddDrug, matchSymptomGuide } from './consult/suggestion.js'
-import type { ConsultDrug, ConsultRunResult, InsertSlice } from './consult/types.js'
+import { toInsertSlice } from './consult/insert-slice.js'
+import type { ConsultDrug, ConsultRunResult } from './consult/types.js'
 import type { InteractionRuleInput } from './rules/index.js'
 import { newId } from '../lib/util.js'
 import { ApiError } from '../lib/http.js'
@@ -84,31 +86,6 @@ function isScopeGateEnabled(): boolean {
  */
 function isObjectClarifyEnabled(): boolean {
   return String(process.env.ENABLE_OBJECT_CLARIFY ?? '').toLowerCase() !== 'false'
-}
-
-/** package_inserts 行 → InsertSlice（裁剪到按键取数所需列）。 */
-function toInsertSlice(row: assetsRepo.PackageInsertRow): InsertSlice {
-  return {
-    drugId: row.drugId,
-    genericName: row.genericName,
-    brandName: row.brandName,
-    specification: row.specification,
-    form: row.form,
-    indication: row.indication,
-    components: row.components,
-    dosage: row.dosage,
-    contraindications: row.contraindications,
-    adverseReactions: row.adverseReactions,
-    precautions: row.precautions,
-    interactions: row.interactions,
-    pharmacology: row.pharmacology,
-    pharmacokinetics: row.pharmacokinetics,
-    storage: row.storage,
-    source: row.source,
-    version: row.version,
-    sourceSections: row.sourceSections ?? null,
-    curationStatus: row.curationStatus,
-  }
 }
 
 /**
@@ -319,6 +296,16 @@ export async function consult(
       result = buildOutOfScopeResult(scope)
     } else if (drugs.length > 0) {
       gateSteps.push({ layer: 'object', outcome: 'bound', detail: { drugCount: drugs.length } })
+      // 2026-11-20：「说明书有没有/能不能看」是资料可用性问题，不是内容解释——
+      // 走确定性回答（0 次 LLM、0 写入），给来源/版本/批准文号/核验状态 + 查看入口。
+      if (isInsertAvailabilityQuestion(questionRedacted)) {
+        result = buildInsertAvailabilityResult(drugs)
+        gateSteps.push({
+          layer: 'leaflet',
+          outcome: result.status === 'no-source' ? 'missing' : 'collected',
+          detail: { reviewStatus: drugs.find((d) => d.insert)?.insert?.curationStatus ?? 'none' },
+        })
+      }
     } else if (isObjectClarifyEnabled() && shouldClarifyObject(normalizeRoutingText(questionRedacted))) {
       // 只在药箱非空时澄清；空药箱回退既有 no-source（引导去录入）。
       const boxRows = await drugsRepo.listDrugs(userId)
@@ -537,6 +524,7 @@ export async function consult(
     blocked: result.blocked,
     toolUsed: result.toolUsed ?? null,
     clarifyOptions: result.clarifyOptions ?? null,
+    leafletDrugId: result.leafletDrugId ?? null,
     consultLogId,
     sessionId: session.id,
     suggestion,

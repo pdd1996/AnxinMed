@@ -1,6 +1,6 @@
 import { hc } from 'hono/client'
 import type { AppType } from '@anxin/api'
-import type { ConsultSkillId, DraftConfirm } from '@anxin/shared'
+import type { ConsultSkillId, DraftConfirm, Leaflet } from '@anxin/shared'
 import { BAD_RESPONSE_ERROR_CODE, BAD_RESPONSE_ERROR_MESSAGE } from '../lib/error-messages'
 
 /**
@@ -168,6 +168,16 @@ export async function fetchDrugs() {
   const res = await client.api.drugs.$get()
   const data = await unwrap(res)
   return data.items
+}
+
+/**
+ * GET /api/drugs/:id/leaflet —— 说明书分段落原文（2026-11-20）。
+ * 咨询卡「查看完整说明书」入口与独立分段落页共用；本地未收录/越权时 API 404（失败可见）。
+ */
+export async function fetchLeaflet(drugId: string): Promise<Leaflet> {
+  const res = await client.api.drugs[':id'].leaflet.$get({ param: { id: drugId } })
+  const data = await unwrap(res)
+  return data.leaflet
 }
 
 /** 今日任务：验证嵌套路径 /api/tasks/today 的类型连通。 */

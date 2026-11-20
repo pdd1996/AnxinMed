@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import type { ConsultSections } from '@anxin/shared'
 import { AnswerCard } from './AnswerCard'
 
@@ -121,42 +122,89 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText(/未经 OCR 确认/)).toBeTruthy()
   })
 
-  // 2026-11-20 排版优化：L0 先交代「未核验 + 来源」，标题改成原文语义，长原文进折叠区
-  it('L0（manual-gate）→ 顶部未核验提示 + 来源 + 原文版式短摘要', () => {
+  // 2026-11-20 排版优化：L0 先交代「未核验 + 身份/来源」，标题改成原文语义，长原文进折叠区
+  it('L0（manual-gate）→ 顶部未核验提示 + 身份/来源/核验状态 + 原文版式 + 查看入口', () => {
     render(
-      <AnswerCard
-        riskLevel="L1"
-        status="manual-gate"
-        answer="用于缓解干眼症状"
-        sections={mkSections({
-          summary: '用于缓解干眼症状',
-          keyPoints: ['开封后一个月内使用'],
-          risks: ['对玻璃酸钠过敏者禁用'],
-          details: [{ title: '适应症段（原文）', body: '用于缓解干眼症状', source: '丁香园用药助手' }],
-        })}
-        citations={[
-          {
-            drugName: '玻璃酸钠滴眼液',
-            source: '丁香园用药助手',
-            version: '2024-01',
-            unverified: false,
-          },
-        ]}
-        l0Notice="该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。"
-        blocked
-      />,
+      <MemoryRouter>
+        <AnswerCard
+          riskLevel="L1"
+          status="manual-gate"
+          answer="用于缓解干眼症状"
+          sections={mkSections({
+            summary: '用于缓解干眼症状',
+            keyPoints: ['开封后一个月内使用'],
+            risks: ['对玻璃酸钠过敏者禁用'],
+            details: [{ title: '适应症段（原文）', body: '用于缓解干眼症状', source: '丁香园用药助手' }],
+          })}
+          citations={[
+            {
+              drugName: '玻璃酸钠滴眼液',
+              source: '丁香园用药助手',
+              version: '2024-01',
+              unverified: false,
+              reviewStatus: 'crawled',
+              specification: '0.1%（10mL:10mg）',
+              approvalNumbers: ['国药准字H20240001'],
+            },
+          ]}
+          l0Notice="该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。"
+          leafletHref="/leaflet/drug-1"
+          blocked
+        />
+      </MemoryRouter>,
     )
-    // 顶部提示 + 来源（不再等用户滚到卡片底部才看到）
+    // 顶部提示 + 身份/来源/批准文号/核验状态（不再等用户滚到卡片底部才看到）
     expect(screen.getByText(/尚未人工核验/)).toBeTruthy()
-    expect(screen.getByText(/来源：玻璃酸钠滴眼液 · 丁香园用药助手（版本 2024-01）/)).toBeTruthy()
+    expect(screen.getByText(/玻璃酸钠滴眼液 · 0.1%（10mL:10mg） · 丁香园用药助手（版本 2024-01）/)).toBeTruthy()
+    expect(screen.getByText(/批准文号：国药准字H20240001 · 核验状态：未人工核验/)).toBeTruthy()
     // 原文语义标题（不再写「简明结论/需要知道/注意风险」）
-    expect(screen.getByText('说明书要点')).toBeTruthy()
+    expect(screen.getByText('说明书原文')).toBeTruthy()
     expect(screen.getByText('注意事项')).toBeTruthy()
     expect(screen.getByText('禁忌')).toBeTruthy()
     expect(screen.queryByText('简明结论')).toBeNull()
-    // 完整原文进折叠区
+    // 完整原文进折叠区 + 查看入口
     expect(screen.getByText('展开原文（1 条）')).toBeTruthy()
     expect(screen.getByText('适应症段（原文）')).toBeTruthy()
+    expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
+  })
+
+  it('说明书可用性回答（未核验）→ 顶部 banner + 身份/来源 + 查看入口（首屏可见）', () => {
+    render(
+      <MemoryRouter>
+        <AnswerCard
+          riskLevel="L1"
+          status="answered"
+          answer="已收录「玻璃酸钠滴眼液」的说明书原文，但尚未人工核验。"
+          sections={mkSections({
+            summary: '已收录「玻璃酸钠滴眼液 0.1%」的说明书原文，但尚未人工核验。',
+            keyPoints: ['以下内容为说明书原文摘录，仅供查阅，请以药品包装内说明书为准。'],
+            risks: ['对玻璃酸钠过敏者禁用。'],
+          })}
+          citations={[
+            {
+              drugName: '玻璃酸钠滴眼液',
+              source: '说明书 PDF（本地资料库）',
+              version: '2024-01',
+              unverified: false,
+              reviewStatus: 'crawled',
+              specification: '0.1%（10mL:10mg）',
+              approvalNumbers: ['国药准字H20240001'],
+            },
+          ]}
+          l0Notice="该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。涉及：玻璃酸钠滴眼液。"
+          leafletHref="/leaflet/drug-1"
+        />
+      </MemoryRouter>,
+    )
+    // 顶部 banner 首屏可见：未核验 + 身份 + 来源 + 批准文号 + 核验状态（summary 也含「未核验」，用 getAll）
+    expect(screen.getAllByText(/尚未人工核验/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/暂不能提供个性化解释/)).toBeTruthy()
+    expect(screen.getByText(/玻璃酸钠滴眼液 · 0.1%（10mL:10mg） · 说明书 PDF（本地资料库）/)).toBeTruthy()
+    expect(screen.getByText(/批准文号：国药准字H20240001 · 核验状态：未人工核验/)).toBeTruthy()
+    expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
+    // 可用性回答不是原文卡：标题仍是「简明结论」（原文卡才用「说明书原文」）
+    expect(screen.getByText('简明结论')).toBeTruthy()
+    expect(screen.queryByText('说明书原文')).toBeNull()
   })
 
   it('no-source → notice 兜底提示（状态徽章已移除）', () => {

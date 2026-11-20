@@ -302,6 +302,11 @@ export default function Consult() {
                         blocked={msg.response.blocked}
                         toolUsed={msg.response.toolUsed}
                         clarifyOptions={msg.response.clarifyOptions ?? null}
+                        leafletHref={
+                          msg.response.leafletDrugId
+                            ? `/leaflet/${msg.response.leafletDrugId}`
+                            : null
+                        }
                         onPickDrug={(drugId) => handleClarifyPick(messages[idx - 1]?.question, drugId)}
                       />
                     ) : null}

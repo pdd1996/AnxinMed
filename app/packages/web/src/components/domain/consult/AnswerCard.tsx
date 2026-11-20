@@ -1,4 +1,5 @@
 import { AlertTriangle, ChevronRight, Info, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Link } from 'react-router'
 import type { ConsultClarifyOption, ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -34,6 +35,8 @@ export interface AnswerCardProps {
   /** 对象澄清选项（仅 status='clarify' 时非空，M13-P1）：点选后由页面带 drugId 重发原问题。 */
   clarifyOptions?: ConsultClarifyOption[] | null
   onPickDrug?: (drugId: string) => void
+  /** 说明书分段落页入口（2026-11-20）：有值时渲染「查看完整说明书」链接。 */
+  leafletHref?: string | null
 }
 
 /**
@@ -62,6 +65,7 @@ export function buildSpeakText(sections: ConsultSections | null, answer: string,
 }
 
 export function AnswerCard({
+  status,
   answer,
   sections,
   notice,
@@ -70,11 +74,29 @@ export function AnswerCard({
   blocked,
   clarifyOptions,
   onPickDrug,
+  leafletHref,
 }: AnswerCardProps) {
   // L0 资料查询（manual 档 / 说明书未核验）：原文摘录，不是个性化回答——
-  // 顶部先交代「未核验 + 来源」，再用短摘要渲染；完整原文收在「展开原文」。
+  // 顶部先交代「未核验 + 身份/来源」，再用短摘要渲染；完整原文去「查看完整说明书」分段页。
   const isL0 = Boolean(l0Notice)
+  // 只有 manual-gate（L0 原文卡）用「说明书原文」语义标签；可用性回答仍是普通小结。
+  const isRawLeaflet = isL0 && status === 'manual-gate'
   const source = citations[0]
+  const reviewText =
+    source?.reviewStatus === 'reviewed'
+      ? '已人工核验'
+      : source?.reviewStatus
+        ? '未人工核验'
+        : null
+  const identityLine = source
+    ? `${[source.drugName, source.specification].filter(Boolean).join(' · ')} · ${source.source}（版本 ${source.version}）`
+    : null
+  const metaLine = [
+    source?.approvalNumbers?.length ? `批准文号：${source.approvalNumbers.join('、')}` : null,
+    reviewText ? `核验状态：${reviewText}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
@@ -85,11 +107,8 @@ export function AnswerCard({
               <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               {l0Notice}
             </p>
-            {source && (
-              <p className="pl-5 text-xs text-muted-foreground">
-                来源：{source.drugName} · {source.source}（版本 {source.version}）
-              </p>
-            )}
+            {identityLine && <p className="pl-5 text-xs text-muted-foreground">{identityLine}</p>}
+            {metaLine && <p className="pl-5 text-xs text-muted-foreground">{metaLine}</p>}
           </div>
         )}
 
@@ -98,7 +117,7 @@ export function AnswerCard({
           <div className="space-y-3">
             <div className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">
-                {isL0 ? '说明书要点' : '简明结论'}
+                {isRawLeaflet ? '说明书原文' : '简明结论'}
               </span>
               <p className="text-sm font-semibold text-foreground">{sections.summary}</p>
             </div>
@@ -107,7 +126,7 @@ export function AnswerCard({
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <Info className="size-3.5" aria-hidden />
-                  {isL0 ? '注意事项' : '需要知道'}
+                  {isRawLeaflet ? '注意事项' : '需要知道'}
                 </h4>
                 <ul className="space-y-1 pl-1 text-sm text-foreground">
                   {sections.keyPoints.map((item) => (
@@ -142,7 +161,7 @@ export function AnswerCard({
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-risk-l3">
                   <AlertTriangle className="size-3.5" aria-hidden />
-                  {isL0 ? '禁忌' : '注意风险'}
+                  {isRawLeaflet ? '禁忌' : '注意风险'}
                 </h4>
                 <ul className="space-y-1 pl-1 text-sm text-foreground">
                   {sections.risks.map((item) => (
@@ -170,6 +189,17 @@ export function AnswerCard({
           </div>
         ) : (
           <p className="text-sm text-foreground">{answer}</p>
+        )}
+
+        {/* 说明书查看入口（2026-11-20）：可用性回答 / L0 原文卡 → 分段落页 */}
+        {leafletHref && (
+          <Link
+            to={leafletHref}
+            className="flex min-h-11 items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            查看完整说明书
+            <ChevronRight className="size-4" aria-hidden />
+          </Link>
         )}
 
         {/* 底部：notice（L2 过滤 / no-source 兜底 / ai-unavailable 降级） */}

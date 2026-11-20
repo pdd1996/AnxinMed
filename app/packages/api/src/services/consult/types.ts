@@ -29,6 +29,8 @@ export interface InsertSlice {
   genericName: string
   brandName: string | null
   specification: string | null
+  /** 批准文号（可多值；来源行缺失时为空——用于 L0 顶部身份与引用展示）。 */
+  approvalNumbers?: string[] | null
   form: string | null
   indication: string | null
   components: string | null
@@ -131,6 +133,11 @@ export interface Citation {
   sectionLabel?: string
   /** 段落锚点（M4-T9）：指向的说明书段落键，且必须 ∈ 本轮证据集合（coverage 校验）。 */
   sectionKey?: string
+  /** 说明书核验状态（2026-11-20）：非说明书来源的引用无此字段。 */
+  reviewStatus?: 'mock' | 'crawled' | 'reviewed'
+  /** 说明书身份补充（L0 顶部 banner 用）。 */
+  specification?: string
+  approvalNumbers?: string[]
 }
 
 /** runConsult 输入（路由层组装：DB 取数 + 用户提问 + env 开关）。 */
@@ -199,4 +206,9 @@ export interface ConsultRunResult {
    * 其余路径缺省；service 层透传到响应 `clarifyOptions`。
    */
   clarifyOptions?: ConsultClarifyOption[] | null
+  /**
+   * 说明书查看入口（2026-11-20）：L0/说明书可用性回答时回用户药箱 drugId，
+   * 前端展示「查看完整说明书」并路由到分段落页；其余路径缺省。
+   */
+  leafletDrugId?: string | null
 }

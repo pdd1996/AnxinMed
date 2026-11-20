@@ -55,6 +55,7 @@ export default function RootLayout() {
                 <Stack.Screen name="records" options={{ title: "服药记录" }} />
                 <Stack.Screen name="account" options={{ title: "个人资料" }} />
                 <Stack.Screen name="health-info" options={{ title: "健康信息" }} />
+                <Stack.Screen name="leaflet/[drugId]" options={{ title: "说明书" }} />
                 <Stack.Screen name="settings" options={{ title: "设置" }} />
                 <Stack.Screen name="password" options={{ title: "登录密码" }} />
                 <Stack.Screen name="notification-settings" options={{ title: "通知与提醒设置" }} />

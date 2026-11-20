@@ -13,6 +13,7 @@ const IntakeRx = lazy(() => import('@/routes/patient/IntakeRx'))
 const IntakeDrug = lazy(() => import('@/routes/patient/IntakeDrug'))
 const Draft = lazy(() => import('@/routes/patient/Draft'))
 const Consult = lazy(() => import('@/routes/patient/Consult'))
+const Leaflet = lazy(() => import('@/routes/patient/Leaflet'))
 const Profile = lazy(() => import('@/routes/patient/Profile'))
 const Account = lazy(() => import('@/routes/patient/Account'))
 const HealthInfo = lazy(() => import('@/routes/patient/HealthInfo'))
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
           { path: '/intake/drug', element: page(<IntakeDrug />) },
           { path: '/drafts/:id', element: page(<Draft />) },
           { path: '/consult', element: page(<Consult />) },
+          { path: '/leaflet/:drugId', element: page(<Leaflet />) },
           { path: '/profile', element: page(<Profile />) },
           { path: '/account', element: page(<Account />) },
           { path: '/health-info', element: page(<HealthInfo />) },

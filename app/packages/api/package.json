@@ -51,7 +51,8 @@
     "demo:setup-doctor": "tsx src/scripts/demo-doctor-setup.ts",
     "sms:smoke": "tsx src/scripts/sms-smoke.ts",
     "eval:record-consult-fixtures": "tsx src/scripts/record-consult-fixtures.ts",
-    "eval:consult-bakeoff": "tsx src/scripts/consult-bakeoff.ts"
+    "eval:consult-bakeoff": "tsx src/scripts/consult-bakeoff.ts",
+    "db:normalize-crawled-inserts": "tsx src/db/oneoff-2026-11-20-normalize-crawled-inserts.ts"
   },
   "dependencies": {
     "@anxin/shared": "workspace:*",

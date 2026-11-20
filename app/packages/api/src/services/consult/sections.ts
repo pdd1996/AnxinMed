@@ -151,7 +151,7 @@ export function normalizeSections(raw: ConsultRawSections | null, context: Norma
 const CJK_RE = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/
 
 /** 合并 PDF 硬折行：中文字符之间的换行直接拼接，其余换行归一为空格。 */
-function flattenLeafletText(text: unknown): string {
+export function normalizeLeafletText(text: unknown): string {
   const raw = String(text ?? '').replace(/\r/g, '')
   const joined = raw.replace(/\n+/g, (match: string, offset: number, whole: string) => {
     const prev = whole[offset - 1] ?? ''
@@ -210,7 +210,7 @@ function splitLeafletItems(value: unknown): string[] {
       parts = raw.split(/(?=[·●•○]\s*\d{1,2}\s*[.、．])/)
     }
     for (const part of parts) {
-      const item = stripItemNumber(flattenLeafletText(part))
+      const item = stripItemNumber(normalizeLeafletText(part))
       if (item) items.push(item)
     }
   }
@@ -218,8 +218,8 @@ function splitLeafletItems(value: unknown): string[] {
 }
 
 /** 说明书段落 → 短摘要（去长括注 + 去句首编号 + 截首句）。 */
-function digestSectionText(text: string, max = 90): string {
-  const t = stripLongParentheticals(flattenLeafletText(text)).replace(
+export function digestSectionText(text: string, max = 90): string {
+  const t = stripLongParentheticals(normalizeLeafletText(text)).replace(
     /(^|[。；！？])\s*\d{1,2}\s*[.、．]\s*/g,
     '$1',
   )
@@ -232,8 +232,20 @@ function digestLeafletItem(text: string, max = 64): string {
 }
 
 /** 禁忌等短段落 → 短要点。 */
-function digestShortText(text: unknown, max = 50): string {
-  return firstSentences(stripLongParentheticals(flattenLeafletText(text)), max)
+export function digestShortText(text: unknown, max = 50): string {
+  return firstSentences(stripLongParentheticals(normalizeLeafletText(text)), max)
+}
+
+/**
+ * 说明书原文的「下一步」：命中严重警示关键词时给即时就医提示（P2，2026-11-20）；
+ * 否则回到通用「问医生/药师」。只加固定安全语，不生成个体化建议。
+ */
+export function leafletNextAction(texts: string[]): string {
+  const joined = texts.join(' ')
+  if (/致命|精神神经|谵妄|惊厥|幻觉|行为异常|严重过敏|过敏性休克|呼吸困难|立即就医/.test(joined)) {
+    return '如出现幻觉、谵妄、行为异常、严重过敏或呼吸困难等，请立即就医；用药调整请咨询医生或药师。'
+  }
+  return '具体是否适用、用法用量及疗程请咨询医生或药师。'
 }
 
 /**
@@ -255,7 +267,7 @@ export function fallbackSectionsFromInsert(question: string, insert: InsertSlice
       summary: digestSectionText(sectionText, 90),
       keyPoints: precautionItems.slice(0, 3).map((item) => digestLeafletItem(item, 64)),
       risks: contraItems.slice(0, 2).map((item) => digestShortText(item, 50)),
-      nextAction: '如有疑问，请咨询医生或药师。',
+      nextAction: leafletNextAction([sectionText, ...precautionItems.slice(0, 3), ...contraItems]),
       warning: '不要根据 AI 回答自行调整处方。',
     },
     {
@@ -267,7 +279,7 @@ export function fallbackSectionsFromInsert(question: string, insert: InsertSlice
 
   // 展开原文：所选段落全文 + 注意事项逐条原文（选中的就是注意事项时只保留逐条，避免重复）
   const details: Array<{ title: string; body: string; source?: string }> = []
-  const sectionBody = flattenLeafletText(sectionText)
+  const sectionBody = normalizeLeafletText(sectionText)
   if (sectionBody && section.key !== 'precautions') {
     details.push({ title: `${section.label}（原文）`, body: sectionBody, source: insert.source || undefined })
   }

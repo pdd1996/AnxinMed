@@ -24,6 +24,7 @@ import { AIUnavailableError } from '../../lib/ai/types.js'
 import type { AiClients } from '../../lib/ai/types.js'
 import { insertCitation } from './citations.js'
 import { guardConsult } from './guards.js'
+import { MANUAL_GATE_NOTICE, UNVERIFIED_NOTICE, withDrugNames } from './notices.js'
 import { fallbackSectionsFromInsert, normalizeSections, pickInsertSections } from './sections.js'
 import type {
   Citation,
@@ -54,14 +55,6 @@ const REFUSED_SECTIONS: NormalizedSections = {
   limited: false,
 }
 
-/** manual-gate 固定提示（PRD §7.5：仅可 L0 资料查询，不可进入个体化解释）。 */
-const MANUAL_GATE_NOTICE =
-  '该药为手动建档（未经 OCR 确认），暂不能提供个性化解释，仅可查看说明书原文。'
-
-/** 说明书未核验提示（资产侧门禁：curationStatus !== reviewed）。 */
-const UNVERIFIED_NOTICE =
-  '该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。'
-
 /**
  * L0 资料查询结果（manual-gate 与 unverified 共用）。
  * 暂复用 manual-gate 状态，避免扩展 consult_logs.status 枚举；l0Notice 负责区分原因。
@@ -81,6 +74,7 @@ function buildL0FromInsert(primary: ConsultDrug, question: string, notice: strin
     blocked: true,
     matchedKeyword: null,
     triggerDrugId: primary.id,
+    leafletDrugId: primary.id,
   }
 }
 
@@ -186,7 +180,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     const primary = pickPrimaryDrug(drugs)
     // manual 档也可能命中说明书（demo findInsertByDrug 的 nameMatches 兜底路径）
     if (primary?.insert) {
-      return buildL0FromInsert(primary, question, MANUAL_GATE_NOTICE)
+      return buildL0FromInsert(primary, question, withDrugNames(MANUAL_GATE_NOTICE, [primary.genericName]))
     }
     // manual 档 + 说明书也未命中 → 仍返回 manual-gate（门禁基于 confirmStatus，不基于 insert）
     // 附固定文案说明"未经 OCR 确认且本地未收录"，避免前端拿到空 sections
@@ -198,7 +192,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
       answer: summary,
       sections: {
         summary,
-        keyPoints: ['手动建档药品仅可做 L0 资料查询', '本地说明书库按药名兜底也未命中'],
+        keyPoints: ['手动建档药品仅可查看药品原文资料', '本地说明书库按药名兜底也未命中'],
         risks: [],
         nextAction: '请查看药品说明书或咨询医生、药师。',
         warning: '不要根据未标注来源的资料自行调整用药。',
@@ -222,7 +216,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
       return buildL0FromInsert(
         primary,
         question,
-        `${UNVERIFIED_NOTICE}涉及：${decision.drugNames.join('、')}。`,
+        withDrugNames(UNVERIFIED_NOTICE, decision.drugNames),
       )
     }
     return buildNoSourceResult(primary?.genericName ?? null)
@@ -325,6 +319,7 @@ export async function runConsult(input: ConsultRunInput): Promise<ConsultRunResu
     blocked: false,
     matchedKeyword: null,
     triggerDrugId: null,
+    leafletDrugId: primary.id,
   }
 }
 

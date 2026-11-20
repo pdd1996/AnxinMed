@@ -391,6 +391,11 @@ export default function Consult() {
                 toolUsed={msg.response.toolUsed}
                 clarifyOptions={msg.response.clarifyOptions ?? null}
                 onPickDrug={(drugId) => handleClarifyPick(messages[idx - 1]?.question, drugId)}
+                onViewLeaflet={
+                  msg.response?.leafletDrugId
+                    ? () => router.push(`/leaflet/${msg.response!.leafletDrugId}`)
+                    : undefined
+                }
               />
             ) : null,
           )}

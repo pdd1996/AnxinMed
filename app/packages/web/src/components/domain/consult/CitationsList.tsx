@@ -32,6 +32,13 @@ function sectionText(c: Citation): string | null {
   return null
 }
 
+/** 核验徽章（2026-11-20）：外部检索 → 未经本库核实；本地说明书未人工核对 → 说明书未经人工核验。 */
+function verificationBadge(c: Citation): string | null {
+  if (c.unverified) return '未经本库核实'
+  if (c.reviewStatus && c.reviewStatus !== 'reviewed') return '说明书未经人工核验'
+  return null
+}
+
 export function CitationsList({ citations, className }: { citations: Citation[]; className?: string }) {
   const [open, setOpen] = useState(false)
 
@@ -60,10 +67,10 @@ export function CitationsList({ citations, className }: { citations: Citation[];
             >
               <div className="flex items-start justify-between gap-2">
                 <strong className="font-semibold text-foreground">{c.drugName}</strong>
-                {c.unverified && (
+                {verificationBadge(c) && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-risk-l3/35 bg-risk-l3/15 px-2 py-0.5 text-xs font-semibold text-risk-l3">
                     <ShieldAlert className="size-3" aria-hidden />
-                    未经本库核实
+                    {verificationBadge(c)}
                   </span>
                 )}
               </div>
@@ -77,6 +84,18 @@ export function CitationsList({ citations, className }: { citations: Citation[];
                   <span className="font-medium text-foreground/80">版本：</span>
                   {c.version}
                 </p>
+                {c.specification && (
+                  <p>
+                    <span className="font-medium text-foreground/80">规格：</span>
+                    {c.specification}
+                  </p>
+                )}
+                {c.approvalNumbers && c.approvalNumbers.length > 0 && (
+                  <p>
+                    <span className="font-medium text-foreground/80">批准文号：</span>
+                    {c.approvalNumbers.join('、')}
+                  </p>
+                )}
               </div>
             </li>
           ))}

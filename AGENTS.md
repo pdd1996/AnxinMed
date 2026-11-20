@@ -29,6 +29,7 @@ AnxinMed/
 5. [docs/06-安心用药-产品需求文档-PRD-V2.md](docs/06-安心用药-产品需求文档-PRD-V2.md) — 需求
 6. M4 咨询 Agent 改革：[docs/10-咨询Agent架构改革方案.md](docs/10-咨询Agent架构改革方案.md) · [docs/11-咨询Agent评估与指标口径-M4.md](docs/11-咨询Agent评估与指标口径-M4.md) · [docs/12-安心用药-Agent整体架构.md](docs/12-安心用药-Agent整体架构.md)
 7. M13 咨询路由工程化（2026-11-18）：[docs/14-咨询Agent路由与评测改造方案.md](docs/14-咨询Agent路由与评测改造方案.md) · [docs/specs/16-咨询Agent路由工程化.md](docs/specs/16-咨询Agent路由工程化.md)（P0）· [docs/specs/18-咨询Agent-P1-对象澄清与范围层.md](docs/specs/18-咨询Agent-P1-对象澄清与范围层.md)（P1）· [docs/specs/19-咨询Agent-P2-T6-候选打分与低置信观测.md](docs/specs/19-咨询Agent-P2-T6-候选打分与低置信观测.md)（P2-T6）· [docs/specs/20-咨询Agent-P2-T7-语义归一化路由视图.md](docs/specs/20-咨询Agent-P2-T7-语义归一化路由视图.md)（P2-T7）· [docs/specs/21-咨询Agent-P3-小模型离线意图评测.md](docs/specs/21-咨询Agent-P3-小模型离线意图评测.md)（P3 离线，不接线上）· [docs/specs/22-M13-收口总结与试点观测清单.md](docs/specs/22-M13-收口总结与试点观测清单.md)（交接入口）· [docs/specs/23-外部知识兜底-百川医疗模型-演示版.md](docs/specs/23-外部知识兜底-百川医疗模型-演示版.md)（M14 演示/灰度）· [docs/specs/24-特殊状态确定性覆盖层.md](docs/specs/24-特殊状态确定性覆盖层.md)（M15 建议，**未落地**：PRD V2.4 §7.1.2 新增的特殊状态 × 禁忌/慎用段确定性覆盖层）· [docs/specs/25-医生端患者绑定-演示最小闭环.md](docs/specs/25-医生端患者绑定-演示最小闭环.md)（2026-11-19 演示切片 A，**未进 PRD 正式范围**：`users.role` + 一次性绑定码 + 医生端按授权患者过滤）
+8. 说明书资料卡与分段页（2026-11-20）：[docs/specs/27-说明书资料卡与分段页.md](docs/specs/27-说明书资料卡与分段页.md)（L0 卡排版/文字简化 + 说明书可用性意图 0 LLM + `GET /api/drugs/:id/leaflet` 分段落页 + crawled 说明书数据整理脚本）
 
 优先级：任务书 > 技术方案 08 > ADR 07 > PRD 06。文档间冲突时**停下来向用户报告**，不要自行裁决。现状以 `git status` 和目录实际内容为准（任务书 §2 是写书时的快照）。
 

@@ -147,6 +147,7 @@ describe('不变量 ① 响应结构', () => {
         'blocked',
         'toolUsed',
         'clarifyOptions',
+        'leafletDrugId',
         'consultLogId',
         'sessionId',
         'suggestion',
@@ -161,7 +162,18 @@ describe('不变量 ① 响应结构', () => {
     const citationKeys = Object.keys(res.body.citations[0]).sort()
     expect(citationKeys).toEqual(expect.arrayContaining(['drugName', 'source', 'version']))
     for (const k of citationKeys) {
-      expect(['drugName', 'source', 'version', 'unverified', 'sectionKey', 'sectionLabel']).toContain(k)
+      expect([
+        'drugName',
+        'source',
+        'version',
+        'unverified',
+        'sectionKey',
+        'sectionLabel',
+        // 2026-11-20：本地引用核验状态与身份字段（L0 banner / 来源卡）
+        'reviewStatus',
+        'specification',
+        'approvalNumbers',
+      ]).toContain(k)
     }
     // 标量字段类型面
     expect(typeof res.body.answer).toBe('string')

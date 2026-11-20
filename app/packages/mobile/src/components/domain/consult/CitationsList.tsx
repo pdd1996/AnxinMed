@@ -30,6 +30,13 @@ function sectionText(c: Citation): string | null {
   return null;
 }
 
+/** 核验徽章（2026-11-20）：外部检索 → 未经本库核实；本地说明书未人工核对 → 说明书未经人工核验。 */
+function verificationBadge(c: Citation): string | null {
+  if (c.unverified) return "未经本库核实";
+  if (c.reviewStatus && c.reviewStatus !== "reviewed") return "说明书未经人工核验";
+  return null;
+}
+
 export function CitationsList({
   citations,
   className,
@@ -72,10 +79,12 @@ export function CitationsList({
                 <Text className="flex-1 text-base font-semibold text-card-foreground">
                   {c.drugName}
                 </Text>
-                {c.unverified ? (
+                {verificationBadge(c) ? (
                   <View className="flex-row items-center gap-1 rounded-full border border-risk-l3 bg-risk-l3-tint px-2 py-0.5">
                     <Icon as={ShieldAlert} size={12} color={riskL3} />
-                    <Text className="text-xs font-semibold text-risk-l3">未经本库核实</Text>
+                    <Text className="text-xs font-semibold text-risk-l3">
+                      {verificationBadge(c)}
+                    </Text>
                   </View>
                 ) : null}
               </View>
@@ -86,6 +95,16 @@ export function CitationsList({
               <Text className="mt-0.5 text-sm leading-5 text-muted-foreground">
                 版本：{c.version}
               </Text>
+              {c.specification ? (
+                <Text className="mt-0.5 text-sm leading-5 text-muted-foreground">
+                  规格：{c.specification}
+                </Text>
+              ) : null}
+              {c.approvalNumbers && c.approvalNumbers.length > 0 ? (
+                <Text className="mt-0.5 text-sm leading-5 text-muted-foreground">
+                  批准文号：{c.approvalNumbers.join("、")}
+                </Text>
+              ) : null}
             </View>
           ))}
         </View>

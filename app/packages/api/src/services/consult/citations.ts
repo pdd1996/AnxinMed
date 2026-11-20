@@ -11,12 +11,19 @@ import type { Citation, InsertSlice } from './types.js'
 
 /** 本地说明书库引用（三件套齐备；缺失字段以"未标注"兜底，不留空）。 */
 export function insertCitation(insert: InsertSlice): Citation {
-  return {
+  const citation: Citation = {
     drugName: insert.genericName,
     source: insert.source || '本地说明书库（未标注来源）',
     version: insert.version || '未标注版本',
     unverified: false,
+    // 2026-11-20：本地引用也标核验状态（crawled/mock 的说明书未人工核验），供界面展示。
+    reviewStatus: insert.curationStatus,
   }
+  if (insert.specification) citation.specification = insert.specification
+  if (insert.approvalNumbers && insert.approvalNumbers.length > 0) {
+    citation.approvalNumbers = insert.approvalNumbers
+  }
+  return citation
 }
 
 /**

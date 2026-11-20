@@ -175,6 +175,14 @@ export const CitationSchema = z.object({
    * 且必须 ∈ 本轮证据集合（注入完整性校验，services/consult/coverage.ts）。数据直答/网络检索引用无此字段。
    */
   sectionKey: z.string().optional(),
+  /**
+   * 说明书核验状态（2026-11-20）：本地说明书行是否经人工核对。
+   * 非说明书来源的引用（数据直答/外部知识）无此字段；前端据此渲染「未经人工核验」徽章。
+   */
+  reviewStatus: z.enum(['mock', 'crawled', 'reviewed']).optional(),
+  /** 说明书身份补充（L0 顶部 banner 用）：规格 / 批准文号（可多值）。 */
+  specification: z.string().optional(),
+  approvalNumbers: z.array(z.string()).optional(),
 })
 export type Citation = z.infer<typeof CitationSchema>
 
@@ -209,8 +217,48 @@ export const ConsultResponseSchema = z.object({
   blocked: z.boolean().default(false),
   toolUsed: z.string().nullish(),
   clarifyOptions: z.array(ConsultClarifyOptionSchema).nullish(),
+  /**
+   * 说明书查看入口（2026-11-20）：L0/说明书可用性回答时给用户药箱 drugId，
+   * 前端展示「查看完整说明书」并路由到分段落页；其他回答路径为 null。
+   */
+  leafletDrugId: z.string().nullish(),
 })
 export type ConsultResponse = z.infer<typeof ConsultResponseSchema>
+
+/**
+ * 说明书分段落展示（2026-11-20）——咨询卡「查看完整说明书」入口 + 独立分段落页共用。
+ * 一条 = 一个说明书段落（适应症/禁忌/注意事项/…）；用法用量段固定为「医嘱范畴」提示，不含剂量数字。
+ */
+export const LeafletSectionSchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  body: z.string(),
+})
+export type LeafletSection = z.infer<typeof LeafletSectionSchema>
+
+/** 单支药的说明书（含身份、来源三件套与核验状态）。 */
+export const LeafletSchema = z.object({
+  drugId: z.string(),
+  genericName: z.string(),
+  brandName: z.string().nullish(),
+  specification: z.string().nullish(),
+  form: z.string().nullish(),
+  approvalNumbers: z.array(z.string()).nullish(),
+  source: z.string(),
+  version: z.string(),
+  curationStatus: z.enum(['mock', 'crawled', 'reviewed']),
+  reviewed: z.boolean(),
+  /** 未人工核验时的固定提示；已核验为 null。 */
+  notice: z.string().nullish(),
+  sections: z.array(LeafletSectionSchema),
+})
+export type Leaflet = z.infer<typeof LeafletSchema>
+
+export const LeafletResponseSchema = z.object({
+  ok: z.literal(true),
+  leaflet: LeafletSchema,
+})
+export type LeafletResponse = z.infer<typeof LeafletResponseSchema>
 
 /**
  * 确认式建议卡（M4-T6 · specs/04-T6，确定性规则生成非 LLM）：
