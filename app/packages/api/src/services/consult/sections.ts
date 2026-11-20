@@ -414,6 +414,19 @@ export function isLeafletRequest(question: string): boolean {
 }
 
 /**
+ * 说明书「不良反应」段首句常是临床试验免责句（「1.临床试验 由于本品的临床试验…」），
+ * 摘要目录里不取它：跳过免责/统计段，取第一条含具体不良反应词的原文句。
+ */
+function digestAdverseForOverview(text: string | null, max = 60): string {
+  const body = String(text ?? '')
+  if (!body) return '（未收录）'
+  const skip = /^(?:\d{1,2}[.、]\s*)?(临床试验|安全性特征)|由于本品的临床试验|不能直接将本品/
+  const adverseWords = /恶心|呕吐|腹泻|头痛|头晕|失眠|皮疹|瘙痒|肝功能|肝酶|过敏|心悸|乏力/
+  const hit = excerptSegments(`不良反应：${body}`).find((seg) => !skip.test(seg) && adverseWords.test(seg))
+  return digestSectionText(hit ?? body, max)
+}
+
+/**
  * 说明书分段摘要：适应症 / 用法用量（医嘱口径）/ 禁忌 / 注意事项 / 不良反应 各一句。
  * 只做摘录与固定提示，不生成医学内容；完整原文由前端「查看完整说明书」进入分段落页。
  */
@@ -426,15 +439,15 @@ export function leafletOverviewSections(insert: InsertSlice): NormalizedSections
   const precautionItems = splitLeafletItems(insert.precautions)
 
   const lines = [
-    `适应症：${digestSectionText(insert.indication || '（未收录）', 60)}`,
+    `适应症：${digestSectionText(insert.indication || '（未收录）', 55)}`,
     '用法用量：具体剂量、频次与疗程属医嘱范畴，请按医生处方或说明书执行。',
-    `禁忌：${contraItems.length ? contraItems.slice(0, 2).map((item) => digestShortText(item, 40)).join('；') : '（未收录）'}`,
+    `禁忌：${contraItems.length ? contraItems.slice(0, 2).map((item) => digestShortText(item, 36)).join('；') : '（未收录）'}`,
     `注意事项：${
       precautionItems.length
-        ? precautionItems.slice(0, 2).map((item) => digestLeafletItem(item, 40)).join('；')
+        ? precautionItems.slice(0, 2).map((item) => digestLeafletItem(item, 36)).join('；')
         : '（未收录）'
     }`,
-    `不良反应：${digestSectionText(insert.adverseReactions || '（未收录）', 60)}`,
+    `不良反应：${digestAdverseForOverview(insert.adverseReactions, 60)}`,
   ]
     .map((line) => stripDosageAdvice(line))
     .filter(Boolean)
