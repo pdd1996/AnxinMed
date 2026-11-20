@@ -370,6 +370,79 @@ describe('fallbackSectionsFromInsert · L0 排版简化', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 段内锚定摘录（2026-11-20）：问「伤肝吗」不能拿段首免责句和无关注意事项充数
+// ---------------------------------------------------------------------------
+
+describe('fallbackSectionsFromInsert · 段内锚定摘录（伤肝/伤肾/犯困）', () => {
+  // 与 DB 实际形态一致：PDF 抽取入库后无换行，器官标签直接粘在上一条正文末尾
+  // （真实数据：「…体温过低皮肤：皮疹…多形性红斑消化系统：肝炎、肝功能检查异常心脏：心律失常」）
+  const adverseWithLiver =
+    '1.临床试验由于本品的临床试验是在各种不同条件下进行的，因此不能直接将本品在临床试验中的不良反应发生率与其它药物进行比较。' +
+    '2.上市后经验在本品的批准后使用过程中，已鉴定出以下不良事件。' +
+    '全身：脸部或舌部肿胀、变态反应、过敏样反应、体温过低皮肤：皮疹、皮炎、荨麻疹、多形性红斑消化系统：肝炎、肝功能检查异常心脏：心律失常神经：癫痫发作'
+  const precautionsWithLiver =
+    '·1.精神神经性不良事件，流感可能会引起许多神经和行为症状，包括幻觉、谵妄和行为异常。\n' +
+    '·2.尚无证据显示磷酸奥司他韦对甲型流感和乙型流感以外的其他疾病有效。\n' +
+    '·3.严重肝功能不全者慎用，需监测肝功能。'
+
+  const olsetamivir = mkInsert({
+    genericName: '磷酸奥司他韦胶囊',
+    adverseReactions: adverseWithLiver,
+    precautions: [precautionsWithLiver],
+    contraindications: ['对本品的任何成份过敏者禁用。'],
+  })
+
+  it('「这个药伤肝吗」→ 结论取段内「肝炎」原文，不再取「1.临床试验」；要点只留肝相关注意事项', () => {
+    const s = fallbackSectionsFromInsert('这个药伤肝吗', olsetamivir)
+
+    expect(s.summary).toContain('肝炎')
+    expect(s.summary).toContain('上市后经验')
+    expect(s.summary).not.toContain('临床试验')
+    expect(s.keyPoints).toEqual(['严重肝功能不全者慎用，需监测肝功能。'])
+    expect(s.keyPoints.join('')).not.toContain('精神神经')
+    // 原文仍可追溯
+    expect(s.details?.[0]?.title).toBe('不良反应段（原文）')
+  })
+
+  it('段内确实没有「肾」→ 明说未见，不拿无关段落充数', () => {
+    const s = fallbackSectionsFromInsert('这个药伤肾吗', olsetamivir)
+
+    expect(s.summary).toContain('未见')
+    expect(s.summary).toContain('肾')
+    expect(s.keyPoints).toEqual([])
+    expect(s.details?.length).toBeGreaterThan(0)
+  })
+
+  it('「犯困」命中段内「嗜睡」+ 相关注意事项', () => {
+    const sleepy = mkInsert({
+      adverseReactions: '常见不良反应为嗜睡、乏力。',
+      precautions: ['·1.服药期间可能出现嗜睡，避免驾车或操作机器。'],
+    })
+    const s = fallbackSectionsFromInsert('这个药吃了犯困正常吗', sleepy)
+
+    expect(s.summary).toContain('嗜睡')
+    expect(s.keyPoints[0]).toContain('避免驾车')
+  })
+
+  it('非锚定问题（副作用）→ 行为不变，仍是段首摘要 + 注意事项前 3 条', () => {
+    const s = fallbackSectionsFromInsert('有什么副作用', olsetamivir)
+
+    expect(s.summary).toContain('临床试验')
+    expect(s.keyPoints[0]).toContain('精神神经性不良事件')
+  })
+
+  it('锚定词只在非不良反应段出现（喝酒伤肝）→ 不摘录，保持原段落路由行为', () => {
+    const s = fallbackSectionsFromInsert(
+      '喝酒伤肝吗',
+      mkInsert({ interactions: '本品与酒精同服可能增加肝脏负担。', adverseReactions: adverseWithLiver }),
+    )
+    // 路由到相互作用段 → 不触发不良反应段的锚定摘录
+    expect(s.summary).toContain('酒精')
+    expect(s.summary).not.toContain('上市后经验')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // citations · 引用三件套（PRD §7.5）
 // ---------------------------------------------------------------------------
 
