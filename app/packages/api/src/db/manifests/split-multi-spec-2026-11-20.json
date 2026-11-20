@@ -1,0 +1,1127 @@
+{
+  "version": 1,
+  "date": "2026-11-20",
+  "note": "多规格合并行拆行 + 单规格行批号收窄；由 data/split-dryrun-2026-11-20 干跑结果生成，人工复核后执行。",
+  "expectedFlaggedBefore": 147,
+  "expectedFlaggedAfter": 102,
+  "splits": [
+    {
+      "sourceId": "drug-alishatanzhi-pian-80mg",
+      "expect": {
+        "specification": "80mg，240mg",
+        "approvalNumbers": [
+          "国药准字H20138001",
+          "国药准字H20138002"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-alishatanzhi-pian-80mg",
+          "action": "update",
+          "specification": "80mg",
+          "approvalNumber": "国药准字H20138001",
+          "approvalNumbers": [
+            "国药准字H20138001"
+          ]
+        },
+        {
+          "id": "drug-alishatanzhi-pian-80mg-split-240mg",
+          "action": "insert",
+          "specification": "240mg",
+          "approvalNumber": "国药准字H20138002",
+          "approvalNumbers": [
+            "国药准字H20138002"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-chongzu-ren-culuanpaojisu-zhusheye-11ug",
+      "expect": {
+        "specification": "11μg（150IU）、22μg（300IU）、33μg（450IU）",
+        "approvalNumbers": [
+          "J20235002",
+          "J20160039",
+          "J20160040"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-chongzu-ren-culuanpaojisu-zhusheye-11ug",
+          "action": "update",
+          "specification": "11μg（150IU）",
+          "approvalNumber": "SJ20235002",
+          "approvalNumbers": [
+            "SJ20235002"
+          ]
+        },
+        {
+          "id": "drug-chongzu-ren-culuanpaojisu-zhusheye-11ug-split-22ug",
+          "action": "insert",
+          "specification": "22μg（300IU）",
+          "approvalNumber": "SJ20160039",
+          "approvalNumbers": [
+            "SJ20160039"
+          ]
+        },
+        {
+          "id": "drug-chongzu-ren-culuanpaojisu-zhusheye-11ug-split-33ug",
+          "action": "insert",
+          "specification": "33μg（450IU）",
+          "approvalNumber": "SJ20160040",
+          "approvalNumbers": [
+            "SJ20160040"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-ebeishatan-pian-75mg",
+      "expect": {
+        "specification": "75mg，0.15g",
+        "approvalNumbers": [
+          "国药准字H20030016",
+          "国药准字H20237163"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-ebeishatan-pian-75mg",
+          "action": "update",
+          "specification": "75mg",
+          "approvalNumber": "国药准字H20030016",
+          "approvalNumbers": [
+            "国药准字H20030016"
+          ]
+        },
+        {
+          "id": "drug-ebeishatan-pian-75mg-split-0p15g",
+          "action": "insert",
+          "specification": "0.15g",
+          "approvalNumber": "国药准字H20237163",
+          "approvalNumbers": [
+            "国药准字H20237163"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-fufatatingna-jiaonang-20mg",
+      "expect": {
+        "specification": "20mg、40mg",
+        "approvalNumbers": [
+          "国药准字H20070167",
+          "国药准字H20070168"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-fufatatingna-jiaonang-20mg",
+          "action": "update",
+          "specification": "20mg",
+          "approvalNumber": "国药准字H20070167",
+          "approvalNumbers": [
+            "国药准字H20070167"
+          ]
+        },
+        {
+          "id": "drug-fufatatingna-jiaonang-20mg-split-40mg",
+          "action": "insert",
+          "specification": "40mg",
+          "approvalNumber": "国药准字H20070168",
+          "approvalNumbers": [
+            "国药准字H20070168"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-fugeliebotang-pian-0p2mg",
+      "expect": {
+        "specification": "0.2mg，0.3mg",
+        "approvalNumbers": [
+          "国药准字H20010308",
+          "国药准字H20163151"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-fugeliebotang-pian-0p2mg",
+          "action": "update",
+          "specification": "0.2mg",
+          "approvalNumber": "国药准字H20010308",
+          "approvalNumbers": [
+            "国药准字H20010308"
+          ]
+        },
+        {
+          "id": "drug-fugeliebotang-pian-0p2mg-split-0p3mg",
+          "action": "insert",
+          "specification": "0.3mg",
+          "approvalNumber": "国药准字H20163151",
+          "approvalNumbers": [
+            "国药准字H20163151"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-fulikangzuo-pian-50mg",
+      "expect": {
+        "specification": "1）50mg 2）200mg",
+        "approvalNumbers": [
+          "H20150051",
+          "H20150052"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-fulikangzuo-pian-50mg",
+          "action": "update",
+          "specification": "50mg",
+          "approvalNumber": "H20150051",
+          "approvalNumbers": [
+            "H20150051"
+          ]
+        },
+        {
+          "id": "drug-fulikangzuo-pian-50mg-split-200mg",
+          "action": "insert",
+          "specification": "200mg",
+          "approvalNumber": "H20150052",
+          "approvalNumbers": [
+            "H20150052"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-lipeitong-pian-1mg-h200504101mg",
+      "expect": {
+        "specification": "1mg、2mg",
+        "approvalNumbers": [
+          "国药准字H20050410",
+          "国药准字H20051731"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-lipeitong-pian-1mg-h200504101mg",
+          "action": "update",
+          "specification": "1mg",
+          "approvalNumber": "国药准字H20050410",
+          "approvalNumbers": [
+            "国药准字H20050410"
+          ]
+        },
+        {
+          "id": "drug-lipeitong-pian-1mg-h200504101mg-split-2mg",
+          "action": "insert",
+          "specification": "2mg",
+          "approvalNumber": "国药准字H20051731",
+          "approvalNumbers": [
+            "国药准字H20051731"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-shenmai-zhusheye-2ml",
+      "expect": {
+        "specification": "①每支装2ml②每支装5ml③每支装10ml④每支装20ml⑤每支装50ml⑥每支装100ml",
+        "approvalNumbers": [
+          "国药准字Z33020023",
+          "国药准字Z33020022",
+          "国药准字Z33020021",
+          "国药准字Z33020020",
+          "国药准字Z33020019",
+          "国药准字Z33020018"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-shenmai-zhusheye-2ml",
+          "action": "update",
+          "specification": "每支装2ml",
+          "approvalNumber": "国药准字Z33020023",
+          "approvalNumbers": [
+            "国药准字Z33020023"
+          ]
+        },
+        {
+          "id": "drug-shenmai-zhusheye-2ml-split-5ml",
+          "action": "insert",
+          "specification": "每支装5ml",
+          "approvalNumber": "国药准字Z33020022",
+          "approvalNumbers": [
+            "国药准字Z33020022"
+          ]
+        },
+        {
+          "id": "drug-shenmai-zhusheye-2ml-split-10ml",
+          "action": "insert",
+          "specification": "每支装10ml",
+          "approvalNumber": "国药准字Z33020021",
+          "approvalNumbers": [
+            "国药准字Z33020021"
+          ]
+        },
+        {
+          "id": "drug-shenmai-zhusheye-2ml-split-20ml",
+          "action": "insert",
+          "specification": "每支装20ml",
+          "approvalNumber": "国药准字Z33020020",
+          "approvalNumbers": [
+            "国药准字Z33020020"
+          ]
+        },
+        {
+          "id": "drug-shenmai-zhusheye-2ml-split-50ml",
+          "action": "insert",
+          "specification": "每支装50ml",
+          "approvalNumber": "国药准字Z33020019",
+          "approvalNumbers": [
+            "国药准字Z33020019"
+          ]
+        },
+        {
+          "id": "drug-shenmai-zhusheye-2ml-split-100ml",
+          "action": "insert",
+          "specification": "每支装100ml",
+          "approvalNumber": "国药准字Z33020018",
+          "approvalNumbers": [
+            "国药准字Z33020018"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-suofantini-jiaonang-50mg",
+      "expect": {
+        "specification": "50mg、100mg",
+        "approvalNumbers": [
+          "国药准字H20200017",
+          "国药准字H20217028"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-suofantini-jiaonang-50mg",
+          "action": "update",
+          "specification": "50mg",
+          "approvalNumber": "国药准字H20200017",
+          "approvalNumbers": [
+            "国药准字H20200017"
+          ]
+        },
+        {
+          "id": "drug-suofantini-jiaonang-50mg-split-100mg",
+          "action": "insert",
+          "specification": "100mg",
+          "approvalNumber": "国药准字H20217028",
+          "approvalNumbers": [
+            "国药准字H20217028"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-ticagrelor-tablets-60mg",
+      "expect": {
+        "specification": "60mg，90mg",
+        "approvalNumbers": [
+          "国药准字H20205031",
+          "国药准字H20193166"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-ticagrelor-tablets-60mg",
+          "action": "update",
+          "specification": "60mg",
+          "approvalNumber": "国药准字H20205031",
+          "approvalNumbers": [
+            "国药准字H20205031"
+          ]
+        },
+        {
+          "id": "drug-ticagrelor-tablets-60mg-split-90mg",
+          "action": "insert",
+          "specification": "90mg",
+          "approvalNumber": "国药准字H20193166",
+          "approvalNumbers": [
+            "国药准字H20193166"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-yansuan-beinapuli-pian-5mg",
+      "expect": {
+        "specification": "5mg，10mg",
+        "approvalNumbers": [
+          "国药准字H20054771",
+          "国药准字H20043648"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-yansuan-beinapuli-pian-5mg",
+          "action": "update",
+          "specification": "5mg",
+          "approvalNumber": "国药准字H20054771",
+          "approvalNumbers": [
+            "国药准字H20054771"
+          ]
+        },
+        {
+          "id": "drug-yansuan-beinapuli-pian-5mg-split-10mg",
+          "action": "insert",
+          "specification": "10mg",
+          "approvalNumber": "国药准字H20043648",
+          "approvalNumbers": [
+            "国药准字H20043648"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-yansuan-beinapuli-pian-5mg-h20000292",
+      "expect": {
+        "specification": "5mg,10mg",
+        "approvalNumbers": [
+          "国药准字H20000292",
+          "国药准字H20030514"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-yansuan-beinapuli-pian-5mg-h20000292",
+          "action": "update",
+          "specification": "5mg",
+          "approvalNumber": "国药准字H20000292",
+          "approvalNumbers": [
+            "国药准字H20000292"
+          ]
+        },
+        {
+          "id": "drug-yansuan-beinapuli-pian-5mg-h20000292-split-10mg",
+          "action": "insert",
+          "specification": "10mg",
+          "approvalNumber": "国药准字H20030514",
+          "approvalNumbers": [
+            "国药准字H20030514"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-yansuan-meijingang-pian-5mg",
+      "expect": {
+        "specification": "5mg，10mg",
+        "approvalNumbers": [
+          "国药准字H20203320",
+          "国药准字H20203319"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-yansuan-meijingang-pian-5mg",
+          "action": "update",
+          "specification": "5mg",
+          "approvalNumber": "国药准字H20203320",
+          "approvalNumbers": [
+            "国药准字H20203320"
+          ]
+        },
+        {
+          "id": "drug-yansuan-meijingang-pian-5mg-split-10mg",
+          "action": "insert",
+          "specification": "10mg",
+          "approvalNumber": "国药准字H20203319",
+          "approvalNumbers": [
+            "国药准字H20203319"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-zhusheyong-axiluowei-0p25g-h42020129025g",
+      "expect": {
+        "specification": "0.25g(C8H11N5O3计)、0.5g(以C8H11N5O3计)",
+        "approvalNumbers": [
+          "国药准字H42020129",
+          "国药准字H20045113"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-zhusheyong-axiluowei-0p25g-h42020129025g",
+          "action": "update",
+          "specification": "0.25g(C8H11N5O3计)",
+          "approvalNumber": "国药准字H42020129",
+          "approvalNumbers": [
+            "国药准字H42020129"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-axiluowei-0p25g-h42020129025g-split-0p5g",
+          "action": "insert",
+          "specification": "0.5g(以C8H11N5O3计)",
+          "approvalNumber": "国药准字H20045113",
+          "approvalNumbers": [
+            "国药准字H20045113"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-zhusheyong-benhuangsuan-ruimazuolun-25mg",
+      "expect": {
+        "specification": "25mg（按C21H19BrN4O2计），50mg（按C21H19BrN4O2计）",
+        "approvalNumbers": [
+          "国药准字H20200006",
+          "国药准字H20227087"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-zhusheyong-benhuangsuan-ruimazuolun-25mg",
+          "action": "update",
+          "specification": "25mg（按C21H19BrN4O2计）",
+          "approvalNumber": "国药准字H20200006",
+          "approvalNumbers": [
+            "国药准字H20200006"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-benhuangsuan-ruimazuolun-25mg-split-50mg",
+          "action": "insert",
+          "specification": "50mg（按C21H19BrN4O2计）",
+          "approvalNumber": "国药准字H20227087",
+          "approvalNumbers": [
+            "国药准字H20227087"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-zhusheyong-xiangangu-an-0p5mg",
+      "expect": {
+        "specification": "0.5mg、1.0mg、1.5mg",
+        "approvalNumbers": [
+          "国药准字H20066456",
+          "国药准字H20066849",
+          "国药准字H20066850"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-zhusheyong-xiangangu-an-0p5mg",
+          "action": "update",
+          "specification": "0.5mg",
+          "approvalNumber": "国药准字H20066456",
+          "approvalNumbers": [
+            "国药准字H20066456"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-xiangangu-an-0p5mg-split-1p0mg",
+          "action": "insert",
+          "specification": "1.0mg",
+          "approvalNumber": "国药准字H20066849",
+          "approvalNumbers": [
+            "国药准字H20066849"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-xiangangu-an-0p5mg-split-1p5mg",
+          "action": "insert",
+          "specification": "1.5mg",
+          "approvalNumber": "国药准字H20066850",
+          "approvalNumbers": [
+            "国药准字H20066850"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-zhusheyong-yansuan-toubaojiawo-0p25g",
+      "expect": {
+        "specification": "0.25g、0.5g、1.0g、2.0g(按C16H17N9O5S3计)",
+        "approvalNumbers": [
+          "国药准字H20041145",
+          "国药准字H20041146",
+          "国药准字H20041147",
+          "H20093940"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-zhusheyong-yansuan-toubaojiawo-0p25g",
+          "action": "update",
+          "specification": "0.25g",
+          "approvalNumber": "国药准字H20041145",
+          "approvalNumbers": [
+            "国药准字H20041145"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-yansuan-toubaojiawo-0p25g-split-0p5g",
+          "action": "insert",
+          "specification": "0.5g",
+          "approvalNumber": "国药准字H20041146",
+          "approvalNumbers": [
+            "国药准字H20041146"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-yansuan-toubaojiawo-0p25g-split-1p0g",
+          "action": "insert",
+          "specification": "1.0g",
+          "approvalNumber": "国药准字H20041147",
+          "approvalNumbers": [
+            "国药准字H20041147"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-yansuan-toubaojiawo-0p25g-split-2p0g",
+          "action": "insert",
+          "specification": "2.0g(按C16H17N9O5S3计)",
+          "approvalNumber": "国药准字H20093940",
+          "approvalNumbers": [
+            "国药准字H20093940"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-zhusheyong-yansuantoubaoti-an-0p25g",
+      "expect": {
+        "specification": "0.25g、0.5g、1.0g、2.0g(按头孢替安C18H23N9O4S3计)",
+        "approvalNumbers": [
+          "国药准字H20060987",
+          "国药准字H20056344",
+          "国药准字H20020399",
+          "国药准字H20060899"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-zhusheyong-yansuantoubaoti-an-0p25g",
+          "action": "update",
+          "specification": "0.25g",
+          "approvalNumber": "国药准字H20060987",
+          "approvalNumbers": [
+            "国药准字H20060987"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-yansuantoubaoti-an-0p25g-split-0p5g",
+          "action": "insert",
+          "specification": "0.5g",
+          "approvalNumber": "国药准字H20056344",
+          "approvalNumbers": [
+            "国药准字H20056344"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-yansuantoubaoti-an-0p25g-split-1p0g",
+          "action": "insert",
+          "specification": "1.0g",
+          "approvalNumber": "国药准字H20020399",
+          "approvalNumbers": [
+            "国药准字H20020399"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-yansuantoubaoti-an-0p25g-split-2p0g",
+          "action": "insert",
+          "specification": "2.0g(按头孢替安C18H23N9O4S3计)",
+          "approvalNumber": "国药准字H20060899",
+          "approvalNumbers": [
+            "国药准字H20060899"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-l-huana-zhusheye-50ml",
+      "expect": {
+        "specification": "50ml:0.45g,100ml:0.9g",
+        "approvalNumbers": [
+          "国药准字H20045173",
+          "国药准字H50021772"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-l-huana-zhusheye-50ml",
+          "action": "update",
+          "specification": "50ml:0.45g",
+          "approvalNumber": "国药准字H20045173",
+          "approvalNumbers": [
+            "国药准字H20045173"
+          ]
+        },
+        {
+          "id": "drug-l-huana-zhusheye-50ml-split-0p9g",
+          "action": "insert",
+          "specification": "100ml:0.9g",
+          "approvalNumber": "国药准字H50021772",
+          "approvalNumbers": [
+            "国药准字H50021772"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-paliguhuachun-zhusheye-1ml-h201934192",
+      "expect": {
+        "specification": "1ml：5μg，2ml：10μg",
+        "approvalNumbers": [
+          "国药准字H20193419",
+          "国药准字H20193418"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-paliguhuachun-zhusheye-1ml-h201934192",
+          "action": "update",
+          "specification": "1ml：5μg",
+          "approvalNumber": "国药准字H20193419",
+          "approvalNumbers": [
+            "国药准字H20193419"
+          ]
+        },
+        {
+          "id": "drug-paliguhuachun-zhusheye-1ml-h201934192-split-10ug",
+          "action": "insert",
+          "specification": "2ml：10μg",
+          "approvalNumber": "国药准字H20193418",
+          "approvalNumbers": [
+            "国药准字H20193418"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-ren-cuhongsu-zhusheye-0p5ml",
+      "expect": {
+        "specification": "2000lU/0.5ml/支（预灌封注射器）、4000lU/0.5ml/支（预灌封注射器）、6000lU/0.5ml/支（预灌封注射器）、10000lU/0.5ml/支（预灌封注射器）",
+        "approvalNumbers": [
+          "国药准字S20103002",
+          "国药准字S20133020",
+          "国药准字S20133002",
+          "国药准字S20133003"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-ren-cuhongsu-zhusheye-0p5ml",
+          "action": "update",
+          "specification": "2000IU/0.5ml/支（预灌封注射器）",
+          "approvalNumber": "国药准字S20133020",
+          "approvalNumbers": [
+            "国药准字S20133020"
+          ]
+        },
+        {
+          "id": "drug-ren-cuhongsu-zhusheye-0p5ml-split-4000iu",
+          "action": "insert",
+          "specification": "4000IU/0.5ml/支（预灌封注射器）",
+          "approvalNumber": "国药准字S20133002",
+          "approvalNumbers": [
+            "国药准字S20133002"
+          ]
+        },
+        {
+          "id": "drug-ren-cuhongsu-zhusheye-0p5ml-split-6000iu",
+          "action": "insert",
+          "specification": "6000IU/0.5ml/支（预灌封注射器）",
+          "approvalNumber": "国药准字S20103002",
+          "approvalNumbers": [
+            "国药准字S20103002"
+          ]
+        },
+        {
+          "id": "drug-ren-cuhongsu-zhusheye-0p5ml-split-10000iu",
+          "action": "insert",
+          "specification": "10000IU/0.5ml/支（预灌封注射器）",
+          "approvalNumber": "国药准字S20133003",
+          "approvalNumbers": [
+            "国药准字S20133003"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-yansuan-luopaikayin-zhusheye-10ml",
+      "expect": {
+        "specification": "10ml:50mg，10ml:75mg，10ml:l00mg（按C17H26N2O·HCl计）",
+        "approvalNumbers": [
+          "国药准字H20113381",
+          "国药准字H20133181",
+          "国药准字H20133178"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-yansuan-luopaikayin-zhusheye-10ml",
+          "action": "update",
+          "specification": "10ml:50mg",
+          "approvalNumber": "国药准字H20133181",
+          "approvalNumbers": [
+            "国药准字H20133181"
+          ]
+        },
+        {
+          "id": "drug-yansuan-luopaikayin-zhusheye-10ml-split-75mg",
+          "action": "insert",
+          "specification": "10ml:75mg",
+          "approvalNumber": "国药准字H20113381",
+          "approvalNumbers": [
+            "国药准字H20113381"
+          ]
+        },
+        {
+          "id": "drug-yansuan-luopaikayin-zhusheye-10ml-split-100mg",
+          "action": "insert",
+          "specification": "10ml:100mg（按C17H26N2O·HCl计）",
+          "approvalNumber": "国药准字H20133178",
+          "approvalNumbers": [
+            "国药准字H20133178"
+          ]
+        }
+      ]
+    },
+    {
+      "sourceId": "drug-zhusheyong-ren-baijiesu-11-3mg",
+      "expect": {
+        "specification": "3mg（2400万U）/瓶，1.5mg（1200万U）/瓶，0.75mg（600万U）/瓶",
+        "approvalNumbers": [
+          "国药准字S20030077",
+          "国药准字S20063110",
+          "国药准字S20060062"
+        ]
+      },
+      "targets": [
+        {
+          "id": "drug-zhusheyong-ren-baijiesu-11-3mg",
+          "action": "update",
+          "specification": "3mg（2400万U）/瓶",
+          "approvalNumber": "国药准字S20030077",
+          "approvalNumbers": [
+            "国药准字S20030077"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-ren-baijiesu-11-3mg-split-1p5mg",
+          "action": "insert",
+          "specification": "1.5mg（1200万U）/瓶",
+          "approvalNumber": "国药准字S20063110",
+          "approvalNumbers": [
+            "国药准字S20063110"
+          ]
+        },
+        {
+          "id": "drug-zhusheyong-ren-baijiesu-11-3mg-split-0p75mg",
+          "action": "insert",
+          "specification": "0.75mg（600万U）/瓶",
+          "approvalNumber": "国药准字S20060062",
+          "approvalNumbers": [
+            "国药准字S20060062"
+          ]
+        }
+      ]
+    }
+  ],
+  "narrows": [
+    {
+      "id": "drug-aomeishatanzhi-qingl-saiqin-pian-20mg",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20203404",
+          "国药准字H20203405"
+        ]
+      },
+      "approvalNumber": "国药准字H20203404",
+      "approvalNumbers": [
+        "国药准字H20203404"
+      ]
+    },
+    {
+      "id": "drug-aomeishatanzhi-qingl-saiqin-pian-40mg",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20203404",
+          "国药准字H20203405"
+        ]
+      },
+      "approvalNumber": "国药准字H20203405",
+      "approvalNumbers": [
+        "国药准字H20203405"
+      ]
+    },
+    {
+      "id": "drug-aomeishatanzhi-qingl-saiqin-pian-40mg-3",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20203405",
+          "国药准字H20203406"
+        ]
+      },
+      "approvalNumber": "国药准字H20203406",
+      "approvalNumbers": [
+        "国药准字H20203406"
+      ]
+    },
+    {
+      "id": "drug-chongzu-ren-xuexiaoban-shengchengsu-zhusheye-1",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字S20050049",
+          "国药准字S20050048"
+        ]
+      },
+      "approvalNumber": "国药准字S20050049",
+      "approvalNumbers": [
+        "国药准字S20050049"
+      ]
+    },
+    {
+      "id": "drug-chongzu-ren-xuexiaoban-shengchengsu-zhusheye-1-3",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字S20050049",
+          "国药准字S20050048"
+        ]
+      },
+      "approvalNumber": "国药准字S20050048",
+      "approvalNumbers": [
+        "国药准字S20050048"
+      ]
+    },
+    {
+      "id": "drug-dulatangtai-zhusheye-0p75mg",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字SJ20190021",
+          "国药准字SJ20190022"
+        ]
+      },
+      "approvalNumber": "国药准字SJ20190021",
+      "approvalNumbers": [
+        "国药准字SJ20190021"
+      ]
+    },
+    {
+      "id": "drug-dulatangtai-zhusheye-1p5mg",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字SJ20190021",
+          "国药准字SJ20190022"
+        ]
+      },
+      "approvalNumber": "国药准字SJ20190022",
+      "approvalNumbers": [
+        "国药准字SJ20190022"
+      ]
+    },
+    {
+      "id": "drug-gansuna-zhusheye-2ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20043155",
+          "国药准字H20043156"
+        ]
+      },
+      "approvalNumber": "国药准字H20043155",
+      "approvalNumbers": [
+        "国药准字H20043155"
+      ]
+    },
+    {
+      "id": "drug-gansuna-zhusheye-2ml-2",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20043155",
+          "国药准字H20043156"
+        ]
+      },
+      "approvalNumber": "国药准字H20043156",
+      "approvalNumbers": [
+        "国药准字H20043156"
+      ]
+    },
+    {
+      "id": "drug-midazuolun-zhusheye-1ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H19990027",
+          "国药准字H20031071"
+        ]
+      },
+      "approvalNumber": "国药准字H19990027",
+      "approvalNumbers": [
+        "国药准字H19990027"
+      ]
+    },
+    {
+      "id": "drug-midazuolun-zhusheye-5ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H19990027",
+          "国药准字H20031071"
+        ]
+      },
+      "approvalNumber": "国药准字H20031071",
+      "approvalNumbers": [
+        "国药准字H20031071"
+      ]
+    },
+    {
+      "id": "drug-ren-shengzhangjisu-zhusheye-10mg",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字S20050024",
+          "国药准字S20050025"
+        ]
+      },
+      "approvalNumber": "国药准字S20050025",
+      "approvalNumbers": [
+        "国药准字S20050025"
+      ]
+    },
+    {
+      "id": "drug-ren-shengzhangjisu-zhusheye-5mg",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字S20050024",
+          "国药准字S20050025"
+        ]
+      },
+      "approvalNumber": "国药准字S20050024",
+      "approvalNumbers": [
+        "国药准字S20050024"
+      ]
+    },
+    {
+      "id": "drug-suogongsu-zhusheye-1ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20233754",
+          "国药准字H20233755"
+        ]
+      },
+      "approvalNumber": "国药准字H20233754",
+      "approvalNumbers": [
+        "国药准字H20233754"
+      ]
+    },
+    {
+      "id": "drug-suogongsu-zhusheye-1ml-2",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20233754",
+          "国药准字H20233755"
+        ]
+      },
+      "approvalNumber": "国药准字H20233755",
+      "approvalNumbers": [
+        "国药准字H20233755"
+      ]
+    },
+    {
+      "id": "drug-yansuan-xitiliqin-diji-10ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字HC20181013",
+          "国药准字HC20181014"
+        ]
+      },
+      "approvalNumber": "国药准字HC20181013",
+      "approvalNumbers": [
+        "国药准字HC20181013"
+      ]
+    },
+    {
+      "id": "drug-zhong-changlian-zhifangru-zhusheye-c6-24-250ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20041101",
+          "国药准字H20030609"
+        ]
+      },
+      "approvalNumber": "国药准字H20041101",
+      "approvalNumbers": [
+        "国药准字H20041101"
+      ]
+    },
+    {
+      "id": "drug-zhong-changlian-zhifangru-zhusheye-c6-24-250ml-3",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20030608",
+          "国药准字H20030609"
+        ]
+      },
+      "approvalNumber": "国药准字H20030609",
+      "approvalNumbers": [
+        "国药准字H20030609"
+      ]
+    },
+    {
+      "id": "drug-zhong-changlian-zhifangru-zhusheye-c6-24-500ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20030608",
+          "国药准字H20030609"
+        ]
+      },
+      "approvalNumber": "国药准字H20030608",
+      "approvalNumbers": [
+        "国药准字H20030608"
+      ]
+    },
+    {
+      "id": "drug-zhong-changlian-zhifangru-zhusheye-c6-24-500ml-4",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20030608",
+          "国药准字H20030610"
+        ]
+      },
+      "approvalNumber": "国药准字H20030610",
+      "approvalNumbers": [
+        "国药准字H20030610"
+      ]
+    },
+    {
+      "id": "drug-zhuanhuatang-dianjiezhi-zhusheye-250ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20080720",
+          "国药准字H20080721"
+        ]
+      },
+      "approvalNumber": "国药准字H20080720",
+      "approvalNumbers": [
+        "国药准字H20080720"
+      ]
+    },
+    {
+      "id": "drug-zhuanhuatang-dianjiezhi-zhusheye-500ml",
+      "expect": {
+        "approvalNumbers": [
+          "国药准字H20080720",
+          "国药准字H20080721"
+        ]
+      },
+      "approvalNumber": "国药准字H20080721",
+      "approvalNumbers": [
+        "国药准字H20080721"
+      ]
+    }
+  ]
+}

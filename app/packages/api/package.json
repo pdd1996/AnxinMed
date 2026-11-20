@@ -38,6 +38,7 @@
     "db:pharmacist-review-import": "tsx src/scripts/pharmacist-review-import.ts",
     "db:repair-specs": "tsx src/scripts/repair-specs.ts",
     "db:repair-manuals": "tsx src/scripts/repair-manuals.ts",
+    "db:split-multi-spec": "tsx src/db/oneoff-2026-11-20-split-multi-spec.ts",
     "db:audit": "tsx src/db/data-audit.ts",
     "perf:intake": "tsx src/scripts/perf-intake.ts",
     "eval:export-labels": "tsx src/scripts/export-consult-labels.ts",
