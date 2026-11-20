@@ -333,7 +333,7 @@ describe('fallbackSectionsFromInsert · L0 排版简化', () => {
     '·3.尚无证据显示磷酸奥司他韦对甲型流感和乙型流感以外的其他疾病有效。\n' +
     '·4.奥司他韦对1岁以下儿童治疗流感的安全性和有效性尚未确定。'
 
-  it('单元素整段注意事项 → 短摘要 + 前 3 条要点 + 原文收进 details', () => {
+  it('单元素整段注意事项 → 短摘要 + 前 3 条要点（不再带展开原文折叠区）', () => {
     const insert = mkInsert({
       indication: longIndication,
       precautions: [longPrecautions],
@@ -351,22 +351,16 @@ describe('fallbackSectionsFromInsert · L0 排版简化', () => {
     expect(s.keyPoints[0]).toContain('精神神经性不良事件')
     expect(s.keyPoints.every((k) => k.length <= 70)).toBe(true)
 
-    // 原文可追溯：适应症原文 + 4 条注意事项逐条
-    expect(s.details).toHaveLength(5)
-    expect(s.details?.[0]?.title).toBe('适应症段（原文）')
-    expect(s.details?.[1]?.title).toBe('注意事项原文 · 第 1 条')
-    expect(s.details?.map((d) => d.body).join('')).not.toContain('流 感')
-    expect(s.details?.map((d) => d.body).join('')).toContain('对1岁以下儿童治疗流感')
+    // 2026-11-20 用户裁定：L0 卡不再渲染「展开原文」（原文走「查看完整说明书」）
+    expect(s.details).toBeUndefined()
   })
 
-  it('已拆条的注意事项数组 → details 逐条保留，摘要仍短', () => {
+  it('已拆条的注意事项数组 → 摘要仍短、要点保留', () => {
     const insert = mkInsert({ precautions: ['开封后一个月内使用', '避免瓶口接触眼睛'] })
     const s = fallbackSectionsFromInsert('这个药通常用于什么', insert)
 
     expect(s.keyPoints).toEqual(['开封后一个月内使用', '避免瓶口接触眼睛'])
-    // 适应症原文 + 2 条注意事项
-    expect(s.details).toHaveLength(3)
-    expect(s.details?.map((d) => d.body)).toContain('避免瓶口接触眼睛')
+    expect(s.details).toBeUndefined()
   })
 })
 
@@ -404,8 +398,8 @@ describe('fallbackSectionsFromInsert · 段内锚定摘录（伤肝/伤肾/犯�
     expect(s.keyPoints[0]).toContain('发生频率无法估计')
     expect(s.keyPoints.join('')).toContain('严重肝功能不全者慎用')
     expect(s.keyPoints.join('')).not.toContain('精神神经')
-    // 原文仍可追溯
-    expect(s.details?.[0]?.title).toBe('不良反应段（原文）')
+    // 原文不再进折叠区（2026-11-20 用户裁定），由「查看完整说明书」承接
+    expect(s.details).toBeUndefined()
   })
 
   it('段内确实没有「肾」→ 明说未见，不拿无关段落充数', () => {
@@ -414,7 +408,7 @@ describe('fallbackSectionsFromInsert · 段内锚定摘录（伤肝/伤肾/犯�
     expect(s.summary).toContain('未见')
     expect(s.summary).toContain('肾')
     expect(s.keyPoints).toEqual([])
-    expect(s.details?.length).toBeGreaterThan(0)
+    expect(s.details).toBeUndefined()
   })
 
   it('「犯困」命中段内「嗜睡」+ 相关注意事项', () => {

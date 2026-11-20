@@ -335,11 +335,11 @@ describe('POST /api/consult · 说明书未核验门禁', () => {
     expect(res.body.l0Notice).toContain('尚未人工核验')
     expect(res.body.l0Notice).toContain('玻璃酸钠滴眼液')
     expect(res.body.citations).toHaveLength(1)
-    // 2026-11-20 排版优化：L0 用短摘要渲染，完整原文收进 details「展开原文」，不再整段塞 keyPoints
+    // 2026-11-20 用户裁定：L0 卡不再渲染「展开原文」折叠区（原文走「查看完整说明书」分段落页）
     expect(res.body.sections.summary).toContain('缓解干眼症状')
     expect(res.body.sections.keyPoints.length).toBeLessThanOrEqual(3)
     expect(res.body.sections.keyPoints.every((k: string) => k.length <= 80)).toBe(true)
-    expect(res.body.sections.details?.length).toBe(3) // 适应症原文 + 2 条注意事项
+    expect(res.body.sections.details).toBeUndefined()
 
     const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
     expect(events).toHaveLength(1)

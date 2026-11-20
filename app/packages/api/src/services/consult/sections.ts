@@ -469,7 +469,8 @@ export function leafletOverviewSections(insert: InsertSlice): NormalizedSections
 
 /**
  * Baichuan 不可用/L0 资料查询时的降级路径：用说明书段落拼装确定性回答（不依赖 LLM）。
- * 卡片只放短摘要，完整原文放 details 展开区；status 由调用方决定。
+ * 卡片只放短摘要；**不渲染「展开原文」折叠区**（2026-11-20 用户裁定），
+ * 完整原文由「查看完整说明书」进入分段落页查看。
  */
 export function fallbackSectionsFromInsert(question: string, insert: InsertSlice): NormalizedSections {
   // 纯「说明书」请求：给分段摘要目录，不再落进适应症兜底（2026-11-20 用户裁定）
@@ -550,19 +551,7 @@ export function fallbackSectionsFromInsert(question: string, insert: InsertSlice
     },
   )
 
-  // 展开原文：所选段落全文 + 注意事项逐条原文（选中的就是注意事项时只保留逐条，避免重复）
-  const details: Array<{ title: string; body: string; source?: string }> = []
-  const sectionBody = normalizeLeafletText(sectionText)
-  if (sectionBody && section.key !== 'precautions') {
-    details.push({ title: `${section.label}（原文）`, body: sectionBody, source: insert.source || undefined })
-  }
-  precautionItems.forEach((item, index) => {
-    details.push({
-      title: `注意事项原文 · 第 ${index + 1} 条`,
-      body: item,
-      source: insert.source || undefined,
-    })
-  })
-
-  return details.length > 0 ? { ...sections, details } : sections
+  // 2026-11-20 用户裁定：L0 卡不再渲染「展开原文（N 条）」折叠区（伤肝卡上是 15 条原文墙）。
+  // 原文改由卡片底部「查看完整说明书」进入分段落页查看；interaction-check 等其它路径的 details 不受影响。
+  return sections
 }
