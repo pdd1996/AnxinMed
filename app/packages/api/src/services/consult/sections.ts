@@ -352,7 +352,9 @@ function findTopicAnchor(question: string): TopicAnchor | null {
 
 /** 段落原文 → 句级片段（先去段名前缀；再按换行/句号/器官标签切分）。 */
 function excerptSegments(sectionText: string): string[] {
-  return sectionText
+  // 必须先合并 PDF 硬折行：staging 库里大量说明书保留「不良\n事件」这类断行，
+  // 先切段会把词切断（锚点匹配不到、摘要从词中间开始）。
+  return normalizeLeafletText(sectionText)
     .replace(/^[^：:]+[：:]/, '')
     .split(/\n+/)
     .flatMap((line) => line.split(/(?<=[。；])/))

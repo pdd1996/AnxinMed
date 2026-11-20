@@ -485,6 +485,18 @@ describe('fallbackSectionsFromInsert · 「说明书」问句', () => {
     expect(s.nextAction).toContain('查看完整说明书')
   })
 
+  it('PDF 硬折行（「不良\\n事件」）不会被切成半句（staging 库真实形态）', () => {
+    const wrapped = mkInsert({
+      adverseReactions:
+        '1.临床试验\n由于本品的临床试验是在各种不同条件下进行的。\n成年受试者治疗研究\n参与临床试验的受试者最常报告的不良\n事件为恶心和呕吐。',
+    })
+    const s = fallbackSectionsFromInsert('说明书', wrapped)
+    const line = s.keyPoints.find((item) => item.startsWith('不良反应：'))
+    expect(line).toBeTruthy()
+    expect(line).toContain('不良事件为恶心')
+    expect(line).not.toBe('不良反应：事件为恶心和呕吐。')
+  })
+
   it('「看说明书」同样识别；「说明书里写没写伤肝」不算纯说明书请求', () => {
     expect(isLeafletRequest('看说明书')).toBe(true)
     expect(isLeafletRequest('说明书全文')).toBe(true)
