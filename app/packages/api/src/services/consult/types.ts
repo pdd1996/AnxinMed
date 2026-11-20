@@ -118,6 +118,8 @@ export interface NormalizedSections {
   warning: string
   /** M11-T2：可展开原文（interaction-check 用；keyPoints 只放短摘要）。 */
   details?: Array<{ title: string; body: string; source?: string }>
+  /** 分区语义标记（2026-11-20）：leaflet-overview = 「说明书」问句的分段摘要目录。 */
+  kind?: 'leaflet-overview'
   /** true 表示 stripDosageAdvice 命中过（L2）；run.ts 据此决定 status/riskLevel。 */
   limited: boolean
 }

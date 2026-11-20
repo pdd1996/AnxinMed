@@ -77,6 +77,8 @@ export function AnswerCard({
   // L0 原文卡（manual-gate）：原文语义标签；不渲染顶部未核验 banner（2026-11-20 用户裁定删除），
   // 未核验/来源信息只在「查看完整说明书」分段页展示。
   const isRawLeaflet = status === 'manual-gate'
+  // 「说明书」问句的分段摘要目录（2026-11-20）：标题用摘要语义，不套原文卡的「注意事项」
+  const isOverview = sections?.kind === 'leaflet-overview'
   return (
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
@@ -86,7 +88,7 @@ export function AnswerCard({
           <div className="space-y-3">
             <div className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">
-                {isRawLeaflet ? '说明书原文' : '简明结论'}
+                {isOverview ? '说明书摘要' : isRawLeaflet ? '说明书原文' : '简明结论'}
               </span>
               <p className="text-sm font-semibold text-foreground">{sections.summary}</p>
             </div>
@@ -95,7 +97,7 @@ export function AnswerCard({
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <Info className="size-3.5" aria-hidden />
-                  {isRawLeaflet ? '注意事项' : '需要知道'}
+                  {isOverview ? '分段摘要' : isRawLeaflet ? '注意事项' : '需要知道'}
                 </h4>
                 <ul className="space-y-1 pl-1 text-sm text-foreground">
                   {sections.keyPoints.map((item) => (
@@ -130,7 +132,7 @@ export function AnswerCard({
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-risk-l3">
                   <AlertTriangle className="size-3.5" aria-hidden />
-                  {isRawLeaflet ? '禁忌' : '注意风险'}
+                  {isRawLeaflet || isOverview ? '禁忌' : '注意风险'}
                 </h4>
                 <ul className="space-y-1 pl-1 text-sm text-foreground">
                   {sections.risks.map((item) => (

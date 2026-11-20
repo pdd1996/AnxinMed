@@ -169,6 +169,34 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
   })
 
+  it('「说明书」分段摘要目录（kind=leaflet-overview）→ 标题为「说明书摘要 / 分段摘要」', () => {
+    const summary = '下面是本药说明书的段落摘要；完整原文请点「查看完整说明书」。'
+    render(
+      <MemoryRouter>
+        <AnswerCard
+          riskLevel="L1"
+          status="manual-gate"
+          answer={summary}
+          sections={mkSections({
+            kind: 'leaflet-overview',
+            summary,
+            keyPoints: ['适应症：用于流感治疗', '用法用量：请按医生处方执行', '禁忌：过敏者禁用', '注意事项：精神神经性不良事件', '不良反应：常见恶心、呕吐'],
+            risks: [],
+            nextAction: '具体是否适用与用法请咨询医生或药师；完整原文见「查看完整说明书」。',
+          })}
+          citations={[]}
+          leafletHref="/leaflet/drug-1"
+          blocked
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('说明书摘要')).toBeTruthy()
+    expect(screen.getByText('分段摘要')).toBeTruthy()
+    expect(screen.queryByText('说明书原文')).toBeNull()
+    expect(screen.queryByText('注意事项')).toBeNull()
+    expect(screen.getByText('查看完整说明书')).toBeTruthy()
+  })
+
   it('no-source → notice 兜底提示（状态徽章已移除）', () => {
     render(
       <AnswerCard

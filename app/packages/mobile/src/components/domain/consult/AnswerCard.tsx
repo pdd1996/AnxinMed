@@ -88,6 +88,8 @@ export function AnswerCard({
   // L0 原文卡（manual-gate）：原文语义标签；不渲染顶部未核验 banner（2026-11-20 用户裁定删除），
   // 未核验/来源信息只在「查看完整说明书」分段页展示。
   const isRawLeaflet = status === "manual-gate";
+  // 「说明书」问句的分段摘要目录（2026-11-20）：标题用摘要语义，不套原文卡的「注意事项」
+  const isOverview = sections?.kind === "leaflet-overview";
 
   return (
     <View
@@ -101,7 +103,7 @@ export function AnswerCard({
         <View className="gap-3">
           <View className="gap-1">
             <Text className="text-sm font-medium text-muted-foreground">
-              {isRawLeaflet ? "说明书原文" : "简明结论"}
+              {isOverview ? "说明书摘要" : isRawLeaflet ? "说明书原文" : "简明结论"}
             </Text>
             <Text className="text-lg font-semibold leading-7 text-card-foreground">
               {sections.summary}
@@ -113,7 +115,7 @@ export function AnswerCard({
               <View className="flex-row items-center gap-1.5">
                 <Icon as={Info} size={16} color={mutedForeground} />
                 <Text className="text-sm font-medium text-muted-foreground">
-                  {isRawLeaflet ? "注意事项" : "需要知道"}
+                  {isOverview ? "分段摘要" : isRawLeaflet ? "注意事项" : "需要知道"}
                 </Text>
               </View>
               <View className="gap-1.5 pl-1">
@@ -163,7 +165,7 @@ export function AnswerCard({
               <View className="flex-row items-center gap-1.5">
                 <Icon as={AlertTriangle} size={16} color={riskL3} />
                 <Text className="text-sm font-medium text-risk-l3">
-                  {isRawLeaflet ? "禁忌" : "注意风险"}
+                  {isRawLeaflet || isOverview ? "禁忌" : "注意风险"}
                 </Text>
               </View>
               <View className="gap-1.5 pl-1">

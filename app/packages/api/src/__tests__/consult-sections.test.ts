@@ -20,6 +20,7 @@ import {
 import {
   fallbackSectionsFromInsert,
   hasFrequencyTable,
+  isLeafletRequest,
   normalizeSections,
   pickInsertSections,
 } from '../services/consult/sections.js'
@@ -454,6 +455,40 @@ describe('fallbackSectionsFromInsert · 段内锚定摘录（伤肝/伤肾/犯�
     // 路由到相互作用段 → 不触发不良反应段的锚定摘录
     expect(s.summary).toContain('酒精')
     expect(s.summary).not.toContain('上市后经验')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 「说明书」问句 → 分段摘要目录（2026-11-20 用户裁定）
+// ---------------------------------------------------------------------------
+
+describe('fallbackSectionsFromInsert · 「说明书」问句', () => {
+  const insert = mkInsert({
+    genericName: '磷酸奥司他韦胶囊',
+    indication: '用于成人和1岁及1岁以上儿童的甲型和乙型流感治疗。',
+    adverseReactions: '1.临床试验\n常见恶心、呕吐。\n2.上市后经验\n消化系统：肝炎、肝功能检查异常',
+    precautions: ['·1.精神神经性不良事件，可能引起幻觉、谵妄。\n·2.尚无证据显示对流感以外疾病有效。'],
+    contraindications: ['对本品的任何成份过敏者禁用。'],
+  })
+
+  it('「说明书」→ 分段摘要目录（kind=leaflet-overview），不再落适应症兜底', () => {
+    const s = fallbackSectionsFromInsert('说明书', insert)
+
+    expect(s.kind).toBe('leaflet-overview')
+    expect(s.summary).toContain('段落摘要')
+    expect(s.keyPoints).toHaveLength(5)
+    expect(s.keyPoints[0]).toContain('适应症：')
+    expect(s.keyPoints[1]).toContain('用法用量：')
+    expect(s.keyPoints[2]).toContain('禁忌：')
+    expect(s.keyPoints[3]).toContain('注意事项：')
+    expect(s.keyPoints[4]).toContain('不良反应：')
+    expect(s.nextAction).toContain('查看完整说明书')
+  })
+
+  it('「看说明书」同样识别；「说明书里写没写伤肝」不算纯说明书请求', () => {
+    expect(isLeafletRequest('看说明书')).toBe(true)
+    expect(isLeafletRequest('说明书全文')).toBe(true)
+    expect(isLeafletRequest('说明书里写没写伤肝')).toBe(false)
   })
 })
 

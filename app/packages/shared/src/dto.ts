@@ -155,6 +155,12 @@ export const ConsultSectionsSchema = z.object({
    * 其他模板不填，旧客户端忽略该字段不受影响。
    */
   details: z.array(z.object({ title: z.string(), body: z.string(), source: z.string().optional() })).optional(),
+  /**
+   * 分区语义标记（2026-11-20）：`leaflet-overview` = 问「说明书」时返回的分段摘要目录，
+   * 前端据此把标题渲染为「说明书摘要 / 分段摘要」，而不是原文卡的「说明书原文 / 注意事项」。
+   * 旧客户端忽略该字段不受影响。
+   */
+  kind: z.enum(['leaflet-overview']).optional(),
 })
 export type ConsultSections = z.infer<typeof ConsultSectionsSchema>
 

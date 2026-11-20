@@ -399,11 +399,67 @@ export function leafletNextAction(texts: string[]): string {
   return '具体是否适用、用法用量及疗程请咨询医生或药师。'
 }
 
+// ---------------------------------------------------------------------------
+// 「说明书」问句：分段摘要目录（2026-11-20 用户裁定：给目录 + 每段一句摘要，
+// 底部保留「查看完整说明书」；不是只有「已收录/未核验」元信息的旧可用性卡）。
+// ---------------------------------------------------------------------------
+
+/** 纯说明书请求（「说明书」「看说明书」「说明书全文」），不是针对某段内容的提问。 */
+const LEAFLET_REQUEST_RE =
+  /^(?:请|帮我|麻烦)?(?:看|读|查看|打开|给我看|发|来)?(?:一下|一份)?(?:这个药|该药|本药)?(?:的)?说明书(?:内容|全文|原文|图片)?[?？。！!\s]*$/
+
+/** 问句是否只是在要说明书（区别于「说明书里写没写伤肝」这类内容提问）。 */
+export function isLeafletRequest(question: string): boolean {
+  return LEAFLET_REQUEST_RE.test(String(question ?? '').trim())
+}
+
+/**
+ * 说明书分段摘要：适应症 / 用法用量（医嘱口径）/ 禁忌 / 注意事项 / 不良反应 各一句。
+ * 只做摘录与固定提示，不生成医学内容；完整原文由前端「查看完整说明书」进入分段落页。
+ */
+export function leafletOverviewSections(insert: InsertSlice): NormalizedSections {
+  const contraItems = Array.isArray(insert.contraindications)
+    ? insert.contraindications.map(String)
+    : typeof insert.contraindications === 'string'
+      ? [insert.contraindications]
+      : []
+  const precautionItems = splitLeafletItems(insert.precautions)
+
+  const lines = [
+    `适应症：${digestSectionText(insert.indication || '（未收录）', 60)}`,
+    '用法用量：具体剂量、频次与疗程属医嘱范畴，请按医生处方或说明书执行。',
+    `禁忌：${contraItems.length ? contraItems.slice(0, 2).map((item) => digestShortText(item, 40)).join('；') : '（未收录）'}`,
+    `注意事项：${
+      precautionItems.length
+        ? precautionItems.slice(0, 2).map((item) => digestLeafletItem(item, 40)).join('；')
+        : '（未收录）'
+    }`,
+    `不良反应：${digestSectionText(insert.adverseReactions || '（未收录）', 60)}`,
+  ]
+    .map((line) => stripDosageAdvice(line))
+    .filter(Boolean)
+
+  const summary = '下面是本药说明书的段落摘要；完整原文请点「查看完整说明书」。'
+  const nextAction = '具体是否适用与用法请咨询医生或药师；完整原文见「查看完整说明书」。'
+  return {
+    summary,
+    keyPoints: lines,
+    risks: [],
+    nextAction,
+    warning: '不要根据 AI 回答自行调整处方。',
+    kind: 'leaflet-overview',
+    limited: [summary, ...lines, nextAction].some(containsDosageAdvice),
+  }
+}
+
 /**
  * Baichuan 不可用/L0 资料查询时的降级路径：用说明书段落拼装确定性回答（不依赖 LLM）。
  * 卡片只放短摘要，完整原文放 details 展开区；status 由调用方决定。
  */
 export function fallbackSectionsFromInsert(question: string, insert: InsertSlice): NormalizedSections {
+  // 纯「说明书」请求：给分段摘要目录，不再落进适应症兜底（2026-11-20 用户裁定）
+  if (isLeafletRequest(question)) return leafletOverviewSections(insert)
+
   const section = pickInsertSections(question, insert)
   const sectionText = section.text.replace(/^[^：:]+[：:]/, '')
   const precautionItems = splitLeafletItems(insert.precautions)

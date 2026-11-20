@@ -33,6 +33,30 @@ describe("AnswerCard · 状态分支", () => {
     expect(view.getByText("警示语")).toBeTruthy();
   });
 
+  it("说明书分段摘要目录（kind=leaflet-overview）→ 标题用摘要语义", async () => {
+    const view = await render(
+      <AnswerCard
+        riskLevel="L1"
+        status="manual-gate"
+        answer="下面是本药说明书的段落摘要；完整原文请点「查看完整说明书」。"
+        sections={{
+          ...sections,
+          kind: "leaflet-overview",
+          summary: "下面是本药说明书的段落摘要；完整原文请点「查看完整说明书」。",
+          keyPoints: ["适应症：用于流感治疗", "不良反应：常见恶心"],
+          risks: [],
+        }}
+        citations={[]}
+        blocked
+      />,
+    );
+
+    expect(view.getByText("说明书摘要")).toBeTruthy();
+    expect(view.getByText("分段摘要")).toBeTruthy();
+    expect(view.queryByText("说明书原文")).toBeNull();
+    expect(view.queryByText("注意事项")).toBeNull();
+  });
+
   it("L2 limited 显示 notice（状态徽章已移除）", async () => {
     const view = await render(
       <AnswerCard
