@@ -1,5 +1,14 @@
+import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { AlertTriangle, ChevronRight, Info, ShieldCheck } from "lucide-react-native";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Info,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react-native";
 import { useUnstableNativeVariable } from "nativewind";
 import type {
   Citation,
@@ -14,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * 常规回答卡（照 web `components/domain/consult/AnswerCard.tsx` 重写渲染层）。
- * 结构：sections 五段 → notice/l0Notice。
+ * 结构：sections 五段 → notice；L0（manual/未核验）先渲染「原文摘录」提示，原文收进展开区。
  * L4 不走本卡（EmergencyCard）；blocked=true 时仍全量渲染守门固定文案（用户需要看到拒答原因）。
  *
  * 风险等级/状态/来源徽章按产品新口径从患者界面移除（仅保留正文与 citations）。
@@ -66,13 +75,18 @@ export function AnswerCard({
   sections,
   notice,
   l0Notice,
+  citations,
   blocked,
   clarifyOptions,
   onPickDrug,
 }: AnswerCardProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const mutedForeground = useUnstableNativeVariable("--muted-foreground");
   const riskL2 = useUnstableNativeVariable("--risk-l2");
   const riskL3 = useUnstableNativeVariable("--risk-l3");
+  // L0 资料查询（manual 档 / 说明书未核验）：原文摘录，不是个性化回答。
+  const isL0 = Boolean(l0Notice);
+  const source = citations[0];
 
   return (
     <View
@@ -81,10 +95,26 @@ export function AnswerCard({
         blocked ? "border-risk-l3" : "border-border",
       )}
     >
+      {isL0 ? (
+        <View className="mb-3 gap-1 rounded-xl border border-risk-l2 bg-risk-l2-tint p-2.5">
+          <View className="flex-row items-start gap-1.5">
+            <Icon as={ShieldAlert} size={16} color={riskL2} />
+            <Text className="flex-1 text-sm font-medium leading-5 text-risk-l2">{l0Notice}</Text>
+          </View>
+          {source ? (
+            <Text className="pl-5 text-xs leading-4 text-muted-foreground">
+              来源：{source.drugName} · {source.source}（版本 {source.version}）
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {sections ? (
         <View className="gap-3">
           <View className="gap-1">
-            <Text className="text-sm font-medium text-muted-foreground">简明结论</Text>
+            <Text className="text-sm font-medium text-muted-foreground">
+              {isL0 ? "说明书要点" : "简明结论"}
+            </Text>
             <Text className="text-lg font-semibold leading-7 text-card-foreground">
               {sections.summary}
             </Text>
@@ -94,7 +124,9 @@ export function AnswerCard({
             <View className="gap-1">
               <View className="flex-row items-center gap-1.5">
                 <Icon as={Info} size={16} color={mutedForeground} />
-                <Text className="text-sm font-medium text-muted-foreground">需要知道</Text>
+                <Text className="text-sm font-medium text-muted-foreground">
+                  {isL0 ? "注意事项" : "需要知道"}
+                </Text>
               </View>
               <View className="gap-1.5 pl-1">
                 {sections.keyPoints.map((item) => (
@@ -107,11 +139,44 @@ export function AnswerCard({
             </View>
           ) : null}
 
+          {sections.details && sections.details.length > 0 ? (
+            <View className="gap-1">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: detailsOpen }}
+                onPress={() => setDetailsOpen((v) => !v)}
+                className="min-h-[44px] flex-row items-center justify-between gap-2 rounded-xl border border-border bg-muted px-3 active:opacity-80"
+              >
+                <Text className="text-sm font-medium text-muted-foreground">
+                  展开原文（{sections.details.length} 条）
+                </Text>
+                <Icon as={detailsOpen ? ChevronUp : ChevronDown} size={18} color={mutedForeground} />
+              </Pressable>
+              {detailsOpen ? (
+                <View className="gap-2 pl-1">
+                  {sections.details.map((d) => (
+                    <View key={`${d.title}-${d.body}`} className="gap-0.5">
+                      <Text className="text-sm font-semibold text-card-foreground">{d.title}</Text>
+                      <Text className="text-sm leading-5 text-muted-foreground">{d.body}</Text>
+                      {d.source ? (
+                        <Text className="text-xs leading-4 text-muted-foreground">
+                          来源：{d.source}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {sections.risks.length > 0 ? (
             <View className="gap-1">
               <View className="flex-row items-center gap-1.5">
                 <Icon as={AlertTriangle} size={16} color={riskL3} />
-                <Text className="text-sm font-medium text-risk-l3">注意风险</Text>
+                <Text className="text-sm font-medium text-risk-l3">
+                  {isL0 ? "禁忌" : "注意风险"}
+                </Text>
               </View>
               <View className="gap-1.5 pl-1">
                 {sections.risks.map((item) => (
@@ -149,13 +214,6 @@ export function AnswerCard({
         <View className="mt-3 flex-row items-start gap-1.5 rounded-xl border border-risk-l2 bg-risk-l2-tint p-2.5">
           <Icon as={Info} size={16} color={riskL2} />
           <Text className="flex-1 text-sm leading-5 text-risk-l2">{notice}</Text>
-        </View>
-      ) : null}
-
-      {l0Notice ? (
-        <View className="mt-3 flex-row items-start gap-1.5 rounded-xl border border-muted-foreground bg-muted p-2.5">
-          <Icon as={ShieldCheck} size={16} color={mutedForeground} />
-          <Text className="flex-1 text-sm leading-5 text-muted-foreground">{l0Notice}</Text>
         </View>
       ) : null}
 

@@ -56,11 +56,11 @@ const REFUSED_SECTIONS: NormalizedSections = {
 
 /** manual-gate 固定提示（PRD §7.5：仅可 L0 资料查询，不可进入个体化解释）。 */
 const MANUAL_GATE_NOTICE =
-  '该药品为用户手动建档（未经 OCR 确认），AI 个性化咨询不可用，仅可查询药品资料（L0）。'
+  '该药为手动建档（未经 OCR 确认），暂不能提供个性化解释，仅可查看说明书原文。'
 
 /** 说明书未核验提示（资产侧门禁：curationStatus !== reviewed）。 */
 const UNVERIFIED_NOTICE =
-  '该药品说明书尚未人工核验，AI 个性化咨询不可用，仅可查询药品原文资料（L0）。'
+  '该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。'
 
 /**
  * L0 资料查询结果（manual-gate 与 unverified 共用）。

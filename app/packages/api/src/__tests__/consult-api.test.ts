@@ -304,7 +304,7 @@ describe('POST /api/consult · manual 档门禁（PRD §7.5.4）', () => {
     expect(res.body.status).toBe('manual-gate')
     expect(res.body.blocked).toBe(true)
     expect(res.body.l0Notice).toContain('手动建档')
-    expect(res.body.l0Notice).toContain('L0')
+    expect(res.body.l0Notice).toContain('仅可查看说明书原文')
 
     const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
     expect(events).toHaveLength(1)
@@ -335,6 +335,11 @@ describe('POST /api/consult · 说明书未核验门禁', () => {
     expect(res.body.l0Notice).toContain('尚未人工核验')
     expect(res.body.l0Notice).toContain('玻璃酸钠滴眼液')
     expect(res.body.citations).toHaveLength(1)
+    // 2026-11-20 排版优化：L0 用短摘要渲染，完整原文收进 details「展开原文」，不再整段塞 keyPoints
+    expect(res.body.sections.summary).toContain('缓解干眼症状')
+    expect(res.body.sections.keyPoints.length).toBeLessThanOrEqual(3)
+    expect(res.body.sections.keyPoints.every((k: string) => k.length <= 80)).toBe(true)
+    expect(res.body.sections.details?.length).toBe(3) // 适应症原文 + 2 条注意事项
 
     const events = await db.select().from(riskEvents).where(eq(riskEvents.userId, USER))
     expect(events).toHaveLength(1)

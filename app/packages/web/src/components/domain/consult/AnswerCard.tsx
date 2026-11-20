@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronRight, Info, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Info, ShieldAlert, ShieldCheck } from 'lucide-react'
 import type { ConsultClarifyOption, ConsultSections, ConsultStatus, RiskLevel } from '@anxin/shared'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -66,19 +66,40 @@ export function AnswerCard({
   sections,
   notice,
   l0Notice,
+  citations,
   blocked,
   clarifyOptions,
   onPickDrug,
 }: AnswerCardProps) {
+  // L0 资料查询（manual 档 / 说明书未核验）：原文摘录，不是个性化回答——
+  // 顶部先交代「未核验 + 来源」，再用短摘要渲染；完整原文收在「展开原文」。
+  const isL0 = Boolean(l0Notice)
+  const source = citations[0]
   return (
     // data-testid：E2E（consult-dataquery.spec.ts）按回答卡 scope 断言，避开 DrugSelector 中同名药 chip 的文本重名歧义。
     <Card className={blocked ? 'border-risk-l3/30' : undefined} data-testid="consult-answer-card">
       <CardContent className="space-y-3 p-4">
+        {isL0 && (
+          <div className="space-y-1 rounded-md border border-risk-l2/30 bg-risk-l2/10 p-2.5">
+            <p className="flex items-start gap-1.5 text-xs font-medium text-risk-l2">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              {l0Notice}
+            </p>
+            {source && (
+              <p className="pl-5 text-xs text-muted-foreground">
+                来源：{source.drugName} · {source.source}（版本 {source.version}）
+              </p>
+            )}
+          </div>
+        )}
+
         {/* 中部：sections 结构化（如有）；否则仅 answer 一句话 */}
         {sections ? (
           <div className="space-y-3">
             <div className="space-y-1">
-              <span className="text-xs font-medium text-muted-foreground">简明结论</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {isL0 ? '说明书要点' : '简明结论'}
+              </span>
               <p className="text-sm font-semibold text-foreground">{sections.summary}</p>
             </div>
 
@@ -86,7 +107,7 @@ export function AnswerCard({
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                   <Info className="size-3.5" aria-hidden />
-                  需要知道
+                  {isL0 ? '注意事项' : '需要知道'}
                 </h4>
                 <ul className="space-y-1 pl-1 text-sm text-foreground">
                   {sections.keyPoints.map((item) => (
@@ -121,7 +142,7 @@ export function AnswerCard({
               <div className="space-y-1">
                 <h4 className="flex items-center gap-1.5 text-xs font-medium text-risk-l3">
                   <AlertTriangle className="size-3.5" aria-hidden />
-                  注意风险
+                  {isL0 ? '禁忌' : '注意风险'}
                 </h4>
                 <ul className="space-y-1 pl-1 text-sm text-foreground">
                   {sections.risks.map((item) => (
@@ -156,14 +177,6 @@ export function AnswerCard({
           <p className="flex items-start gap-1.5 rounded-md border border-risk-l2/30 bg-risk-l2/10 p-2 text-xs text-risk-l2">
             <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             {notice}
-          </p>
-        )}
-
-        {/* 底部：l0Notice（manual 档提示） */}
-        {l0Notice && (
-          <p className="flex items-start gap-1.5 rounded-md border border-muted-foreground/30 bg-muted p-2 text-xs text-muted-foreground">
-            <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            {l0Notice}
           </p>
         )}
 

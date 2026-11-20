@@ -65,8 +65,9 @@ function logToChatMessages(
     answer: snapshot?.summary ?? log.question,
     sections: snapshot,
     citations: (log.citations ?? null) as ConsultResponseDto["citations"],
-    notice: log.notice,
-    l0Notice: null,
+    // L0（manual/未核验）的提示落库时并入 notice（无独立列）：回放时还原成 l0Notice。
+    notice: log.status === "manual-gate" ? null : log.notice,
+    l0Notice: log.status === "manual-gate" ? log.notice : null,
     blocked: log.blockedAt != null,
     toolUsed: log.status === "data-answered" ? log.intent : null,
     consultLogId: log.consultLogId,

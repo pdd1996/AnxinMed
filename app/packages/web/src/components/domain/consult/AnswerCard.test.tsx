@@ -121,6 +121,44 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText(/未经 OCR 确认/)).toBeTruthy()
   })
 
+  // 2026-11-20 排版优化：L0 先交代「未核验 + 来源」，标题改成原文语义，长原文进折叠区
+  it('L0（manual-gate）→ 顶部未核验提示 + 来源 + 原文版式短摘要', () => {
+    render(
+      <AnswerCard
+        riskLevel="L1"
+        status="manual-gate"
+        answer="用于缓解干眼症状"
+        sections={mkSections({
+          summary: '用于缓解干眼症状',
+          keyPoints: ['开封后一个月内使用'],
+          risks: ['对玻璃酸钠过敏者禁用'],
+          details: [{ title: '适应症段（原文）', body: '用于缓解干眼症状', source: '丁香园用药助手' }],
+        })}
+        citations={[
+          {
+            drugName: '玻璃酸钠滴眼液',
+            source: '丁香园用药助手',
+            version: '2024-01',
+            unverified: false,
+          },
+        ]}
+        l0Notice="该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。"
+        blocked
+      />,
+    )
+    // 顶部提示 + 来源（不再等用户滚到卡片底部才看到）
+    expect(screen.getByText(/尚未人工核验/)).toBeTruthy()
+    expect(screen.getByText(/来源：玻璃酸钠滴眼液 · 丁香园用药助手（版本 2024-01）/)).toBeTruthy()
+    // 原文语义标题（不再写「简明结论/需要知道/注意风险」）
+    expect(screen.getByText('说明书要点')).toBeTruthy()
+    expect(screen.getByText('注意事项')).toBeTruthy()
+    expect(screen.getByText('禁忌')).toBeTruthy()
+    expect(screen.queryByText('简明结论')).toBeNull()
+    // 完整原文进折叠区
+    expect(screen.getByText('展开原文（1 条）')).toBeTruthy()
+    expect(screen.getByText('适应症段（原文）')).toBeTruthy()
+  })
+
   it('no-source → notice 兜底提示（状态徽章已移除）', () => {
     render(
       <AnswerCard

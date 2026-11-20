@@ -135,24 +135,149 @@ export function normalizeSections(raw: ConsultRawSections | null, context: Norma
   }
 }
 
+// ---------------------------------------------------------------------------
+// L0/降级回答的排版与简化（2026-11-20 用户要求：优化排版、简化文字）
+//
+// 背景：未核验说明书的注意事项常被抽成「单元素整段」（可达 1000+ 字），
+// 直接塞进卡片就是一大堵文字墙（见 M6/M7 抽取形态）。这里只做**展示层整理**：
+// - 合并 PDF 硬折行产生的词内换行，避免「乙型流 感」这类断词；
+// - 短摘要省略长括注（原文全部保留在 details 展开区）；
+// - 注意事项按行首编号拆条，摘要只取前 3 条、每条截到首句/两句；
+// - 完整段落与逐条原文收进 details（前端「展开原文」）。
+// 不生成、不改写医学内容；原文始终可在展开区逐字核对。
+// ---------------------------------------------------------------------------
+
+/** 中日韩文字与全角标点（含中文标点区、全角字符区）。 */
+const CJK_RE = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/
+
+/** 合并 PDF 硬折行：中文字符之间的换行直接拼接，其余换行归一为空格。 */
+function flattenLeafletText(text: unknown): string {
+  const raw = String(text ?? '').replace(/\r/g, '')
+  const joined = raw.replace(/\n+/g, (match: string, offset: number, whole: string) => {
+    const prev = whole[offset - 1] ?? ''
+    const next = whole[offset + match.length] ?? ''
+    return CJK_RE.test(prev) || CJK_RE.test(next) ? '' : ' '
+  })
+  return joined
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+([，。；！？、：）】》])/g, '$1')
+    .replace(/([（【《])\s+/g, '$1')
+    .trim()
+}
+
+/** 短摘要里省略长括注（≥10 字）；短括注（如「（75mg）」）保留。 */
+function stripLongParentheticals(text: string): string {
+  return text.replace(/[（(][^（）()]{10,}[）)]/g, '')
+}
+
+/** 取前若干整句（尽量不截断句子）；仍有剩余时补省略号。 */
+function firstSentences(text: string, max: number): string {
+  const t = text.trim()
+  if (t.length <= max) return t
+  const parts = t.match(/[^。！？；]*[。！？；]?/g)?.map((s) => s.trim()).filter(Boolean) ?? []
+  let out = ''
+  for (const part of parts) {
+    if (out && out.length + part.length > max) break
+    if (!out && part.length > max) return `${part.slice(0, max - 1)}…`
+    out += part
+  }
+  if (!out) return `${t.slice(0, max - 1)}…`
+  return out.length < t.length ? `${out}…` : out
+}
+
+/** 去掉条目前的编号（「·1.」「●2.」「3.」「（4）」等）。 */
+function stripItemNumber(text: string): string {
+  return text.replace(/^\s*(?:[·●•○]\s*)?\d{1,2}\s*[.、．)）]\s*/, '')
+}
+
 /**
- * Baichuan 不可用时的降级路径：直接用说明书段落拼装确定性回答（不依赖 LLM）。
- * 与 demo fallbackSectionsFromInsert 等价；status='answered' 但附 notice 说明是降级。
+ * jsonb 注意事项 → 条目数组：兼容单元素整段（跨行）与已拆条数组，
+ * 按行首编号拆分；拆不出来时整段作为一条。
+ */
+function splitLeafletItems(value: unknown): string[] {
+  const chunks = Array.isArray(value)
+    ? value.map((v) => String(v ?? '')).filter(Boolean)
+    : typeof value === 'string'
+      ? [value]
+      : []
+  const items: string[] = []
+  for (const chunk of chunks) {
+    const raw = chunk.replace(/\r/g, '').trim()
+    if (!raw) continue
+    let parts = raw.split(/\n(?=\s*(?:[·●•○]\s*)?\d{1,2}\s*[.、．)）])/)
+    // 兜底：编号与内容在同一行、仅用分隔符排开时，按编号再次拆分
+    if (parts.length === 1 && (raw.match(/[·●•○]\s*\d{1,2}\s*[.、．]/g) ?? []).length > 1) {
+      parts = raw.split(/(?=[·●•○]\s*\d{1,2}\s*[.、．])/)
+    }
+    for (const part of parts) {
+      const item = stripItemNumber(flattenLeafletText(part))
+      if (item) items.push(item)
+    }
+  }
+  return items
+}
+
+/** 说明书段落 → 短摘要（去长括注 + 去句首编号 + 截首句）。 */
+function digestSectionText(text: string, max = 90): string {
+  const t = stripLongParentheticals(flattenLeafletText(text)).replace(
+    /(^|[。；！？])\s*\d{1,2}\s*[.、．]\s*/g,
+    '$1',
+  )
+  return firstSentences(t, max)
+}
+
+/** 注意事项单条 → 短要点（去编号 + 长括注 + 截首句）。 */
+function digestLeafletItem(text: string, max = 64): string {
+  return firstSentences(stripLongParentheticals(stripItemNumber(text)), max)
+}
+
+/** 禁忌等短段落 → 短要点。 */
+function digestShortText(text: unknown, max = 50): string {
+  return firstSentences(stripLongParentheticals(flattenLeafletText(text)), max)
+}
+
+/**
+ * Baichuan 不可用/L0 资料查询时的降级路径：用说明书段落拼装确定性回答（不依赖 LLM）。
+ * 卡片只放短摘要，完整原文放 details 展开区；status 由调用方决定。
  */
 export function fallbackSectionsFromInsert(question: string, insert: InsertSlice): NormalizedSections {
   const section = pickInsertSections(question, insert)
-  return normalizeSections(
+  const sectionText = section.text.replace(/^[^：:]+[：:]/, '')
+  const precautionItems = splitLeafletItems(insert.precautions)
+  const contraItems = Array.isArray(insert.contraindications)
+    ? insert.contraindications.map(String)
+    : typeof insert.contraindications === 'string'
+      ? [insert.contraindications]
+      : []
+
+  const sections = normalizeSections(
     {
-      summary: section.text.replace(/^[^：:]+[：:]/, '').slice(0, 120),
-      keyPoints: (Array.isArray(insert.precautions) ? insert.precautions : []).slice(0, 2).map((s: unknown) => sanitizeText(s)),
-      risks: (Array.isArray(insert.contraindications) ? insert.contraindications : []).slice(0, 2).map((s: unknown) => sanitizeText(s)),
+      summary: digestSectionText(sectionText, 90),
+      keyPoints: precautionItems.slice(0, 3).map((item) => digestLeafletItem(item, 64)),
+      risks: contraItems.slice(0, 2).map((item) => digestShortText(item, 50)),
       nextAction: '如有疑问，请咨询医生或药师。',
       warning: '不要根据 AI 回答自行调整处方。',
     },
     {
       summaryFallback: `${insert.genericName}的资料请以说明书为准。`,
-      keyPointsFallback: insert.indication ? [sanitizeText(insert.indication)] : [],
-      risksFallback: (Array.isArray(insert.contraindications) ? insert.contraindications : []).slice(0, 2).map((s: unknown) => sanitizeText(s)),
+      keyPointsFallback: insert.indication ? [digestSectionText(insert.indication, 90)] : [],
+      risksFallback: contraItems.slice(0, 2).map((item) => digestShortText(item, 50)),
     },
   )
+
+  // 展开原文：所选段落全文 + 注意事项逐条原文（选中的就是注意事项时只保留逐条，避免重复）
+  const details: Array<{ title: string; body: string; source?: string }> = []
+  const sectionBody = flattenLeafletText(sectionText)
+  if (sectionBody && section.key !== 'precautions') {
+    details.push({ title: `${section.label}（原文）`, body: sectionBody, source: insert.source || undefined })
+  }
+  precautionItems.forEach((item, index) => {
+    details.push({
+      title: `注意事项原文 · 第 ${index + 1} 条`,
+      body: item,
+      source: insert.source || undefined,
+    })
+  })
+
+  return details.length > 0 ? { ...sections, details } : sections
 }

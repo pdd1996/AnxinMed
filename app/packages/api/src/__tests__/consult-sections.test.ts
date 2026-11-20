@@ -319,6 +319,57 @@ describe('fallbackSectionsFromInsert · Baichuan 不可用降级', () => {
 })
 
 // ---------------------------------------------------------------------------
+// L0/降级回答的排版简化（2026-11-20 用户要求：优化排版、简化文字）
+// ---------------------------------------------------------------------------
+
+describe('fallbackSectionsFromInsert · L0 排版简化', () => {
+  const longIndication =
+    '1.用于成人和1岁及1岁以上儿童的甲型和乙型流感治疗（磷酸奥司他韦能够有效治疗甲型和乙型流感，但是乙型流\n' +
+    '感的临床应用数据尚不多）。患者应在首次出现症状48小时以内使用。2.用于成人和13岁及13岁以上青少年的甲型和乙型流感的预防。'
+  const longPrecautions =
+    '·1.精神神经性不良事件，流感可能会引起许多神经和行为症状，包括幻觉、谵妄和行为异常，有些病例中，还会引发致命性结果。\n' +
+    '·2.接受本品用药的流感患者中，曾出现过导致受伤的谵妄和行为异常等上市后报告（主要来源于日本），有些病例还导致致命性结果。\n' +
+    '·3.尚无证据显示磷酸奥司他韦对甲型流感和乙型流感以外的其他疾病有效。\n' +
+    '·4.奥司他韦对1岁以下儿童治疗流感的安全性和有效性尚未确定。'
+
+  it('单元素整段注意事项 → 短摘要 + 前 3 条要点 + 原文收进 details', () => {
+    const insert = mkInsert({
+      indication: longIndication,
+      precautions: [longPrecautions],
+    })
+    const s = fallbackSectionsFromInsert('这个药品说明书有吗', insert)
+
+    // 摘要：去长括注、合并 PDF 折行、截短，且保留关键时间窗
+    expect(s.summary).toContain('48小时')
+    expect(s.summary).not.toContain('（磷酸奥司他韦')
+    expect(s.summary).not.toContain('流 感')
+    expect(s.summary.length).toBeLessThanOrEqual(95)
+
+    // 要点：只取前 3 条，每条截到首句/短句，不再是一堵 1000+ 字文字墙
+    expect(s.keyPoints).toHaveLength(3)
+    expect(s.keyPoints[0]).toContain('精神神经性不良事件')
+    expect(s.keyPoints.every((k) => k.length <= 70)).toBe(true)
+
+    // 原文可追溯：适应症原文 + 4 条注意事项逐条
+    expect(s.details).toHaveLength(5)
+    expect(s.details?.[0]?.title).toBe('适应症段（原文）')
+    expect(s.details?.[1]?.title).toBe('注意事项原文 · 第 1 条')
+    expect(s.details?.map((d) => d.body).join('')).not.toContain('流 感')
+    expect(s.details?.map((d) => d.body).join('')).toContain('对1岁以下儿童治疗流感')
+  })
+
+  it('已拆条的注意事项数组 → details 逐条保留，摘要仍短', () => {
+    const insert = mkInsert({ precautions: ['开封后一个月内使用', '避免瓶口接触眼睛'] })
+    const s = fallbackSectionsFromInsert('这个药通常用于什么', insert)
+
+    expect(s.keyPoints).toEqual(['开封后一个月内使用', '避免瓶口接触眼睛'])
+    // 适应症原文 + 2 条注意事项
+    expect(s.details).toHaveLength(3)
+    expect(s.details?.map((d) => d.body)).toContain('避免瓶口接触眼睛')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // citations · 引用三件套（PRD §7.5）
 // ---------------------------------------------------------------------------
 
