@@ -314,13 +314,16 @@ describe('renderInteractionsSections · 相互作用模板（纯函数）', () =
     expect(s.risks.join('')).toContain('请勿自行停药')
   })
 
-  it('≥2 药无命中 → coverageNote（未覆盖 ≠ 无风险）', () => {
+  it('≥2 药无命中 → 只留简明结论 + 下一步（不展示覆盖提示两块）', () => {
     const s = renderInteractionsSections(
       { hits: [], coverageNote: '当前药品组合未被相互作用规则库覆盖 ≠ 无风险，联用前请咨询医生或药师' },
       ['dm-a', 'dm-b'],
     )
     expect(s.summary).toContain('未检出已知相互作用')
-    expect(s.keyPoints.join('')).toContain('未被相互作用规则库覆盖')
+    // 2026-11-20 产品裁定：删掉「需要知道 / 注意风险」两块（覆盖范围改在药箱预检展示）
+    expect(s.keyPoints).toEqual([])
+    expect(s.risks).toEqual([])
+    expect(s.nextAction).toContain('咨询医生或药师')
   })
 })
 
@@ -476,10 +479,11 @@ describe('runDataQuery · interaction-check 集成（纯传参，不查库）', 
     expect(r.sections!.keyPoints[0]).toContain('华法林钠片')
   })
 
-  it('≥2 药无命中规则 → coverageNote（未覆盖 ≠ 无风险）', async () => {
+  it('≥2 药无命中规则 → 只留简明结论 + 下一步（不展示覆盖提示两块）', async () => {
     const r = await runDataQuery(mkInput('interaction-check', { activeMasterIds: ['dm-a', 'dm-b'] }))
     expect(r.sections!.summary).toContain('未检出已知相互作用')
-    expect(r.sections!.keyPoints.join('')).toContain('未被相互作用规则库覆盖')
+    expect(r.sections!.keyPoints).toEqual([])
+    expect(r.sections!.risks).toEqual([])
   })
 
   it('无生效计划 → 友好文案', async () => {

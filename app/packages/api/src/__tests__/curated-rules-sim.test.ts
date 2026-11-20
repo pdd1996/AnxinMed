@@ -159,6 +159,8 @@ describe('M11 · curated 规则模拟患者（真实 consult 链路）', () => {
     const sections = res.sections
     if (!sections) throw new Error('sections 缺失')
     expect(sections.summary).toContain('未检出已知相互作用')
-    expect(sections.keyPoints.join('\n')).toContain('未被相互作用规则库覆盖')
+    // 2026-11-20 产品裁定：回答不再展示「需要知道 / 注意风险」两块（覆盖提示改在药箱预检展示）
+    expect(sections.keyPoints).toEqual([])
+    expect(sections.risks).toEqual([])
   })
 })

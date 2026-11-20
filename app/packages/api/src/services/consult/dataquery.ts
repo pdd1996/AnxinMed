@@ -29,7 +29,6 @@ import {
 } from '../../repositories/insight.repo.js'
 import {
   checkInteractions,
-  INTERACTION_COVERAGE_NOTE,
   type InteractionResult,
   type InteractionRuleInput,
 } from '../rules/index.js'
@@ -406,11 +405,13 @@ export function renderInteractionsSections(
       limited: false,
     }
   }
-  // ≥2 药但无规则命中：coverageNote 非空（未覆盖 ≠ 无风险）
+  // ≥2 药但无规则命中：2026-11-20 产品裁定——回答只留「简明结论 + 下一步 + 安全语」，
+  // 不再渲染「需要知道（未覆盖 ≠ 无风险）」与「注意风险（覆盖有限）」两块（截图红框）。
+  // 覆盖范围仍由药箱入箱预检 / 安全汇总（RiskCards coverageNote）如实展示，不静默吞掉。
   return {
     summary: '当前在服药品组合未检出已知相互作用。',
-    keyPoints: [result.coverageNote ?? INTERACTION_COVERAGE_NOTE],
-    risks: ['规则库覆盖有限，未检出不等于无风险。'],
+    keyPoints: [],
+    risks: [],
     nextAction: '联用前如有疑虑，请咨询医生或药师。',
     warning: DATA_QUERY_WARNING,
     limited: false,
