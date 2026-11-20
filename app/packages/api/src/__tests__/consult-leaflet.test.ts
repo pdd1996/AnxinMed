@@ -1,10 +1,9 @@
 /**
- * 2026-11-20 新增：说明书可用性意图 + 说明书分段页接口。
+ * 2026-11-20：说明书分段落页接口 + 说明书问句回归。
  *
  * 覆盖：
- * - 「这个药品说明书有吗」→ 0 次 LLM 的确定性回答（已收录/未核验/未收录三态 + 来源/版本/批准文号/核验状态）；
- * - 同句含内容词（禁忌/副作用…）不被可用性意图截胡（仍走 S1 说明书管线）；
- * - GET /api/drugs/:id/leaflet：分段原文、用法用量固定提示、未核验提示、越权/未收录 404。
+ * - GET /api/drugs/:id/leaflet：分段原文、用法用量固定提示、未核验提示、越权/未收录 404；
+ * - 回归：「这个药品说明书有吗」不再走已移除的「说明书可用性」专用卡，回到 S1 说明书管线。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import { eq, inArray } from 'drizzle-orm'
@@ -122,73 +121,11 @@ afterEach(async () => {
 })
 
 // ---------------------------------------------------------------------------
-// 说明书可用性意图（0 次 LLM）
+// 说明书可用性意图已按用户裁定移除（2026-11-20）：问「说明书有吗」回到 S1 说明书管线
 // ---------------------------------------------------------------------------
 
-describe('POST /api/consult · 说明书可用性意图', () => {
-  it('已核验：「这个药品说明书有吗」→ 已收录/已核验 + 来源/版本/批准文号 + 查看入口（0 次 LLM）', async () => {
-    const calls = newCalls()
-    prevClients = setAiClients(mockClients({ calls }))
-
-    const res = await req('POST', '/api/consult', {
-      question: '这个药品说明书有吗',
-      drugIds: [DRUG],
-    })
-
-    expect(res.status).toBe(200)
-    expect(res.body.status).toBe('answered')
-    expect(res.body.sections.summary).toContain('已收录')
-    expect(res.body.sections.summary).toContain('已人工核验')
-    expect(res.body.sections.summary).not.toContain('来源：') // 首屏不重复来源，来源在要点/引用里
-    expect(res.body.sections.keyPoints.join('')).toContain('国药准字H20240001')
-    expect(res.body.citations[0].reviewStatus).toBe('reviewed')
-    expect(res.body.leafletDrugId).toBe(DRUG)
-    expect(res.body.l0Notice).toBeNull()
-    expect(res.body.sections.keyPoints.length).toBeLessThanOrEqual(3)
-    expect(res.body.sections.keyPoints.every((k: string) => k.length <= 200)).toBe(true)
-    expect(calls.consultAnswer).toBe(0) // 确定性回答，不调 LLM
-  })
-
-  it('未核验：说明书原文已收录但未核验 → l0Notice + 引用标 crawled + 查看入口（0 次 LLM）', async () => {
-    await db.update(packageInserts).set({ curationStatus: 'crawled' }).where(eq(packageInserts.id, PI))
-    const calls = newCalls()
-    prevClients = setAiClients(mockClients({ calls }))
-
-    const res = await req('POST', '/api/consult', {
-      question: '这个药品说明书有没有',
-      drugIds: [DRUG],
-    })
-
-    expect(res.status).toBe(200)
-    expect(res.body.status).toBe('answered')
-    expect(res.body.sections.summary).toContain('尚未人工核验')
-    expect(res.body.l0Notice).toContain('尚未人工核验')
-    expect(res.body.l0Notice).not.toContain('涉及：') // banner 已展示身份，不重复药名
-    expect(res.body.citations[0].reviewStatus).toBe('crawled')
-    expect(res.body.leafletDrugId).toBe(DRUG)
-    // 排版/文字上限（P2 golden）：摘要不超 200 字、要点 ≤3 条且每条 ≤120 字
-    expect(res.body.sections.summary.length).toBeLessThanOrEqual(200)
-    expect(res.body.sections.keyPoints.length).toBeLessThanOrEqual(3)
-    expect(res.body.sections.keyPoints.every((k: string) => k.length <= 120)).toBe(true)
-    expect(calls.consultAnswer).toBe(0)
-  })
-
-  it('未收录：本地无说明书 → no-source 固定回答 + 无查看入口', async () => {
-    prevClients = setAiClients(mockClients({}))
-
-    const res = await req('POST', '/api/consult', {
-      question: '这个药的说明书有吗',
-      drugIds: [DRUG_NO_INSERT],
-    })
-
-    expect(res.status).toBe(200)
-    expect(res.body.status).toBe('no-source')
-    expect(res.body.answer).toContain('暂未收录')
-    expect(res.body.citations).toEqual([])
-    expect(res.body.leafletDrugId).toBeNull()
-  })
-
-  it('内容问句不被截胡：「说明书上写的禁忌是什么」仍走说明书管线（调用 1 次 LLM）', async () => {
+describe('POST /api/consult · 说明书问句（可用性意图已移除）', () => {
+  it('「这个药品说明书有吗」→ 不再返回可用性专用卡，走 S1 说明书管线（1 次 LLM）', async () => {
     const calls = newCalls()
     prevClients = setAiClients(
       mockClients({
@@ -204,12 +141,14 @@ describe('POST /api/consult · 说明书可用性意图', () => {
     )
 
     const res = await req('POST', '/api/consult', {
-      question: '说明书上写的禁忌是什么',
+      question: '这个药品说明书有吗',
       drugIds: [DRUG],
     })
 
     expect(res.status).toBe(200)
+    // 不再有「已收录…」的确定性可用性回答；回到 S1 管线（mock 模型输出）
     expect(res.body.sections.summary).toBe('对玻璃酸钠过敏者禁用。')
+    expect(res.body.sections.summary).not.toContain('已收录')
     expect(calls.consultAnswer).toBe(1)
   })
 })

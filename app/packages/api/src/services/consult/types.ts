@@ -207,7 +207,7 @@ export interface ConsultRunResult {
    */
   clarifyOptions?: ConsultClarifyOption[] | null
   /**
-   * 说明书查看入口（2026-11-20）：L0/说明书可用性回答时回用户药箱 drugId，
+   * 说明书查看入口（2026-11-20）：L0 资料卡/普通回答时回用户药箱 drugId，
    * 前端展示「查看完整说明书」并路由到分段落页；其余路径缺省。
    */
   leafletDrugId?: string | null

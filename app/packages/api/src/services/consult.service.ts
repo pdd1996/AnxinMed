@@ -34,7 +34,6 @@ import { PII_ASSERT_PATTERNS, scrubWithPatterns } from './sanitize/scan.js'
 import { nameMatches } from './identity/normalize.js'
 import * as profilesRepo from '../repositories/profiles.repo.js'
 import { runConsult } from './consult/run.js'
-import { buildInsertAvailabilityResult, isInsertAvailabilityQuestion } from './consult/availability.js'
 import { runDataQuery } from './consult/dataquery.js'
 import { formatSkillRoute, resolveSkillRoute } from './consult/registry.js'
 import {
@@ -296,16 +295,6 @@ export async function consult(
       result = buildOutOfScopeResult(scope)
     } else if (drugs.length > 0) {
       gateSteps.push({ layer: 'object', outcome: 'bound', detail: { drugCount: drugs.length } })
-      // 2026-11-20：「说明书有没有/能不能看」是资料可用性问题，不是内容解释——
-      // 走确定性回答（0 次 LLM、0 写入），给来源/版本/批准文号/核验状态 + 查看入口。
-      if (isInsertAvailabilityQuestion(questionRedacted)) {
-        result = buildInsertAvailabilityResult(drugs)
-        gateSteps.push({
-          layer: 'leaflet',
-          outcome: result.status === 'no-source' ? 'missing' : 'collected',
-          detail: { reviewStatus: drugs.find((d) => d.insert)?.insert?.curationStatus ?? 'none' },
-        })
-      }
     } else if (isObjectClarifyEnabled() && shouldClarifyObject(normalizeRoutingText(questionRedacted))) {
       // 只在药箱非空时澄清；空药箱回退既有 no-source（引导去录入）。
       const boxRows = await drugsRepo.listDrugs(userId)

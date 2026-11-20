@@ -169,44 +169,6 @@ describe('AnswerCard · 四风险等级 UI 状态（spec §T2 完成标准）', 
     expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
   })
 
-  it('说明书可用性回答（未核验）→ 无顶部 banner；结论里保留核验状态 + 查看入口', () => {
-    render(
-      <MemoryRouter>
-        <AnswerCard
-          riskLevel="L1"
-          status="answered"
-          answer="已收录「玻璃酸钠滴眼液」的说明书原文，但尚未人工核验。"
-          sections={mkSections({
-            summary: '已收录「玻璃酸钠滴眼液 0.1%」的说明书原文，但尚未人工核验。',
-            keyPoints: ['以下内容为说明书原文摘录，仅供查阅，请以药品包装内说明书为准。'],
-            risks: ['对玻璃酸钠过敏者禁用。'],
-          })}
-          citations={[
-            {
-              drugName: '玻璃酸钠滴眼液',
-              source: '说明书 PDF（本地资料库）',
-              version: '2024-01',
-              unverified: false,
-              reviewStatus: 'crawled',
-              specification: '0.1%（10mL:10mg）',
-              approvalNumbers: ['国药准字H20240001'],
-            },
-          ]}
-          l0Notice="该药说明书尚未人工核验，暂不能提供个性化解释，仅可查看说明书原文。涉及：玻璃酸钠滴眼液。"
-          leafletHref="/leaflet/drug-1"
-        />
-      </MemoryRouter>,
-    )
-    // 顶部 banner 已删除；核验状态由结论句承担（不再重复身份/来源/批准文号）
-    expect(screen.queryByText(/暂不能提供个性化解释/)).toBeNull()
-    expect(screen.queryByText(/核验状态：/)).toBeNull()
-    expect(screen.getByText(/但尚未人工核验/)).toBeTruthy()
-    expect(screen.getByText('查看完整说明书').closest('a')?.getAttribute('href')).toBe('/leaflet/drug-1')
-    // 可用性回答不是原文卡：标题仍是「简明结论」（原文卡才用「说明书原文」）
-    expect(screen.getByText('简明结论')).toBeTruthy()
-    expect(screen.queryByText('说明书原文')).toBeNull()
-  })
-
   it('no-source → notice 兜底提示（状态徽章已移除）', () => {
     render(
       <AnswerCard
